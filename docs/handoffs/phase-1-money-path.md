@@ -128,6 +128,13 @@ Start with **T5**, because it decides the wallet policy T6 creates. T7 can run a
 - Wallet safety is proven: the policy, the `order-safety` checks, the daily cap and the payroll cap
 - Reviewed with Dennis before any screens are built
 
+**Split (decided by Dennis, 2026-11-02).** Checkpoint B has two parts:
+
+- **Gate for Phase 2:** the forced M-Pesa failure refunds and its retry pays once, the batch of 3 with one forced failure, and the crash test. These prove the rules Phase 2's Approve & pay depends on. Phase 2 claims pay to M-Pesa numbers, which is already proven live.
+- **Gate for Phase 2B:** one real payment each to a Till, a Paybill, a Kenyan bank and an allowlisted USDC address, and the payroll cap. These run alongside Phase 2 and must pass before Phase 2B starts, because bills and payroll use them.
+
+Dennis reviews each part when it passes.
+
 ---
 
 ## QA checklist
@@ -186,6 +193,9 @@ Start with **T5**, because it decides the wallet policy T6 creates. T7 can run a
   - T9 and T10 are done (EXP-285, EXP-288 Done).
   - T33 is done (EXP-304 Done).
   - **All Phase 1 code is built. Next is Checkpoint B:** the live checks with Dennis (runbook below).
+- **Status (2026-11-02):**
+  - The API is deployed to Railway (`dev`), and Checkpoint B setup is complete: runbook steps 1–7.
+  - Live checks are in progress, split into a Phase 2 gate and a Phase 2B gate (see "Split" under Exit criteria). Results are under "Live payout results".
 - **T5 decision (Sender API or gateway contract):** **keep the Sender API.** Privy policies can limit a wallet to USDC `transfer` on Base under a maximum amount, and allowlists can be updated through the API. Proven live with 31 checks; see `docs/decisions/privy-wallet-policies.md`.
   - **Design for T6:**
     - Each wallet is owned by an Expendi management key quorum the API never holds.
@@ -353,6 +363,58 @@ Start with **T5**, because it decides the wallet policy T6 creates. T7 can run a
   10. **Crash test:** kill the process right after funding starts. `scripts/test-payout.ts reconcile` must end the payout `paid` or `needs_review`, never with a second transfer.
   11. **Calibrate:** compare the real Paycrest `transactionFee` with `maxDebitFor` (0.25 USDC + 0.5%), and record settlement times per channel.
 - **Live payout results (order IDs, tx hashes, M-Pesa references):**
+  - **Setup (2026-11-02):**
+    - Railway project `expendi-business`, environment `dev`: service `api` at `https://api-dev-dcdc.up.railway.app`, deployed from `main` by `railway.json` (migrations run before each deploy), and a private Postgres.
+    - Secrets in Doppler `expendi-business`/`dev`. Railway holds only `SECRETS_MANAGER` and `DOPPLER_TOKEN`.
+    - Privy `dev` key quorums: management `sf5qdamyq7y247z9y8e40d7z`, runtime `clz9de5fmdgfrx7ehs3gvqht`.
+    - Alchemy webhook `wh_mljam5zi5emrcdk4` (Base mainnet) → `/webhooks/alchemy`.
+    - Test company "Expendi Test Co" `3881397e-cff4-4904-aa96-5fa0a8529a7d`, admin `hello@cradlelabs.io` (software passkey), wallet `0x69685f698F002120af8185722A3C364A265BD0C3` (Privy `dvmrt90q0c1bf4sm5vihb1g9`).
+  - **Deposits:** the ledger matched the chain after every step.
+    - 2.020359 USDC, tx `0x6e3fc1a7c4ef744bb9d9a32433657ed2ab78be8b08a162b364b054da6c0ff890` (log 171, block 53389679). Alchemy's delivery was lost: the webhook URL had a trailing `.`, so the API answered 404. Credited by one signed replay of the delivery; a second, identical replay credited nothing.
+    - 1.010180 USDC, tx `0x651d2a0e3eb2c72777c25474e4597c087a4adaea5022580dc24abf494a22957d` (log 486). Credited by Alchemy's own delivery within a minute.
+  - **M-Pesa payouts** (rate 128.69 KES/USDC):
+    1. `63b0ed94-834f-4aa2-ae19-3425d0c62c3e`: KES 100 to +254743312265 (Dennis Kimathi). Order `02a96397-8558-483e-b796-fa6d9f1362f6`: 0.777062 + 0.02 fee = 0.797062 USDC, Paycrest deposit tx `0xb25342b1566f557c1f7178a2ef359f9c0a6b0aea4600124dc8d9dba4d1a6078e`. Paid 35 s after funding; Dennis confirmed receipt.
+    2. `ff34b366-cc6a-4958-a48b-3853dab141cf`: KES 100 to the same number, order `fa5d9b81-bf5a-4761-9564-37d587cd81a4`. Paid. Sent by mistake: a shell error skipped the cap change before the daily cap check.
+    3. `e7a3189b-93a4-4498-b8de-70cfc1470dab`: forced failure, KES 99.50 (rounded to 100) to +254700000000, order `c0bc8726-30a8-4638-9f4f-4c5e8bc2ab02`, funded 0.797062 USDC. Paycrest refunded it 32 minutes after funding, and the payout ended `failed`. The refund was 0.777062 USDC (Paycrest kept its 0.02 fee), tx `0x2cf51a57c72d3a1e9a8c4e4797e9aa97d573f23b8489a7c5d37adc44ae61240d`, **sent from Paycrest's Gateway contract** `0x30f6a8457f8e42371e204a9c103f2bd42341dd0f`, not from the order's deposit address. So it was credited as a `deposit`, not as a `refund` linked to the payout. The balance stayed right: ledger = chain = 1.416415 USDC.
+       - **Paycrest's `transactionLogs` (UTC):**
+         - 21:48:26 `crypto_deposited`
+         - 21:48:33 `order_created`, with `gateway_id` `0xe5f673d6acc1f3f317e121ad1c35835e3d5fc512ef1187ee757b75b0ef7835b0`
+         - 21:49:12 `order_cancelled`
+         - 22:20:28 `order_refunding`
+         - 22:20:35 `order_refunded`
+         - The refund log carries the same `gateway_id`, which is how a refund can be linked to its payout.
+       - **The order was missing from Paycrest's API during the refund.** Between the cancellation and the refund, `GET /v1|v2/sender/orders/:id` returned 404 "Payment order not found", seen at ~22:02. Afterwards it came back as `refunded`, with `txHash` = the refund tx. This is why reconcile treats a 404 like any other fetch error (see Changes from spec or plan).
+    - No M-Pesa references: Paycrest returns `paymentReference: null` for settled M-Pesa orders.
+  - **Top-up:** 1.01018 USDC, tx `0xdcfcaf4d2d11edce7e2e7a81b522b57a6cd86b4749065ec56b1d36f3f62cee80` (22:24:43 UTC), credited by Alchemy. Ledger = chain = 2.426595 USDC.
+  - **Batch of 3 under one approval** (2026-11-01, Phase 2 gate). KES 65 each = 0.50509 + 0.02 fee = 0.52509 USDC; 2.272848 USDC reserved.
+    1. `d59be8a4-8f8c-424e-b070-c232cf804de9` to +254743312265, order `15923db8-b7b8-4043-8658-668a14f1d780`: paid 70 s after funding. Dennis confirmed receipt.
+    2. `8cbfbc6c-00a4-4417-ba9d-a7e76b73abe0` to +254743312265, order `856f381f-77b7-4624-a88d-0cb310180f4a`: paid 62 s after funding. Dennis confirmed receipt.
+    3. `ce7dd771-0694-4517-9d47-93d99acec044` to +254700000000 (forced failure), order `3e5a98fe-2e43-4b2a-95cc-31cb92f9a143`. Paycrest returned 404 for it again between the cancellation and the refund (22:31–23:02).
+       - **The refund:** 0.50509 USDC from the Gateway, tx `0x0a18a3a28f0385de37b237e79472bb099f2eada6612659b3322f2824c64678fd`, at 23:02:32. That was 31.5 minutes after funding, and it was credited as a `deposit`.
+       - **The payout:** `paying → failed` at 23:02:43.
+    - The forced failure didn't hold up the other two.
+    - **Retry, which pays once:** `99a0d41b-1b38-49ef-a632-642e5b463130` (retry of `ce7dd771`, new key) to +254743312265, order `5814e123-589f-4044-954d-713c9ea5acb9`.
+      - It was paid at 23:04:06, about 60 s after funding, and Dennis confirmed receipt.
+      - The claim has exactly two payouts, one `failed` and one `paid`.
+      - This retry stands in for retrying `e7a3189b`, because the balance allowed only one retry.
+  - **Crash test (passed):**
+    - `feedcfae-c9c7-4397-a209-23c4ad1f475b`: KES 65 to +254743312265, order `1043858f-93ba-4ef0-9f71-cbdc908aa312`.
+    - The `pay` process was SIGKILLed 536 ms after `funding_started_at` (23:04:51.071), before Privy returned a transaction.
+    - No transfer reached the deposit address `0xeDC8f461B99EC738Dc5fce35CeE2ef38E03B9696`, and Paycrest stayed `initiated`.
+    - The new reconcile, run locally at 23:05:50, left it alone (inside the 10-minute window).
+    - The deployed reconcile job moved it to `needs_review` at 23:15:27: "Funding started but no outcome was recorded."
+    - There was no ledger debit and no second transfer. Ledger = chain = 0.831325 USDC.
+    - **Still open:** it's in `needs_review` and reserves 0.757616 USDC until a person closes it. Its order expires at 00:04:49 UTC; after that, close it by hand as `failed`, since nothing was sent. There's no tooling for this before T24.
+  - **Phase 2 gate: passed.** All four checks pass:
+    - the forced failure refunds
+    - a retry pays once
+    - in a batch of 3 under one approval, one forced failure doesn't affect the others
+    - the crash test ends in `needs_review` with no second transfer
+  - **Settlement times:** M-Pesa number, 35–70 s after funding. A failed M-Pesa payout is cancelled within about 1 minute, and the refund arrives about 31 minutes after funding.
+  - **Safety checks:**
+    - **Daily cap:** passed. Cap KES 250 with KES 200 paid today, then KES 100: refused (`daily_cap`), no Paycrest order, audited.
+    - **Company pause:** passed. Refused (`paused`), no Paycrest order, audited.
+    - **Privy policy:** passed for every target that isn't USDC. With the runtime key, another token's transfer and a 0-ETH send were refused with `policy_violation`. A USDC transfer above 3,100 can't be shown with `sendTransaction` at this balance, because Privy's simulation fails first. The T5 spike covers that rule.
 - **Changes from spec or plan, and why:**
   - **USDC payee amounts are exact USDC** (recorded in spec §6.19), with a KES equivalent for the cap and reports. Whether bills to USDC payees are entered in USD is decided in T35.
   - **Withdrawals (T21) aren't a payout subject yet.** They must go through the same onchain path (allowlist checks, passkey approval, funding barrier). T21 adds a `withdrawal` subject type, or a sibling flow over `fundOnchainPayout`.
@@ -391,7 +453,7 @@ Start with **T5**, because it decides the wallet policy T6 creates. T7 can run a
   - **Decision for Dennis:** the 5,000 USDC Privy per-transaction cap is above Paycrest's ~3,000 per order. A KES payout can't use the headroom, but USDC payees and withdrawals could. Options: lower the default to ~3,100, or keep 5,000 for USDC payouts.
 - **Known issues and TODOs:**
   - **An approved payout whose funding never started** is released by reconciliation after 15 minutes (`failed`, nothing sent), and the admin retries. There's no automatic resume, deliberately: the job never orders or sends.
-  - **Refund sender is unconfirmed.** Refunds are recognised by the sender being the payout's Paycrest deposit address. If Paycrest refunds from its gateway contract instead, the refund lands as a `deposit` row: the balance is right, but it isn't linked to the payout. **Check the sender of the forced-failure refund at Checkpoint B.**
+  - **Refunds come from Paycrest's Gateway contract (confirmed at Checkpoint B, 2026-11-02).** Refunds are recognised by the sender being the payout's Paycrest deposit address, but the real refund came from the Gateway `0x30f6a8457f8e42371e204a9c103f2bd42341dd0f`. So refunds land as `deposit` rows: the balance is right, but they aren't linked to the payout. **To fix:** treat the Gateway as a refund source and link the payout through the refund event the Gateway emits in the same transaction (it carries the on-chain order ID).
   - **`needs_review` has no resolution tooling yet.** Ops resolve by hand against Paycrest and the chain. The internal admin app (T24) should add it.
   - **Salary privacy for payouts:** `payouts` rows from payroll runs are visible to any company scope. T39 should restrict them to admins in RLS, as `payroll_runs` already is, keeping the reconciliation job's access in mind.
   - **Passkey enrolment security:** only a first passkey can be enrolled. A stolen session for an admin who hasn't enrolled could enrol one. Mitigations for T19: require a recent login, and email every admin on enrolment.
@@ -399,5 +461,18 @@ Start with **T5**, because it decides the wallet policy T6 creates. T7 can run a
   - **Reorgs aren't reversed.** A reorged-out transfer is only logged as an error; Base reorgs are rare. The Checkpoint B check that the ledger matches the chain covers it.
   - **No backfill job yet.** If Alchemy stops delivering, deposits wait. T9's minute job could also scan USDC Transfer logs to company wallets.
   - **One Privy app for every environment.** Dev and production share the Privy app, so their key quorums must differ. Keep production's management key out of dev.
+  - **Found at Checkpoint B (2026-11-02), not yet changed:**
+    - **The fee buffer is too large.** Paycrest's real `transactionFee` was 0.02 USDC on a 0.777 USDC order, but `maxDebitFor` reserved 1.030948 USDC for a payout that cost 0.797062. Decide a smaller buffer (runbook step 11).
+    - **The funding tx hash isn't saved.** A sponsored Privy send returns no hash, so the payout and its ledger debit carry only `privy_transaction_id`. Paycrest's order has the hash (`txHash`); sync could fill it in.
+    - **No M-Pesa receipt.** Paycrest's `paymentReference` is null for settled M-Pesa orders, so `provider_reference` stays empty.
+    - **Runbook step 9:** Privy's `sendTransaction` reports a simulation failure before the policy result. To see `policy_violation`, use `signTransaction` or a transaction that would succeed on chain.
+    - **A wrong Alchemy webhook URL fails silently.** The API answers 404 and nothing is logged, and with no backfill the deposit waits. Check the URL character by character. A missed delivery can be replayed with a body signed by `ALCHEMY_WEBHOOK_SIGNING_KEY`.
+  - **Database access:** Railway Postgres has no public address. From a Mac, `npx -y @railway/cli@5.71.0 connect Postgres -e dev --tunnel-only -P 55432` opens an SSH tunnel; it needs your SSH key registered (`railway ssh keys add`). Railway CLI 4.27 has no tunnel.
 - **QA results (date, who ran it):**
-- **Next session starts with:** Checkpoint B with Dennis (runbook above). After it passes, review it and mark EXP-278 (T6, waiting on the live deposit check) Done. Phase 2 starts only after that review.
+  - 2026-11-01, Claude: automated QA passed: 328 tests (326 main, 2 serial), plus build, typecheck and lint.
+  - 2026-11-02, Claude with Dennis: the Phase 2 gate passed (see "Live payout results").
+- **Next session starts with:**
+  1. **Dennis reviews the Phase 2 gate results.**
+  2. **Close `feedcfae` by hand as `failed`** once its Paycrest order has expired (00:04:49 UTC). Nothing was sent.
+  3. **The Phase 2B gate:** Till, Paybill, bank, allowlisted USDC address, and the payroll cap. It needs more USDC: the wallet holds 0.83 USDC, with 0.76 of it reserved by `feedcfae` until it's closed. It must pass before Phase 2B.
+  4. **Mark EXP-278 (T6) Done in Linear.** Auto mode blocked Claude from doing it.

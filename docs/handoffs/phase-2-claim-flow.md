@@ -34,7 +34,7 @@
 
 ## Where things stand
 
-Phases 0 and 1 are done; check their Handoff notes. Live payouts are proven:
+Phases 0 and 1 are done; check their Handoff notes. **Start only when the Phase 2 gate of Checkpoint B has passed** (refund and retry, batch with one failure, crash test; see "Split" in the Phase 1 handoff). Live payouts are proven:
 
 - the payout engine (T8–T10) pays any subject to any method, with batches and caps
 - T33 added USDC payouts and the address allowlist
@@ -153,12 +153,100 @@ T11 → T12 → T13 → T32 → T14 → T15, T16, T17 (any order) → T18 → T1
 
 ## Handoff notes (fill in before ending each session)
 
-- **Status:**
+- **Status (2026-11-02):**
+  - **Code done, device QA pending:**
+    - T11 (EXP-279), T12 (EXP-282) and T13 (EXP-286): the app and the API.
+    - T32 (EXP-303): the API only. The `payout-number` screen isn't built yet.
+    - All four stay In Progress in Linear until their device checks pass.
+  - **Not started:** T14–T21.
+  - **How it was built:** in parallel with the Phase 2 gate of Checkpoint B, by subagents, as Dennis decided. See the Phase 1 handoff for the gate results.
 - **Built:**
-- **Claude model chosen and eval accuracy:**
-- **Telnyx Verify profile used:**
+  - **T11 app (`apps/mobile`):**
+    - Expo SDK 54 with expo-router, NativeWind and React Query. Versions are pinned to what the consumer's lockfile actually runs:
+      - `@privy-io/expo` 0.63.6, native-extensions 0.0.7, `react-native-passkeys` 0.3.3
+      - React 19.1.0, RN 0.81.5
+    - **Login:** email code, then a passkey offer, then `/me`. A passkey sign-in button is on the sign-in screen.
+    - **API client:** `src/lib/api.ts`, typed from `@expendi-business/shared`, parses the API's `{ success, error }` envelope.
+    - **Isolated pnpm linker works:** no `.npmrc` and no hoisting.
+    - **Passkey library:** `react-native-passkeys` takes the same WebAuthn JSON that `@simplewebauthn/server` uses, so the T19 approval passkeys can use it too.
+  - **App identity:**
+    - "Expendi Business", `app.expendi.business`
+    - EAS project `@chizaalabs/expendi-business` (`3c092318-4971-433e-b238-6b4586e09bac`), with the owner pinned in `app.config.ts`
+    - channels `development` / `preview` / `production`, `runtimeVersion` fingerprint
+    - `EXPO_PUBLIC_*` values are set in the EAS `development` and `preview` environments
+  - **Passkey domain files:** `apps/mobile/well-known/`.
+    - The AASA file has Team ID `46XB9S9YV6`.
+    - `assetlinks.json` still needs the Android SHA-256 from the first EAS build.
+    - Neither is hosted yet.
+  - **T12 company sign-up:**
+    - **`POST /organizations`:** checks the KRA PIN after trimming and uppercasing. In one audited transaction, it creates the company, the creator's admin membership and the starter categories, then creates the wallet.
+      - If wallet creation fails, the company stays and `POST /organizations/:id/wallet` (admin) resumes it.
+      - `GET …/wallet` returns `{ status: "creating" }` or the active wallet. A GET never calls Privy.
+    - **`categories` table** (RLS FORCE, no DELETE grant), with 13 starter categories. Air travel and Bank & M-Pesa charges are `etims_not_required`.
+    - **`GET …/categories`:** any member can read it.
+    - **App screens:**
+      - create company, with the shared schema checking the PIN on the phone
+      - deposit/wallet: "Send USDC on Base only", QR, copy, USDC and KES balance, and "Finish setting up wallet"
+      - a company picker for people in several companies
+  - **T13 staff invites:**
+    - `/organizations/:id/members` is admin only: list, invite, change role, remove.
+    - **Each change locks the company row** and re-checks the actor is an admin, so two admins can't remove each other at once.
+    - **Last-admin guards** return 409.
+    - **Invites:**
+      - An invite creates the `users` row by email.
+      - It activates on first sign-in (in `authenticate`) or on `GET /me` for an existing login. Each activation is audited.
+      - The email goes out through Resend over `fetch` (`services/email/`) after commit. If it fails, the invite stands, and the response carries `emailSent: false` and `installUrl`.
+      - **Accountants:** the membership holds the email and name, it is `active` at once, and no install email is sent.
+    - **App screens:** team list, invite (with Share/Copy of the install link when the email fails), member detail (role, remove, resend invite).
+  - **T32 payout phone (API):**
+    - **Routes:** `POST /me/payout-phone`, `/resend` and `/confirm`, a port of the consumer's Telnyx Verify flow with a fetch client.
+    - **Limits:** a code lasts 5 minutes, with 5 attempts, a 60 s cooldown, 3 sends per challenge and 5 starts a day. A new cap allows 5 sends per user per hour.
+    - **Locking:** the user's row is locked across the Telnyx call.
+    - **Confirming:**
+      - The `approved` state is saved first, so a retry commits without asking Telnyx again.
+      - A number confirmed by someone else moves to them; both changes are audited and both people are emailed (last 4 digits only).
+    - `requireConfirmedPayoutPhone(tx, userId)` is exported for T19.
+    - **Auth fix:** the `/me` auth middleware is now mounted on `/me/*`, so sub-routes are protected. `GET /me` still gets 401 without a token.
+  - **Reconcile fix (Phase 1 engine, found at Checkpoint B):**
+    - A funded payout no longer sits in `funding`/`paying` forever.
+    - A failed Paycrest fetch of any kind, a 404 included, moves it to `needs_review` only past its threshold: `funding` 10 minutes, `paying` 2 hours (`PAYING_STUCK_MS`, Dennis's decision).
+    - A `paying` order that Paycrest still reports as pending after 2 hours also goes to review.
+    - The tests run serially (`payout-sync.serial.test.ts`), because reconcile sweeps every company.
+  - **Tests:** 466 main + 26 serial in the API, and 18 money-formatting tests in the app. Typecheck, lint, format and the API build all pass.
+- **Claude model chosen and eval accuracy:** not yet (T16).
+- **Telnyx Verify profile used:** Dennis's choice is the consumer's Telnyx account with a new Verify profile for Expendi Business. The keys aren't in Doppler yet. Without them the routes return 503 and the API still starts.
 - **Changes from spec or plan, and why:**
+  - **Spec §10 updated:**
+    - `memberships` gains `full_name` (accountants have no user row) and `invited_at`, plus a per-company unique email.
+    - `phone_verification_challenges` gains `send_count`, `last_sent_at` and the `approved` status, as in the consumer flow.
+  - **The reconcile thresholds above.**
+    - Paycrest returned 404 for a refunding order for about 18 minutes at Checkpoint B, then `refunded`.
+    - A "404 → review now" rule was built and then dropped (Dennis, 2026-11-02), because it would have flagged payouts that resolve themselves.
+  - **Optional env vars:** the Resend and Telnyx variables are optional. Without them, invites and payout-phone codes fail cleanly, and the API and scripts still start.
+  - **Linear text corrected:** EXP-279 and EXP-286 were rewritten to match the build plan (email login, email invites).
+  - **Re-inviting:** someone already invited only gets the email again. Their role and the audit log are unchanged.
 - **Environment variables added:**
+  - **API, all optional:** `RESEND_API_KEY`, `EMAIL_FROM`, `APP_INSTALL_URL`, `TELNYX_API_KEY`, `TELNYX_VERIFY_PROFILE_ID`
+  - **App:** `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_PRIVY_APP_ID`, `EXPO_PUBLIC_PRIVY_CLIENT_ID`
+    - locally in the git-ignored `apps/mobile/.env`
+    - for builds in the EAS environments
 - **Known issues and TODOs:**
+  - **T19 must call `requireConfirmedPayoutPhone`** inside its Approve & pay transaction and pay only to the number it returns. Until then, T32's "Approve & pay is refused" criterion is open.
+  - **Refunds land as `deposit` rows.** Paycrest refunds come from its Gateway contract (`0x30f6…dd0f`), confirmed twice at Checkpoint B.
+    - **Fix:** save the order's on-chain `gateway_id` (it's in Paycrest's `transactionLogs`) on the payout during sync, and classify a Gateway transfer as that payout's `refund` from the Gateway's refund event in the same receipt.
+    - **Needed before T21,** whose wallet history must show refunds.
+  - **Needed before Checkpoint C:**
+    - **SPF/DKIM** for the Resend sending domain.
+    - **Host the passkey files** (`apps/mobile/well-known/`) at `https://business.expendi.app/.well-known/` (HTTPS, `application/json`, no redirect).
+    - **Android SHA-256 in `assetlinks.json`,** from the first EAS build.
+  - **The `payout-number` mobile screen (T32)** isn't built.
+  - **No icon or splash image yet.** On iOS the forms' keyboard avoidance ignores the header height.
+  - **Railway installs the whole workspace,** mobile included. It's safe, since pnpm only runs esbuild's install script, but slower. Consider an API-only install filter.
 - **QA results (date, who ran it, devices used):**
+  - 2026-11-02, Claude: automated checks pass (see Tests above). No device runs yet.
 - **Next session starts with:**
+  1. Build the Android dev client: `eas build --profile development --platform android`.
+  2. Add its SHA-256 to `assetlinks.json` and host the well-known files.
+  3. Go through the T11–T13 device checks with Dennis.
+  4. Build the T32 `payout-number` screen.
+  5. Then T14.

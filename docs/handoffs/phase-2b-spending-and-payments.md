@@ -46,7 +46,7 @@ The overview groups spending under exactly those four headings.
 
 ## Where things stand
 
-Phases 0–2 are done; check their Handoff notes.
+Phases 0–2 are done; check their Handoff notes. **Start only when the Phase 2B gate of Checkpoint B has passed:** one real payment each to a Till, a Paybill, a Kenyan bank and an allowlisted USDC address, and the payroll cap (see "Split" in the Phase 1 handoff).
 
 - **Payouts:** the engine pays any subject with batches and caps (T8). Paycrest supports every KES channel (T7). USDC payouts to allowlisted addresses work (T33).
 - **Claims:** the claim flow works end to end (T11–T21).
