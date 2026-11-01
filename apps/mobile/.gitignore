@@ -1,0 +1,15 @@
+.expo/
+expo-env.d.ts
+android/
+ios/
+
+*.apk
+*.aab
+*.ipa
+*.jks
+*.keystore
+*.p12
+*.p8
+*.mobileprovision
+google-services.json
+google-service-account.json
