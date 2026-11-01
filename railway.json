@@ -1,0 +1,19 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "RAILPACK",
+    "buildCommand": "pnpm turbo run build --filter=@expendi-business/api",
+    "watchPatterns": [
+      "apps/api/**",
+      "packages/**",
+      "pnpm-lock.yaml",
+      "railway.json"
+    ]
+  },
+  "deploy": {
+    "preDeployCommand": ["pnpm --filter @expendi-business/api migrate"],
+    "startCommand": "pnpm --filter @expendi-business/api start",
+    "healthcheckPath": "/health",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}
