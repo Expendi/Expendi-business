@@ -36,6 +36,13 @@ import {
 import { makeTestRuntime } from "../helpers/runtime.js";
 import { TEST_DATABASE_URL_MIGRATE } from "../setup/test-database.js";
 
+// Serial: reconcilePaycrestPayouts sweeps every company's payouts, so run in
+// parallel it could move other files' stale payouts (unknown to this file's
+// fake Paycrest) to needs_review.
+
+/** Decided by Dennis at Checkpoint B (2026-11-02). */
+const TWO_HOURS_MS = 2 * 60 * 60_000;
+
 const privy = makeFakePrivyWallets();
 const paycrest = makeFakePaycrest();
 const rpc = makeFakeBaseRpc();
@@ -180,6 +187,151 @@ describe("reconciling payouts with Paycrest", () => {
       status: (await reload(payout)).status,
       newSends: privy.state.sends.length - sendsBefore,
     }).toEqual({ status: "needs_review", newSends: 0 });
+  });
+
+  it("keeps a recently funded payout paying while Paycrest briefly returns 404 for its order", async () => {
+    // #given the USDC was sent, then Paycrest 404s the order (c0bc8726 did for ~18 minutes mid-refund)
+    const payout = await payingPayout();
+    paycrest.state.orders.delete(payout.providerOrderId ?? "");
+    const sendsBefore = privy.state.sends.length;
+
+    // #when
+    await reconcile();
+
+    // #then
+    expect({
+      status: (await reload(payout)).status,
+      newSends: privy.state.sends.length - sendsBefore,
+    }).toEqual({ status: "paying", newSends: 0 });
+  });
+
+  it("sends a payout for review when Paycrest has returned 404 for two hours after funding", async () => {
+    // #given
+    const payout = await payingPayout();
+    await updatePayout(db, paying.company, payout.id, {
+      fundingStartedAt: new Date(Date.now() - TWO_HOURS_MS - 60_000),
+    });
+    paycrest.state.orders.delete(payout.providerOrderId ?? "");
+    const sendsBefore = privy.state.sends.length;
+
+    // #when
+    await reconcile();
+
+    // #then
+    expect({
+      status: (await reload(payout)).status,
+      newSends: privy.state.sends.length - sendsBefore,
+    }).toEqual({ status: "needs_review", newSends: 0 });
+  });
+
+  it("sends a payout stuck in funding for review when Paycrest returns 404 for its order", async () => {
+    // #given
+    const payout = await payingPayout();
+    await updatePayout(db, paying.company, payout.id, {
+      status: "funding",
+      txHash: null,
+      fundingStartedAt: new Date(Date.now() - FUNDING_STUCK_MS - 60_000),
+    });
+    paycrest.state.orders.delete(payout.providerOrderId ?? "");
+
+    // #when
+    await reconcile();
+
+    // #then
+    expect((await reload(payout)).status).toBe("needs_review");
+  });
+
+  it("keeps a recently started payout funding while Paycrest briefly returns 404 for its order", async () => {
+    // #given
+    const payout = await payingPayout();
+    await updatePayout(db, paying.company, payout.id, {
+      status: "funding",
+      txHash: null,
+    });
+    paycrest.state.orders.delete(payout.providerOrderId ?? "");
+
+    // #when
+    await reconcile();
+
+    // #then
+    expect((await reload(payout)).status).toBe("funding");
+  });
+
+  it("sends a payout still paying two hours after funding for review", async () => {
+    // #given
+    const payout = await payingPayout();
+    setOrder(payout, { status: "pending" });
+    await updatePayout(db, paying.company, payout.id, {
+      fundingStartedAt: new Date(Date.now() - TWO_HOURS_MS - 60_000),
+    });
+
+    // #when
+    await reconcile();
+
+    // #then
+    expect((await reload(payout)).status).toBe("needs_review");
+  });
+
+  it("leaves a payout paying when it was funded just under two hours ago", async () => {
+    // #given
+    const payout = await payingPayout();
+    setOrder(payout, { status: "pending" });
+    await updatePayout(db, paying.company, payout.id, {
+      fundingStartedAt: new Date(Date.now() - TWO_HOURS_MS + 5 * 60_000),
+    });
+
+    // #when
+    await reconcile();
+
+    // #then
+    expect((await reload(payout)).status).toBe("paying");
+  });
+
+  it("keeps a recently funded payout paying while Paycrest is briefly unreachable", async () => {
+    // #given
+    const payout = await payingPayout();
+    paycrest.state.failGetOrder = true;
+
+    // #when
+    await reconcile();
+
+    // #then
+    expect((await reload(payout)).status).toBe("paying");
+  });
+
+  it("sends a payout for review when Paycrest stays unreachable two hours after funding", async () => {
+    // #given
+    const payout = await payingPayout();
+    await updatePayout(db, paying.company, payout.id, {
+      fundingStartedAt: new Date(Date.now() - TWO_HOURS_MS - 60_000),
+    });
+    paycrest.state.failGetOrder = true;
+
+    // #when
+    await reconcile();
+
+    // #then
+    expect((await reload(payout)).status).toBe("needs_review");
+  });
+
+  it("sends a payout stuck in funding for review while Paycrest is unreachable", async () => {
+    // #given
+    const payout = await payingPayout();
+    await updatePayout(db, paying.company, payout.id, {
+      status: "funding",
+      txHash: null,
+      fundingStartedAt: new Date(Date.now() - FUNDING_STUCK_MS - 60_000),
+    });
+    paycrest.state.failGetOrder = true;
+
+    // #when
+    await reconcile();
+
+    // #then
+    expect({
+      status: (await reload(payout)).status,
+      audited: (await auditActions(payout.id)).at(-1),
+    }).toEqual({ status: "needs_review", audited: "payout.needs_review" });
   });
 
   it("moves funding to paying when Paycrest has our deposit, recording the debit", async () => {

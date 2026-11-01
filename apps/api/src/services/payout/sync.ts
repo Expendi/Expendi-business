@@ -1,15 +1,19 @@
 import { and, eq, sql } from "drizzle-orm";
-import { Cause, Effect, Exit } from "effect";
+import { Cause, Effect, Either, Exit } from "effect";
 
 import type { DatabaseService } from "../../db/client.js";
 import type { Payout } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
-import type { PaycrestOrder } from "../paycrest/paycrest-client.js";
+import type {
+  PaycrestError,
+  PaycrestOrder,
+} from "../paycrest/paycrest-client.js";
 import { payouts, walletTransactions } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { Paycrest } from "../paycrest/paycrest-client.js";
+import { lockPayout } from "./guards.js";
 
 /**
  * Brings payouts in line with Paycrest (spec §6.8). Both the signed webhook
@@ -35,6 +39,8 @@ const NEVER_FUNDED = new Set(["expired", "cancelled"]);
 
 /** No result recorded this long after funding started: a person looks. */
 export const FUNDING_STUCK_MS = 10 * 60_000;
+/** Still not paid this long after funding started: a person looks. */
+export const PAYING_STUCK_MS = 2 * 60 * 60_000;
 /** An order request still unanswered after this is treated as unknown. */
 export const ORDER_REQUEST_STUCK_MS = 2 * 60_000;
 /** An approval that never started funding is released after this. */
@@ -52,6 +58,13 @@ interface Transition {
   readonly status: Payout["status"];
   readonly action: string;
   readonly reason?: string;
+}
+
+function fundedLongerThan(payout: Payout, ms: number, now: number): boolean {
+  return (
+    payout.fundingStartedAt !== null &&
+    now - payout.fundingStartedAt.getTime() > ms
+  );
 }
 
 function nextFor(
@@ -78,6 +91,13 @@ function nextFor(
           reason: `Paycrest marked the order ${status} after the USDC was sent.`,
         };
       }
+      if (fundedLongerThan(payout, PAYING_STUCK_MS, now)) {
+        return {
+          status: "needs_review",
+          action: "payout.needs_review",
+          reason: `The USDC was sent but Paycrest still reports the order ${status}. Check with Paycrest before doing anything.`,
+        };
+      }
       return null;
     case "funding":
       if (PAID.has(status) || RECEIVED.has(status) || status === "refunded") {
@@ -90,10 +110,7 @@ function nextFor(
           reason: `Funding started but Paycrest marked the order ${status}. Check the chain before doing anything.`,
         };
       }
-      if (
-        payout.fundingStartedAt &&
-        now - payout.fundingStartedAt.getTime() > FUNDING_STUCK_MS
-      ) {
+      if (fundedLongerThan(payout, FUNDING_STUCK_MS, now)) {
         return {
           status: "needs_review",
           action: "payout.needs_review",
@@ -340,6 +357,65 @@ function settleOrderlessApproval(
   );
 }
 
+/**
+ * Settles a funded payout whose order Paycrest won't return: never sends,
+ * never orders. Any fetch error, a 404 included (Paycrest 404s an order
+ * while it refunds), is for a person only once the payout is past its
+ * stuck threshold. Before that the error stands and the next run retries.
+ */
+function reviewUnfetchedOrder(
+  payout: Payout,
+  error: PaycrestError,
+  now: number,
+): Effect.Effect<
+  boolean,
+  DatabaseError | PaycrestError,
+  DatabaseService | AuditLog
+> {
+  const stuck =
+    (payout.status === "funding" &&
+      fundedLongerThan(payout, FUNDING_STUCK_MS, now)) ||
+    (payout.status === "paying" &&
+      fundedLongerThan(payout, PAYING_STUCK_MS, now));
+  if (!stuck) return Effect.fail(error);
+  const settled: Transition = {
+    status: "needs_review",
+    action: "payout.needs_review",
+    reason: `Paycrest hasn't returned the order (${error.code}) and no outcome was recorded. Check the chain before doing anything.`,
+  };
+  return withScope({ organizationId: payout.organizationId }, (tx) =>
+    Effect.gen(function* () {
+      const audit = yield* AuditLog;
+      const locked = yield* lockPayout(tx, payout.id);
+      if (locked?.status !== payout.status) return false;
+      yield* query(() =>
+        tx
+          .update(payouts)
+          .set({
+            status: settled.status,
+            providerCheckedAt: new Date(now),
+            failureReason: settled.reason ?? null,
+          })
+          .where(eq(payouts.id, payout.id)),
+      );
+      yield* audit.record(tx, {
+        actor: ACTOR,
+        organizationId: payout.organizationId,
+        action: settled.action,
+        entity: { type: "payout", id: payout.id },
+        before: { status: payout.status },
+        after: {
+          status: settled.status,
+          paycrestError: error.code,
+          source: "reconcile",
+          reason: settled.reason,
+        },
+      });
+      return true;
+    }),
+  );
+}
+
 export interface ReconcileSummary {
   readonly checked: number;
   readonly changed: number;
@@ -386,11 +462,20 @@ export function reconcilePaycrestPayouts(
               ? yield* settleOrderlessApproval(payout, Date.now())
               : false;
           }
-          const order = yield* paycrest.getOrder(payout.providerOrderId);
+          const fetched = yield* Effect.either(
+            paycrest.getOrder(payout.providerOrderId),
+          );
+          if (Either.isLeft(fetched)) {
+            return yield* reviewUnfetchedOrder(
+              payout,
+              fetched.left,
+              Date.now(),
+            );
+          }
           const outcome = yield* syncPayoutOrder({
             organizationId: ref.organization_id,
             payoutId: payout.id,
-            order,
+            order: fetched.right,
             source: "reconcile",
             touch: true,
           });
