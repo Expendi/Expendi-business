@@ -1,0 +1,3 @@
+{
+  "extends": "@expendi-business/tsconfig/node-build.json"
+}

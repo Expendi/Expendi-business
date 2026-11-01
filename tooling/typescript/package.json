@@ -1,0 +1,7 @@
+{
+  "name": "@expendi-business/tsconfig",
+  "private": true,
+  "files": [
+    "*.json"
+  ]
+}

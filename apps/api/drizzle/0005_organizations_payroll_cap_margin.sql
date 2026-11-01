@@ -1,0 +1,2 @@
+ALTER TABLE "organizations" ADD COLUMN "payroll_cap_margin_pct" integer DEFAULT 20 NOT NULL;--> statement-breakpoint
+ALTER TABLE "organizations" ADD CONSTRAINT "organizations_payroll_cap_margin_pct_range" CHECK ("organizations"."payroll_cap_margin_pct" BETWEEN 0 AND 100);

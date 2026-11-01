@@ -1,0 +1,49 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "stream",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "format": {
+      "outputs": [".cache/.prettiercache"],
+      "outputLogs": "new-only"
+    },
+    "lint": {
+      "dependsOn": ["^build"],
+      "outputs": [".cache/.eslintcache"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": [".cache/tsbuildinfo.json"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "passThroughEnv": ["TEST_DATABASE_URL", "TEST_DATABASE_URL_MIGRATE"]
+    },
+    "clean": {
+      "cache": false
+    }
+  },
+  "globalPassThroughEnv": [
+    "NODE_ENV",
+    "CI",
+    "PORT",
+    "DATABASE_URL",
+    "DATABASE_URL_MIGRATE",
+    "SECRETS_MANAGER",
+    "DOPPLER_TOKEN",
+    "DOPPLER_PROJECT",
+    "DOPPLER_CONFIG",
+    "PRIVY_APP_ID",
+    "PRIVY_APP_SECRET",
+    "PRIVY_JWT_VERIFICATION_KEY"
+  ]
+}

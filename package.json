@@ -1,0 +1,29 @@
+{
+  "name": "expendi-business",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^22.21.0",
+    "pnpm": "^10.19.0"
+  },
+  "packageManager": "pnpm@10.19.0",
+  "scripts": {
+    "build": "turbo run build",
+    "clean": "git clean -xdf node_modules",
+    "clean:workspaces": "turbo run clean",
+    "dev": "turbo watch dev --continue",
+    "format": "turbo run format --continue -- --cache --cache-location .cache/.prettiercache",
+    "format:fix": "turbo run format --continue -- --write --cache --cache-location .cache/.prettiercache",
+    "lint": "turbo run lint --continue -- --cache --cache-location .cache/.eslintcache",
+    "lint:fix": "turbo run lint --continue -- --fix --cache --cache-location .cache/.eslintcache",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "@expendi-business/prettier-config": "workspace:*",
+    "prettier": "catalog:",
+    "turbo": "^2.11.10",
+    "typescript": "catalog:"
+  },
+  "prettier": "@expendi-business/prettier-config"
+}

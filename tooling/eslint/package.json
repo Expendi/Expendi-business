@@ -1,0 +1,30 @@
+{
+  "name": "@expendi-business/eslint-config",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./base": "./base.ts",
+    "./node": "./node.ts"
+  },
+  "scripts": {
+    "clean": "git clean -xdf .cache .turbo node_modules",
+    "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path ../../.prettierignore",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@eslint/compat": "^1.4.1",
+    "@eslint/js": "catalog:",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-turbo": "^2.11.10",
+    "typescript-eslint": "^8.72.1"
+  },
+  "devDependencies": {
+    "@expendi-business/prettier-config": "workspace:*",
+    "@expendi-business/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  },
+  "prettier": "@expendi-business/prettier-config"
+}
