@@ -453,6 +453,7 @@ A payee is anyone the company pays through Expendi other than a staff claim.
 - **Employees** are paid only to their confirmed M-Pesa number (section 6.18), or to a bank account an admin adds for them.
 - **Changing payment details:** adding or changing a payee's payment details needs the admin's passkey, is audited and emails every admin. Swapped payment details are a common route for payment fraud, so paying a payee whose details changed in the last 24 hours shows a warning and needs a second confirmation.
 - **USDC addresses** go on the company's allowlist, the same list that withdrawals use (section 7).
+- **USDC payments are an exact USDC amount** (built in T33). A USDC payee is paid exactly what's entered; Expendi pays the gas. Its KES equivalent at Paycrest's current rate is recorded for the daily cap and reports. Whether a bill to a USDC payee is entered in USD or KES is decided in T35.
 - **Account name:** Paycrest needs one for every KES payout, so store it with the payee.
 
 ### 6.20 Bills and recurring payments
@@ -577,8 +578,8 @@ Expendi holds each company's USDC, so these controls are required for launch:
 5. **Enforced at the wallet.** Privy wallet policies allow only USDC transfers, up to a per-transaction maximum, so a backend bug can't send other tokens or large amounts.
    - **Payout recipients:** Paycrest gives a new deposit address for every order, so the policy can't list allowed recipients. The backend checks each one with the `order-safety` rules instead (section 6.7).
    - **Withdrawals and USDC payees:** addresses are checked against the company's allowlist (section 6.19).
-   - **Per-transaction maximum:** set high enough for the largest single payment, usually a salary.
-   - **Build check:** confirm exactly which conditions Privy policies can enforce. If they can't limit ERC-20 transfer amounts, move payouts to Paycrest's onchain gateway contract so the policy can allow that one contract.
+   - **Per-transaction maximum:** 3,100 USDC by default, just above Paycrest's largest KES order (about 3,000 USDC). A larger payment, such as a big salary, is split into several orders. Ops can raise a company's cap with Expendi's management key.
+   - **Build check (settled 2026-11-01, T5):** Privy policies can limit a wallet to USDC `transfer` on Base under a maximum amount, so payouts stay on Paycrest's Sender API. Each wallet is owned by an Expendi management key the API never holds. The API signs as an additional signer that can't change the policy or export the key. See `docs/decisions/privy-wallet-policies.md`.
 6. **Payout pause.** The Expendi team can pause all payouts, or one company's payouts, from the internal admin app. Pausing never moves money.
 7. **Confirmed payout numbers.** Claims, floats and salaries to M-Pesa are paid only to a number the employee confirmed by SMS code (section 6.18).
 8. **Guarded payee details.** Adding or changing a payee's payment details needs the admin's passkey, is audited and emails every admin. Paying a payee within 24 hours of a change needs a second confirmation (section 6.19).
@@ -720,14 +721,13 @@ Dennis confirmed 1–5, 8 and 9 on 2026-11-01. Expendi is **not offering an API 
 
 ### To settle
 
-- **Paycrest limits and channels:**
-  - the maximum amount per order (salaries may need several orders)
-  - whether Till, Paybill and bank payouts settle as fast as payouts to M-Pesa numbers
-  - whether Paycrest confirms the recipient's name before paying
-  - Check all three during the T7 build.
+- **Paycrest limits and channels** (checked during T7, 2026-11-01; details in the Phase 1 handoff notes):
+  - **Maximum per order:** set per provider, not by Paycrest. The two KES providers allowed 1,500 and 3,000 USDC (about KES 386,000 at 128.68), and a 20,000 USDC rate request found no provider. The minimum is 0.5 USDC. A salary above the largest provider's maximum needs several orders (T39).
+  - **Settlement time per channel:** not documented. Measure each channel in the Checkpoint B live payouts.
+  - **Name checks:** Paycrest's account check returns only "OK" for KES M-Pesa, with no name, so it doesn't confirm who receives the money. Every order carries the name Expendi has for the payee. Whether banks return a name is checked at Checkpoint B.
 
-- **Privy policies:** confirm which conditions they can enforce on ERC-20 transfers (section 7).
-- **Passkey approvals:** confirm whether the backend can verify a passkey signature against the passkey Privy registered (Privy exposes its public key), or whether money approvals need their own WebAuthn credential, as in the consumer backend (T8).
+- ~~**Privy policies:** confirm which conditions they can enforce on ERC-20 transfers (section 7).~~ Settled by T5: they can cap USDC transfer amounts (`docs/decisions/privy-wallet-policies.md`). Dennis decided the rest on 2026-11-01: the default per-transaction maximum is 3,100 USDC, and he holds the management key, ops-only.
+- ~~**Passkey approvals:** confirm whether the backend can verify a passkey signature against the passkey Privy registered (Privy exposes its public key), or whether money approvals need their own WebAuthn credential, as in the consumer backend (T8).~~ **Decided (Dennis, 2026-11-01): Expendi's own WebAuthn credential.** Each admin enrols an approval passkey once, and the backend verifies it with `@simplewebauthn/server`, as the consumer backend does. Privy's passkey is unproven for this: passkeys are off in the app, and its `public_key` is optional and undocumented. It can be imported into the same table later.
 
 ### Owner to-dos
 

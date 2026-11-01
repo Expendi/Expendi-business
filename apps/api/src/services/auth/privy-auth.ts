@@ -1,6 +1,8 @@
+import type { PrivyClient } from "@privy-io/node";
 import type { ConfigError } from "effect";
-import { PrivyClient } from "@privy-io/node";
-import { Config, Context, Data, Effect, Layer, Option, Redacted } from "effect";
+import { Context, Data, Effect, Layer } from "effect";
+
+import { PrivyClientLive, PrivyClientService } from "../privy/privy-client.js";
 
 export class InvalidAccessToken extends Data.TaggedError("InvalidAccessToken")<{
   readonly cause: unknown;
@@ -48,27 +50,7 @@ export const makePrivyAuth = (client: PrivyClient): PrivyAuthShape => ({
     ),
 });
 
-/**
- * Reads the Expendi Business Privy app's credentials. Set
- * PRIVY_JWT_VERIFICATION_KEY (from the Privy dashboard) to verify tokens
- * locally instead of fetching Privy's JWKS.
- */
 export const PrivyAuthLive: Layer.Layer<PrivyAuth, ConfigError.ConfigError> =
-  Layer.effect(
-    PrivyAuth,
-    Effect.gen(function* () {
-      const appId = yield* Config.string("PRIVY_APP_ID");
-      const appSecret = yield* Config.redacted("PRIVY_APP_SECRET");
-      const verificationKey = yield* Config.option(
-        Config.redacted("PRIVY_JWT_VERIFICATION_KEY"),
-      );
-      const client = new PrivyClient({
-        appId,
-        appSecret: Redacted.value(appSecret),
-        jwtVerificationKey: Option.getOrUndefined(
-          Option.map(verificationKey, Redacted.value),
-        ),
-      });
-      return makePrivyAuth(client);
-    }),
+  Layer.effect(PrivyAuth, Effect.map(PrivyClientService, makePrivyAuth)).pipe(
+    Layer.provide(PrivyClientLive),
   );

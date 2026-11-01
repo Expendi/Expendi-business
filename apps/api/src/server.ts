@@ -3,6 +3,9 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { ConfigService } from "./config.js";
 import { makeRuntime } from "./runtime.js";
+import { confirmOnchainJob } from "./station/confirm-onchain.js";
+import { reconcilePaycrestJob } from "./station/reconcile-paycrest.js";
+import { startStation } from "./station/scheduler.js";
 
 const runtime = makeRuntime();
 // The first run builds every layer: loads config (incl. Privy), connects to
@@ -15,17 +18,24 @@ const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`[server] Expendi Business API listening on port ${info.port}`);
 });
 
+const stopStation = startStation(runtime, [
+  reconcilePaycrestJob,
+  confirmOnchainJob,
+]);
+
 function shutdown(signal: NodeJS.Signals): void {
   console.log(`[server] ${signal} received, shutting down`);
   server.close((closeError) => {
     if (closeError) console.error("[server] close failed", closeError);
-    runtime.dispose().then(
-      () => process.exit(closeError ? 1 : 0),
-      (disposeError: unknown) => {
-        console.error("[server] runtime dispose failed", disposeError);
-        process.exit(1);
-      },
-    );
+    stopStation()
+      .then(() => runtime.dispose())
+      .then(
+        () => process.exit(closeError ? 1 : 0),
+        (disposeError: unknown) => {
+          console.error("[server] runtime dispose failed", disposeError);
+          process.exit(1);
+        },
+      );
   });
 }
 

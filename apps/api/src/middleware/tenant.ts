@@ -73,3 +73,16 @@ export function tenantMiddleware(runtime: AppRuntime) {
     await next();
   });
 }
+
+/** Runs after `tenantMiddleware`; other roles get 403 (spec §4). */
+export function requireRole(...roles: readonly MembershipRole[]) {
+  const forbidden = new Forbidden({
+    message: "Your role in this company can't do this",
+  });
+  return createMiddleware<{ Variables: TenantVariables }>(async (c, next) => {
+    if (!roles.includes(c.get("tenant").role)) {
+      return clientErrorResponse(c, forbidden);
+    }
+    await next();
+  });
+}

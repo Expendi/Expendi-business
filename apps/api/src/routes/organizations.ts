@@ -9,6 +9,8 @@ import { query, withScope } from "../db/scope.js";
 import { NotFound } from "../errors.js";
 import { runEffect } from "../http/respond.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
+import { createAllowlistRoutes } from "./allowlist.js";
+import { createWalletRoutes } from "./wallet.js";
 
 /** Mounted at `/organizations/:organizationId`. */
 export function createOrganizationRoutes(
@@ -37,5 +39,7 @@ export function createOrganizationRoutes(
           ),
         ),
       );
-    });
+    })
+    .route("/wallet", createWalletRoutes(runtime))
+    .route("/withdrawal-addresses", createAllowlistRoutes(runtime));
 }

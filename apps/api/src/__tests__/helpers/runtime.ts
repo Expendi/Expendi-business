@@ -1,5 +1,6 @@
 import { Effect, Layer } from "effect";
 
+import type { ExternalLayers } from "../../layers/main.js";
 import type { AppRuntime } from "../../runtime.js";
 import { makeAppLayer } from "../../layers/main.js";
 import { makeRuntime } from "../../runtime.js";
@@ -7,6 +8,14 @@ import {
   InvalidAccessToken,
   PrivyAuth,
 } from "../../services/auth/privy-auth.js";
+import {
+  makeFakeAlchemyWebhook,
+  makeFakeBaseRpc,
+  makeFakePaycrest,
+  makeFakePrivyWallets,
+  TestApprovalSettings,
+  TestWalletSettings,
+} from "./fakes.js";
 
 const TOKEN_PREFIX = "test-token:";
 
@@ -48,8 +57,25 @@ export const FakePrivyAuth = Layer.succeed(PrivyAuth, {
     ).pipe(Effect.as(fakePrivyEmails.get(privyUserId) ?? null)),
 });
 
-export function makeTestRuntime(): AppRuntime {
-  return makeRuntime(makeAppLayer(FakePrivyAuth));
+/**
+ * The real API and database with every external provider faked. Pass a
+ * fake's layer to inspect or steer it from the test.
+ */
+export function makeTestRuntime(
+  overrides: Partial<ExternalLayers> = {},
+): AppRuntime {
+  return makeRuntime(
+    makeAppLayer({
+      privyAuth: FakePrivyAuth,
+      privyWallets: makeFakePrivyWallets().layer,
+      walletSettings: TestWalletSettings,
+      alchemyWebhook: makeFakeAlchemyWebhook().layer,
+      baseRpc: makeFakeBaseRpc().layer,
+      paycrest: makeFakePaycrest().layer,
+      approvalSettings: TestApprovalSettings,
+      ...overrides,
+    }),
+  );
 }
 
 export function bearer(privyUserId: string): { authorization: string } {

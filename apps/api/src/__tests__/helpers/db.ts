@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import type {
   MembershipRole,
@@ -6,7 +6,12 @@ import type {
 } from "@expendi-business/shared";
 
 import type { Database } from "../../db/client.js";
-import { memberships, organizations, users } from "../../db/schema/index.js";
+import {
+  memberships,
+  organizations,
+  users,
+  wallets,
+} from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 
 export interface TestUser {
@@ -86,6 +91,39 @@ export async function addMember(
         .returning({ id: memberships.id });
       if (!membership) throw new Error("membership insert returned no row");
       return membership.id;
+    },
+  );
+}
+
+export interface TestWallet {
+  readonly id: string;
+  readonly address: string;
+}
+
+/** An active company wallet, as `ensureCompanyWallet` leaves it. */
+export async function createActiveWallet(
+  db: Database,
+  company: TestCompany,
+  address = `0x${randomBytes(20).toString("hex")}`,
+): Promise<TestWallet> {
+  return runInScope(
+    db,
+    { organizationId: company.organizationId },
+    async (tx) => {
+      const [wallet] = await tx
+        .insert(wallets)
+        .values({
+          organizationId: company.organizationId,
+          status: "active",
+          perTransactionMaxUsdc: 5_000_000_000n,
+          privyPolicyId: `policy-${randomUUID()}`,
+          privyWalletId: `wallet-${randomUUID()}`,
+          address,
+          depositsWatchedAt: new Date(),
+        })
+        .returning({ id: wallets.id, address: wallets.address });
+      if (!wallet?.address) throw new Error("wallet insert returned no row");
+      return { id: wallet.id, address: wallet.address };
     },
   );
 }
