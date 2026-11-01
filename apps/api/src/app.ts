@@ -8,7 +8,10 @@ import { authMiddleware } from "./middleware/auth.js";
 import { createAlchemyWebhookRoutes } from "./routes/alchemy-webhooks.js";
 import { createHealthRoutes } from "./routes/health.js";
 import { createMeRoutes } from "./routes/me.js";
-import { createOrganizationRoutes } from "./routes/organizations.js";
+import {
+  createOrganizationRoutes,
+  createSignUpRoutes,
+} from "./routes/organizations.js";
 import { createPaycrestWebhookRoutes } from "./routes/paycrest-webhook.js";
 
 export type App = Hono<{ Variables: AuthVariables }>;
@@ -30,10 +33,13 @@ export function createApp({ runtime }: { readonly runtime: AppRuntime }): App {
   app.route("/webhooks", createPaycrestWebhookRoutes(runtime));
 
   const authenticate = authMiddleware(runtime);
-  app.use("/me", authenticate);
+  // Also matches `/me` itself.
+  app.use("/me/*", authenticate);
   app.route("/me", createMeRoutes(runtime));
 
+  // Also matches `/organizations` itself, so sign-up is authenticated too.
   app.use("/organizations/*", authenticate);
+  app.route("/organizations", createSignUpRoutes(runtime));
   app.route(
     "/organizations/:organizationId",
     createOrganizationRoutes(runtime),

@@ -5,7 +5,9 @@ import {
   pgEnum,
   pgTable,
   text,
+  timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -33,9 +35,14 @@ export const memberships = pgTable(
       .references(() => organizations.id),
     userId: uuid("user_id").references(() => users.id),
     role: membershipRole("role").notNull(),
+    /** Accountants only, lowercased: they have no `users` row (spec §4). */
     email: text("email"),
+    /** Accountants only; everyone else's name is `users.full_name`. */
+    fullName: text("full_name"),
     status: membershipStatus("status").notNull().default("invited"),
     invitedBy: uuid("invited_by").references(() => users.id),
+    /** The latest invite; null for the admin who created the company. */
+    invitedAt: timestamp("invited_at", { withTimezone: true }),
     ...timestamps,
   },
   (table) => [
@@ -44,6 +51,13 @@ export const memberships = pgTable(
       table.userId,
     ),
     index("memberships_user_id_idx").on(table.userId),
+    uniqueIndex("memberships_organization_email_unique")
+      .on(table.organizationId, table.email)
+      .where(sql`${table.email} IS NOT NULL`),
+    check(
+      "memberships_email_lowercase",
+      sql`${table.email} = lower(${table.email})`,
+    ),
     // Accountants get the export by email and have no login (spec §4);
     // everyone else logs in, so they must be a user.
     check(

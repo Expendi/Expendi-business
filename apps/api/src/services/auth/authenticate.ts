@@ -8,6 +8,7 @@ import { users } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { Forbidden, Unauthorized } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { activateInvitedMemberships } from "../membership/activation.js";
 import { PrivyAuth } from "./privy-auth.js";
 
 export interface AuthenticatedUser {
@@ -109,7 +110,9 @@ function registerUser(
 /**
  * Verifies a Privy access token and resolves it to our user, creating the
  * user exactly once on first login. Login is email + passkey (spec §4); the
- * payout phone is captured separately (§6.18).
+ * payout phone is captured separately (§6.18). A first login also activates
+ * the invites waiting for that email (§6.2); later invites activate on
+ * `GET /me`.
  */
 export function authenticate(
   accessToken: string,
@@ -134,6 +137,8 @@ export function authenticate(
         message: "Sign in with your email to use Expendi Business",
       });
     }
-    return yield* registerUser(privyUserId, email);
+    const user = yield* registerUser(privyUserId, email);
+    yield* activateInvitedMemberships(user.userId);
+    return user;
   });
 }

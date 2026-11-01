@@ -2,10 +2,15 @@ import { createHmac, randomBytes } from "node:crypto";
 import { Effect, Layer, Redacted } from "effect";
 
 import type { TransactionReceipt } from "../../services/chain/base.js";
+import type { EmailMessage } from "../../services/email/email-sender.js";
 import type {
   PaycrestOrder,
   PaycrestOrderRequest,
 } from "../../services/paycrest/paycrest-client.js";
+import type {
+  OtpProviderErrorCode,
+  VerificationCheckResult,
+} from "../../services/phone-verification/otp-provider.js";
 import type {
   CreatePolicyInput,
   CreateWalletInput,
@@ -19,12 +24,20 @@ import {
 } from "../../services/alchemy/alchemy-webhook.js";
 import { ApprovalSettings } from "../../services/approval/passkeys.js";
 import { BaseRpc, BaseRpcError } from "../../services/chain/base-rpc.js";
+import {
+  EmailSender,
+  EmailSendError,
+} from "../../services/email/email-sender.js";
 import { fromMicro, toMicro } from "../../services/paycrest/amounts.js";
 import {
   Paycrest,
   PaycrestError,
   verifyPaycrestSignature,
 } from "../../services/paycrest/paycrest-client.js";
+import {
+  OtpProvider,
+  OtpProviderError,
+} from "../../services/phone-verification/otp-provider.js";
 import { WalletSettings } from "../../services/wallet/company-wallet.js";
 import {
   PrivyWalletError,
@@ -390,6 +403,98 @@ export function makeFakePaycrest() {
               ambiguous: false,
             }),
           );
+    },
+  });
+  return { layer, state };
+}
+
+/** Records every email "sent"; `failNext` makes the next sends fail. */
+export function makeFakeEmailSender() {
+  const sent: EmailMessage[] = [];
+  let failures = 0;
+  const state = {
+    sent,
+    failNext(times = 1) {
+      failures = times;
+    },
+    reset() {
+      sent.length = 0;
+      failures = 0;
+    },
+  };
+  const layer = Layer.succeed(EmailSender, {
+    send: (message) => {
+      if (failures > 0) {
+        failures -= 1;
+        return Effect.fail(
+          new EmailSendError({ message: "fake Resend failure" }),
+        );
+      }
+      sent.push(message);
+      return Effect.void;
+    },
+  });
+  return { layer, state };
+}
+
+/** The code the fake SMS provider sends to every number. */
+export const TEST_OTP_CODE = "246810";
+
+/**
+ * In-memory Telnyx Verify. A send makes `TEST_OTP_CODE` live for that
+ * number until a check accepts it; like Telnyx, an accepted code can't be
+ * checked again. `failNextSend` and `nextCheck` steer the next calls.
+ */
+export function makeFakeOtpProvider() {
+  const sends: string[] = [];
+  const checks: { readonly to: string; readonly code: string }[] = [];
+  const live = new Set<string>();
+  let sendFailure: OtpProviderErrorCode | null = null;
+  let checkOverride: VerificationCheckResult | null = null;
+  const state = {
+    sends,
+    checks,
+    failNextSend(code: OtpProviderErrorCode) {
+      sendFailure = code;
+    },
+    nextCheck(result: VerificationCheckResult) {
+      checkOverride = result;
+    },
+    reset() {
+      sends.length = 0;
+      checks.length = 0;
+      live.clear();
+      sendFailure = null;
+      checkOverride = null;
+    },
+  };
+  const layer = Layer.succeed(OtpProvider, {
+    startVerification: ({ to }) => {
+      const failure = sendFailure;
+      sendFailure = null;
+      if (failure) {
+        return Effect.fail(
+          new OtpProviderError({ code: failure, message: `fake ${failure}` }),
+        );
+      }
+      sends.push(to);
+      live.add(to);
+      return Effect.succeed({
+        providerRef: `verification-${randomBytes(6).toString("hex")}`,
+      });
+    },
+    checkVerification: ({ to, code }) => {
+      checks.push({ to, code });
+      const override = checkOverride;
+      checkOverride = null;
+      return Effect.sync((): VerificationCheckResult => {
+        if (override) return override;
+        if (!live.has(to)) return { approved: false, reason: "expired" };
+        if (code !== TEST_OTP_CODE)
+          return { approved: false, reason: "invalid" };
+        live.delete(to);
+        return { approved: true };
+      });
     },
   });
   return { layer, state };

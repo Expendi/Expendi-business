@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect";
+import { ConfigProvider, Effect, Layer } from "effect";
 
 import type { ExternalLayers } from "../../layers/main.js";
 import type { AppRuntime } from "../../runtime.js";
@@ -11,6 +11,8 @@ import {
 import {
   makeFakeAlchemyWebhook,
   makeFakeBaseRpc,
+  makeFakeEmailSender,
+  makeFakeOtpProvider,
   makeFakePaycrest,
   makeFakePrivyWallets,
   TestApprovalSettings,
@@ -57,24 +59,43 @@ export const FakePrivyAuth = Layer.succeed(PrivyAuth, {
     ).pipe(Effect.as(fakePrivyEmails.get(privyUserId) ?? null)),
 });
 
+/** The test environment with `env` laid over it; `undefined` unsets a variable. */
+function environmentWith(
+  env: Readonly<Record<string, string | undefined>>,
+): ConfigProvider.ConfigProvider {
+  const merged = Object.entries({ ...process.env, ...env }).filter(
+    (entry): entry is [string, string] => entry[1] !== undefined,
+  );
+  return ConfigProvider.fromMap(new Map(merged));
+}
+
 /**
  * The real API and database with every external provider faked. Pass a
- * fake's layer to inspect or steer it from the test.
+ * fake's layer to inspect or steer it from the test, and `env` to change
+ * the API's configuration for this runtime only.
  */
 export function makeTestRuntime(
   overrides: Partial<ExternalLayers> = {},
+  env: Readonly<Record<string, string | undefined>> = {},
 ): AppRuntime {
+  const layer = makeAppLayer({
+    privyAuth: FakePrivyAuth,
+    privyWallets: makeFakePrivyWallets().layer,
+    walletSettings: TestWalletSettings,
+    alchemyWebhook: makeFakeAlchemyWebhook().layer,
+    baseRpc: makeFakeBaseRpc().layer,
+    paycrest: makeFakePaycrest().layer,
+    approvalSettings: TestApprovalSettings,
+    emailSender: makeFakeEmailSender().layer,
+    otpProvider: makeFakeOtpProvider().layer,
+    ...overrides,
+  });
   return makeRuntime(
-    makeAppLayer({
-      privyAuth: FakePrivyAuth,
-      privyWallets: makeFakePrivyWallets().layer,
-      walletSettings: TestWalletSettings,
-      alchemyWebhook: makeFakeAlchemyWebhook().layer,
-      baseRpc: makeFakeBaseRpc().layer,
-      paycrest: makeFakePaycrest().layer,
-      approvalSettings: TestApprovalSettings,
-      ...overrides,
-    }),
+    Object.keys(env).length === 0
+      ? layer
+      : layer.pipe(
+          Layer.provide(Layer.setConfigProvider(environmentWith(env))),
+        ),
   );
 }
 

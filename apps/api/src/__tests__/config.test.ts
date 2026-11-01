@@ -1,5 +1,5 @@
 import type { ConfigError } from "effect";
-import { ConfigProvider, Effect, Exit, Layer, Redacted } from "effect";
+import { ConfigProvider, Effect, Exit, Layer, Option, Redacted } from "effect";
 import { describe, expect, it } from "vitest";
 
 import type { AppConfig } from "../config.js";
@@ -46,6 +46,41 @@ describe("ConfigLive", () => {
   it("fails to load without DATABASE_URL", async () => {
     // #when
     const exit = await Effect.runPromiseExit(loadConfig({}));
+
+    // #then
+    expect(Exit.isFailure(exit)).toBe(true);
+  });
+
+  it("reads APP_INSTALL_URL when it is set", async () => {
+    // #given
+    const env = {
+      DATABASE_URL,
+      APP_INSTALL_URL: "https://business.expendi.app/install",
+    };
+
+    // #when
+    const config = await Effect.runPromise(loadConfig(env));
+
+    // #then
+    expect(config.appInstallUrl).toEqual(
+      Option.some("https://business.expendi.app/install"),
+    );
+  });
+
+  it("loads without APP_INSTALL_URL, so invites are created but not emailed", async () => {
+    // #when
+    const config = await Effect.runPromise(loadConfig({ DATABASE_URL }));
+
+    // #then
+    expect(Option.isNone(config.appInstallUrl)).toBe(true);
+  });
+
+  it("fails to load when APP_INSTALL_URL isn't a URL", async () => {
+    // #given
+    const env = { DATABASE_URL, APP_INSTALL_URL: "not a url" };
+
+    // #when
+    const exit = await Effect.runPromiseExit(loadConfig(env));
 
     // #then
     expect(Exit.isFailure(exit)).toBe(true);

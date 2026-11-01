@@ -4,6 +4,7 @@ import {
   TEST_DATABASE_URL,
   TEST_DATABASE_URL_MIGRATE,
 } from "./src/__tests__/setup/test-database.js";
+import { TEST_APP_INSTALL_URL } from "./src/__tests__/setup/test-env.js";
 
 export default defineConfig({
   test: {
@@ -18,6 +19,7 @@ export default defineConfig({
     env: {
       DATABASE_URL: TEST_DATABASE_URL,
       DATABASE_URL_MIGRATE: TEST_DATABASE_URL_MIGRATE,
+      APP_INSTALL_URL: TEST_APP_INSTALL_URL,
     },
     testTimeout: 10_000,
   },

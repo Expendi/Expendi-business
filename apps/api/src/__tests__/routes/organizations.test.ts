@@ -52,7 +52,12 @@ describe("GET /organizations/:organizationId", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       success: true,
-      data: { id: companyA.organizationId, name: companyA.name, role: "admin" },
+      data: {
+        id: companyA.organizationId,
+        name: companyA.name,
+        kraPin: null,
+        role: "admin",
+      },
     });
   });
 

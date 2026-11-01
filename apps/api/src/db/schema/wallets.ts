@@ -11,7 +11,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { WALLET_CHAINS } from "@expendi-business/shared";
+import { WALLET_CHAINS, WALLET_STATUSES } from "@expendi-business/shared";
 
 import { timestamps } from "./columns.js";
 import { organizations } from "./organizations.js";
@@ -22,7 +22,7 @@ export const walletChain = pgEnum("wallet_chain", WALLET_CHAINS);
  * `creating` until both the Privy policy and the wallet exist. Creation
  * resumes from whichever step a crash or retry stopped at.
  */
-export const walletStatus = pgEnum("wallet_status", ["creating", "active"]);
+export const walletStatus = pgEnum("wallet_status", WALLET_STATUSES);
 
 /**
  * One USDC wallet per company, never pooled (spec §7.1). Owned in Privy by
