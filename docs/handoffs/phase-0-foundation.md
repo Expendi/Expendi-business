@@ -115,7 +115,7 @@ Secrets are stored in Doppler. Railway sets only `SECRETS_MANAGER=doppler` and `
 
 ## Handoff notes (fill in before ending each session)
 
-- **Status:** T1–T4 are built and their acceptance criteria pass. Phase 0 is waiting on the Checkpoint A review and the three manual QA items that need a real Privy app (see QA results).
+- **Status:** T1–T4 are built, their acceptance criteria pass, and all manual QA passed against the real Expendi Business Privy app on 2026-11-01. Only the Checkpoint A review with Dennis is left.
 - **Built:**
   - **T1:** Turbo + pnpm workspace with `apps/api`, `packages/shared`, and `tooling/{typescript,eslint,prettier}` (the frontend monorepo's layout). Hono + Effect API with `GET /health`. Config goes through Effect `Config`; DB URLs and the Privy secret are `Redacted`. The Doppler secrets bootstrap is ported from `backend/src/secrets/`. The server shuts down cleanly on SIGTERM.
   - **T2:** Drizzle schema for `organizations`, `users`, `memberships`. Migrations `0000_init` and `0001_rls`: group role `expendi_business_app`, least-privilege grants, ENABLE+FORCE RLS, and per-command policies keyed on `app.org_id`/`app.user_id`, set per transaction. The API refuses to start if its DB role is a superuser, has BYPASSRLS, or owns a table. The tenant middleware returns the same 403 for a malformed ID, an unknown company, a non-member, and an invited or removed membership. First company-scoped route: `GET /organizations/:organizationId`. The isolation helpers are `src/__tests__/helpers/isolation.ts` (`expectTableIsolation`, `expectRouteIsolation`).
@@ -151,5 +151,12 @@ Secrets are stored in Doppler. Railway sets only `SECRETS_MANAGER=doppler` and `
   - **Automated, all pass:** 95 tests after the switch to email login (91 before it). The fresh-clone simulation (install, build, typecheck, test), lint and format check pass too.
   - **Mutation checks, each re-run to green after reverting:** disabling RLS on `memberships` fails 5 isolation tests. Session-level `set_config` fails the pooled-connection leak test. Dropping the audit triggers fails the 3 owner-role tests. Removing `ON CONFLICT` fails the concurrent-first-login test (re-checked after the switch to email login).
   - **Manual, done:** migrations run twice on an empty DB (second run no-op); the dev DB now has all 5 applied, including `0004_users_email_login`. Checked in psql as `expendi_business_api`: not superuser, no BYPASSRLS, owns no table, `memberships` returns 0 rows. The built server returns `/health` 200 with `x-request-id`, and `/me` and company routes return 401 without a valid token. Started with the owner role's URL, the server exits with code 1.
-  - **Manual, not done:** the Privy test-account login, the 403 with a real token, and `request_id` against a real login. These need the new Privy app's credentials. Automated tests cover the same paths: the real SDK verification runs against locally signed JWTs, and the route tests use a fake Privy.
-- **Next session starts with:** Dennis creates the Expendi Business Privy app (email login and passkeys enabled, a test email account) and puts `PRIVY_APP_ID`/`PRIVY_APP_SECRET` in Doppler or `apps/api/.env`. Run the three remaining manual QA items, review Checkpoint A, then start Phase 1 with T5 (EXP-273, the Privy wallet-policy spike).
+  - **Manual with the real Privy app, done 2026-11-01:** the Expendi Business app ID ends in `gns2d6`, the test account is `test-4960@privy.io`, and the local API ran on :3000. All pass:
+    - a real test-account token returns the user from `GET /me` (200), and a second call doesn't create a second user row
+    - a company the user doesn't belong to returns 403; the user's own company returns 200 as a control
+    - the first login's audit entry (`user.registered`) has the same `request_id` as the response's `x-request-id`
+  - **How to re-run it:** the check script is `apps/api/.cache/qa-real-login.mts` (git-ignored). Run it with `QA_API_URL`, `QA_TEST_EMAIL` and `QA_TEST_OTP` set. The SDK's `apps().getTestAccessToken()` returned nothing for this app, so the script logs in through Privy's client `passwordless/init` and `passwordless/authenticate` endpoints instead.
+- **Next session starts with:** review Checkpoint A with Dennis, then start Phase 1 with T5 (EXP-273, the Privy wallet-policy spike).
+  - The Privy app exists, and its keys are in the local `apps/api/.env` only.
+  - Still to do in Privy: turn on passkeys (currently off; Phase 2 needs them).
+  - Still to do in Doppler: add the keys for deploys.

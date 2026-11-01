@@ -8,14 +8,14 @@ The company holds USD as USDC in a wallet Expendi manages. Expendi pays out in K
 
 _Last updated 2026-11-01._
 
-| Phase                           | What it covers                                                                      | Status                                        |
-| ------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------- |
-| 0 · Foundation                  | Monorepo, API, per-company data isolation, audit log, login                         | **Built.** Waiting on the Checkpoint A review |
-| 1 · Money path                  | Company wallet, Paycrest payouts to every method, one payout engine, USDC payouts   | **Next**                                      |
-| 2 · Claim flow                  | Expo app, sign-up, invites, claims, receipt reading, eTIMS, Approve & pay           | Not started                                   |
-| 2B · Spending & payments        | Payees, bills, recurring payments, salaries, petty cash, company spending, overview | Not started                                   |
-| 3 · Accountant & internal tools | Monthly export, Zoho Books sync, internal admin app, import, alerts                 | Not started                                   |
-| 4 · Pilot launch                | App distribution and go-live with the pilot company                                 | Not started                                   |
+| Phase                           | What it covers                                                                      | Status                                       |
+| ------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------- |
+| 0 · Foundation                  | Monorepo, API, per-company data isolation, audit log, login                         | **Built and QA'd.** Checkpoint A review left |
+| 1 · Money path                  | Company wallet, Paycrest payouts to every method, one payout engine, USDC payouts   | **Next**                                     |
+| 2 · Claim flow                  | Expo app, sign-up, invites, claims, receipt reading, eTIMS, Approve & pay           | Not started                                  |
+| 2B · Spending & payments        | Payees, bills, recurring payments, salaries, petty cash, company spending, overview | Not started                                  |
+| 3 · Accountant & internal tools | Monthly export, Zoho Books sync, internal admin app, import, alerts                 | Not started                                  |
+| 4 · Pilot launch                | App distribution and go-live with the pilot company                                 | Not started                                  |
 
 ### Implemented so far (Phase 0, tasks T1–T4)
 
@@ -30,11 +30,14 @@ _Last updated 2026-11-01._
 - **Secrets:** loaded from Doppler at startup.
 - **Ready for the wider scope:** a payroll cap margin on each company, and the caller's role available to database policies, so salaries can be hidden from employees.
 - **Tests:** 103, all passing, with build, typecheck, lint and format checks.
+- **Manual QA with the real Privy app (2026-11-01):** passed. A real test-account login reaches `GET /me`, gets 403 for another company, and its audit entry carries the response's request ID.
 
 ### Up next
 
-1. **Create the Expendi Business Privy app** with email login and passkeys, and put its keys in Doppler.
-2. **Finish Phase 0:** run the 3 remaining manual checks that need a real Privy login, then review Checkpoint A.
+1. **Review Checkpoint A** for Phase 0.
+2. **Finish the Privy setup:**
+   - turn on passkeys (Phase 2 needs them for login and payment approvals)
+   - put the app keys in Doppler for deploys (locally they're in the git-ignored `apps/api/.env`)
 3. **Start Phase 1 with T5:** check what Privy wallet policies can enforce. Use the start prompt in the [Phase 1 handoff](docs/handoffs/phase-1-money-path.md).
 4. **Optional parallel work:** the internal admin app (T23) and audit log viewer (T27) only need Phase 0, so another session can build them alongside Phase 1.
 
