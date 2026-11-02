@@ -19,8 +19,8 @@ import { BILL_STATUSES } from "@expendi-business/shared";
 
 import { categories } from "./categories.js";
 import { timestamps } from "./columns.js";
-import { overviewHeading } from "./expenses.js";
 import { organizations } from "./organizations.js";
+import { overviewHeading } from "./overview-heading.js";
 import { payees } from "./payees.js";
 import { payouts } from "./payouts.js";
 import { payrollRuns } from "./payroll-runs.js";
@@ -118,11 +118,25 @@ export const bills = pgTable(
     // A recurring payment has at most one bill still owed (spec §10): one
     // unpaid, or being paid. Its next bill can only be created once that one
     // is paid, paid outside or cancelled. OUTSTANDING_BILL_STATUSES in shared.
+    // Salaries are left out: their unit is the payroll run, so a person's
+    // pay for one month never waits on the month before, e.g. a failed
+    // payout still being retried.
     uniqueIndex("bills_recurring_item_outstanding_unique")
       .on(table.recurringItemId)
       .where(
-        sql`${table.recurringItemId} IS NOT NULL AND ${table.status} IN ('upcoming', 'due', 'overdue', 'payout_failed', 'paying')`,
+        sql`${table.recurringItemId} IS NOT NULL AND ${table.payrollRunId} IS NULL AND ${table.status} IN ('upcoming', 'due', 'overdue', 'payout_failed', 'paying')`,
       ),
+    // One bill per salary in a payroll run, whatever its status: a person
+    // left out of a run isn't drafted into it again. One-off payments have
+    // no salary, so a person can have several.
+    uniqueIndex("bills_payroll_run_salary_unique")
+      .on(table.payrollRunId, table.recurringItemId)
+      .where(
+        sql`${table.payrollRunId} IS NOT NULL AND ${table.recurringItemId} IS NOT NULL`,
+      ),
+    index("bills_payroll_run_id_idx")
+      .on(table.payrollRunId)
+      .where(sql`${table.payrollRunId} IS NOT NULL`),
     // What the daily status job scans.
     index("bills_dated_due_on_idx")
       .on(table.dueOn)

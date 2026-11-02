@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   check,
   date,
   foreignKey,
@@ -20,17 +21,19 @@ import {
   EXPENSE_KINDS,
   EXPENSE_SOURCES,
   EXPENSE_STATUSES,
-  OVERVIEW_HEADINGS,
 } from "@expendi-business/shared";
 
+import { bills } from "./bills.js";
 import { categories } from "./categories.js";
 import { timestamps } from "./columns.js";
 import { memberships } from "./memberships.js";
 import { organizations } from "./organizations.js";
+import { overviewHeading } from "./overview-heading.js";
+import { paidFromAccounts } from "./paid-from-accounts.js";
+import { payouts } from "./payouts.js";
 import { users } from "./users.js";
 
 export const expenseKind = pgEnum("expense_kind", EXPENSE_KINDS);
-export const overviewHeading = pgEnum("overview_heading", OVERVIEW_HEADINGS);
 export const expenseSource = pgEnum("expense_source", EXPENSE_SOURCES);
 export const expenseStatus = pgEnum("expense_status", EXPENSE_STATUSES);
 export const etimsStatus = pgEnum("etims_status", ETIMS_STATUSES);
@@ -54,8 +57,13 @@ export const expenses = pgTable(
     overviewHeading: overviewHeading("overview_heading").notNull(),
     /** Float spending's float (spec §6.22); its foreign key comes with the floats table. */
     floatId: uuid("float_id"),
-    /** Company spending's source account, as mapped for Zoho (spec §6.23). */
-    paidFromAccount: text("paid_from_account"),
+    /**
+     * Company spending's source account (spec §6.17, §6.23). Null only on
+     * spending recorded from a bill marked paid without saying from where.
+     */
+    paidFromAccountId: uuid("paid_from_account_id"),
+    /** The bill marked paid outside Expendi that recorded this company spending (spec §6.23). */
+    billId: uuid("bill_id"),
     categoryId: uuid("category_id").notNull(),
     merchant: text("merchant").notNull(),
     /** KES cents. */
@@ -75,11 +83,23 @@ export const expenses = pgTable(
     etimsStatus: etimsStatus("etims_status").notNull().default("none"),
     /** What reading the receipt returned, before the employee's edits (spec §6.4). */
     extraction: jsonb("extraction"),
+    /**
+     * Why an admin saved it without a receipt (spec §6.23); such spending is
+     * flagged "no receipt". Never on a claim, which always has one (spec §6.5).
+     */
+    noReceiptReason: text("no_receipt_reason"),
     /** Shown to the admin, e.g. a near-duplicate or an old date (spec §6.5). */
     warnings: jsonb("warnings").$type<unknown[]>().notNull().default([]),
     /** Set only while `rejected`; earlier reasons stay in the audit log. */
     rejectedReason: text("rejected_reason"),
     approvedBy: uuid("approved_by").references(() => users.id),
+    /**
+     * The claimant approved their own claim (spec §4): allowed, and flagged
+     * here for the export as well as in the audit log.
+     */
+    selfApproved: boolean("self_approved").notNull().default(false),
+    /** The claim's latest payout (spec §6.7); a retry replaces it. */
+    payoutId: uuid("payout_id"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     ...timestamps,
@@ -95,6 +115,21 @@ export const expenses = pgTable(
       columns: [table.categoryId, table.organizationId],
       foreignColumns: [categories.id, categories.organizationId],
     }),
+    foreignKey({
+      name: "expenses_paid_from_account_organization_fk",
+      columns: [table.paidFromAccountId, table.organizationId],
+      foreignColumns: [paidFromAccounts.id, paidFromAccounts.organizationId],
+    }),
+    foreignKey({
+      name: "expenses_payout_organization_fk",
+      columns: [table.payoutId, table.organizationId],
+      foreignColumns: [payouts.id, payouts.organizationId],
+    }),
+    foreignKey({
+      name: "expenses_bill_organization_fk",
+      columns: [table.billId, table.organizationId],
+      foreignColumns: [bills.id, bills.organizationId],
+    }),
     // Target of receipt_files' composite foreign key.
     unique("expenses_id_organization_id_unique").on(
       table.id,
@@ -106,6 +141,14 @@ export const expenses = pgTable(
     uniqueIndex("expenses_etims_invoice_number_unique")
       .on(table.organizationId, table.etimsInvoiceNumber)
       .where(sql`${table.etimsInvoiceNumber} IS NOT NULL`),
+    // A bill paid outside Expendi records exactly one company spending entry,
+    // however often marking it is retried (spec §6.23).
+    uniqueIndex("expenses_payout_id_unique")
+      .on(table.payoutId)
+      .where(sql`${table.payoutId} IS NOT NULL`),
+    uniqueIndex("expenses_bill_id_unique")
+      .on(table.billId)
+      .where(sql`${table.billId} IS NOT NULL`),
     index("expenses_organization_created_idx").on(
       table.organizationId,
       table.createdAt,
@@ -113,6 +156,12 @@ export const expenses = pgTable(
     index("expenses_membership_created_idx").on(
       table.membershipId,
       table.createdAt,
+    ),
+    // Company spending and the overview list one kind by date.
+    index("expenses_organization_kind_spent_on_idx").on(
+      table.organizationId,
+      table.kind,
+      table.spentOn,
     ),
     check("expenses_amount_positive", sql`${table.amountKes} > 0`),
     check(
@@ -122,6 +171,22 @@ export const expenses = pgTable(
     check(
       "expenses_rejected_has_reason",
       sql`(${table.status} = 'rejected') = (${table.rejectedReason} IS NOT NULL)`,
+    ),
+    check(
+      "expenses_self_approval_is_approved",
+      sql`NOT ${table.selfApproved} OR ${table.approvedBy} IS NOT NULL`,
+    ),
+    check(
+      "expenses_company_recorded",
+      sql`${table.kind} <> 'company' OR ${table.status} = 'recorded'`,
+    ),
+    check(
+      "expenses_company_links",
+      sql`${table.kind} = 'company' OR (${table.paidFromAccountId} IS NULL AND ${table.billId} IS NULL)`,
+    ),
+    check(
+      "expenses_no_receipt_reason",
+      sql`${table.noReceiptReason} IS NULL OR (${table.kind} <> 'claim' AND length(btrim(${table.noReceiptReason})) > 0)`,
     ),
   ],
 );

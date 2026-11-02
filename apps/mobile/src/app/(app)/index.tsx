@@ -66,8 +66,19 @@ export default function HomeScreen(): JSX.Element {
         onPress={() => router.push("/claims")}
       />
 
+      <ListRow
+        title="My salary payments"
+        subtitle="Your pay from this company"
+        onPress={() => router.push("/salary-payments")}
+      />
+
       {company.role === "admin" ? (
         <View className="gap-3">
+          <ListRow
+            title="Approvals"
+            subtitle="Claims waiting for you to approve and pay"
+            onPress={() => router.push("/approvals")}
+          />
           <ListRow
             title="Bills"
             subtitle="What’s due, overdue and paid"
@@ -87,6 +98,16 @@ export default function HomeScreen(): JSX.Element {
             title="Payees"
             subtitle="Suppliers, subscriptions and others the company pays"
             onPress={() => router.push("/payees")}
+          />
+          <ListRow
+            title="Payroll"
+            subtitle="Salaries and payroll runs. Only admins see them."
+            onPress={() => router.push("/payroll")}
+          />
+          <ListRow
+            title="Company spending"
+            subtitle="Spending already paid from the bank, card or cash"
+            onPress={() => router.push("/spending")}
           />
         </View>
       ) : null}

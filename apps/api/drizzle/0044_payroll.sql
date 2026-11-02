@@ -1,0 +1,10 @@
+ALTER TYPE "public"."webauthn_purpose" ADD VALUE 'change_salary';--> statement-breakpoint
+DROP INDEX "bills_recurring_item_outstanding_unique";--> statement-breakpoint
+ALTER TABLE "payroll_runs" ADD COLUMN "salaries_kes" bigint DEFAULT 0 NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "bills_payroll_run_salary_unique" ON "bills" USING btree ("payroll_run_id","recurring_item_id") WHERE "bills"."payroll_run_id" IS NOT NULL AND "bills"."recurring_item_id" IS NOT NULL;--> statement-breakpoint
+CREATE INDEX "bills_payroll_run_id_idx" ON "bills" USING btree ("payroll_run_id") WHERE "bills"."payroll_run_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "recurring_items_one_salary_per_payee" ON "recurring_items" USING btree ("payee_id") WHERE "recurring_items"."overview_heading" = 'salaries' AND "recurring_items"."next_due_on" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "bills_recurring_item_outstanding_unique" ON "bills" USING btree ("recurring_item_id") WHERE "bills"."recurring_item_id" IS NOT NULL AND "bills"."payroll_run_id" IS NULL AND "bills"."status" IN ('upcoming', 'due', 'overdue', 'payout_failed', 'paying');--> statement-breakpoint
+ALTER TABLE "payroll_runs" ADD CONSTRAINT "payroll_runs_organization_pay_date_unique" UNIQUE("organization_id","pay_date");--> statement-breakpoint
+ALTER TABLE "payroll_runs" ADD CONSTRAINT "payroll_runs_cap_covers_salaries" CHECK ("payroll_runs"."salaries_kes" >= 0 AND "payroll_runs"."cap_kes" >= "payroll_runs"."salaries_kes");--> statement-breakpoint
+ALTER TABLE "recurring_items" ADD CONSTRAINT "recurring_items_salary_shape" CHECK ("recurring_items"."overview_heading" <> 'salaries' OR ("recurring_items"."amount_kes" IS NOT NULL AND "recurring_items"."schedule" = 'monthly' AND "recurring_items"."pay_via" = 'expendi'));

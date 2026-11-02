@@ -35,6 +35,7 @@ import { fromMicro } from "../paycrest/amounts.js";
 import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
 import { payoutIntentHash } from "./intent.js";
 import { PayoutRejected } from "./payout-errors.js";
+import { approveSubjects } from "./subjects.js";
 
 type ApproveDeps = DatabaseService | AuditLog | ApprovalSettings;
 
@@ -342,9 +343,12 @@ export function approvePayouts(input: {
           (yield* ledgerBalance(tx, wallet.id)) -
           (yield* reservedForPayouts(tx, wallet.id));
         if (available < needed) {
-          return yield* reject(
-            "insufficient_balance",
-            `The wallet is short by ${fromMicro(needed - available)} USDC. Top up first.`,
+          return yield* Effect.fail(
+            new PayoutRejected({
+              reason: "insufficient_balance",
+              message: `The wallet is short by ${fromMicro(needed - available)} USDC. Top up first.`,
+              shortfallUsdc: needed - available,
+            }),
           );
         }
 
@@ -385,6 +389,7 @@ export function approvePayouts(input: {
             },
           });
         }
+        yield* approveSubjects(tx, approved);
         return approved;
       }),
     ).pipe(

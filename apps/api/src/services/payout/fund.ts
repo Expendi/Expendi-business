@@ -19,6 +19,7 @@ import { PrivyWallets } from "../wallet/privy-wallets.js";
 import { isPaused, lockPayout } from "./guards.js";
 import { fundOnchainPayout } from "./onchain.js";
 import { PAYOUT_MEMO } from "./prepare.js";
+import { applyPayoutOutcome } from "./subjects.js";
 
 const ACTOR = { type: "system", id: "payout-engine" } as const;
 
@@ -86,6 +87,7 @@ function fundPaycrestPayout(input: {
             entity: { type: "payout", id: payoutId },
             after: { status: updated.status, ...after },
           });
+          yield* applyPayoutOutcome(tx, updated);
           return updated;
         }),
       );
@@ -258,14 +260,16 @@ function fundPaycrestPayout(input: {
         if (checkOrder(order, { ...expected, now: Date.now() })) {
           return "expired" as const;
         }
-        yield* query(() =>
+        const [funding] = yield* query(() =>
           tx
             .update(payouts)
             .set({ status: "funding", fundingStartedAt: new Date() })
             .where(
               and(eq(payouts.id, payoutId), isNull(payouts.fundingStartedAt)),
-            ),
+            )
+            .returning(),
         );
+        if (funding) yield* applyPayoutOutcome(tx, funding);
         yield* audit.record(tx, {
           actor: ACTOR,
           organizationId,
@@ -357,6 +361,7 @@ function fundPaycrestPayout(input: {
             amountToTransfer: amount,
           },
         });
+        yield* applyPayoutOutcome(tx, paying);
         return paying;
       }),
     );

@@ -12,6 +12,7 @@ import { BaseRpc } from "../chain/base-rpc.js";
 import { usdcTransfersIn } from "../chain/base.js";
 import { PrivyWallets } from "../wallet/privy-wallets.js";
 import { isPaused, lockPayout } from "./guards.js";
+import { applyPayoutOutcome } from "./subjects.js";
 import { FUNDING_STUCK_MS } from "./sync.js";
 
 /**
@@ -71,6 +72,7 @@ export function fundOnchainPayout(input: {
             entity: { type: "payout", id: payoutId },
             after: { status: updated.status, ...after },
           });
+          yield* applyPayoutOutcome(tx, updated);
           return updated;
         }),
       );
@@ -111,7 +113,7 @@ export function fundOnchainPayout(input: {
             reason: "The company wallet isn't active.",
           } as const;
         }
-        yield* query(() =>
+        const [funding] = yield* query(() =>
           tx
             .update(payouts)
             .set({
@@ -120,8 +122,10 @@ export function fundOnchainPayout(input: {
               depositAddress: address,
               amountToTransferUsdc: payout.quotedUsdc,
             })
-            .where(eq(payouts.id, payoutId)),
+            .where(eq(payouts.id, payoutId))
+            .returning(),
         );
+        if (funding) yield* applyPayoutOutcome(tx, funding);
         yield* audit.record(tx, {
           actor: ENGINE,
           organizationId,
@@ -218,6 +222,7 @@ export function fundOnchainPayout(input: {
             amount: barrier.amount,
           },
         });
+        yield* applyPayoutOutcome(tx, paying);
         return paying;
       }),
     );
@@ -364,9 +369,10 @@ export function confirmOnchainPayouts(
                       eq(payouts.status, payout.status),
                     ),
                   )
-                  .returning({ id: payouts.id }),
+                  .returning(),
               );
               if (!updated) return false;
+              yield* applyPayoutOutcome(tx, updated);
               yield* audit.record(tx, {
                 actor: CONFIRMER,
                 organizationId: ref.organization_id,

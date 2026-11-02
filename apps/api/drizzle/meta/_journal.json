@@ -281,6 +281,48 @@
       "when": 1793583595200,
       "tag": "0039_recurring_items_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1793600072176,
+      "tag": "0040_company_spending",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1793600080542,
+      "tag": "0041_company_spending_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1793600094584,
+      "tag": "0042_drop_expenses_paid_from_account",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1793600191601,
+      "tag": "0043_claim_approval",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1793600312934,
+      "tag": "0044_payroll",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1793600324449,
+      "tag": "0045_payroll_privacy",
+      "breakpoints": true
     }
   ]
 }

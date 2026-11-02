@@ -22,6 +22,7 @@ import { query, withScope } from "../../db/scope.js";
 import { BadRequest, Conflict } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { lockPayout } from "../payout/guards.js";
+import { applyPayoutOutcome } from "../payout/subjects.js";
 import {
   issueConfirmation,
   peekConfirmation,
@@ -309,6 +310,7 @@ export function confirmResolution(
             confirmationId: confirmation.id,
           },
         });
+        yield* applyPayoutOutcome(tx, updated);
         return {
           status: updated.status,
           ledgerDebit: recorded ? ledgerView(recorded) : null,

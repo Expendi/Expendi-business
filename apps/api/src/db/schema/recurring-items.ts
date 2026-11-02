@@ -10,6 +10,7 @@ import {
   pgEnum,
   pgTable,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -22,8 +23,8 @@ import {
 
 import { categories } from "./categories.js";
 import { timestamps } from "./columns.js";
-import { overviewHeading } from "./expenses.js";
 import { organizations } from "./organizations.js";
+import { overviewHeading } from "./overview-heading.js";
 import { payees } from "./payees.js";
 
 export const recurringSchedule = pgEnum(
@@ -43,7 +44,9 @@ export const recurringPayVia = pgEnum("recurring_pay_via", RECURRING_PAY_VIA);
  *   never passes `ends_on`; null means the schedule has ended, which is
  *   final. `active = false` is paused.
  * - Salaries (the `salaries` heading) are created and billed by payroll
- *   (T38), not by the recurring-bills job.
+ *   (T38), not by the recurring-bills job: monthly on the pay day, a fixed
+ *   net pay, paid through Expendi. `next_due_on` is the next pay date not
+ *   yet in a payroll run.
  */
 export const recurringItems = pgTable(
   "recurring_items",
@@ -110,6 +113,16 @@ export const recurringItems = pgTable(
     check(
       "recurring_items_ends_after_start",
       sql`${table.endsOn} IS NULL OR ${table.endsOn} >= ${table.startsOn}`,
+    ),
+    // A person has one salary until it ends.
+    uniqueIndex("recurring_items_one_salary_per_payee")
+      .on(table.payeeId)
+      .where(
+        sql`${table.overviewHeading} = 'salaries' AND ${table.nextDueOn} IS NOT NULL`,
+      ),
+    check(
+      "recurring_items_salary_shape",
+      sql`${table.overviewHeading} <> 'salaries' OR (${table.amountKes} IS NOT NULL AND ${table.schedule} = 'monthly' AND ${table.payVia} = 'expendi')`,
     ),
     check(
       "recurring_items_next_due_in_schedule",

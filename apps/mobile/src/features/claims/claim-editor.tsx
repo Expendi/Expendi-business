@@ -355,7 +355,7 @@ export function ClaimEditor({
 }
 
 /** Reading a receipt only pre-fills the form; the person can stop waiting. */
-function ReadingNotice({
+export function ReadingNotice({
   status,
   onStop,
 }: {
@@ -392,7 +392,7 @@ function ReadingNotice({
   return null;
 }
 
-function CategoryField({
+export function CategoryField({
   categories,
   loading,
   loadError,
@@ -595,7 +595,7 @@ const SOURCE_NOTES: Record<FieldSource, string> = {
 };
 
 /** Says where a value the person didn't type came from (spec §6.3). */
-function SourceNote({
+export function SourceNote({
   source,
 }: {
   source: FieldSource | undefined;
@@ -615,7 +615,7 @@ function SourceNote({
 }
 
 /** Scanning is optional; an unreadable code is still kept (spec §6.4). */
-function EtimsQrField({
+export function EtimsQrField({
   scanned,
   note,
   error,

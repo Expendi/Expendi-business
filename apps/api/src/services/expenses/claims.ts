@@ -13,6 +13,7 @@ import type {
 import { EDITABLE_CLAIM_STATUSES } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
+import type { Payout } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError, ServiceUnavailable } from "../../errors.js";
 import type { Tenant } from "../../middleware/tenant.js";
@@ -23,6 +24,7 @@ import {
   categories,
   expenses,
   memberships,
+  payouts,
   receiptFiles,
   users,
 } from "../../db/schema/index.js";
@@ -47,9 +49,9 @@ import {
 import { reconcileWithSms, smsTextAmong } from "./sms-evidence.js";
 
 /**
- * Staff claims up to approval (spec §5, §6.3): submitting, listing, and the
- * owner's edits while a claim is `submitted` or `rejected`, where editing a
- * rejected claim resubmits it. Approval and payment are T19.
+ * Staff claims (spec §5, §6.3): submitting, listing, the owner's edits while
+ * a claim is `submitted` or `rejected` (editing a rejected claim resubmits
+ * it), and an admin rejecting it. Approve & pay is `claim-approval.ts`.
  */
 
 /** `Claim` before serialisation turns bigints and dates into strings. */
@@ -71,7 +73,11 @@ export interface ClaimView {
     readonly membershipId: string;
     readonly name: string | null;
     readonly email: string;
+    readonly payoutPhoneConfirmed: boolean;
   };
+  readonly approvedAt: Date | null;
+  readonly selfApproved: boolean;
+  readonly paidAt: Date | null;
   readonly canEdit: boolean;
   /** Admins only (spec §6.5). */
   readonly warnings: readonly ExpenseWarning[];
@@ -92,6 +98,12 @@ export type ClaimReceiptView =
 
 export interface ClaimDetailView extends ClaimView {
   readonly receipts: readonly ClaimReceiptView[];
+  /** Admins only (spec §6.8): the latest payment, to see why it failed. */
+  readonly payout: {
+    readonly id: string;
+    readonly status: Payout["status"];
+    readonly failureReason: string | null;
+  } | null;
 }
 
 export interface ClaimsPageView {
@@ -209,6 +221,11 @@ const claimColumns = {
     string | null
   >`coalesce(${users.fullName}, ${memberships.fullName})`,
   submitterEmail: sql<string>`coalesce(${users.email}, ${memberships.email})`,
+  submitterPhoneConfirmed: sql<boolean>`${users.phone} IS NOT NULL`,
+  approvedAt: expenses.approvedAt,
+  selfApproved: expenses.selfApproved,
+  paidAt: expenses.paidAt,
+  payoutId: expenses.payoutId,
   receiptCount: sql<number>`(SELECT count(*)::int FROM ${receiptFiles} WHERE ${receiptFiles.expenseId} = ${expenses.id})`,
   createdAt: expenses.createdAt,
   updatedAt: expenses.updatedAt,
@@ -246,7 +263,11 @@ function toClaimView(tenant: Tenant, row: ClaimRow): ClaimView {
       membershipId: row.membershipId,
       name: row.submitterName,
       email: row.submitterEmail,
+      payoutPhoneConfirmed: row.submitterPhoneConfirmed,
     },
+    approvedAt: row.approvedAt,
+    selfApproved: row.selfApproved,
+    paidAt: row.paidAt,
     canEdit: row.membershipId === tenant.membershipId && isEditable(row.status),
     warnings: tenant.role === "admin" ? readWarnings(row.warnings) : [],
     receiptCount: row.receiptCount,
@@ -325,7 +346,7 @@ export function getClaim(
 > {
   return Effect.gen(function* () {
     const storage = yield* FileStorage;
-    const { row, files } = yield* withScope(tenant, (tx) =>
+    const { row, files, payout } = yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
         const [row] = yield* query(() =>
           selectClaims(
@@ -334,6 +355,20 @@ export function getClaim(
           ).limit(1),
         );
         if (!row) return yield* Effect.fail(claimNotFound);
+        const payoutId = row.payoutId;
+        const [payout] =
+          tenant.role === "admin" && payoutId
+            ? yield* query(() =>
+                tx
+                  .select({
+                    id: payouts.id,
+                    status: payouts.status,
+                    failureReason: payouts.failureReason,
+                  })
+                  .from(payouts)
+                  .where(eq(payouts.id, payoutId)),
+              )
+            : [];
         const files = yield* query(() =>
           tx
             .select({
@@ -352,7 +387,7 @@ export function getClaim(
             )
             .orderBy(asc(receiptFiles.createdAt), asc(receiptFiles.id)),
         );
-        return { row, files };
+        return { row, files, payout: payout ?? null };
       }),
     );
     const receipts = yield* Effect.forEach(
@@ -377,7 +412,7 @@ export function getClaim(
         );
       },
     ).pipe(Effect.mapError(storageFailure));
-    return { ...toClaimView(tenant, row), receipts };
+    return { ...toClaimView(tenant, row), receipts, payout };
   });
 }
 
@@ -759,6 +794,58 @@ export function updateClaim(
         });
       }),
     ).pipe(Effect.catchTag("DatabaseError", duplicateCodeConflict));
+    return yield* getClaim(tenant, claimId);
+  });
+}
+
+/**
+ * An admin rejects a claim waiting for approval, with a reason the
+ * employee sees (spec §5). They can edit and resubmit it.
+ */
+export function rejectClaim(
+  tenant: Tenant,
+  claimId: string,
+  reason: string,
+): Effect.Effect<
+  ClaimDetailView,
+  Conflict | NotFound | ServiceUnavailable | DatabaseError,
+  DatabaseService | AuditLog | FileStorage
+> {
+  return Effect.gen(function* () {
+    yield* withScope(tenant, (tx) =>
+      Effect.gen(function* () {
+        const audit = yield* AuditLog;
+        const [claim] = yield* query(() =>
+          tx
+            .select({ status: expenses.status })
+            .from(expenses)
+            .where(and(visibleClaims(tenant), eq(expenses.id, claimId)))
+            .for("update"),
+        );
+        if (!claim) return yield* Effect.fail(claimNotFound);
+        if (claim.status !== "submitted") {
+          return yield* Effect.fail(
+            new Conflict({
+              message: "Only a claim waiting for approval can be rejected.",
+            }),
+          );
+        }
+        yield* query(() =>
+          tx
+            .update(expenses)
+            .set({ status: "rejected", rejectedReason: reason })
+            .where(eq(expenses.id, claimId)),
+        );
+        yield* audit.record(tx, {
+          actor: userActor(tenant),
+          organizationId: tenant.organizationId,
+          action: "expense.rejected",
+          entity: { type: "expense", id: claimId },
+          before: { status: claim.status },
+          after: { status: "rejected", rejectedReason: reason },
+        });
+      }),
+    );
     return yield* getClaim(tenant, claimId);
   });
 }

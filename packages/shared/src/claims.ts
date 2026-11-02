@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ETIMS_QR_MAX_BYTES, etimsQrByteLength } from "./etims-qr.js";
 import { parseKesToCents } from "./kes-amount.js";
 import { KRA_PIN_PATTERN } from "./organization.js";
+import { payoutStatusSchema } from "./wallet-history.js";
 
 /**
  * Money out recorded with a receipt (spec §5): a staff claim, spending from
@@ -392,7 +393,14 @@ export const claimSchema = z.object({
     membershipId: z.uuid(),
     name: z.string().nullable(),
     email: z.string(),
+    /** Whether they've confirmed an M-Pesa payout number; Approve & pay waits for it (spec §6.18). */
+    payoutPhoneConfirmed: z.boolean(),
   }),
+  /** When an admin last approved it for payment. */
+  approvedAt: z.iso.datetime().nullable(),
+  /** The claimant approved it themselves (spec §4); flagged in the audit log and the export. */
+  selfApproved: z.boolean(),
+  paidAt: z.iso.datetime().nullable(),
   /** The caller's own claim, still `submitted` or `rejected`. */
   canEdit: z.boolean(),
   /** For admins only; always empty for anyone else. */
@@ -425,6 +433,14 @@ export type ClaimReceipt = z.infer<typeof claimReceiptSchema>;
 
 export const claimDetailSchema = claimSchema.extend({
   receipts: z.array(claimReceiptSchema),
+  /** The latest payment of the claim, for admins only; null for anyone else. */
+  payout: z
+    .object({
+      id: z.uuid(),
+      status: payoutStatusSchema,
+      failureReason: z.string().nullable(),
+    })
+    .nullable(),
 });
 
 export type ClaimDetail = z.infer<typeof claimDetailSchema>;

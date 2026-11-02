@@ -23,6 +23,7 @@ export function payoutRejectionAsClientError(
     case "payroll_cap":
     case "paused":
     case "no_wallet":
+    case "subject_not_payable":
       return new Conflict({ message });
     case "empty_batch":
     case "mixed_batch":

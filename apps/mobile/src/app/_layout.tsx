@@ -133,6 +133,58 @@ function RootNavigator(): JSX.Element {
           options={withHeader("Edit recurring payment")}
         />
         <Stack.Screen
+          name="(admin)/spending/index"
+          options={withHeader("Company spending")}
+        />
+        <Stack.Screen
+          name="(admin)/spending/new"
+          options={withHeader("Record spending")}
+        />
+        <Stack.Screen
+          name="(admin)/spending/accounts"
+          options={withHeader("Paid-from accounts")}
+        />
+        <Stack.Screen
+          name="(admin)/spending/[spendingId]/index"
+          options={withHeader("Company spending")}
+        />
+        <Stack.Screen
+          name="(admin)/spending/[spendingId]/edit"
+          options={withHeader("Edit spending")}
+        />
+        <Stack.Screen
+          name="(admin)/approvals/index"
+          options={withHeader("Approvals")}
+        />
+        <Stack.Screen
+          name="(admin)/approvals/[claimId]/pay"
+          options={withHeader("Approve & pay")}
+        />
+        <Stack.Screen
+          name="(admin)/payroll/index"
+          options={withHeader("Payroll")}
+        />
+        <Stack.Screen
+          name="(admin)/payroll/salaries/index"
+          options={withHeader("Salaries")}
+        />
+        <Stack.Screen
+          name="(admin)/payroll/salaries/new"
+          options={withHeader("New salary")}
+        />
+        <Stack.Screen
+          name="(admin)/payroll/salaries/[salaryId]"
+          options={withHeader("Salary")}
+        />
+        <Stack.Screen
+          name="(admin)/payroll/runs/[runId]"
+          options={withHeader("Payroll run")}
+        />
+        <Stack.Screen
+          name="(employee)/salary-payments"
+          options={withHeader("My salary payments")}
+        />
+        <Stack.Screen
           name="(employee)/claims/index"
           options={withHeader("Claims")}
         />

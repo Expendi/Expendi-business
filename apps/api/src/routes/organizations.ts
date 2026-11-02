@@ -20,9 +20,16 @@ import { createBillRoutes } from "./bills.js";
 import { createCategoryRoutes } from "./categories.js";
 import { createClaimRoutes } from "./claims.js";
 import { createMemberRoutes } from "./members.js";
+import { createPaidFromAccountRoutes } from "./paid-from-accounts.js";
 import { createPayeeRoutes } from "./payees.js";
+import {
+  createMyCompanyRoutes,
+  createPayrollRunRoutes,
+  createSalaryRoutes,
+} from "./payroll.js";
 import { createReceiptRoutes } from "./receipts.js";
 import { createRecurringItemRoutes } from "./recurring-items.js";
+import { createCompanySpendingRoutes } from "./spending.js";
 import { createWalletRoutes } from "./wallet.js";
 import { createWithdrawalRoutes } from "./withdrawals.js";
 
@@ -86,10 +93,15 @@ export function createOrganizationRoutes(
     .route("/bills", createBillRoutes(runtime))
     .route("/categories", createCategoryRoutes(runtime))
     .route("/claims", createClaimRoutes(runtime))
+    .route("/company-spending", createCompanySpendingRoutes(runtime))
     .route("/members", createMemberRoutes(runtime))
+    .route("/me", createMyCompanyRoutes(runtime))
+    .route("/paid-from-accounts", createPaidFromAccountRoutes(runtime))
     .route("/payees", createPayeeRoutes(runtime))
+    .route("/payroll-runs", createPayrollRunRoutes(runtime))
     .route("/receipts", createReceiptRoutes(runtime))
     .route("/recurring-items", createRecurringItemRoutes(runtime))
+    .route("/salaries", createSalaryRoutes(runtime))
     .route("/wallet", createWalletRoutes(runtime))
     .route("/withdrawal-addresses", createAllowlistRoutes(runtime))
     .route("/withdrawals", createWithdrawalRoutes(runtime));

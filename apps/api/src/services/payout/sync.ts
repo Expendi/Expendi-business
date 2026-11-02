@@ -15,6 +15,7 @@ import { AuditLog } from "../audit/audit-log.js";
 import { GATEWAY_ORDER_ID } from "../paycrest/gateway.js";
 import { Paycrest } from "../paycrest/paycrest-client.js";
 import { lockPayout } from "./guards.js";
+import { applyPayoutOutcome } from "./subjects.js";
 
 /**
  * Brings payouts in line with Paycrest (spec §6.8). Both the signed webhook
@@ -298,6 +299,7 @@ export function syncPayoutOrder(input: {
             }),
           },
         });
+        yield* applyPayoutOutcome(tx, updated);
         current = updated;
       }
 
@@ -387,7 +389,7 @@ function settleOrderlessApproval(
                 : sql`${payouts.orderRequestedAt} IS NULL`,
             ),
           )
-          .returning({ id: payouts.id }),
+          .returning(),
       );
       if (!updated) return false;
       yield* audit.record(tx, {
@@ -398,6 +400,7 @@ function settleOrderlessApproval(
         before: { status: "approved" },
         after: { status: settled.status, reason: settled.reason },
       });
+      yield* applyPayoutOutcome(tx, updated);
       return true;
     }),
   );
@@ -434,7 +437,7 @@ function reviewUnfetchedOrder(
       const audit = yield* AuditLog;
       const locked = yield* lockPayout(tx, payout.id);
       if (locked?.status !== payout.status) return false;
-      yield* query(() =>
+      const [updated] = yield* query(() =>
         tx
           .update(payouts)
           .set({
@@ -442,8 +445,10 @@ function reviewUnfetchedOrder(
             providerCheckedAt: new Date(now),
             failureReason: settled.reason ?? null,
           })
-          .where(eq(payouts.id, payout.id)),
+          .where(eq(payouts.id, payout.id))
+          .returning(),
       );
+      if (updated) yield* applyPayoutOutcome(tx, updated);
       yield* audit.record(tx, {
         actor: ACTOR,
         organizationId: payout.organizationId,

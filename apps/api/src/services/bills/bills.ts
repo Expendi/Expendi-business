@@ -36,6 +36,7 @@ import {
 import { query, withScope } from "../../db/scope.js";
 import { BadRequest, Conflict, NotFound } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { recordBillSpending } from "../expenses/company.js";
 import { onRecurringBillSettled } from "../recurring/next-bill.js";
 import {
   attachBillFiles,
@@ -658,6 +659,11 @@ export function markBillPaidOutside(
             note: fields.note ?? null,
             proofFileIds,
           },
+        });
+        yield* recordBillSpending(tx, tenant, row, {
+          paidOn: fields.paidOn,
+          note: fields.note ?? null,
+          paidFromAccountId: fields.paidFromAccountId ?? null,
         });
         yield* onRecurringBillSettled(tx, row, now);
       }),

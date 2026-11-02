@@ -16,7 +16,8 @@ export type PayoutRejectionReason =
   | "payroll_cap"
   | "not_allowlisted"
   | "over_transaction_cap"
-  | "invalid_amount";
+  | "invalid_amount"
+  | "subject_not_payable";
 
 /**
  * A payment the engine refused before any order was created or any money
@@ -25,4 +26,6 @@ export type PayoutRejectionReason =
 export class PayoutRejected extends Data.TaggedError("PayoutRejected")<{
   readonly reason: PayoutRejectionReason;
   readonly message: string;
+  /** For `insufficient_balance`: how much more USDC the batch needs, in base units. */
+  readonly shortfallUsdc?: bigint;
 }> {}

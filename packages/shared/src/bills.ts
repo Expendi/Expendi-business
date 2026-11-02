@@ -200,11 +200,19 @@ export type AttachBillFilesRequest = z.input<
   typeof attachBillFilesRequestSchema
 >;
 
-/** The admin records a bill paid outside Expendi, optionally with proof. */
+/**
+ * The admin records a bill paid outside Expendi, optionally with proof.
+ * It also records the bill as company spending (spec §6.23), paid from
+ * `paidFromAccountId`; left out, the account is "not specified" until the
+ * admin edits that spending.
+ */
 export const markBillPaidOutsideRequestSchema = z.object({
   paidOn: z.iso.date({ error: "Enter the date it was paid as YYYY-MM-DD." }),
   note: notes,
   receiptFileIds: fileIds.default([]),
+  paidFromAccountId: z
+    .uuid({ error: "Pick the account it was paid from." })
+    .nullish(),
 });
 
 export type MarkBillPaidOutsideRequest = z.input<

@@ -8,6 +8,11 @@ import type { Company } from "~/features/company/company-provider";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import {
+  AdminClaimActions,
+  ApprovalDetails,
+  PaymentNote,
+} from "~/features/claims/claim-actions";
 import { ReviewRow } from "~/features/claims/claim-editor";
 import { ClaimStatusBadge } from "~/features/claims/claim-status";
 import { WarningList } from "~/features/claims/claim-warnings";
@@ -36,6 +41,7 @@ function ClaimScreen({ company }: { company: Company }): JSX.Element {
   const router = useRouter();
   const { claimId } = useLocalSearchParams<{ claimId: string }>();
   const claim = useClaim(company.organizationId, claimId);
+  const isAdmin = company.role === "admin";
 
   if (claim.isPending) {
     return (
@@ -64,10 +70,7 @@ function ClaimScreen({ company }: { company: Company }): JSX.Element {
       refreshing={claim.isRefetching}
       onRefresh={() => void claim.refetch()}
     >
-      <ClaimDetails
-        claim={claim.data}
-        showSubmitter={company.role === "admin"}
-      />
+      <ClaimDetails claim={claim.data} showSubmitter={isAdmin} />
       <WarningList
         warnings={claim.data.warnings}
         onOpenClaim={(otherClaimId) =>
@@ -77,6 +80,12 @@ function ClaimScreen({ company }: { company: Company }): JSX.Element {
           })
         }
       />
+      {isAdmin ? (
+        <AdminClaimActions
+          organizationId={company.organizationId}
+          claim={claim.data}
+        />
+      ) : null}
       {claim.data.canEdit ? (
         <Button
           label={
@@ -122,6 +131,11 @@ function ClaimDetails({
       {claim.status === "rejected" && claim.rejectedReason ? (
         <RejectionNotice reason={claim.rejectedReason} />
       ) : null}
+      {showSubmitter ? (
+        <ApprovalDetails claim={claim} />
+      ) : (
+        <PaymentNote claim={claim} />
+      )}
 
       <View className="gap-4">
         {showSubmitter ? (

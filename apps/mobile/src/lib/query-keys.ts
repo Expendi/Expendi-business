@@ -22,6 +22,12 @@ export const queryKeys = {
     ["organizations", organizationId, "claims"] as const,
   claimList: (organizationId: string) =>
     ["organizations", organizationId, "claims", "list"] as const,
+  /** The admin's queue: one status, under `claimList` so its invalidation covers it. */
+  claimQueue: (organizationId: string, status: string) =>
+    ["organizations", organizationId, "claims", "list", status] as const,
+  /** Preparing Approve & pay; outside `claims` so refreshing claims never prepares again. */
+  claimPayment: (organizationId: string, claimId: string, retry: boolean) =>
+    ["organizations", organizationId, "claim-payment", claimId, retry] as const,
   claim: (organizationId: string, claimId: string) =>
     ["organizations", organizationId, "claims", "detail", claimId] as const,
   /** Prefix of every payee list and payee, so one invalidation refreshes both. */
@@ -59,4 +65,44 @@ export const queryKeys = {
       "detail",
       itemId,
     ] as const,
+  /** Prefix of every company spending list and record, so one invalidation refreshes both. */
+  companySpending: (organizationId: string) =>
+    ["organizations", organizationId, "company-spending"] as const,
+  companySpendingList: (
+    organizationId: string,
+    filters: { readonly heading: string | null },
+  ) =>
+    [
+      "organizations",
+      organizationId,
+      "company-spending",
+      "list",
+      filters,
+    ] as const,
+  companySpendingItem: (organizationId: string, spendingId: string) =>
+    [
+      "organizations",
+      organizationId,
+      "company-spending",
+      "detail",
+      spendingId,
+    ] as const,
+  /** Prefix of both paid-from account lists. */
+  paidFromAccounts: (organizationId: string) =>
+    ["organizations", organizationId, "paid-from-accounts"] as const,
+  paidFromAccountList: (organizationId: string, archived: boolean) =>
+    ["organizations", organizationId, "paid-from-accounts", archived] as const,
+  /** Prefix of salaries and payroll runs: a salary change can draft a run. */
+  payroll: (organizationId: string) =>
+    ["organizations", organizationId, "payroll"] as const,
+  salaryList: (organizationId: string) =>
+    ["organizations", organizationId, "payroll", "salaries"] as const,
+  salary: (organizationId: string, salaryId: string) =>
+    ["organizations", organizationId, "payroll", "salaries", salaryId] as const,
+  payrollRunList: (organizationId: string) =>
+    ["organizations", organizationId, "payroll", "runs"] as const,
+  payrollRun: (organizationId: string, runId: string) =>
+    ["organizations", organizationId, "payroll", "runs", runId] as const,
+  mySalaryPayments: (organizationId: string) =>
+    ["organizations", organizationId, "my-salary-payments"] as const,
 };

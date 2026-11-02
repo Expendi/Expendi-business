@@ -20,6 +20,8 @@ import { localIsoDate } from "~/features/claims/dates";
 import { ReceiptPicker } from "~/features/claims/receipt-picker";
 import { useReceiptSlots } from "~/features/claims/use-receipt-slots";
 import { RequireAdmin } from "~/features/company/require-admin";
+import { PaidFromAccountPicker } from "~/features/spending/paid-from-account-picker";
+import { useInvalidateCompanySpending } from "~/features/spending/use-spending";
 import { describeApiError } from "~/lib/api";
 
 export default function MarkBillPaidRoute(): JSX.Element {
@@ -35,9 +37,13 @@ function MarkBillPaidScreen({ company }: { company: Company }): JSX.Element {
   const router = useRouter();
   const { billId } = useLocalSearchParams<{ billId: string }>();
   const markPaid = useMarkBillPaidOutside(company.organizationId, billId);
+  const refreshSpending = useInvalidateCompanySpending(company.organizationId);
   const proof = useReceiptSlots(company.organizationId);
   const [paidOn, setPaidOn] = useState(() => localIsoDate(new Date()));
   const [note, setNote] = useState("");
+  const [paidFromAccountId, setPaidFromAccountId] = useState<string | null>(
+    null,
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const failedUploads = proof.slots.some((slot) => slot.status === "failed");
 
@@ -46,6 +52,7 @@ function MarkBillPaidScreen({ company }: { company: Company }): JSX.Element {
       paidOn: paidOn.trim(),
       note: blankToNull(note),
       receiptFileIds: proof.receiptFileIds,
+      paidFromAccountId,
     };
     const parsed = markBillPaidOutsideRequestSchema.safeParse(request);
     if (!parsed.success) {
@@ -53,14 +60,19 @@ function MarkBillPaidScreen({ company }: { company: Company }): JSX.Element {
       return;
     }
     setFormError(null);
-    markPaid.mutate(request, { onSuccess: () => router.back() });
+    markPaid.mutate(request, {
+      onSuccess: () => {
+        void refreshSpending();
+        router.back();
+      },
+    });
   }
 
   return (
     <Screen belowHeader>
       <Text className="text-base text-gray-600">
         Record a bill you paid outside Expendi, e.g. by card or from the bank.
-        Nothing is sent from the wallet.
+        Nothing is sent from the wallet. It’s also recorded as company spending.
       </Text>
 
       <View className="gap-4">
@@ -81,6 +93,13 @@ function MarkBillPaidScreen({ company }: { company: Company }): JSX.Element {
           maxLength={BILL_NOTES_MAX_LENGTH}
         />
       </View>
+
+      <PaidFromAccountPicker
+        organizationId={company.organizationId}
+        value={paidFromAccountId}
+        onChange={setPaidFromAccountId}
+        optional
+      />
 
       <ReceiptPicker receipts={proof} label="Proof of payment (optional)" />
 

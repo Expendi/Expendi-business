@@ -6,6 +6,8 @@ export * from "./categories.js";
 export * from "./expenses.js";
 export * from "./memberships.js";
 export * from "./organizations.js";
+export * from "./overview-heading.js";
+export * from "./paid-from-accounts.js";
 export * from "./payees.js";
 export * from "./payouts.js";
 export * from "./payroll-runs.js";
