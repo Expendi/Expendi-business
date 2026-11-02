@@ -912,7 +912,7 @@ describe("variable bills", () => {
     expect([amountOnly.status, withReference.status]).toEqual([200, 200]);
     expect([before, withoutReference]).toEqual(["no_amount", "no_reference"]);
     expect(await payableCheck(billId)).toEqual(
-      Either.right({ amountKes: 6_125_000n }),
+      Either.right({ currency: "kes", amountKes: 6_125_000n }),
     );
     expect(
       (await dataOf(withReference, billDetailSchema)).recurringItemId,

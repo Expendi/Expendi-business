@@ -20,13 +20,14 @@ import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
 import { TextField } from "~/components/text-field";
 import { AttachInvoice } from "~/features/bills/attach-invoice";
+import { formatBillAmount, storedAmount } from "~/features/bills/bill-amount";
+import { isPayable, joinBillIds } from "~/features/bills/bill-payment";
 import { BillStatusBadge, HEADING_LABELS } from "~/features/bills/bill-status";
 import { useBill, useCancelBill } from "~/features/bills/use-bills";
 import { ReviewRow } from "~/features/claims/claim-editor";
 import { formatIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
 import { describeApiError } from "~/lib/api";
-import { formatKesCents } from "~/lib/money";
 
 const isUnpaid = (status: BillStatus): boolean =>
   (UNPAID_BILL_STATUSES as readonly BillStatus[]).includes(status);
@@ -93,9 +94,7 @@ function BillSummary({ bill }: { bill: BillDetail }): JSX.Element {
           {bill.payee.name}
         </Text>
         <Text className="text-3xl font-bold text-gray-900">
-          {bill.amountKes === null
-            ? "Amount not entered yet"
-            : `KES ${formatKesCents(bill.amountKes)}`}
+          {formatBillAmount(bill) ?? "Amount not entered yet"}
         </Text>
         <BillStatusBadge status={bill.status} />
       </View>
@@ -195,7 +194,7 @@ function BillActions({
   const cancel = useCancelBill(company.organizationId, bill.id);
   const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState("");
-  const needsAmount = bill.amountKes === null;
+  const needsAmount = storedAmount(bill) === null;
 
   function closeCancel(): void {
     setCancelling(false);
@@ -203,15 +202,39 @@ function BillActions({
     cancel.reset();
   }
 
+  const payable = isPayable(bill);
+  const failed = bill.status === "payout_failed";
+
   return (
     <View className="gap-3">
+      {payable ? (
+        <Button
+          label={failed ? "Retry payment" : "Pay"}
+          onPress={() =>
+            router.push({
+              pathname: "/bills/pay",
+              params: {
+                billIds: joinBillIds([bill.id]),
+                ...(failed && { retry: "1" }),
+              },
+            })
+          }
+        />
+      ) : null}
+      {failed ? (
+        <Text className="text-sm text-gray-600">
+          The last payment failed and nothing reached {bill.payee.name}. A retry
+          is a new payment that needs your passkey again.
+        </Text>
+      ) : null}
       {needsAmount ? (
         <Text className="text-sm text-gray-600">
-          Enter the amount before marking this bill paid.
+          Enter the amount before paying or marking this bill paid.
         </Text>
       ) : null}
       <Button
         label={needsAmount ? "Enter the amount" : "Mark paid outside Expendi"}
+        variant={payable ? "secondary" : "primary"}
         onPress={() =>
           router.push({
             pathname: needsAmount

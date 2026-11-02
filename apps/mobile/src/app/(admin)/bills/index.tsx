@@ -4,21 +4,27 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import type { Bill } from "@expendi-business/shared";
+import { BILL_PAYMENT_MAX_BILLS } from "@expendi-business/shared";
 
 import type { Company } from "~/features/company/company-provider";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { formatBillAmount } from "~/features/bills/bill-amount";
 import {
   groupOpenBills,
   historyNewestFirst,
 } from "~/features/bills/bill-groups";
+import {
+  isPayable,
+  joinBillIds,
+  toggleSelection,
+} from "~/features/bills/bill-payment";
 import { BillStatusBadge } from "~/features/bills/bill-status";
 import { useBillHistory, useOpenBills } from "~/features/bills/use-bills";
 import { formatIsoDate, localIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
 import { describeApiError } from "~/lib/api";
-import { formatKesCents } from "~/lib/money";
 
 export default function BillsRoute(): JSX.Element {
   return (
@@ -35,9 +41,23 @@ function BillsScreen({ company }: { company: Company }): JSX.Element {
   const history = useBillHistory(company.organizationId, today);
   const groups = groupOpenBills(open.data ?? []);
   const settled = historyNewestFirst(history.data ?? []);
+  const anyPayable = (open.data ?? []).some(isPayable);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
 
   const openBill = (bill: Bill) =>
     router.push({ pathname: "/bills/[billId]", params: { billId: bill.id } });
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelected([]);
+  };
+  const pressBill = (bill: Bill) => {
+    if (!selecting) {
+      openBill(bill);
+      return;
+    }
+    if (isPayable(bill)) setSelected((ids) => toggleSelection(ids, bill.id));
+  };
 
   return (
     <Screen
@@ -48,12 +68,46 @@ function BillsScreen({ company }: { company: Company }): JSX.Element {
         void history.refetch();
       }}
     >
-      <Button label="New bill" onPress={() => router.push("/bills/new")} />
-      <Button
-        label="Recurring payments"
-        variant="secondary"
-        onPress={() => router.push("/recurring")}
-      />
+      {selecting ? (
+        <View className="gap-3 rounded-2xl border border-gray-200 p-4">
+          <Text className="text-base text-gray-700">
+            Tap the bills to pay together, up to {BILL_PAYMENT_MAX_BILLS}. One
+            passkey confirmation pays them all.
+          </Text>
+          <Button
+            label={
+              selected.length === 0
+                ? "Choose bills to pay"
+                : `Pay ${selected.length} ${selected.length === 1 ? "bill" : "bills"}`
+            }
+            disabled={selected.length === 0}
+            onPress={() => {
+              router.push({
+                pathname: "/bills/pay",
+                params: { billIds: joinBillIds(selected) },
+              });
+              stopSelecting();
+            }}
+          />
+          <Button label="Cancel" variant="ghost" onPress={stopSelecting} />
+        </View>
+      ) : (
+        <>
+          <Button label="New bill" onPress={() => router.push("/bills/new")} />
+          {anyPayable ? (
+            <Button
+              label="Pay all"
+              variant="secondary"
+              onPress={() => setSelecting(true)}
+            />
+          ) : null}
+          <Button
+            label="Recurring payments"
+            variant="secondary"
+            onPress={() => router.push("/recurring")}
+          />
+        </>
+      )}
 
       {open.isPending ? (
         <ActivityIndicator accessibilityLabel="Loading bills" />
@@ -80,7 +134,12 @@ function BillsScreen({ company }: { company: Company }): JSX.Element {
               <BillRow
                 key={bill.id}
                 bill={bill}
-                onPress={() => openBill(bill)}
+                selection={
+                  selecting && isPayable(bill)
+                    ? selected.includes(bill.id)
+                    : null
+                }
+                onPress={() => pressBill(bill)}
               />
             ))}
           </View>
@@ -91,7 +150,12 @@ function BillsScreen({ company }: { company: Company }): JSX.Element {
         <View className="gap-3">
           <SectionTitle title="Paid and cancelled" count={settled.length} />
           {settled.map((bill) => (
-            <BillRow key={bill.id} bill={bill} onPress={() => openBill(bill)} />
+            <BillRow
+              key={bill.id}
+              bill={bill}
+              selection={null}
+              onPress={() => openBill(bill)}
+            />
           ))}
         </View>
       ) : null}
@@ -121,27 +185,38 @@ function SectionTitle({
 
 function BillRow({
   bill,
+  selection,
   onPress,
 }: {
   bill: Bill;
+  /** Whether it's chosen for Pay all; null when it can't be chosen. */
+  selection: boolean | null;
   onPress: () => void;
 }): JSX.Element {
-  const amount =
-    bill.amountKes === null
-      ? "Amount to enter"
-      : `KES ${formatKesCents(bill.amountKes)}`;
+  const formatted = formatBillAmount(bill);
+  const amount = formatted ?? "Amount to enter";
   const when =
     bill.paidOn !== null
       ? `Paid ${formatIsoDate(bill.paidOn)}`
       : `Due ${formatIsoDate(bill.dueOn)}`;
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={selection === null ? "button" : "checkbox"}
+      accessibilityState={
+        selection === null ? undefined : { checked: selection }
+      }
       accessibilityLabel={`${bill.payee.name}, ${amount}, ${when}`}
       onPress={onPress}
-      className="gap-2 rounded-xl border border-gray-200 px-4 py-3 active:bg-gray-50"
+      className={`gap-2 rounded-xl border px-4 py-3 active:bg-gray-50 ${selection ? "border-gray-900 bg-gray-50" : "border-gray-200"}`}
     >
       <View className="flex-row items-start justify-between gap-3">
+        {selection === null ? null : (
+          <View
+            className={`mt-0.5 h-6 w-6 items-center justify-center rounded border-2 ${selection ? "border-gray-900 bg-gray-900" : "border-gray-400"}`}
+          >
+            {selection ? <Text className="text-sm text-white">✓</Text> : null}
+          </View>
+        )}
         <View className="flex-1 gap-0.5">
           <Text className="text-base font-semibold text-gray-900">
             {bill.payee.name}
@@ -152,7 +227,7 @@ function BillRow({
           </Text>
         </View>
         <Text
-          className={`text-base font-semibold ${bill.amountKes === null ? "text-amber-800" : "text-gray-900"}`}
+          className={`text-base font-semibold ${formatted === null ? "text-amber-800" : "text-gray-900"}`}
         >
           {amount}
         </Text>

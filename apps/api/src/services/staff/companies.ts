@@ -180,15 +180,13 @@ export function companyDetail(
           tx
             .select({
               id: memberships.id,
-              name: sql<
-                string | null
-              >`coalesce(${users.fullName}, ${memberships.fullName})`,
-              email: sql<string>`coalesce(${users.email}, ${memberships.email})`,
+              name: users.fullName,
+              email: users.email,
               role: memberships.role,
               status: memberships.status,
             })
             .from(memberships)
-            .leftJoin(users, eq(users.id, memberships.userId))
+            .innerJoin(users, eq(users.id, memberships.userId))
             .where(eq(memberships.organizationId, organizationId))
             .orderBy(memberships.role, memberships.createdAt),
         );

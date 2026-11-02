@@ -306,8 +306,8 @@ function normaliseNewPayee(input: {
 }
 
 /**
- * An employee payee belongs to someone in this company who can log in
- * (accountants can't), and each person has at most one active payee.
+ * An employee payee belongs to someone in this company who isn't its
+ * accountant, and each person has at most one active payee.
  */
 function checkEmployee(
   tx: Transaction,
@@ -318,7 +318,7 @@ function checkEmployee(
   return Effect.gen(function* () {
     const [membership] = yield* query(() =>
       tx
-        .select({ userId: memberships.userId })
+        .select({ role: memberships.role })
         .from(memberships)
         .where(
           and(
@@ -334,7 +334,7 @@ function checkEmployee(
         new NotFound({ message: "That person isn't in this company." }),
       );
     }
-    if (membership.userId === null) {
+    if (membership.role === "accountant") {
       return yield* Effect.fail(
         new BadRequest({
           message: "An accountant can't be paid as an employee.",

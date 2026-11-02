@@ -8,7 +8,7 @@ import type { AppRuntime } from "../runtime.js";
 import type { AllowlistChange } from "../services/allowlist/allowlist.js";
 import { BadRequest } from "../errors.js";
 import { runEffect } from "../http/respond.js";
-import { requireRole } from "../middleware/tenant.js";
+import { requireAdminOrReader } from "../middleware/tenant.js";
 import {
   confirmAllowlistChange,
   listAllowlist,
@@ -62,14 +62,15 @@ const readJson = (request: Request) =>
   });
 
 /**
- * Mounted at `/organizations/:organizationId/withdrawal-addresses`. Admins
- * only (spec §4); every change needs the admin's passkey (spec §7).
+ * Mounted at `/organizations/:organizationId/withdrawal-addresses`. Admins,
+ * and accountants read-only (spec §4); every change needs the admin's
+ * passkey (spec §7).
  */
 export function createAllowlistRoutes(
   runtime: AppRuntime,
 ): Hono<{ Variables: TenantVariables }> {
   return new Hono<{ Variables: TenantVariables }>()
-    .use(requireRole("admin"))
+    .use(requireAdminOrReader())
     .get("/", (c) =>
       runEffect(runtime, c, listAllowlist(c.get("tenant").organizationId)),
     )

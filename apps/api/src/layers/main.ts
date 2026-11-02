@@ -11,6 +11,7 @@ import type { PrivyAuth } from "../services/auth/privy-auth.js";
 import type { BaseRpc } from "../services/chain/base-rpc.js";
 import type { EmailSender } from "../services/email/email-sender.js";
 import type { ReceiptExtractor } from "../services/extraction/receipt-extractor.js";
+import type { PushSender } from "../services/notification/push-sender.js";
 import type { Paycrest } from "../services/paycrest/paycrest-client.js";
 import type { OtpProvider } from "../services/phone-verification/otp-provider.js";
 import type { FileStorage } from "../services/storage/file-storage.js";
@@ -28,6 +29,7 @@ import { PrivyAuthLive } from "../services/auth/privy-auth.js";
 import { BaseRpcLive } from "../services/chain/base-rpc.js";
 import { EmailSenderLive } from "../services/email/email-sender.js";
 import { ReceiptExtractorLive } from "../services/extraction/receipt-extractor.js";
+import { PushSenderLive } from "../services/notification/push-sender.js";
 import { PaycrestLive } from "../services/paycrest/paycrest-client.js";
 import { OtpProviderLive } from "../services/phone-verification/telnyx-verify.js";
 import { FileStorageLive } from "../services/storage/r2.js";
@@ -50,6 +52,7 @@ export type AppDeps =
   | ApprovalSettings
   | EmailSender
   | OtpProvider
+  | PushSender
   | FileStorage
   | ReceiptExtractor
   | Zoho
@@ -68,6 +71,7 @@ export interface ExternalLayers {
   readonly approvalSettings: Layer.Layer<ApprovalSettings, AppLayerError>;
   readonly emailSender: Layer.Layer<EmailSender, AppLayerError>;
   readonly otpProvider: Layer.Layer<OtpProvider, AppLayerError>;
+  readonly pushSender: Layer.Layer<PushSender, AppLayerError>;
   readonly fileStorage: Layer.Layer<FileStorage, AppLayerError>;
   readonly receiptExtractor: Layer.Layer<ReceiptExtractor, AppLayerError>;
   readonly zoho: Layer.Layer<Zoho, AppLayerError>;
@@ -83,6 +87,7 @@ export const LiveExternalLayers: ExternalLayers = {
   approvalSettings: ApprovalSettingsLive,
   emailSender: EmailSenderLive,
   otpProvider: OtpProviderLive,
+  pushSender: PushSenderLive,
   fileStorage: FileStorageLive,
   receiptExtractor: ReceiptExtractorLive,
   zoho: ZohoLive,
@@ -105,6 +110,7 @@ export function makeAppLayer(
     external.approvalSettings,
     external.emailSender,
     external.otpProvider,
+    external.pushSender,
     external.fileStorage,
     external.receiptExtractor,
     external.zoho,

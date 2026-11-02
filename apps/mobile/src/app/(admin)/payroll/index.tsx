@@ -43,6 +43,11 @@ function PayrollScreen({ company }: { company: Company }): JSX.Element {
         subtitle="Who’s on payroll, their net pay and pay day"
         onPress={() => router.push("/payroll/salaries")}
       />
+      <ListRow
+        title="Payroll cap"
+        subtitle="How far a run can go beyond the salaries set up"
+        onPress={() => router.push("/payroll/settings")}
+      />
 
       <View className="gap-3">
         <Text

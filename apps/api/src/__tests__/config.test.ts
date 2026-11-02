@@ -111,6 +111,32 @@ describe("ConfigLive", () => {
     expect(config.adminAppOrigins).toEqual([]);
   });
 
+  it("reads DASHBOARD_ORIGINS as a comma-separated list", async () => {
+    // #given
+    const env = {
+      DATABASE_URL,
+      DASHBOARD_ORIGINS:
+        " https://business.expendi.app, ,http://localhost:3002 ",
+    };
+
+    // #when
+    const config = await Effect.runPromise(loadConfig(env));
+
+    // #then
+    expect(config.dashboardOrigins).toEqual([
+      "https://business.expendi.app",
+      "http://localhost:3002",
+    ]);
+  });
+
+  it("allows no dashboard origins without DASHBOARD_ORIGINS", async () => {
+    // #when
+    const config = await Effect.runPromise(loadConfig({ DATABASE_URL }));
+
+    // #then
+    expect(config.dashboardOrigins).toEqual([]);
+  });
+
   it.each(["not-a-number", "0", "70000", ""])(
     "fails to load when PORT is invalid (%j)",
     async (port) => {

@@ -5,27 +5,46 @@ import { Hono } from "hono";
 import type { MeResponse } from "@expendi-business/shared";
 import {
   confirmPayoutPhoneRequestSchema,
+  expoPushTokenSchema,
+  registerPushTokenRequestSchema,
   resendPayoutPhoneCodeRequestSchema,
   startPayoutPhoneRequestSchema,
+  updateMeRequestSchema,
 } from "@expendi-business/shared";
 
 import type { AuthVariables } from "../middleware/auth.js";
 import type { AppRuntime } from "../runtime.js";
 import { memberships, organizations, users } from "../db/schema/index.js";
 import { query, withScope } from "../db/scope.js";
+import { BadRequest } from "../errors.js";
 import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
 import { activateInvitedMemberships } from "../services/membership/activation.js";
+import {
+  registerPushToken,
+  unregisterPushToken,
+} from "../services/notification/push-tokens.js";
 import {
   confirmPayoutPhone,
   resendPayoutPhoneCode,
   startPayoutPhoneVerification,
 } from "../services/phone-verification/payout-phone.js";
+import { updateFullName } from "../services/users/full-name.js";
+
+function pushTokenFrom(raw: string): Effect.Effect<string, BadRequest> {
+  const parsed = expoPushTokenSchema.safeParse(raw);
+  return parsed.success
+    ? Effect.succeed(parsed.data)
+    : Effect.fail(
+        new BadRequest({ message: "That isn't an Expo push token." }),
+      );
+}
 
 /**
  * Mounted at `/me`, behind authentication. The app loads it at sign-in, so
  * it first activates invites sent to someone who already had a login. The
- * payout-number routes (spec §6.18) belong to the person, not a company.
+ * payout-number routes (spec §6.18), the person's name (§6.2) and their
+ * devices' push tokens (§6.10) belong to the person, not a company.
  */
 export function createMeRoutes(
   runtime: AppRuntime,
@@ -88,6 +107,16 @@ export function createMeRoutes(
         ),
       );
     })
+    .patch("/", (c) => {
+      const userId = c.get("userId");
+      return runEffect(
+        runtime,
+        c,
+        readBody(c.req.raw, updateMeRequestSchema).pipe(
+          Effect.flatMap(({ fullName }) => updateFullName(userId, fullName)),
+        ),
+      );
+    })
     .post("/payout-phone", (c) => {
       const userId = c.get("userId");
       return runEffect(
@@ -122,6 +151,26 @@ export function createMeRoutes(
           Effect.flatMap(({ challengeId, code }) =>
             confirmPayoutPhone(userId, challengeId, code),
           ),
+        ),
+      );
+    })
+    .post("/push-tokens", (c) => {
+      const userId = c.get("userId");
+      return runEffect(
+        runtime,
+        c,
+        readBody(c.req.raw, registerPushTokenRequestSchema).pipe(
+          Effect.flatMap((request) => registerPushToken(userId, request)),
+        ),
+      );
+    })
+    .delete("/push-tokens/:token", (c) => {
+      const userId = c.get("userId");
+      return runEffect(
+        runtime,
+        c,
+        pushTokenFrom(c.req.param("token")).pipe(
+          Effect.flatMap((token) => unregisterPushToken(userId, token)),
         ),
       );
     });

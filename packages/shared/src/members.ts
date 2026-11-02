@@ -33,7 +33,7 @@ export const inviteMemberRequestSchema = z.object({
 /** What the app sends; the API trims both fields and lowercases the email. */
 export type InviteMemberRequest = z.input<typeof inviteMemberRequestSchema>;
 
-/** Accountants have no login, so only these roles can be switched. */
+/** An accountant stays an accountant; only these roles can be switched. */
 export const ASSIGNABLE_ROLES = ["admin", "employee"] as const;
 export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 
@@ -69,8 +69,9 @@ export type MembersResponse = z.infer<typeof membersResponseSchema>;
 export const inviteMemberResponseSchema = z.object({
   member: memberSchema,
   /**
-   * Whether the install email went out. False for accountants, who get no
-   * app email, and when sending failed: the invite stands either way.
+   * Whether the invite email went out: the app's install link, or for an
+   * accountant the web dashboard's link (`WEB_DASHBOARD_URL`). False when
+   * sending failed: the invite stands either way.
    */
   emailSent: z.boolean(),
   /**

@@ -1,15 +1,24 @@
 import type {
   Bill,
+  BillCurrency,
   BillHeading,
   CreateBillRequest,
   UpdateBillRequest,
 } from "@expendi-business/shared";
-import { parseKesToCents } from "@expendi-business/shared";
 
-/** The bill form as typed; the API parses the amount into integer cents. */
+import {
+  currencyOfPayee,
+  parseTyped,
+  storedAmount,
+  toTyped,
+} from "./bill-amount";
+
+/** The bill form as typed; the API parses the amount into integer units. */
 export interface BillDraft {
   payeeId: string | null;
   variable: boolean;
+  /** USD for a payee paid in USDC (spec §6.19), KES otherwise. */
+  currency: BillCurrency;
   amount: string;
   dueOn: string;
   /** Null follows the payee: Subscriptions for a subscription vendor. */
@@ -24,11 +33,19 @@ export interface BillDraft {
 export const blankToNull = (value: string): string | null =>
   value.trim() === "" ? null : value;
 
+/**
+ * The bill as its form starts. The amount is in the payee's currency as it
+ * is now: if their method changed between KES and USDC since, it's blank,
+ * to be entered again in theirs.
+ */
 export function draftFromBill(bill: Bill): BillDraft {
+  const currency = currencyOfPayee(bill.payee.method, bill.currency);
+  const stored = currency === bill.currency ? storedAmount(bill) : null;
   return {
     payeeId: bill.payee.id,
     variable: bill.variable,
-    amount: bill.amountKes === null ? "" : centsToTyped(bill.amountKes),
+    currency,
+    amount: stored === null ? "" : toTyped(currency, stored),
     dueOn: bill.dueOn,
     heading:
       bill.overviewHeading === "transactions" ||
@@ -44,8 +61,17 @@ export function draftFromBill(bill: Bill): BillDraft {
 
 /** KES cents as the person would type them back, e.g. "1500050" → "15000.50". */
 export function centsToTyped(cents: string): string {
-  const padded = cents.padStart(3, "0");
-  return `${padded.slice(0, -2)}.${padded.slice(-2)}`;
+  return toTyped("kes", cents);
+}
+
+/** The typed amount under the field its currency takes. */
+function amountField(
+  draft: BillDraft,
+): { amountKes: string | null } | { amountUsd: string | null } {
+  const amount = blankToNull(draft.amount);
+  return draft.currency === "usd"
+    ? { amountUsd: amount }
+    : { amountKes: amount };
 }
 
 export function toCreateRequest(
@@ -55,7 +81,7 @@ export function toCreateRequest(
   return {
     payeeId: draft.payeeId ?? "",
     variable: draft.variable,
-    amountKes: blankToNull(draft.amount),
+    ...amountField(draft),
     dueOn: draft.dueOn.trim(),
     overviewHeading: draft.heading ?? undefined,
     categoryId: draft.categoryId ?? "",
@@ -65,11 +91,14 @@ export function toCreateRequest(
   };
 }
 
-/** Whether the typed amount differs from the bill's, compared in cents. */
+/** Whether the typed amount differs from the bill's, in its currency's units. */
 export function amountChanged(bill: Bill, draft: BillDraft): boolean {
   const typed = blankToNull(draft.amount);
-  if (typed === null) return bill.amountKes !== null;
-  return parseKesToCents(typed)?.toString() !== bill.amountKes;
+  const stored = storedAmount(bill);
+  if (draft.currency !== bill.currency)
+    return typed !== null || stored !== null;
+  if (typed === null) return stored !== null;
+  return parseTyped(draft.currency, typed) !== stored;
 }
 
 /** Only the fields that changed; an empty request changes nothing. */
@@ -82,7 +111,7 @@ export function toUpdateRequest(
     request.payeeId = draft.payeeId;
   }
   if (amountChanged(bill, draft)) {
-    request.amountKes = blankToNull(draft.amount);
+    Object.assign(request, amountField(draft));
     if (!bill.variable) request.adjustmentReason = draft.adjustmentReason;
   }
   if (draft.dueOn.trim() !== bill.dueOn) request.dueOn = draft.dueOn.trim();

@@ -19,6 +19,7 @@ import { BILL_STATUSES } from "@expendi-business/shared";
 
 import { categories } from "./categories.js";
 import { timestamps } from "./columns.js";
+import { billCurrency } from "./currency.js";
 import { organizations } from "./organizations.js";
 import { overviewHeading } from "./overview-heading.js";
 import { payees } from "./payees.js";
@@ -56,8 +57,15 @@ export const bills = pgTable(
     overviewHeading: overviewHeading("overview_heading").notNull(),
     categoryId: uuid("category_id").notNull(),
     variable: boolean("variable").notNull().default(false),
+    /**
+     * KES, or USD for a payee paid in USDC (spec §6.19). The amount lives in
+     * the matching column; the other stays null.
+     */
+    currency: billCurrency("currency").notNull().default("kes"),
     /** KES cents; null on a variable bill until its amount is entered. */
     amountKes: bigint("amount_kes", { mode: "bigint" }),
+    /** A USD bill's amount: USDC base units (6 decimals), paid exactly. */
+    amountUsdc: bigint("amount_usdc", { mode: "bigint" }),
     /** e.g. an invoice number or a KRA payment registration number. */
     reference: text("reference"),
     notes: text("notes"),
@@ -150,12 +158,25 @@ export const bills = pgTable(
       sql`${table.amountKes} IS NULL OR ${table.amountKes} > 0`,
     ),
     check(
+      "bills_amount_usdc_positive",
+      sql`${table.amountUsdc} IS NULL OR ${table.amountUsdc} > 0`,
+    ),
+    check(
+      "bills_amount_in_currency",
+      sql`(${table.currency} = 'kes' AND ${table.amountUsdc} IS NULL) OR (${table.currency} = 'usd' AND ${table.amountKes} IS NULL)`,
+    ),
+    // Salaries are net pay in KES (spec §6.21).
+    check(
+      "bills_payroll_in_kes",
+      sql`${table.payrollRunId} IS NULL OR ${table.currency} = 'kes'`,
+    ),
+    check(
       "bills_fixed_has_amount",
-      sql`${table.variable} OR ${table.amountKes} IS NOT NULL`,
+      sql`${table.variable} OR ${table.amountKes} IS NOT NULL OR ${table.amountUsdc} IS NOT NULL`,
     ),
     check(
       "bills_settled_has_amount",
-      sql`${table.status} NOT IN ('paying', 'paid', 'paid_outside') OR ${table.amountKes} IS NOT NULL`,
+      sql`${table.status} NOT IN ('paying', 'paid', 'paid_outside') OR ${table.amountKes} IS NOT NULL OR ${table.amountUsdc} IS NOT NULL`,
     ),
     check(
       "bills_paid_has_dates",

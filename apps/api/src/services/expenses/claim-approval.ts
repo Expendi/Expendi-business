@@ -1,5 +1,5 @@
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { Effect } from "effect";
 
 import type { ExpenseStatus } from "@expendi-business/shared";
@@ -11,6 +11,7 @@ import type { DatabaseError, Forbidden } from "../../errors.js";
 import type { Tenant } from "../../middleware/tenant.js";
 import type { ApprovalChallenge } from "../approval/passkeys.js";
 import type { AuditActor } from "../audit/audit-log.js";
+import type { WalletCover } from "../payments/payment-approval.js";
 import type { PayoutRejected } from "../payout/payout-errors.js";
 import type { PayoutEngineDeps } from "../payout/payout-service.js";
 import type { PrepareError } from "../payout/prepare.js";
@@ -19,26 +20,25 @@ import {
   memberships,
   payouts,
   users,
-  wallets,
-  webauthnChallenges,
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { Conflict, NotFound } from "../../errors.js";
 import {
-  ceilDiv,
-  roundUpToWholeShilling,
-  toMicro,
-} from "../paycrest/amounts.js";
-import { discardUnapprovedPayout } from "../payout/discard.js";
+  awaitingPayoutFor,
+  challengePayouts,
+  costOf,
+  topUpConflict,
+  walletCover,
+} from "../payments/payment-approval.js";
 import {
   approveAndPay,
   preparePayouts,
   requestPayoutApproval,
   retryPayout,
 } from "../payout/payout-service.js";
-import { livePayoutOf } from "../payout/prepare.js";
 import { requireConfirmedPayoutPhone } from "../phone-verification/payout-phone.js";
-import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
+
+export { topUpKesFor } from "../payments/payment-approval.js";
 
 /**
  * Approve & pay and its retry (spec §6.7, §6.8): the admin's passkey
@@ -51,9 +51,6 @@ import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
  * payouts, so preparing again returns the same payout and only a failure
  * (or a discarded, never-approved payout) moves the key on.
  */
-
-/** USDC base units × a rate in micro-units, back to whole units. */
-const MICRO_SQUARED = 1_000_000n * 1_000_000n;
 
 const claimNotFound = new NotFound({ message: "Claim not found" });
 const approvalNotFound = new NotFound({
@@ -96,12 +93,11 @@ function readPayableClaim(
           payoutId: expenses.payoutId,
           userId: memberships.userId,
           fullName: users.fullName,
-          email: memberships.email,
-          userEmail: users.email,
+          email: users.email,
         })
         .from(expenses)
         .innerJoin(memberships, eq(memberships.id, expenses.membershipId))
-        .leftJoin(users, eq(users.id, memberships.userId))
+        .innerJoin(users, eq(users.id, memberships.userId))
         .where(
           and(
             eq(expenses.id, claimId),
@@ -116,14 +112,7 @@ function readPayableClaim(
         new Conflict({ message: NOT_EXPECTED[expected] }),
       );
     }
-    const who = claim.fullName ?? claim.userEmail ?? claim.email ?? "They";
-    if (!claim.userId) {
-      return yield* Effect.fail(
-        new Conflict({
-          message: `${who} has no app login, so they can't be paid.`,
-        }),
-      );
-    }
+    const who = claim.fullName ?? claim.email;
     const phone = yield* requireConfirmedPayoutPhone(tx, claim.userId).pipe(
       Effect.catchTag("PayoutPhoneNotConfirmed", () =>
         Effect.fail(
@@ -159,100 +148,59 @@ const pays = (payout: Payout, claim: PayableClaim): boolean =>
   payout.recipient.accountName === claim.recipient.accountName;
 
 /**
- * The claim's payout awaiting approval: the same one again if it still pays
- * exactly this claim, otherwise a new one. A stale one is discarded first,
- * so a claim never has more than one payout waiting.
+ * The claim's payout awaiting approval (`awaitingPayoutFor`). A claim whose
+ * payment failed is paid by a retry of that payout, to the claimant's
+ * current number.
  */
 function payoutFor(
   organizationId: string,
   actor: AuditActor,
   claim: PayableClaim,
 ): Effect.Effect<Payout, PrepareError | Conflict, PayoutEngineDeps> {
-  const scope = { organizationId };
-  return Effect.gen(function* () {
-    const live = yield* livePayoutOf(organizationId, "claim", claim.claimId);
-    if (live) {
-      if (live.status !== "awaiting_approval") {
-        return yield* Effect.fail(
-          new Conflict({ message: "This claim is already being paid." }),
-        );
-      }
-      if (pays(live, claim)) return live;
-      yield* withScope(scope, (tx) =>
-        discardUnapprovedPayout(tx, {
+  return awaitingPayoutFor({
+    organizationId,
+    actor,
+    subjectType: "claim",
+    subjectId: claim.claimId,
+    keyPrefix: "claim",
+    pays: (payout) => pays(payout, claim),
+    replaced: REPLACED,
+    alreadyPaying: "This claim is already being paid.",
+    prepare: (idempotencyKey) =>
+      Effect.gen(function* () {
+        if (claim.status === "payout_failed") {
+          if (!claim.latestPayoutId) {
+            return yield* Effect.dieMessage(
+              `claim ${claim.claimId} failed without a payout`,
+            );
+          }
+          return yield* retryPayout({
+            organizationId,
+            failedPayoutId: claim.latestPayoutId,
+            idempotencyKey,
+            actor,
+            recipient: claim.recipient,
+          });
+        }
+        const [prepared] = yield* preparePayouts({
           organizationId,
-          payoutId: live.id,
-          reason: REPLACED,
           actor,
-        }),
-      );
-    }
-
-    const [failed] = yield* withScope(scope, (tx) =>
-      query(() =>
-        tx
-          .select({ failed: count() })
-          .from(payouts)
-          .where(
-            and(
-              eq(payouts.organizationId, organizationId),
-              eq(payouts.subjectType, "claim"),
-              eq(payouts.subjectId, claim.claimId),
-              eq(payouts.status, "failed"),
-            ),
-          ),
-      ),
-    );
-    const idempotencyKey = `claim:${claim.claimId}:${(failed?.failed ?? 0) + 1}`;
-
-    if (claim.status === "payout_failed") {
-      if (!claim.latestPayoutId) {
-        return yield* Effect.dieMessage(
-          `claim ${claim.claimId} failed without a payout`,
-        );
-      }
-      return yield* retryPayout({
-        organizationId,
-        failedPayoutId: claim.latestPayoutId,
-        idempotencyKey,
-        actor,
-        recipient: claim.recipient,
-      });
-    }
-    const [prepared] = yield* preparePayouts({
-      organizationId,
-      actor,
-      requests: [
-        {
-          subjectType: "claim",
-          subjectId: claim.claimId,
-          idempotencyKey,
-          recipient: claim.recipient,
-          amountKesCents: claim.amountKes,
-        },
-      ],
-    });
-    if (!prepared) return yield* Effect.dieMessage("claim prepared nothing");
-    return prepared;
+          requests: [
+            {
+              subjectType: "claim",
+              subjectId: claim.claimId,
+              idempotencyKey,
+              recipient: claim.recipient,
+              amountKesCents: claim.amountKes,
+            },
+          ],
+        });
+        if (!prepared) {
+          return yield* Effect.dieMessage("claim prepared nothing");
+        }
+        return prepared;
+      }),
   });
-}
-
-/** The highest quoted rate in the batch, so a top-up is never understated. */
-function highestRate(batch: readonly Payout[]): string {
-  return batch.reduce(
-    (highest, payout) =>
-      toMicro(payout.quotedRate) > toMicro(highest)
-        ? payout.quotedRate
-        : highest,
-    batch[0]?.quotedRate ?? "0",
-  );
-}
-
-/** KES to top up for `shortfallUsdc` at `rate`: rounded up to a whole shilling, in cents. */
-export function topUpKesFor(shortfallUsdc: bigint, rate: string): bigint {
-  return roundUpToWholeShilling(
-    ceilDiv(shortfallUsdc * toMicro(rate) * 100n, MICRO_SQUARED),
-  );
 }
 
 export interface ClaimPaymentPreviewView {
@@ -278,11 +226,7 @@ export interface ClaimApprovalView {
     readonly feeAllowanceUsdc: bigint;
     readonly maxDebitUsdc: bigint;
   };
-  readonly wallet: {
-    readonly availableUsdc: bigint;
-    readonly shortfallUsdc: bigint;
-    readonly topUpKes: bigint | null;
-  };
+  readonly wallet: WalletCover;
 }
 
 function previewOf(payout: Payout): ClaimPaymentPreviewView {
@@ -295,37 +239,8 @@ function previewOf(payout: Payout): ClaimPaymentPreviewView {
       recipient.method === "mpesa_phone" ? recipient.phone.slice(-4) : "",
     claimedKes: payout.requestedKesCents,
     receivesKes: payout.amountKes,
-    rate: payout.quotedRate,
-    usdc: payout.quotedUsdc,
-    feeAllowanceUsdc: payout.maxDebitUsdc - payout.quotedUsdc,
-    maxDebitUsdc: payout.maxDebitUsdc,
+    ...costOf(payout),
   };
-}
-
-/** What the wallet has free now, for the preview; approving checks again under lock. */
-function availableUsdc(
-  organizationId: string,
-): Effect.Effect<bigint, DatabaseError, DatabaseService> {
-  return withScope({ organizationId }, (tx) =>
-    Effect.gen(function* () {
-      const [wallet] = yield* query(() =>
-        tx
-          .select({ id: wallets.id })
-          .from(wallets)
-          .where(
-            and(
-              eq(wallets.organizationId, organizationId),
-              eq(wallets.status, "active"),
-            ),
-          ),
-      );
-      if (!wallet) return 0n;
-      const free =
-        (yield* ledgerBalance(tx, wallet.id)) -
-        (yield* reservedForPayouts(tx, wallet.id));
-      return free > 0n ? free : 0n;
-    }),
-  );
 }
 
 /**
@@ -361,20 +276,12 @@ function approvalFor(
       feeAllowanceUsdc: sum((preview) => preview.feeAllowanceUsdc),
       maxDebitUsdc: sum((preview) => preview.maxDebitUsdc),
     };
-    const available = yield* availableUsdc(tenant.organizationId);
-    const shortfall =
-      totals.maxDebitUsdc > available ? totals.maxDebitUsdc - available : 0n;
     return {
       challengeId: challenge.challengeId,
       options: challenge.options,
       claims: previews,
       totals,
-      wallet: {
-        availableUsdc: available,
-        shortfallUsdc: shortfall,
-        topUpKes:
-          shortfall > 0n ? topUpKesFor(shortfall, highestRate(batch)) : null,
-      },
+      wallet: yield* walletCover(tenant.organizationId, batch),
     };
   });
 }
@@ -428,35 +335,14 @@ function claimPayoutsOfChallenge(
   tenant: Tenant,
   challengeId: string,
 ): Effect.Effect<Payout[], NotFound | DatabaseError, DatabaseService> {
-  return withScope(tenant, (tx) =>
-    Effect.gen(function* () {
-      const [challenge] = yield* query(() =>
-        tx
-          .select({ payoutIds: webauthnChallenges.payoutIds })
-          .from(webauthnChallenges)
-          .where(
-            and(
-              eq(webauthnChallenges.id, challengeId),
-              eq(webauthnChallenges.userId, tenant.userId),
-              eq(webauthnChallenges.organizationId, tenant.organizationId),
-              eq(webauthnChallenges.purpose, "approve_payouts"),
-            ),
-          ),
-      );
-      const payoutIds = challenge?.payoutIds ?? [];
-      if (payoutIds.length === 0) return yield* Effect.fail(approvalNotFound);
-      const batch = yield* query(() =>
-        tx
-          .select()
-          .from(payouts)
-          .where(
-            and(
-              inArray(payouts.id, payoutIds),
-              eq(payouts.organizationId, tenant.organizationId),
-            ),
-          ),
-      );
-      const claims = yield* query(() =>
+  return Effect.gen(function* () {
+    const batch = yield* challengePayouts(
+      tenant,
+      challengeId,
+      approvalNotFound,
+    );
+    const claims = yield* withScope(tenant, (tx) =>
+      query(() =>
         tx
           .select({ id: expenses.id })
           .from(expenses)
@@ -470,20 +356,19 @@ function claimPayoutsOfChallenge(
               eq(expenses.kind, "claim"),
             ),
           ),
-      );
-      const known = new Set(claims.map((claim) => claim.id));
-      if (
-        batch.length !== payoutIds.length ||
-        batch.some(
-          (payout) =>
-            payout.subjectType !== "claim" || !known.has(payout.subjectId),
-        )
-      ) {
-        return yield* Effect.fail(approvalNotFound);
-      }
-      return batch;
-    }),
-  );
+      ),
+    );
+    const known = new Set(claims.map((claim) => claim.id));
+    if (
+      batch.some(
+        (payout) =>
+          payout.subjectType !== "claim" || !known.has(payout.subjectId),
+      )
+    ) {
+      return yield* Effect.fail(approvalNotFound);
+    }
+    return batch;
+  });
 }
 
 export interface ClaimPaymentResultView {
@@ -496,27 +381,6 @@ export interface ClaimPaymentResultView {
       readonly failureReason: string | null;
     };
   }[];
-}
-
-/** "Top up KES X" (spec §6.7 step 4), at the batch's quoted rate. */
-function topUpConflict(
-  error: PayoutRejected,
-  batch: readonly Payout[],
-): Effect.Effect<never, PayoutRejected | Conflict> {
-  if (error.reason !== "insufficient_balance" || !error.shortfallUsdc) {
-    return Effect.fail(error);
-  }
-  const topUpKes = topUpKesFor(error.shortfallUsdc, highestRate(batch));
-  const shillings = (topUpKes / 100n).toLocaleString("en-KE");
-  return Effect.fail(
-    new Conflict({
-      message: `The wallet is too short to pay this. Top up KES ${shillings}, then approve again. Nothing was sent.`,
-      details: {
-        shortfallUsdc: error.shortfallUsdc.toString(),
-        topUpKes: topUpKes.toString(),
-      },
-    }),
-  );
 }
 
 /**

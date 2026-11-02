@@ -14,7 +14,7 @@ import { wallets, walletTransactions } from "../db/schema/index.js";
 import { query, withScope } from "../db/scope.js";
 import { BadRequest, NotFound } from "../errors.js";
 import { runEffect } from "../http/respond.js";
-import { requireRole } from "../middleware/tenant.js";
+import { requireAdminOrReader } from "../middleware/tenant.js";
 import { kesCentsFor } from "../services/paycrest/amounts.js";
 import { Paycrest } from "../services/paycrest/paycrest-client.js";
 import { walletHistory } from "../services/wallet/history.js";
@@ -142,14 +142,15 @@ const historyQuerySchema = z.object({
 });
 
 /**
- * Mounted at `/organizations/:organizationId/wallet`. Admins only (spec §4).
+ * Mounted at `/organizations/:organizationId/wallet`. Admins, and accountants
+ * read-only (spec §4).
  * POST finishes a wallet whose setup stopped at sign-up; it's safe to repeat.
  */
 export function createWalletRoutes(
   runtime: AppRuntime,
 ): Hono<{ Variables: TenantVariables }> {
   return new Hono<{ Variables: TenantVariables }>()
-    .use(requireRole("admin"))
+    .use(requireAdminOrReader())
     .get("/", (c) => runEffect(runtime, c, getCompanyWallet(c.get("tenant"))))
     .get("/history", (c) => {
       const organizationId = c.get("tenant").organizationId;

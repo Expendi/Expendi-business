@@ -3,9 +3,11 @@ import { z } from "zod";
 import type { BillStatus } from "./bills.js";
 import type { OverviewHeading } from "./claims.js";
 import {
+  billCurrencySchema,
   billHeadingSchema,
   billStatusSchema,
   UNPAID_BILL_STATUSES,
+  usdAmountSchema,
 } from "./bills.js";
 import { kesAmountSchema } from "./claims.js";
 import { payeeKindSchema, payeeMethodSchema } from "./payee.js";
@@ -163,13 +165,15 @@ const reminderDaysSchema = z
  * one (e.g. PAYE or electricity) has none, and each bill's amount is
  * entered before it's paid. `scheduleDay` is the ISO weekday (1 is Monday)
  * for weekly, the day of the month otherwise. Quarterly and yearly count
- * from `startsOn`'s month. The heading defaults from the payee.
+ * from `startsOn`'s month. The heading defaults from the payee. The amount
+ * is in USD (`amountUsd`) when the payee is paid in USDC (spec §6.19).
  */
 export const createRecurringItemRequestSchema = z
   .object({
     payeeId: z.uuid({ error: "Pick who it's paid to." }),
     variable: z.boolean().default(false),
     amountKes: kesAmountSchema.nullish(),
+    amountUsd: usdAmountSchema.nullish(),
     schedule: recurringScheduleSchema,
     scheduleDay: z.int({ error: "Pick the day it falls due." }).min(1),
     startsOn: isoDate("Enter the start date as YYYY-MM-DD."),
@@ -180,14 +184,22 @@ export const createRecurringItemRequestSchema = z
     categoryId: z.uuid({ error: "Pick a category." }),
   })
   .superRefine((item, ctx) => {
-    if (item.variable && item.amountKes != null) {
+    const hasAmount = item.amountKes != null || item.amountUsd != null;
+    if (item.amountKes != null && item.amountUsd != null) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Enter the amount in KES or in USD, not both.",
+        path: ["amountUsd"],
+      });
+    }
+    if (item.variable && hasAmount) {
       ctx.addIssue({
         code: "custom",
         message: "A variable payment has no set amount.",
         path: ["amountKes"],
       });
     }
-    if (!item.variable && item.amountKes == null) {
+    if (!item.variable && !hasAmount) {
       ctx.addIssue({
         code: "custom",
         message: "Enter the amount, or mark the payment as variable.",
@@ -223,15 +235,25 @@ export type CreateRecurringItemFields = z.output<
 /**
  * Changes for the bills still to come; the current bill keeps its amount
  * unless it's changed on the bill. A field left out is unchanged. A null
- * amount makes the payment variable; a null end date removes it.
+ * amount makes the payment variable; a null end date removes it. The
+ * amount goes in `amountUsd` when the payee is paid in USDC.
  */
-export const updateRecurringItemRequestSchema = z.object({
-  amountKes: kesAmountSchema.nullable().optional(),
-  categoryId: z.uuid({ error: "Pick a category." }).optional(),
-  overviewHeading: billHeadingSchema.optional(),
-  reminderDays: reminderDaysSchema.optional(),
-  endsOn: isoDate("Enter the end date as YYYY-MM-DD.").nullable().optional(),
-});
+export const updateRecurringItemRequestSchema = z
+  .object({
+    amountKes: kesAmountSchema.nullable().optional(),
+    amountUsd: usdAmountSchema.nullable().optional(),
+    categoryId: z.uuid({ error: "Pick a category." }).optional(),
+    overviewHeading: billHeadingSchema.optional(),
+    reminderDays: reminderDaysSchema.optional(),
+    endsOn: isoDate("Enter the end date as YYYY-MM-DD.").nullable().optional(),
+  })
+  .refine(
+    (item) => item.amountKes === undefined || item.amountUsd === undefined,
+    {
+      message: "Enter the amount in KES or in USD, not both.",
+      path: ["amountUsd"],
+    },
+  );
 
 export type UpdateRecurringItemRequest = z.input<
   typeof updateRecurringItemRequestSchema
@@ -253,8 +275,12 @@ export const recurringItemSchema = z.object({
   overviewHeading: z.enum(RECURRING_HEADINGS),
   category: z.object({ id: z.uuid(), name: z.string() }),
   variable: z.boolean(),
-  /** KES cents as a decimal string; null when variable. */
+  /** USD for a payee paid in USDC; every bill takes it. */
+  currency: billCurrencySchema,
+  /** KES cents as a decimal string; null when variable or in USD. */
   amountKes: z.string().regex(/^\d+$/).nullable(),
+  /** USDC base units as a decimal string; null when variable or in KES. */
+  amountUsdc: z.string().regex(/^\d+$/).nullable(),
   schedule: recurringScheduleSchema,
   scheduleDay: z.int(),
   startsOn: z.iso.date(),
@@ -275,6 +301,7 @@ export const recurringItemSchema = z.object({
       status: billStatusSchema,
       dueOn: z.iso.date(),
       amountKes: z.string().regex(/^\d+$/).nullable(),
+      amountUsdc: z.string().regex(/^\d+$/).nullable(),
     })
     .nullable(),
   createdAt: z.iso.datetime(),

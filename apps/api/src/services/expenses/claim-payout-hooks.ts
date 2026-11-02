@@ -10,6 +10,7 @@ import type { SubjectHooks } from "../payout/subjects.js";
 import { expenses, memberships, users } from "../../db/schema/index.js";
 import { query } from "../../db/scope.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { notify } from "../notification/notify.js";
 import { PayoutRejected } from "../payout/payout-errors.js";
 import { requireConfirmedPayoutPhone } from "../phone-verification/payout-phone.js";
 
@@ -41,11 +42,11 @@ function lockClaimOf(tx: Transaction, payout: Payout) {
         status: expenses.status,
         amountKes: expenses.amountKes,
         claimantUserId: memberships.userId,
-        claimantName: sql<string>`coalesce(${users.fullName}, ${memberships.fullName}, ${users.email}, ${memberships.email})`,
+        claimantName: sql<string>`coalesce(${users.fullName}, ${users.email})`,
       })
       .from(expenses)
       .innerJoin(memberships, eq(memberships.id, expenses.membershipId))
-      .leftJoin(users, eq(users.id, memberships.userId))
+      .innerJoin(users, eq(users.id, memberships.userId))
       .where(
         and(
           eq(expenses.id, payout.subjectId),
@@ -78,11 +79,6 @@ function approveClaim(
     if (claim.amountKes !== payout.requestedKesCents) {
       return yield* refuse(
         "This claim changed after the payment was prepared. Nothing was sent. Review it and approve again.",
-      );
-    }
-    if (!claim.claimantUserId) {
-      return yield* refuse(
-        `${claim.claimantName} has no app login, so they can't be paid.`,
       );
     }
     const phone = yield* requireConfirmedPayoutPhone(
@@ -192,6 +188,11 @@ function followPayout(
             }
           : { reason: payout.failureReason }),
       },
+    });
+    yield* notify(tx, {
+      kind: outcome.status === "paid" ? "claim_paid" : "claim_payout_failed",
+      organizationId: payout.organizationId,
+      claimId: moved.id,
     });
   });
 }

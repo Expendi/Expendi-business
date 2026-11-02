@@ -1,7 +1,10 @@
 import { Data, Effect } from "effect";
 
-import type { BillStatus } from "@expendi-business/shared";
-import { UNPAID_BILL_STATUSES } from "@expendi-business/shared";
+import type { BillCurrency, BillStatus } from "@expendi-business/shared";
+import {
+  currencyForPayeeMethod,
+  UNPAID_BILL_STATUSES,
+} from "@expendi-business/shared";
 
 import type {
   BillRow,
@@ -14,7 +17,8 @@ export type BillNotPayableReason =
   | "paid_outside_payee"
   | "paid_outside_recurring"
   | "no_amount"
-  | "no_reference";
+  | "no_reference"
+  | "currency_mismatch";
 
 /** The bill can't be paid through Expendi as it stands (spec §6.20). */
 export class BillNotPayable extends Data.TaggedError("BillNotPayable")<{
@@ -24,7 +28,10 @@ export class BillNotPayable extends Data.TaggedError("BillNotPayable")<{
 }> {}
 
 export interface PayableBillCheck {
-  readonly bill: Pick<BillRow, "id" | "status" | "amountKes" | "reference">;
+  readonly bill: Pick<
+    BillRow,
+    "id" | "status" | "currency" | "amountKes" | "amountUsdc" | "reference"
+  >;
   readonly payee: Pick<PayeeRow, "name" | "kind" | "method">;
   /** The recurring payment the bill came from, if any. */
   readonly recurringItem?: Pick<RecurringItemRow, "payVia"> | null;
@@ -36,6 +43,30 @@ const STATUS_MESSAGES: Partial<Record<BillStatus, string>> = {
   paid_outside: "This bill was already marked paid.",
   cancelled: "This bill is cancelled.",
 };
+
+/** What a payable bill pays: KES through Paycrest, or exactly this USDC. */
+export type BillAmount =
+  | { readonly currency: "kes"; readonly amountKes: bigint }
+  | { readonly currency: "usd"; readonly amountUsdc: bigint };
+
+const CURRENCY_NAMES: Readonly<Record<BillCurrency, string>> = {
+  kes: "KES",
+  usd: "USD",
+};
+
+/** A bill's amount in its own currency, or null while a variable bill has none. */
+export function billAmountOf(
+  bill: Pick<BillRow, "currency" | "amountKes" | "amountUsdc">,
+): BillAmount | null {
+  if (bill.currency === "usd") {
+    return bill.amountUsdc === null
+      ? null
+      : { currency: "usd", amountUsdc: bill.amountUsdc };
+  }
+  return bill.amountKes === null
+    ? null
+    : { currency: "kes", amountKes: bill.amountKes };
+}
 
 const isUnpaid = (status: BillStatus): boolean =>
   (UNPAID_BILL_STATUSES as readonly BillStatus[]).includes(status);
@@ -60,15 +91,15 @@ const needsReference = (payee: PayableBillCheck["payee"]): boolean =>
  *   those bills paid instead.
  * - A variable bill needs its amount first, and a statutory payment its
  *   reference.
+ * - The amount is in the payee's currency: USD for a payee paid in USDC,
+ *   KES otherwise. A payee whose method changed since the bill was entered
+ *   needs the amount entered again.
  */
 export function assertBillPayable({
   bill,
   payee,
   recurringItem,
-}: PayableBillCheck): Effect.Effect<
-  { readonly amountKes: bigint },
-  BillNotPayable
-> {
+}: PayableBillCheck): Effect.Effect<BillAmount, BillNotPayable> {
   const refuse = (reason: BillNotPayableReason, message: string) =>
     Effect.fail(new BillNotPayable({ billId: bill.id, reason, message }));
 
@@ -90,7 +121,15 @@ export function assertBillPayable({
       "This payment is made outside Expendi. Mark this bill paid once you've paid it.",
     );
   }
-  if (bill.amountKes === null) {
+  const payeeCurrency = currencyForPayeeMethod(payee.method);
+  if (payee.method !== null && payeeCurrency !== bill.currency) {
+    return refuse(
+      "currency_mismatch",
+      `${payee.name} is now paid in ${payeeCurrency === "usd" ? "USDC" : "KES"}. Enter this bill's amount in ${CURRENCY_NAMES[payeeCurrency]} before paying it.`,
+    );
+  }
+  const amount = billAmountOf(bill);
+  if (amount === null) {
     return refuse("no_amount", "Enter this bill's amount before paying it.");
   }
   if (needsReference(payee) && bill.reference === null) {
@@ -99,5 +138,5 @@ export function assertBillPayable({
       "Enter the payment reference before paying, e.g. the KRA payment registration number.",
     );
   }
-  return Effect.succeed({ amountKes: bill.amountKes });
+  return Effect.succeed(amount);
 }

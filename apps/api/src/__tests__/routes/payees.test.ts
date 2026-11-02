@@ -18,13 +18,13 @@ import type { PayingCompany } from "../helpers/payouts.js";
 import { SoftwarePasskey } from "../../../scripts/lib/software-passkey.js";
 import { createApp } from "../../app.js";
 import { DatabaseService } from "../../db/client.js";
-import { memberships, payees, users } from "../../db/schema/index.js";
+import { payees, users } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 import {
   confirmAllowlistChange,
   requestAllowlistChange,
 } from "../../services/allowlist/allowlist.js";
-import { addMember, createUser, randomEmail } from "../helpers/db.js";
+import { addMember, createUser } from "../helpers/db.js";
 import {
   makeFakeEmailSender,
   randomAddress,
@@ -647,29 +647,20 @@ describe("employee payees", () => {
     expect(response.status).toBe(404);
   });
 
-  it("refuses an accountant, who has no login to confirm a number with", async () => {
+  it("refuses an accountant, who isn't paid as an employee", async () => {
     // #given
-    const [accountant] = await runInScope(
+    const accountant = await addMember(
       db,
-      { organizationId: paying.company.organizationId },
-      (tx) =>
-        tx
-          .insert(memberships)
-          .values({
-            organizationId: paying.company.organizationId,
-            role: "accountant",
-            status: "active",
-            email: randomEmail(),
-            fullName: "Grace",
-          })
-          .returning({ id: memberships.id }),
+      paying.company,
+      await createUser(db),
+      { role: "accountant" },
     );
 
     // #when
     const response = await send("POST", base(), {
       kind: "employee",
       name: "Grace",
-      membershipId: accountant?.id,
+      membershipId: accountant,
     });
 
     // #then

@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { Text, View } from "react-native";
 
 import { useAuth } from "~/features/auth/auth-provider";
+import { PushNotifications } from "~/features/notifications/push-notifications";
 import { readPublicEnv } from "~/lib/env";
 import { AppProviders } from "~/providers/app-providers";
 
@@ -21,6 +22,7 @@ export default function RootLayout(): JSX.Element {
   return (
     <AppProviders env={publicEnv.env}>
       <RootNavigator />
+      <PushNotifications />
       <StatusBar style="dark" />
     </AppProviders>
   );
@@ -199,6 +201,42 @@ function RootNavigator(): JSX.Element {
         <Stack.Screen
           name="(employee)/claims/[claimId]/edit"
           options={withHeader("Edit claim")}
+        />
+        <Stack.Screen
+          name="(employee)/petty-cash/index"
+          options={withHeader("Petty cash")}
+        />
+        <Stack.Screen
+          name="(employee)/petty-cash/new"
+          options={withHeader("Paid from petty cash")}
+        />
+        <Stack.Screen
+          name="(admin)/petty-cash/floats/index"
+          options={withHeader("Petty cash floats")}
+        />
+        <Stack.Screen
+          name="(admin)/petty-cash/floats/new"
+          options={withHeader("Issue a float")}
+        />
+        <Stack.Screen
+          name="(admin)/petty-cash/floats/[floatId]/index"
+          options={withHeader("Float")}
+        />
+        <Stack.Screen
+          name="(admin)/petty-cash/floats/[floatId]/top-up"
+          options={withHeader("Top up")}
+        />
+        <Stack.Screen
+          name="(admin)/petty-cash/floats/[floatId]/pay"
+          options={withHeader("Approve & pay")}
+        />
+        <Stack.Screen
+          name="(admin)/petty-cash/floats/[floatId]/return"
+          options={withHeader("Cash handed back")}
+        />
+        <Stack.Screen
+          name="(admin)/petty-cash/floats/[floatId]/close"
+          options={withHeader("Close the float")}
         />
       </Stack.Protected>
       <Stack.Protected guard={!isSignedIn}>

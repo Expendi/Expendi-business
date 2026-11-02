@@ -77,6 +77,12 @@ export interface PayrollRunView {
   readonly capKes: bigint;
   readonly people: number;
   readonly leftOut: number;
+  /** How many payments are paid, being paid and failed (spec §6.21). */
+  readonly progress: {
+    readonly paid: number;
+    readonly paying: number;
+    readonly failed: number;
+  };
   readonly createdAt: Date;
   readonly approvedAt: Date | null;
 }
@@ -114,12 +120,18 @@ const runColumns = {
   run: payrollRuns,
   people: sql<number>`(SELECT count(*)::int FROM bills b WHERE b.payroll_run_id = payroll_runs.id AND b.status <> 'cancelled')`,
   leftOut: sql<number>`(SELECT count(*)::int FROM bills b WHERE b.payroll_run_id = payroll_runs.id AND b.status = 'cancelled')`,
+  paid: sql<number>`(SELECT count(*)::int FROM bills b WHERE b.payroll_run_id = payroll_runs.id AND b.status = 'paid')`,
+  paying: sql<number>`(SELECT count(*)::int FROM bills b WHERE b.payroll_run_id = payroll_runs.id AND b.status = 'paying')`,
+  failed: sql<number>`(SELECT count(*)::int FROM bills b WHERE b.payroll_run_id = payroll_runs.id AND b.status = 'payout_failed')`,
 };
 
 function toRunView(row: {
   readonly run: PayrollRun;
   readonly people: number;
   readonly leftOut: number;
+  readonly paid: number;
+  readonly paying: number;
+  readonly failed: number;
 }): PayrollRunView {
   const { run } = row;
   return {
@@ -131,6 +143,7 @@ function toRunView(row: {
     capKes: run.capKes,
     people: row.people,
     leftOut: row.leftOut,
+    progress: { paid: row.paid, paying: row.paying, failed: row.failed },
     createdAt: run.createdAt,
     approvedAt: run.approvedAt,
   };

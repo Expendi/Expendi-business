@@ -7,6 +7,9 @@
 
 export const MPESA_INSTITUTION = "SAFAKEPC";
 
+/** What every Paycrest recipient sees as the payment's description. */
+export const PAYOUT_MEMO = "Expendi Business payout";
+
 export type KesRecipient =
   | {
       readonly method: "mpesa_phone";

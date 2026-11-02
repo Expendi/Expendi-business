@@ -3,6 +3,7 @@ import { Exit } from "effect";
 import { createMiddleware } from "hono/factory";
 
 import type { MembershipRole } from "@expendi-business/shared";
+import { COMPANY_READER_ROLES } from "@expendi-business/shared";
 
 import type { AppRuntime } from "../runtime.js";
 import type { AuthVariables } from "./auth.js";
@@ -29,10 +30,23 @@ const noAccess = new Forbidden({
   message: "You don't have access to this company",
 });
 
+const viewOnly = new Forbidden({
+  message: "Accountants can see this company but can't change anything",
+});
+
+/** Hono answers HEAD with the GET route, so both only read. */
+const READ_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD"]);
+
+export const isReadRequest = (method: string): boolean =>
+  READ_METHODS.has(method);
+
 /**
  * Resolves `:organizationId` against the caller's active membership. A
  * malformed ID, an unknown company and a company the caller doesn't belong
  * to all get the same 403, so responses don't reveal which companies exist.
+ *
+ * Accountants only read (spec §4, §6.14): anything else they send is refused
+ * here, for every company route, including ones added later.
  */
 export function tenantMiddleware(runtime: AppRuntime) {
   return createMiddleware<{ Variables: TenantVariables }>(async (c, next) => {
@@ -63,6 +77,9 @@ export function tenantMiddleware(runtime: AppRuntime) {
 
     const [membership] = exit.value;
     if (!membership) return clientErrorResponse(c, noAccess);
+    if (membership.role === "accountant" && !isReadRequest(c.req.method)) {
+      return clientErrorResponse(c, viewOnly);
+    }
 
     c.set("tenant", {
       organizationId,
@@ -85,4 +102,17 @@ export function requireRole(...roles: readonly MembershipRole[]) {
     }
     await next();
   });
+}
+
+/**
+ * For routes an admin manages that accountants also see (spec §4, §6.14):
+ * reads are open to every role in `COMPANY_READER_ROLES`, and every other
+ * method stays admin-only.
+ */
+export function requireAdminOrReader() {
+  const reader = requireRole(...COMPANY_READER_ROLES);
+  const admin = requireRole("admin");
+  return createMiddleware<{ Variables: TenantVariables }>((c, next) =>
+    isReadRequest(c.req.method) ? reader(c, next) : admin(c, next),
+  );
 }

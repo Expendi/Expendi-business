@@ -23,6 +23,7 @@ import {
 
 import { categories } from "./categories.js";
 import { timestamps } from "./columns.js";
+import { billCurrency } from "./currency.js";
 import { organizations } from "./organizations.js";
 import { overviewHeading } from "./overview-heading.js";
 import { payees } from "./payees.js";
@@ -58,8 +59,12 @@ export const recurringItems = pgTable(
     payeeId: uuid("payee_id").notNull(),
     overviewHeading: overviewHeading("overview_heading").notNull(),
     categoryId: uuid("category_id").notNull(),
+    /** KES, or USD for a payee paid in USDC (spec §6.19); its bills take it. */
+    currency: billCurrency("currency").notNull().default("kes"),
     /** KES cents for every bill; null when variable, entered on each bill. */
     amountKes: bigint("amount_kes", { mode: "bigint" }),
+    /** A USD item's amount for every bill: USDC base units (6 decimals). */
+    amountUsdc: bigint("amount_usdc", { mode: "bigint" }),
     schedule: recurringSchedule("schedule").notNull(),
     scheduleDay: integer("schedule_day").notNull(),
     startsOn: date("starts_on", { mode: "string" }).notNull(),
@@ -103,6 +108,14 @@ export const recurringItems = pgTable(
       sql`${table.amountKes} IS NULL OR ${table.amountKes} > 0`,
     ),
     check(
+      "recurring_items_amount_usdc_positive",
+      sql`${table.amountUsdc} IS NULL OR ${table.amountUsdc} > 0`,
+    ),
+    check(
+      "recurring_items_amount_in_currency",
+      sql`(${table.currency} = 'kes' AND ${table.amountUsdc} IS NULL) OR (${table.currency} = 'usd' AND ${table.amountKes} IS NULL)`,
+    ),
+    check(
       "recurring_items_schedule_day",
       sql`${table.scheduleDay} >= 1 AND ${table.scheduleDay} <= CASE WHEN ${table.schedule} = 'weekly' THEN 7 ELSE 31 END`,
     ),
@@ -122,7 +135,7 @@ export const recurringItems = pgTable(
       ),
     check(
       "recurring_items_salary_shape",
-      sql`${table.overviewHeading} <> 'salaries' OR (${table.amountKes} IS NOT NULL AND ${table.schedule} = 'monthly' AND ${table.payVia} = 'expendi')`,
+      sql`${table.overviewHeading} <> 'salaries' OR (${table.amountKes} IS NOT NULL AND ${table.currency} = 'kes' AND ${table.schedule} = 'monthly' AND ${table.payVia} = 'expendi')`,
     ),
     check(
       "recurring_items_next_due_in_schedule",

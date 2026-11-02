@@ -12,6 +12,7 @@ import { Button } from "~/components/button";
 import { ConfirmSheet } from "~/components/confirm-sheet";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { formatBillAmount } from "~/features/bills/bill-amount";
 import { BillStatusBadge, HEADING_LABELS } from "~/features/bills/bill-status";
 import { ReviewRow } from "~/features/claims/claim-editor";
 import { formatIsoDate } from "~/features/claims/dates";
@@ -25,7 +26,6 @@ import {
   useRecurringItemAction,
 } from "~/features/recurring/use-recurring";
 import { describeApiError } from "~/lib/api";
-import { formatKesCents } from "~/lib/money";
 
 export default function RecurringItemRoute(): JSX.Element {
   return (
@@ -92,9 +92,7 @@ function ItemSummary({ item }: { item: RecurringItem }): JSX.Element {
           {item.payee.name}
         </Text>
         <Text className="text-3xl font-bold text-gray-900">
-          {item.amountKes === null
-            ? "Variable amount"
-            : `KES ${formatKesCents(item.amountKes)}`}
+          {formatBillAmount(item) ?? "Variable amount"}
         </Text>
         <Badge label={state.label} tone={state.tone} />
       </View>
@@ -139,10 +137,8 @@ function NextBill({ item }: { item: RecurringItem }): JSX.Element | null {
   const router = useRouter();
   const bill = item.nextBill;
   if (bill === null) return null;
-  const amount =
-    bill.amountKes === null
-      ? "Amount to enter"
-      : `KES ${formatKesCents(bill.amountKes)}`;
+  const formatted = formatBillAmount({ ...bill, currency: item.currency });
+  const amount = formatted ?? "Amount to enter";
   return (
     <View className="gap-3">
       <Text
@@ -167,7 +163,7 @@ function NextBill({ item }: { item: RecurringItem }): JSX.Element | null {
             Due {formatIsoDate(bill.dueOn)}
           </Text>
           <Text
-            className={`text-base font-semibold ${bill.amountKes === null ? "text-amber-800" : "text-gray-900"}`}
+            className={`text-base font-semibold ${formatted === null ? "text-amber-800" : "text-gray-900"}`}
           >
             {amount}
           </Text>

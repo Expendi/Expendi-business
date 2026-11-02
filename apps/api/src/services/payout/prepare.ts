@@ -18,12 +18,12 @@ import { Paycrest } from "../paycrest/paycrest-client.js";
 import { quoteKesPayout } from "../paycrest/quote.js";
 import {
   InvalidRecipient,
+  PAYOUT_MEMO,
   toPaycrestRecipient,
 } from "../paycrest/recipient.js";
 import { PayoutRejected } from "./payout-errors.js";
 
-/** What every Paycrest recipient sees as the payment's description. */
-export const PAYOUT_MEMO = "Expendi Business payout";
+export { PAYOUT_MEMO } from "../paycrest/recipient.js";
 
 /** Paycrest's marginal rate, used to value a USDC payout in KES. */
 const RATE_PROBE_USDC = "1";
@@ -42,6 +42,8 @@ export function maxDebitFor(quotedUsdc: bigint): bigint {
 interface PayoutRequestBase {
   readonly subjectType: Payout["subjectType"];
   readonly subjectId: string;
+  /** A split salary's order, from 1 (spec §7.5); leave out otherwise. */
+  readonly subjectPart?: number;
   readonly payrollRunId?: string;
   /** Stable for this attempt, e.g. `claim:<id>:1`; a retry uses a new one. */
   readonly idempotencyKey: string;
@@ -87,6 +89,7 @@ function normalise(request: PayoutRequest): PayoutRequest {
 const sameRequest = (payout: Payout, request: PayoutRequest): boolean =>
   payout.subjectType === request.subjectType &&
   payout.subjectId === request.subjectId &&
+  payout.subjectPart === (request.subjectPart ?? 1) &&
   (payout.payrollRunId ?? undefined) === request.payrollRunId &&
   (isUsdcRequest(request)
     ? payout.quotedUsdc === request.amountUsdc
@@ -275,6 +278,7 @@ export function preparePayouts(input: {
                 walletId: wallet.id,
                 subjectType: request.subjectType,
                 subjectId: request.subjectId,
+                subjectPart: request.subjectPart ?? 1,
                 payrollRunId: request.payrollRunId,
                 idempotencyKey: request.idempotencyKey,
                 method: request.recipient.method,
@@ -293,6 +297,7 @@ export function preparePayouts(input: {
             after: {
               subjectType: inserted.subjectType,
               subjectId: inserted.subjectId,
+              subjectPart: inserted.subjectPart,
               payrollRunId: inserted.payrollRunId,
               provider: inserted.provider,
               method: inserted.method,

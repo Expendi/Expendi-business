@@ -232,6 +232,12 @@ export const payrollRunSchema = z.object({
   /** Payments not left out. */
   people: z.int().nonnegative(),
   leftOut: z.int().nonnegative(),
+  /** How many payments are paid, being paid and failed (spec §6.21). */
+  progress: z.object({
+    paid: z.int().nonnegative(),
+    paying: z.int().nonnegative(),
+    failed: z.int().nonnegative(),
+  }),
   createdAt: z.iso.datetime(),
   approvedAt: z.iso.datetime().nullable(),
 });

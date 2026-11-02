@@ -52,6 +52,7 @@ export function retryPayout(input: {
     const base = {
       subjectType: failed.subjectType,
       subjectId: failed.subjectId,
+      ...(failed.subjectPart > 1 && { subjectPart: failed.subjectPart }),
       ...(failed.payrollRunId && { payrollRunId: failed.payrollRunId }),
       idempotencyKey: input.idempotencyKey,
     };

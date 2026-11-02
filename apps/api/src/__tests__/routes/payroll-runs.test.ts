@@ -814,15 +814,16 @@ describe("row-level security", () => {
     });
   });
 
-  it("hides payroll payouts from a role that isn't on payroll", async () => {
+  it("hides payroll payouts from an employee who isn't on payroll", async () => {
     // #given
     await settleEveryone();
-    const accountant = await createUser(db);
+    const colleague = await createUser(db);
+    await addMember(db, company, colleague);
 
     // #when
     const seen = await rawAs(
       sql`SELECT id FROM payouts WHERE payroll_run_id IS NOT NULL`,
-      { userId: accountant.id, role: "accountant" },
+      { userId: colleague.id, role: "employee" },
     );
 
     // #then
@@ -843,9 +844,11 @@ describe("row-level security", () => {
     expect(changed).toEqual([]);
   });
 
-  it("shows admins and the payout engine every payroll payout", async () => {
+  it("shows admins, accountants and the payout engine every payroll payout", async () => {
     // #given
     const { aminaPayout, brianPayout } = await settleEveryone();
+    const accountant = await createUser(db);
+    await addMember(db, company, accountant, { role: "accountant" });
     const query = sql`SELECT id FROM payouts WHERE payroll_run_id IS NOT NULL ORDER BY id`;
 
     // #when
@@ -854,12 +857,16 @@ describe("row-level security", () => {
         userId: company.admin.id,
         role: "admin",
       }),
+      accountant: await rawAs<{ id: string }>(query, {
+        userId: accountant.id,
+        role: "accountant",
+      }),
       engine: await rawAs<{ id: string }>(query, {}),
     };
 
     // #then
     const all = [aminaPayout, brianPayout].sort().map((id) => ({ id }));
-    expect(seen).toEqual({ admin: all, engine: all });
+    expect(seen).toEqual({ admin: all, accountant: all, engine: all });
   });
 
   it("still shows an employee the company's other payouts, e.g. their claims", async () => {

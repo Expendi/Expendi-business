@@ -29,6 +29,7 @@ function NewBillScreen({ company }: { company: Company }): JSX.Element {
         initialDraft={{
           payeeId: null,
           variable: false,
+          currency: "kes",
           amount: "",
           dueOn: today,
           heading: null,

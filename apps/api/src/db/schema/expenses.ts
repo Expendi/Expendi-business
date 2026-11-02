@@ -26,6 +26,7 @@ import {
 import { bills } from "./bills.js";
 import { categories } from "./categories.js";
 import { timestamps } from "./columns.js";
+import { floats } from "./floats.js";
 import { memberships } from "./memberships.js";
 import { organizations } from "./organizations.js";
 import { overviewHeading } from "./overview-heading.js";
@@ -55,8 +56,18 @@ export const expenses = pgTable(
     membershipId: uuid("membership_id").notNull(),
     kind: expenseKind("kind").notNull(),
     overviewHeading: overviewHeading("overview_heading").notNull(),
-    /** Float spending's float (spec §6.22); its foreign key comes with the floats table. */
+    /**
+     * Float spending's float, or the float an overspend claim went over
+     * (spec §6.22).
+     */
     floatId: uuid("float_id"),
+    /**
+     * Float spending whose purchase went over the float: the claim for the
+     * extra. The purchase's receipts, M-Pesa code and eTIMS invoice number
+     * are on that claim, which the admin approves; this row has none of its
+     * own (the company-wide duplicate keys allow each only once).
+     */
+    overspendClaimId: uuid("overspend_claim_id"),
     /**
      * Company spending's source account (spec §6.17, §6.23). Null only on
      * spending recorded from a bill marked paid without saying from where.
@@ -130,6 +141,16 @@ export const expenses = pgTable(
       columns: [table.billId, table.organizationId],
       foreignColumns: [bills.id, bills.organizationId],
     }),
+    foreignKey({
+      name: "expenses_float_organization_fk",
+      columns: [table.floatId, table.organizationId],
+      foreignColumns: [floats.id, floats.organizationId],
+    }),
+    foreignKey({
+      name: "expenses_overspend_claim_organization_fk",
+      columns: [table.overspendClaimId, table.organizationId],
+      foreignColumns: [table.id, table.organizationId],
+    }),
     // Target of receipt_files' composite foreign key.
     unique("expenses_id_organization_id_unique").on(
       table.id,
@@ -149,6 +170,13 @@ export const expenses = pgTable(
     uniqueIndex("expenses_bill_id_unique")
       .on(table.billId)
       .where(sql`${table.billId} IS NOT NULL`),
+    uniqueIndex("expenses_overspend_claim_id_unique")
+      .on(table.overspendClaimId)
+      .where(sql`${table.overspendClaimId} IS NOT NULL`),
+    // A float's balance sums its spending.
+    index("expenses_float_id_idx")
+      .on(table.floatId)
+      .where(sql`${table.floatId} IS NOT NULL`),
     index("expenses_organization_created_idx").on(
       table.organizationId,
       table.createdAt,
@@ -183,6 +211,18 @@ export const expenses = pgTable(
     check(
       "expenses_company_links",
       sql`${table.kind} = 'company' OR (${table.paidFromAccountId} IS NULL AND ${table.billId} IS NULL)`,
+    ),
+    check(
+      "expenses_float_recorded",
+      sql`${table.kind} <> 'float' OR (${table.status} = 'recorded' AND ${table.floatId} IS NOT NULL)`,
+    ),
+    check(
+      "expenses_float_link",
+      sql`${table.floatId} IS NULL OR ${table.kind} IN ('float', 'claim')`,
+    ),
+    check(
+      "expenses_overspend_claim_link",
+      sql`${table.overspendClaimId} IS NULL OR ${table.kind} = 'float'`,
     ),
     check(
       "expenses_no_receipt_reason",

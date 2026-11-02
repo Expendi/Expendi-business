@@ -13,7 +13,7 @@ import type { AppRuntime } from "../runtime.js";
 import { NotFound } from "../errors.js";
 import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
-import { requireRole } from "../middleware/tenant.js";
+import { requireAdminOrReader } from "../middleware/tenant.js";
 import {
   createRecurringItem,
   endRecurringItem,
@@ -35,15 +35,15 @@ function itemIdFrom(raw: string): Effect.Effect<string, NotFound> {
 }
 
 /**
- * Mounted at `/organizations/:organizationId/recurring-items`. Admins only
- * (spec §4); row-level security hides recurring payments from every other
- * role as well.
+ * Mounted at `/organizations/:organizationId/recurring-items`. Admins, and
+ * accountants read-only (spec §4); row-level security hides recurring
+ * payments from every other role as well.
  */
 export function createRecurringItemRoutes(
   runtime: AppRuntime,
 ): Hono<{ Variables: TenantVariables }> {
   return new Hono<{ Variables: TenantVariables }>()
-    .use(requireRole("admin"))
+    .use(requireAdminOrReader())
     .get("/", (c) =>
       runEffect(
         runtime,

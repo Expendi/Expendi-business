@@ -5,6 +5,7 @@ import type { AuthVariables } from "./middleware/auth.js";
 import type { AppRuntime } from "./runtime.js";
 import { internalErrorResponse } from "./http/respond.js";
 import { authMiddleware } from "./middleware/auth.js";
+import { dashboardCors } from "./middleware/dashboard-cors.js";
 import { createAlchemyWebhookRoutes } from "./routes/alchemy-webhooks.js";
 import { createApprovalPasskeyRoutes } from "./routes/approval-passkey.js";
 import { createHealthRoutes } from "./routes/health.js";
@@ -39,13 +40,16 @@ export function createApp({ runtime }: { readonly runtime: AppRuntime }): App {
   app.route("/integrations/zoho", createZohoIntegrationRoutes(runtime));
 
   const authenticate = authMiddleware(runtime);
+  // Browser CORS for the web dashboard on customer routes only, ahead of
+  // login so preflights and refusals reach the dashboard.
+  const customerCors = dashboardCors(runtime);
   // Also matches `/me` itself.
-  app.use("/me/*", authenticate);
+  app.use("/me/*", customerCors, authenticate);
   app.route("/me", createMeRoutes(runtime));
   app.route("/me/approval-passkey", createApprovalPasskeyRoutes(runtime));
 
   // Also matches `/organizations` itself, so sign-up is authenticated too.
-  app.use("/organizations/*", authenticate);
+  app.use("/organizations/*", customerCors, authenticate);
   app.route("/organizations", createSignUpRoutes(runtime));
   app.route(
     "/organizations/:organizationId",

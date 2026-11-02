@@ -51,6 +51,7 @@ export const webauthnPurpose = pgEnum("webauthn_purpose", [
   "change_allowlist",
   "change_payee",
   "change_salary",
+  "change_payroll_margin",
 ]);
 
 /**

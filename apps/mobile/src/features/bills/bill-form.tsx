@@ -8,6 +8,7 @@ import type {
   CreateBillRequest,
   Payee,
   PayeeKind,
+  PayeeMethod,
   UpdateBillRequest,
 } from "@expendi-business/shared";
 import {
@@ -32,6 +33,7 @@ import { useReceiptSlots } from "~/features/claims/use-receipt-slots";
 import { KIND_LABELS } from "~/features/payees/payee-display";
 import { usePayees } from "~/features/payees/use-payees";
 import { describeApiError } from "~/lib/api";
+import { CURRENCY_LABELS, currencyOfPayee } from "./bill-amount";
 import { amountChanged, toCreateRequest, toUpdateRequest } from "./bill-draft";
 import { HEADING_LABELS } from "./bill-status";
 
@@ -50,6 +52,7 @@ type FieldErrors = Partial<Record<ErrorField, string>>;
 const ERROR_FIELDS: Readonly<Record<string, ErrorField>> = {
   payeeId: "payeeId",
   amountKes: "amount",
+  amountUsd: "amount",
   dueOn: "dueOn",
   overviewHeading: "heading",
   categoryId: "categoryId",
@@ -156,7 +159,13 @@ export function BillForm(props: BillFormProps): JSX.Element {
           current={props.bill?.payee}
           value={draft.payeeId}
           onChange={(payeeId) => update("payeeId", payeeId)}
-          onPicked={(payee) => setPayeeKind(payee.kind)}
+          onPicked={(payee) => {
+            setPayeeKind(payee.kind);
+            const currency = currencyOfPayee(payee.method, "kes");
+            if (currency !== draft.currency) {
+              setDraft((current) => ({ ...current, currency, amount: "" }));
+            }
+          }}
         />
         <ErrorMessage message={fieldErrors.payeeId ?? null} />
 
@@ -170,13 +179,20 @@ export function BillForm(props: BillFormProps): JSX.Element {
         )}
         <TextField
           label={
-            draft.variable ? "Amount (KES, if you know it)" : "Amount (KES)"
+            draft.variable
+              ? `Amount (${CURRENCY_LABELS[draft.currency]}, if you know it)`
+              : `Amount (${CURRENCY_LABELS[draft.currency]})`
           }
           value={draft.amount}
           onChangeText={(value) => update("amount", value)}
-          placeholder="15,000.00"
+          placeholder={draft.currency === "usd" ? "120.00" : "15,000.00"}
           keyboardType="decimal-pad"
         />
+        {draft.currency === "usd" ? (
+          <Text className="text-sm text-gray-600">
+            This payee is paid in USDC: they receive exactly this many USDC.
+          </Text>
+        ) : null}
         <ErrorMessage message={fieldErrors.amount ?? null} />
 
         {needsReason ? (
@@ -280,7 +296,10 @@ function PayeeField({
   current: Bill["payee"] | undefined;
   value: string | null;
   onChange: (payeeId: string) => void;
-  onPicked: (payee: Pick<Payee, "kind">) => void;
+  onPicked: (payee: {
+    readonly kind: PayeeKind;
+    readonly method: PayeeMethod | null;
+  }) => void;
 }): JSX.Element {
   const payees = usePayees(organizationId, {
     kind: null,
@@ -330,7 +349,14 @@ function PayeeField({
       onChange={(payeeId) => {
         onChange(payeeId);
         const picked = choices.find((payee) => payee.id === payeeId);
-        if (picked) onPicked(picked);
+        if (picked) {
+          onPicked({
+            kind: picked.kind,
+            method:
+              picked.details?.method ??
+              (current?.id === picked.id ? current.method : null),
+          });
+        }
       }}
     />
   );

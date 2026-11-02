@@ -19,6 +19,12 @@ export interface StationJob {
   readonly run: EffectType.Effect<unknown, unknown, AppDeps>;
 }
 
+/**
+ * What a frequent job's run returns when it found nothing to do, so the
+ * station logs only the runs that did something.
+ */
+export const IDLE = "idle";
+
 function withAdvisoryLock<A, E>(
   lockKey: number,
   work: EffectType.Effect<A, E, AppDeps>,
@@ -65,7 +71,7 @@ export function startStation(
             `[station] ${job.name} failed`,
             Cause.pretty(exit.cause),
           );
-        } else if (exit.value !== "skipped") {
+        } else if (exit.value !== "skipped" && exit.value !== IDLE) {
           console.log(`[station] ${job.name}`, exit.value);
         }
       })

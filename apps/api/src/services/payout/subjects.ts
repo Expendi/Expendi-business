@@ -5,7 +5,9 @@ import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { AuditLog } from "../audit/audit-log.js";
 import type { PayoutRejected } from "./payout-errors.js";
+import { billPayoutHooks } from "../bills/bill-payout-hooks.js";
 import { claimPayoutHooks } from "../expenses/claim-payout-hooks.js";
+import { floatPayoutHooks } from "../floats/float-payout-hooks.js";
 
 /**
  * What a payout pays follows the payout (spec §6.7 step 6, §6.8): a claim
@@ -44,8 +46,8 @@ const NOTHING_FOLLOWS: SubjectHooks = {
 
 const SUBJECTS: Readonly<Record<Payout["subjectType"], SubjectHooks>> = {
   claim: claimPayoutHooks,
-  bill: NOTHING_FOLLOWS,
-  float: NOTHING_FOLLOWS,
+  bill: billPayoutHooks,
+  float: floatPayoutHooks,
   withdrawal: NOTHING_FOLLOWS,
 };
 

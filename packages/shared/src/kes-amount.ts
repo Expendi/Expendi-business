@@ -22,3 +22,24 @@ export function formatKesAmount(cents: bigint): string {
   const whole = digits.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return `KES ${whole}.${digits.slice(-2)}`;
 }
+
+/** USDC base units in one US cent: USD bills pay USDC 1:1 (spec §6.19). */
+export const USDC_UNITS_PER_US_CENT = 10_000n;
+
+/**
+ * A typed USD amount in USDC base units (6 decimals), typed like KES: "1,500.50"
+ * → 1500500000n. A USD bill pays exactly this many USDC. Null for anything
+ * else, including more than 2 decimals.
+ */
+export function parseUsdToUsdcUnits(input: string): bigint | null {
+  const cents = parseKesToCents(input);
+  return cents === null ? null : cents * USDC_UNITS_PER_US_CENT;
+}
+
+/** USDC base units as US dollars for people to read, e.g. 1500500000n → "USD 1,500.50". */
+export function formatUsdAmount(units: bigint): string {
+  const digits = units.toString().padStart(7, "0");
+  const whole = digits.slice(0, -6).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fraction = digits.slice(-6).replace(/0+$/, "").padEnd(2, "0");
+  return `USD ${whole}.${fraction}`;
+}

@@ -11,6 +11,7 @@ import {
   leaveOutOfPayrollRequestSchema,
   passkeyAssertionSchema,
   PAYROLL_RUNS_LIST_MAX_SIZE,
+  retryPaymentRequestSchema,
   SALARIES_LIST_MAX_SIZE,
   salaryAmountChangeSchema,
   updateSalaryRequestSchema,
@@ -18,11 +19,23 @@ import {
 
 import type { TenantVariables } from "../middleware/tenant.js";
 import type { AppRuntime } from "../runtime.js";
-import { Forbidden, NotFound } from "../errors.js";
-import { readBody } from "../http/body.js";
+import type { PayoutRejected } from "../services/payout/payout-errors.js";
+import {
+  BadRequest,
+  Forbidden,
+  NotFound,
+  ServiceUnavailable,
+} from "../errors.js";
+import { readBody, readOptionalBody } from "../http/body.js";
+import { payoutRejectionAsClientError } from "../http/payout-rejection.js";
 import { runEffect } from "../http/respond.js";
-import { requireRole } from "../middleware/tenant.js";
+import { requireAdminOrReader, requireRole } from "../middleware/tenant.js";
 import { listMySalaryPayments } from "../services/payroll/my-payments.js";
+import {
+  confirmPayrollRunPayment,
+  requestPayrollPaymentRetry,
+  requestPayrollRunPayment,
+} from "../services/payroll/pay.js";
 import {
   addPayrollOneOff,
   adjustPayrollPayment,
@@ -65,6 +78,37 @@ function challengeIdFrom(raw: string): Effect.Effect<string, Forbidden> {
       );
 }
 
+const paymentConfirmSchema = z.object({
+  response: z.custom<AuthenticationResponseJSON>(
+    (value) => passkeyAssertionSchema.safeParse(value).success,
+    "Your passkey's confirmation couldn't be read. Try again.",
+  ),
+});
+
+const paymentNotFound = new NotFound({
+  message: "That payment wasn't found. Start Approve & pay again.",
+});
+
+/** Why the engine wouldn't prepare a payment, as the app shows it. */
+const PREPARATION_FAILURES = {
+  PayoutRejected: (error: PayoutRejected) =>
+    Effect.fail(payoutRejectionAsClientError(error)),
+  PaycrestError: () =>
+    Effect.fail(
+      new ServiceUnavailable({
+        message:
+          "Couldn't get today's KES rate from Paycrest. Try again in a minute.",
+      }),
+    ),
+  AmountTooSmall: () =>
+    Effect.fail(
+      new BadRequest({
+        message:
+          "A payment in this run is below the smallest amount Paycrest pays.",
+      }),
+    ),
+} as const;
+
 /** Only the assertion's shape is checked here; the verifier checks its signature. */
 const confirmSchema = z.object({
   change: salaryAmountChangeSchema,
@@ -75,16 +119,16 @@ const confirmSchema = z.object({
 });
 
 /**
- * Mounted at `/organizations/:organizationId/salaries`. Admins only:
- * salaries are private (spec §4), and row-level security hides them from
- * every other role as well. A new net pay returns a passkey challenge,
+ * Mounted at `/organizations/:organizationId/salaries`. Admins, and
+ * accountants read-only: salaries are private (spec §4), and row-level
+ * security hides them from every other role as well. A new net pay returns a passkey challenge,
  * confirmed at `/amount-changes/:challengeId/confirm`.
  */
 export function createSalaryRoutes(
   runtime: AppRuntime,
 ): Hono<{ Variables: TenantVariables }> {
   return new Hono<{ Variables: TenantVariables }>()
-    .use(requireRole("admin"))
+    .use(requireAdminOrReader())
     .get("/", (c) =>
       runEffect(
         runtime,
@@ -169,15 +213,15 @@ export function createSalaryRoutes(
 }
 
 /**
- * Mounted at `/organizations/:organizationId/payroll-runs`. Admins only,
- * like salaries. Drafts change only through these routes, each with a
- * reason; paying a run is T39.
+ * Mounted at `/organizations/:organizationId/payroll-runs`. Admins, and
+ * accountants read-only, like salaries. Drafts change only through these routes, each with a
+ * reason. Approve & pay all and retrying one person are admin-only.
  */
 export function createPayrollRunRoutes(
   runtime: AppRuntime,
 ): Hono<{ Variables: TenantVariables }> {
   return new Hono<{ Variables: TenantVariables }>()
-    .use(requireRole("admin"))
+    .use(requireAdminOrReader())
     .get("/", (c) =>
       runEffect(
         runtime,
@@ -192,6 +236,64 @@ export function createPayrollRunRoutes(
         runIdFrom(c.req.param("runId")).pipe(
           Effect.flatMap((runId) => getPayrollRun(c.get("tenant"), runId)),
         ),
+      ),
+    )
+    .post("/:runId/payment", requireRole("admin"), (c) =>
+      runEffect(
+        runtime,
+        c,
+        Effect.all([
+          runIdFrom(c.req.param("runId")),
+          readOptionalBody(c.req.raw, retryPaymentRequestSchema),
+        ]).pipe(
+          Effect.flatMap(([runId, { secondConfirmation }]) =>
+            requestPayrollRunPayment(c.get("tenant"), runId, {
+              secondConfirmation,
+            }),
+          ),
+          Effect.catchTags(PREPARATION_FAILURES),
+        ),
+        201,
+      ),
+    )
+    .post("/:runId/payment/:challengeId/confirm", requireRole("admin"), (c) => {
+      const challengeId = c.req.param("challengeId");
+      return runEffect(
+        runtime,
+        c,
+        Effect.all([
+          runIdFrom(c.req.param("runId")),
+          uuid.safeParse(challengeId).success
+            ? Effect.succeed(challengeId)
+            : Effect.fail(paymentNotFound),
+          readBody(c.req.raw, paymentConfirmSchema),
+        ]).pipe(
+          Effect.flatMap(([runId, id, { response }]) =>
+            confirmPayrollRunPayment(c.get("tenant"), runId, id, response),
+          ),
+          Effect.catchTag("PayoutRejected", (error) =>
+            Effect.fail(payoutRejectionAsClientError(error)),
+          ),
+        ),
+      );
+    })
+    .post("/:runId/payments/:billId/retry", requireRole("admin"), (c) =>
+      runEffect(
+        runtime,
+        c,
+        Effect.all([
+          runIdFrom(c.req.param("runId")),
+          billIdFrom(c.req.param("billId")),
+          readOptionalBody(c.req.raw, retryPaymentRequestSchema),
+        ]).pipe(
+          Effect.flatMap(([runId, billId, { secondConfirmation }]) =>
+            requestPayrollPaymentRetry(c.get("tenant"), runId, billId, {
+              secondConfirmation,
+            }),
+          ),
+          Effect.catchTags(PREPARATION_FAILURES),
+        ),
+        201,
       ),
     )
     .post("/:runId/one-offs", (c) =>

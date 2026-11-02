@@ -9,6 +9,7 @@ import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { formatBillAmount } from "~/features/bills/bill-amount";
 import { formatIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
 import {
@@ -18,7 +19,6 @@ import {
 } from "~/features/recurring/recurring-draft";
 import { useRecurringItems } from "~/features/recurring/use-recurring";
 import { describeApiError } from "~/lib/api";
-import { formatKesCents } from "~/lib/money";
 
 export default function RecurringItemsRoute(): JSX.Element {
   return (
@@ -87,10 +87,7 @@ function RecurringRow({
   item: RecurringItem;
   onPress: () => void;
 }): JSX.Element {
-  const amount =
-    item.amountKes === null
-      ? "Variable"
-      : `KES ${formatKesCents(item.amountKes)}`;
+  const amount = formatBillAmount(item) ?? "Variable";
   const nextDue = nextDueDate(item);
   const when =
     item.state === "ended" && item.nextBill === null
@@ -115,7 +112,7 @@ function RecurringRow({
           <Text className="text-sm text-gray-600">{when}</Text>
         </View>
         <Text
-          className={`text-base font-semibold ${item.amountKes === null ? "text-amber-800" : "text-gray-900"}`}
+          className={`text-base font-semibold ${item.variable ? "text-amber-800" : "text-gray-900"}`}
         >
           {amount}
         </Text>

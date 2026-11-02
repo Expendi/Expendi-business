@@ -13,7 +13,7 @@ import type { AppRuntime } from "../runtime.js";
 import { BadRequest, NotFound } from "../errors.js";
 import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
-import { requireRole } from "../middleware/tenant.js";
+import { requireAdminOrReader } from "../middleware/tenant.js";
 import {
   getCompanySpending,
   listCompanySpending,
@@ -43,15 +43,15 @@ function parseQuery(
 }
 
 /**
- * Mounted at `/organizations/:organizationId/company-spending`. Admins only
- * (spec §4, §6.23). Receipts are uploaded, pasted and read through the
+ * Mounted at `/organizations/:organizationId/company-spending`. Admins, and
+ * accountants read-only (spec §4, §6.23). Receipts are uploaded, pasted and read through the
  * receipts routes first, as for a claim.
  */
 export function createCompanySpendingRoutes(
   runtime: AppRuntime,
 ): Hono<{ Variables: TenantVariables }> {
   return new Hono<{ Variables: TenantVariables }>()
-    .use(requireRole("admin"))
+    .use(requireAdminOrReader())
     .get("/", (c) =>
       runEffect(
         runtime,

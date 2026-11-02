@@ -19,6 +19,7 @@ import { createAllowlistRoutes } from "./allowlist.js";
 import { createBillRoutes } from "./bills.js";
 import { createCategoryRoutes } from "./categories.js";
 import { createClaimRoutes } from "./claims.js";
+import { createFloatRoutes } from "./floats.js";
 import { createMemberRoutes } from "./members.js";
 import { createPaidFromAccountRoutes } from "./paid-from-accounts.js";
 import { createPayeeRoutes } from "./payees.js";
@@ -29,6 +30,7 @@ import {
 } from "./payroll.js";
 import { createReceiptRoutes } from "./receipts.js";
 import { createRecurringItemRoutes } from "./recurring-items.js";
+import { createSettingsRoutes } from "./settings.js";
 import { createCompanySpendingRoutes } from "./spending.js";
 import { createWalletRoutes } from "./wallet.js";
 import { createWithdrawalRoutes } from "./withdrawals.js";
@@ -94,6 +96,7 @@ export function createOrganizationRoutes(
     .route("/categories", createCategoryRoutes(runtime))
     .route("/claims", createClaimRoutes(runtime))
     .route("/company-spending", createCompanySpendingRoutes(runtime))
+    .route("/floats", createFloatRoutes(runtime))
     .route("/members", createMemberRoutes(runtime))
     .route("/me", createMyCompanyRoutes(runtime))
     .route("/paid-from-accounts", createPaidFromAccountRoutes(runtime))
@@ -102,6 +105,7 @@ export function createOrganizationRoutes(
     .route("/receipts", createReceiptRoutes(runtime))
     .route("/recurring-items", createRecurringItemRoutes(runtime))
     .route("/salaries", createSalaryRoutes(runtime))
+    .route("/settings", createSettingsRoutes(runtime))
     .route("/wallet", createWalletRoutes(runtime))
     .route("/withdrawal-addresses", createAllowlistRoutes(runtime))
     .route("/withdrawals", createWithdrawalRoutes(runtime));

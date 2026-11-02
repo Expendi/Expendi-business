@@ -21,6 +21,7 @@ import {
   TestApprovalSettings,
   TestWalletSettings,
 } from "./fakes.js";
+import { makeFakePushSender } from "./push.js";
 
 const TOKEN_PREFIX = "test-token:";
 
@@ -110,6 +111,7 @@ export function makeTestRuntime(
     approvalSettings: TestApprovalSettings,
     emailSender: makeFakeEmailSender().layer,
     otpProvider: makeFakeOtpProvider().layer,
+    pushSender: makeFakePushSender().layer,
     fileStorage: makeFakeFileStorage().layer,
     receiptExtractor: makeFakeReceiptExtractor().layer,
     zoho: makeFakeZoho().layer,

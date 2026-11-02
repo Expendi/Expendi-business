@@ -17,7 +17,7 @@ import type { AppRuntime } from "../runtime.js";
 import { BadRequest, Forbidden, NotFound } from "../errors.js";
 import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
-import { requireRole } from "../middleware/tenant.js";
+import { requireAdminOrReader } from "../middleware/tenant.js";
 import {
   archivePayee,
   confirmPayeeChange,
@@ -71,8 +71,9 @@ function parseQuery(
 }
 
 /**
- * Mounted at `/organizations/:organizationId/payees`. Admins only: payees
- * hold bank and M-Pesa details (spec §4, §6.19). Adding payment details or
+ * Mounted at `/organizations/:organizationId/payees`. Admins, and accountants
+ * read-only: payees hold bank and M-Pesa details (spec §4, §6.19). Adding
+ * payment details or
  * changing them returns a passkey challenge, confirmed at
  * `/changes/:challengeId/confirm`.
  */
@@ -80,7 +81,7 @@ export function createPayeeRoutes(
   runtime: AppRuntime,
 ): Hono<{ Variables: TenantVariables }> {
   return new Hono<{ Variables: TenantVariables }>()
-    .use(requireRole("admin"))
+    .use(requireAdminOrReader())
     .get("/", (c) =>
       runEffect(
         runtime,

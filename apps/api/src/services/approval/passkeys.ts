@@ -283,7 +283,11 @@ export interface ApprovalChallenge {
  */
 /** What a confirmation is for; enrolment has its own flow. */
 export type ConfirmationPurpose =
-  "approve_payouts" | "change_allowlist" | "change_payee" | "change_salary";
+  | "approve_payouts"
+  | "change_allowlist"
+  | "change_payee"
+  | "change_salary"
+  | "change_payroll_margin";
 
 export function startApproval(input: {
   readonly organizationId: string;

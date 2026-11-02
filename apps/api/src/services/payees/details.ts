@@ -15,9 +15,9 @@ import { normaliseBaseAddress } from "../chain/address.js";
 import { Paycrest } from "../paycrest/paycrest-client.js";
 import {
   InvalidRecipient,
+  PAYOUT_MEMO,
   toPaycrestRecipient,
 } from "../paycrest/recipient.js";
-import { PAYOUT_MEMO } from "../payout/prepare.js";
 
 /**
  * A payee's payment details (spec §6.19): validated against the same rules

@@ -15,6 +15,24 @@ export interface AppConfig {
    * `/internal/*` from the browser. Empty: no cross-origin access.
    */
   readonly adminAppOrigins: readonly string[];
+  /**
+   * Origins of the company web dashboard (spec §6.14), allowed to call the
+   * customer routes (`/me/*`, `/organizations/*`) from the browser. Empty:
+   * no cross-origin access.
+   */
+  readonly dashboardOrigins: readonly string[];
+}
+
+/** A comma-separated list of origins; unset means none. */
+function originList(name: string): Config.Config<readonly string[]> {
+  return Config.withDefault(Config.string(name), "").pipe(
+    Config.map((raw) =>
+      raw
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter((origin) => origin.length > 0),
+    ),
+  );
 }
 
 export class ConfigService extends Context.Tag("ConfigService")<
@@ -31,17 +49,14 @@ export const ConfigLive: Layer.Layer<ConfigService, ConfigError.ConfigError> =
       const appInstallUrl = yield* Config.option(
         Config.url("APP_INSTALL_URL").pipe(Config.map((url) => url.href)),
       );
-      const adminAppOrigins = yield* Config.withDefault(
-        Config.string("ADMIN_APP_ORIGINS"),
-        "",
-      ).pipe(
-        Config.map((raw) =>
-          raw
-            .split(",")
-            .map((origin) => origin.trim())
-            .filter((origin) => origin.length > 0),
-        ),
-      );
-      return { port, databaseUrl, appInstallUrl, adminAppOrigins };
+      const adminAppOrigins = yield* originList("ADMIN_APP_ORIGINS");
+      const dashboardOrigins = yield* originList("DASHBOARD_ORIGINS");
+      return {
+        port,
+        databaseUrl,
+        appInstallUrl,
+        adminAppOrigins,
+        dashboardOrigins,
+      };
     }),
   );

@@ -10,7 +10,10 @@ import type {
   SubmitClaimFields,
   UpdateClaimFields,
 } from "@expendi-business/shared";
-import { EDITABLE_CLAIM_STATUSES } from "@expendi-business/shared";
+import {
+  EDITABLE_CLAIM_STATUSES,
+  readsWholeCompany,
+} from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
 import type { Payout } from "../../db/schema/index.js";
@@ -31,6 +34,7 @@ import {
 import { query, withScope } from "../../db/scope.js";
 import { BadRequest, Conflict, Forbidden, NotFound } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { notify } from "../notification/notify.js";
 import { FileStorage } from "../storage/file-storage.js";
 import { resolveEtims } from "./etims.js";
 import { extractionsOf } from "./extraction.js";
@@ -145,12 +149,15 @@ function duplicateCodeConflict(
   return Effect.fail(message ? new Conflict({ message }) : error);
 }
 
-/** Employees see only their own claims; admins see all of the company's (spec §4). */
+/**
+ * Employees see only their own claims; admins and accountants see all of the
+ * company's (spec §4).
+ */
 function visibleClaims(tenant: Tenant): SQL | undefined {
   return and(
     eq(expenses.organizationId, tenant.organizationId),
     eq(expenses.kind, "claim"),
-    tenant.role === "admin"
+    readsWholeCompany(tenant.role)
       ? undefined
       : eq(expenses.membershipId, tenant.membershipId),
   );
@@ -217,10 +224,8 @@ const claimColumns = {
   rejectedReason: expenses.rejectedReason,
   membershipId: expenses.membershipId,
   warnings: expenses.warnings,
-  submitterName: sql<
-    string | null
-  >`coalesce(${users.fullName}, ${memberships.fullName})`,
-  submitterEmail: sql<string>`coalesce(${users.email}, ${memberships.email})`,
+  submitterName: users.fullName,
+  submitterEmail: users.email,
   submitterPhoneConfirmed: sql<boolean>`${users.phone} IS NOT NULL`,
   approvedAt: expenses.approvedAt,
   selfApproved: expenses.selfApproved,
@@ -239,7 +244,7 @@ const selectClaims = (tx: Transaction, where: SQL | undefined) =>
     .from(expenses)
     .innerJoin(categories, eq(categories.id, expenses.categoryId))
     .innerJoin(memberships, eq(memberships.id, expenses.membershipId))
-    .leftJoin(users, eq(users.id, memberships.userId))
+    .innerJoin(users, eq(users.id, memberships.userId))
     .where(where);
 
 type ClaimRow = Awaited<ReturnType<typeof selectClaims>>[number];
@@ -269,7 +274,7 @@ function toClaimView(tenant: Tenant, row: ClaimRow): ClaimView {
     selfApproved: row.selfApproved,
     paidAt: row.paidAt,
     canEdit: row.membershipId === tenant.membershipId && isEditable(row.status),
-    warnings: tenant.role === "admin" ? readWarnings(row.warnings) : [],
+    warnings: readsWholeCompany(tenant.role) ? readWarnings(row.warnings) : [],
     receiptCount: row.receiptCount,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -357,7 +362,7 @@ export function getClaim(
         if (!row) return yield* Effect.fail(claimNotFound);
         const payoutId = row.payoutId;
         const [payout] =
-          tenant.role === "admin" && payoutId
+          readsWholeCompany(tenant.role) && payoutId
             ? yield* query(() =>
                 tx
                   .select({
@@ -531,6 +536,11 @@ export function submitClaim(
             warnings,
             receiptFileIds: fields.receiptFileIds,
           },
+        });
+        yield* notify(tx, {
+          kind: "claim_submitted",
+          organizationId,
+          claimId: created.id,
         });
         return created.id;
       }),
@@ -792,6 +802,12 @@ export function updateClaim(
             ...(resubmitting && { status: "submitted" }),
           },
         });
+        if (resubmitting)
+          yield* notify(tx, {
+            kind: "claim_submitted",
+            organizationId,
+            claimId,
+          });
       }),
     ).pipe(Effect.catchTag("DatabaseError", duplicateCodeConflict));
     return yield* getClaim(tenant, claimId);
@@ -843,6 +859,11 @@ export function rejectClaim(
           entity: { type: "expense", id: claimId },
           before: { status: claim.status },
           after: { status: "rejected", rejectedReason: reason },
+        });
+        yield* notify(tx, {
+          kind: "claim_rejected",
+          organizationId: tenant.organizationId,
+          claimId,
         });
       }),
     );

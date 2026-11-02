@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 
@@ -22,6 +22,7 @@ import { ReviewRow } from "~/features/claims/claim-editor";
 import { formatIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
 import { capRoom, RUN_STATUS_LABELS } from "~/features/payroll/payroll-display";
+import { progressInWords } from "~/features/payroll/payroll-payment";
 import {
   useChangeDraftRun,
   usePayrollRun,
@@ -38,6 +39,7 @@ export default function PayrollRunRoute(): JSX.Element {
 }
 
 function PayrollRunScreen({ company }: { company: Company }): JSX.Element {
+  const router = useRouter();
   const { runId } = useLocalSearchParams<{ runId: string }>();
   const run = usePayrollRun(company.organizationId, runId);
 
@@ -69,20 +71,29 @@ function PayrollRunScreen({ company }: { company: Company }): JSX.Element {
       onRefresh={() => void run.refetch()}
     >
       <RunSummary run={run.data} />
-      <Payments company={company} run={run.data} />
+      <Payments
+        company={company}
+        run={run.data}
+        onRetry={(billId) =>
+          router.push({
+            pathname: "/payroll/pay",
+            params: { runId: run.data.id, billId },
+          })
+        }
+      />
       {run.data.status === "draft" ? (
         <>
           <AddOneOff company={company} run={run.data} />
-          <View className="gap-2">
-            <Button
-              label="Approve & pay all"
-              disabled
-              onPress={() => undefined}
-            />
-            <Text className="text-center text-sm text-gray-600">
-              Coming with T39
-            </Text>
-          </View>
+          <Button
+            label="Approve & pay all"
+            disabled={capRoom(run.data).overCap}
+            onPress={() =>
+              router.push({
+                pathname: "/payroll/pay",
+                params: { runId: run.data.id },
+              })
+            }
+          />
         </>
       ) : null}
     </Screen>
@@ -107,6 +118,9 @@ function RunSummary({ run }: { run: PayrollRunDetail }): JSX.Element {
         <Badge label={status.label} tone={status.tone} />
       </View>
       <View className="gap-4">
+        {progressInWords(run) ? (
+          <ReviewRow label="Payments" value={progressInWords(run) ?? ""} />
+        ) : null}
         <ReviewRow
           label="People"
           value={
@@ -142,9 +156,11 @@ type SheetState =
 function Payments({
   company,
   run,
+  onRetry,
 }: {
   company: Company;
   run: PayrollRunDetail;
+  onRetry: (billId: string) => void;
 }): JSX.Element {
   const change = useChangeDraftRun(company.organizationId, run.id);
   const [sheet, setSheet] = useState<SheetState | null>(null);
@@ -192,6 +208,7 @@ function Payments({
           editable={editable && payment.leftOut === null}
           onAdjust={() => open({ kind: "adjust", payment })}
           onLeaveOut={() => open({ kind: "leave_out", payment })}
+          onRetry={() => onRetry(payment.billId)}
         />
       ))}
 
@@ -246,11 +263,13 @@ function PaymentCard({
   editable,
   onAdjust,
   onLeaveOut,
+  onRetry,
 }: {
   payment: PayrollPayment;
   editable: boolean;
   onAdjust: () => void;
   onLeaveOut: () => void;
+  onRetry: () => void;
 }): JSX.Element {
   const leftOut = payment.leftOut !== null;
   const amount = `KES ${formatKesCents(payment.amountKes)}`;
@@ -292,6 +311,13 @@ function PaymentCard({
         <Text className="text-sm text-amber-800">
           Hasn’t confirmed their M-Pesa number yet.
         </Text>
+      ) : null}
+      {payment.status === "payout_failed" ? (
+        <Button
+          label={`Retry ${payment.payee.name}’s payment`}
+          variant="secondary"
+          onPress={onRetry}
+        />
       ) : null}
       {editable ? (
         <View className="flex-row gap-3">

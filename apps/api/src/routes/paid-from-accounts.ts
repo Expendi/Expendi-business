@@ -13,7 +13,7 @@ import type { AppRuntime } from "../runtime.js";
 import { BadRequest, NotFound } from "../errors.js";
 import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
-import { requireRole } from "../middleware/tenant.js";
+import { requireAdminOrReader } from "../middleware/tenant.js";
 import {
   archivePaidFromAccount,
   createPaidFromAccount,
@@ -45,13 +45,13 @@ function parseQuery(
 /**
  * Mounted at `/organizations/:organizationId/paid-from-accounts`: the
  * company's list of accounts it pays from outside Expendi (spec §6.23).
- * Admins only.
+ * Admins, and accountants read-only.
  */
 export function createPaidFromAccountRoutes(
   runtime: AppRuntime,
 ): Hono<{ Variables: TenantVariables }> {
   return new Hono<{ Variables: TenantVariables }>()
-    .use(requireRole("admin"))
+    .use(requireAdminOrReader())
     .get("/", (c) =>
       runEffect(
         runtime,

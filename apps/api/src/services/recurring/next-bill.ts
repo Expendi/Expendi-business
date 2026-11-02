@@ -149,8 +149,10 @@ export function createNextRecurringBill(
       recurringItemId: item.id,
       overviewHeading: item.overviewHeading,
       categoryId: item.categoryId,
-      variable: item.amountKes === null,
+      variable: item.amountKes === null && item.amountUsdc === null,
+      currency: item.currency,
       amountKes: item.amountKes,
+      amountUsdc: item.amountUsdc,
       dueOn,
       status: scheduledStatus(dueOn, today),
     };

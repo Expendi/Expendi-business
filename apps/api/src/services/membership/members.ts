@@ -1,5 +1,5 @@
 import type { SQL } from "drizzle-orm";
-import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, sql } from "drizzle-orm";
 import { Effect, Option } from "effect";
 
 import type {
@@ -7,15 +7,18 @@ import type {
   MembershipRole,
   MembershipStatus,
 } from "@expendi-business/shared";
+import { WEB_DASHBOARD_URL } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
+import type { EmailMessage } from "../email/email-sender.js";
 import { ConfigService } from "../../config.js";
 import { memberships, organizations, users } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { Conflict, Forbidden, NotFound } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { accountantAccessEmail } from "../email/accountant-access-email.js";
 import { EmailSender } from "../email/email-sender.js";
 import { inviteEmail } from "../email/invite-email.js";
 
@@ -44,10 +47,8 @@ export interface MemberAdmin {
 
 const memberFields = {
   id: memberships.id,
-  name: sql<
-    string | null
-  >`coalesce(${users.fullName}, ${memberships.fullName})`,
-  email: sql<string>`coalesce(${users.email}, ${memberships.email})`,
+  name: users.fullName,
+  email: users.email,
   role: memberships.role,
   status: memberships.status,
   invitedAt: memberships.invitedAt,
@@ -58,7 +59,7 @@ const selectMembers = (tx: Transaction, where: SQL | undefined) =>
   tx
     .select(memberFields)
     .from(memberships)
-    .leftJoin(users, eq(users.id, memberships.userId))
+    .innerJoin(users, eq(users.id, memberships.userId))
     .where(where);
 
 function selectMember(
@@ -166,7 +167,7 @@ export function listMembers(
           ne(memberships.status, "removed"),
         ),
       ).orderBy(
-        sql`lower(coalesce(${users.fullName}, ${memberships.fullName}, ${users.email}, ${memberships.email})) COLLATE "C"`,
+        sql`lower(coalesce(${users.fullName}, ${users.email})) COLLATE "C"`,
         memberships.id,
       ),
     ),
@@ -181,9 +182,11 @@ export interface Invitation {
 
 interface RecordedInvitation {
   readonly member: MemberRow;
-  /** Set when an install email should go out, after the commit. */
-  readonly installEmail: MemberChange | null;
+  /** For the invite email, sent after the commit. */
+  readonly change: MemberChange;
 }
+
+const isAccountant = (role: MembershipRole): boolean => role === "accountant";
 
 /**
  * The invitee's login identity, created by email if they've never signed in
@@ -236,59 +239,43 @@ function recordInvitation(
       const change = yield* beginMemberChange(tx, admin);
       const now = new Date();
 
-      const sameEmail = yield* query(() =>
+      const [existing] = yield* query(() =>
         tx
           .select({
             id: memberships.id,
-            userId: memberships.userId,
             role: memberships.role,
             status: memberships.status,
           })
           .from(memberships)
-          .leftJoin(users, eq(users.id, memberships.userId))
+          .innerJoin(users, eq(users.id, memberships.userId))
           .where(
             and(
               eq(memberships.organizationId, organizationId),
-              or(
-                eq(users.email, invitation.email),
-                eq(memberships.email, invitation.email),
-              ),
+              eq(users.email, invitation.email),
             ),
-          ),
+          )
+          .limit(1),
       );
-      const isAccountant = invitation.role === "accountant";
-      const existing = sameEmail.find(
-        (row) => (row.userId === null) === isAccountant,
-      );
-      const otherKind = sameEmail.find(
-        (row) => (row.userId === null) !== isAccountant,
-      );
-      if (otherKind && otherKind.status !== "removed") {
-        return yield* Effect.fail(alreadyMember);
-      }
       if (existing?.status === "active") {
         return yield* Effect.fail(alreadyMember);
       }
       if (existing?.status === "invited") {
+        // Resending can't turn a team invite into an accountant's, or back.
+        if (isAccountant(existing.role) !== isAccountant(invitation.role)) {
+          return yield* Effect.fail(alreadyMember);
+        }
         return {
           member: yield* selectMember(tx, organizationId, existing.id),
-          installEmail: change,
+          change,
         };
       }
 
-      const status: MembershipStatus = isAccountant ? "active" : "invited";
-      const userId = isAccountant
-        ? null
-        : yield* findOrCreateUser(tx, invitation);
+      const userId = yield* findOrCreateUser(tx, invitation);
       const invite = {
         role: invitation.role,
-        status,
+        status: "invited" as const,
         invitedBy: admin.userId,
         invitedAt: now,
-        ...(isAccountant && {
-          email: invitation.email,
-          fullName: invitation.fullName,
-        }),
       };
 
       const [saved] = yield* query(() =>
@@ -316,23 +303,47 @@ function recordInvitation(
           email: invitation.email,
           fullName: invitation.fullName,
           role: invitation.role,
-          status,
+          status: invite.status,
         },
       });
 
       return {
         member: yield* selectMember(tx, organizationId, saved.id),
-        installEmail: isAccountant ? null : change,
+        change,
       };
     }),
   );
 }
 
 /**
+ * Admins and employees get the app's install link; accountants, who use only
+ * the web dashboard (spec §4, §6.14), get its link instead. Null when there
+ * is no install link to send.
+ */
+function inviteMessage(
+  member: MemberRow,
+  change: MemberChange,
+  installUrl: string | null,
+): EmailMessage | null {
+  const invite = {
+    to: member.email,
+    companyName: change.companyName,
+    inviterName: change.actorName,
+  };
+  if (isAccountant(member.role)) {
+    return accountantAccessEmail({
+      ...invite,
+      dashboardUrl: WEB_DASHBOARD_URL,
+    });
+  }
+  return installUrl === null ? null : inviteEmail({ ...invite, installUrl });
+}
+
+/**
  * Best effort, after the invite has committed: a failure leaves the invite
  * in place and is logged with the membership ID only.
  */
-function sendInstallEmail(
+function sendInviteEmail(
   member: MemberRow,
   change: MemberChange,
   installUrl: string | null,
@@ -344,17 +355,9 @@ function sendInstallEmail(
       );
       return false;
     });
-  if (installUrl === null) return notSent("APP_INSTALL_URL isn't set");
-  return Effect.flatMap(EmailSender, (sender) =>
-    sender.send(
-      inviteEmail({
-        to: member.email,
-        companyName: change.companyName,
-        inviterName: change.actorName,
-        installUrl,
-      }),
-    ),
-  ).pipe(
+  const message = inviteMessage(member, change, installUrl);
+  if (message === null) return notSent("APP_INSTALL_URL isn't set");
+  return Effect.flatMap(EmailSender, (sender) => sender.send(message)).pipe(
     Effect.as(true),
     Effect.catchTag("EmailSendError", (error) => notSent(error.message)),
   );
@@ -368,11 +371,9 @@ export interface InviteResult {
 }
 
 /**
- * Invites a person by email (spec §6.2). Admins and employees get an
- * `invited` membership that activates when that email signs in, plus an
- * install email; inviting someone already invited sends it again.
- * Accountants have no login (spec §4), so they're added `active` by email
- * alone, with no install email.
+ * Invites a person by email (spec §6.2), as any role: the membership is
+ * `invited` until that email signs in. Inviting someone already invited
+ * sends the email again.
  */
 export function inviteMember(
   admin: MemberAdmin,
@@ -384,10 +385,8 @@ export function inviteMember(
 > {
   return Effect.gen(function* () {
     const installUrl = Option.getOrNull((yield* ConfigService).appInstallUrl);
-    const { member, installEmail } = yield* recordInvitation(admin, invitation);
-    const emailSent = installEmail
-      ? yield* sendInstallEmail(member, installEmail, installUrl)
-      : false;
+    const { member, change } = yield* recordInvitation(admin, invitation);
+    const emailSent = yield* sendInviteEmail(member, change, installUrl);
     return { member, emailSent, installUrl };
   });
 }

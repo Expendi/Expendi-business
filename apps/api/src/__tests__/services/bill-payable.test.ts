@@ -15,7 +15,9 @@ function check(
         bill: {
           id: randomUUID(),
           status: "due",
+          currency: "kes",
           amountKes: 250_000n,
+          amountUsdc: null,
           reference: null,
           ...bill,
         },
@@ -41,7 +43,9 @@ describe("assertBillPayable", () => {
       const result = check({ status });
 
       // #then
-      expect(result).toEqual(Either.right({ amountKes: 250_000n }));
+      expect(result).toEqual(
+        Either.right({ currency: "kes", amountKes: 250_000n }),
+      );
     },
   );
 
@@ -94,5 +98,50 @@ describe("assertBillPayable", () => {
 
     // #then
     expect(Either.isRight(result)).toBe(true);
+  });
+
+  it("pays a USD bill to a payee paid in USDC exactly its USDC", () => {
+    // #when
+    const result = check(
+      { currency: "usd", amountKes: null, amountUsdc: 120_500_000n },
+      { method: "usdc", name: "Vercel" },
+    );
+
+    // #then
+    expect(result).toEqual(
+      Either.right({ currency: "usd", amountUsdc: 120_500_000n }),
+    );
+  });
+
+  it("refuses a variable USD bill until its amount is entered", () => {
+    // #when
+    const result = check(
+      { currency: "usd", amountKes: null, amountUsdc: null },
+      { method: "usdc" },
+    );
+
+    // #then
+    expect(reasonOf(result)).toBe("no_amount");
+  });
+
+  it.each([
+    ["a KES bill to a payee now paid in USDC", "kes", "usdc", "in USD"],
+    ["a USD bill to a payee now paid by M-Pesa", "usd", "mpesa_till", "in KES"],
+  ] as const)("refuses %s", (_, currency, method, asks) => {
+    // #when
+    const result = check(
+      {
+        currency,
+        amountKes: currency === "kes" ? 250_000n : null,
+        amountUsdc: currency === "usd" ? 2_000_000n : null,
+      },
+      { method },
+    );
+
+    // #then
+    expect(Either.isLeft(result) && result.left).toMatchObject({
+      reason: "currency_mismatch",
+      message: expect.stringContaining(asks) as unknown,
+    });
   });
 });

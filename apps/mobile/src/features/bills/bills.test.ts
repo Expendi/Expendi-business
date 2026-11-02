@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Bill, BillStatus } from "@expendi-business/shared";
 
 import type { BillDraft } from "./bill-draft";
+import { formatBillAmount } from "./bill-amount";
 import {
   amountChanged,
   centsToTyped,
@@ -33,7 +34,9 @@ function bill(overrides: Partial<Bill> = {}): Bill {
     overviewHeading: "transactions",
     category: { id: "22222222-2222-4222-8222-222222222222", name: "Utilities" },
     variable: false,
+    currency: "kes",
     amountKes: "1500050",
+    amountUsdc: null,
     reference: "INV-1",
     notes: null,
     dueOn: "2026-11-10",
@@ -131,6 +134,7 @@ describe("toCreateRequest", () => {
     const draft: BillDraft = {
       payeeId: "11111111-1111-4111-8111-111111111111",
       variable: true,
+      currency: "kes",
       amount: " ",
       dueOn: " 2026-11-30 ",
       heading: null,
@@ -223,5 +227,76 @@ describe("toUpdateRequest", () => {
 
     // #then
     expect(request).toEqual({ reference: null });
+  });
+});
+
+describe("bills to a payee paid in USDC (spec §6.19)", () => {
+  const usdcPayee = {
+    id: "11111111-1111-4111-8111-111111111111",
+    name: "Vercel",
+    kind: "vendor" as const,
+    method: "usdc" as const,
+    archived: false,
+  };
+
+  it("are typed and sent in USD", () => {
+    // #given
+    const existing = bill({
+      payee: usdcPayee,
+      currency: "usd",
+      amountKes: null,
+      amountUsdc: "120500000",
+    });
+    const draft = {
+      ...draftFromBill(existing),
+      amount: "130",
+      adjustmentReason: "Seats",
+    };
+
+    // #when
+    const request = toUpdateRequest(existing, draft);
+
+    // #then
+    expect({
+      typed: draftFromBill(existing).amount,
+      label: formatBillAmount(existing),
+      request,
+    }).toEqual({
+      typed: "120.50",
+      label: "USD 120.50",
+      request: { amountUsd: "130", adjustmentReason: "Seats" },
+    });
+  });
+
+  it("start blank when the payee moved to USDC after a KES bill was entered", () => {
+    // #given
+    const existing = bill({ payee: usdcPayee });
+
+    // #when
+    const draft = draftFromBill(existing);
+
+    // #then
+    expect({ currency: draft.currency, amount: draft.amount }).toEqual({
+      currency: "usd",
+      amount: "",
+    });
+  });
+
+  it("send a new bill's amount as amountUsd", () => {
+    // #given
+    const draft: BillDraft = {
+      ...draftFromBill(bill()),
+      currency: "usd",
+      amount: "75.25",
+    };
+
+    // #when
+    const request = toCreateRequest(draft, []);
+
+    // #then
+    expect({ usd: request.amountUsd, kes: request.amountKes }).toEqual({
+      usd: "75.25",
+      kes: undefined,
+    });
   });
 });

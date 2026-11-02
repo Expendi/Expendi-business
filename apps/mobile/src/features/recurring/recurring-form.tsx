@@ -29,6 +29,7 @@ import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { OptionPicker } from "~/components/option-picker";
 import { TextField } from "~/components/text-field";
+import { CURRENCY_LABELS, currencyOfPayee } from "~/features/bills/bill-amount";
 import { HEADING_LABELS } from "~/features/bills/bill-status";
 import { ReviewRow } from "~/features/claims/claim-editor";
 import { formatIsoDate } from "~/features/claims/dates";
@@ -59,6 +60,7 @@ type FieldErrors = Partial<Record<ErrorField, string>>;
 const ERROR_FIELDS: Readonly<Record<string, ErrorField>> = {
   payeeId: "payeeId",
   amountKes: "amount",
+  amountUsd: "amount",
   schedule: "schedule",
   scheduleDay: "scheduleDay",
   startsOn: "startsOn",
@@ -206,6 +208,10 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
               onChange={(payee) => {
                 update("payeeId", payee.id);
                 setPayeeKind(payee.kind);
+                const currency = currencyOfPayee(payee.details?.method, "kes");
+                if (currency !== draft.currency) {
+                  setDraft((current) => ({ ...current, currency, amount: "" }));
+                }
                 const outside = payee.details?.method === "outside";
                 setPayeeOutside(outside);
                 if (outside) update("payVia", "outside");
@@ -223,13 +229,18 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
         />
         {draft.variable ? null : (
           <TextField
-            label="Amount (KES)"
+            label={`Amount (${CURRENCY_LABELS[draft.currency]})`}
             value={draft.amount}
             onChangeText={(value) => update("amount", value)}
-            placeholder="45,000.00"
+            placeholder={draft.currency === "usd" ? "120.00" : "45,000.00"}
             keyboardType="decimal-pad"
           />
         )}
+        {draft.currency === "usd" ? (
+          <Text className="text-sm text-gray-600">
+            This payee is paid in USDC: each bill pays exactly this many USDC.
+          </Text>
+        ) : null}
         <ErrorMessage message={fieldErrors.amount ?? null} />
         {props.item ? (
           <Text className="text-sm text-gray-600">

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { OverviewHeading } from "./claims.js";
-import type { PayeeKind } from "./payee.js";
+import type { PayeeKind, PayeeMethod } from "./payee.js";
 import {
   kesAmountSchema,
   OVERVIEW_HEADINGS,
@@ -9,6 +9,7 @@ import {
   RECEIPT_MAX_BYTES,
   receiptFileKindSchema,
 } from "./claims.js";
+import { parseUsdToUsdcUnits } from "./kes-amount.js";
 import { payeeKindSchema, payeeMethodSchema } from "./payee.js";
 
 /** Bill statuses (spec §6.20). */
@@ -27,6 +28,49 @@ export const billStatusSchema = z.enum(BILL_STATUSES, {
     "A bill status is upcoming, due, overdue, paying, paid, payout_failed, paid_outside or cancelled.",
 });
 export type BillStatus = z.infer<typeof billStatusSchema>;
+
+/**
+ * What a bill's amount is in (spec §6.19): KES, or USD for a payee paid in
+ * USDC, whose bill pays exactly that many USDC.
+ */
+export const BILL_CURRENCIES = ["kes", "usd"] as const;
+export const billCurrencySchema = z.enum(BILL_CURRENCIES);
+export type BillCurrency = z.infer<typeof billCurrencySchema>;
+
+/**
+ * The currency a payee's bills are entered in: USD for a payee paid in
+ * USDC, KES for everyone else, including a payee with no details yet.
+ */
+export function currencyForPayeeMethod(
+  method: PayeeMethod | null,
+): BillCurrency {
+  return method === "usdc" ? "usd" : "kes";
+}
+
+/** The most a USD bill can be: USD 10,000,000, in USDC base units. */
+export const MAX_BILL_USDC_UNITS = 10_000_000_000_000n;
+
+const enterUsd = "Enter the amount in USD, like 1,500 or 1500.50.";
+
+/** USD as typed, e.g. "1,500.50", parsed to USDC base units without floats. */
+export const usdAmountSchema = z
+  .string({ error: enterUsd })
+  .transform((value, ctx) => {
+    const units = parseUsdToUsdcUnits(value);
+    if (units === null) {
+      ctx.addIssue(enterUsd);
+      return z.NEVER;
+    }
+    if (units <= 0n) {
+      ctx.addIssue("Enter an amount above zero.");
+      return z.NEVER;
+    }
+    if (units > MAX_BILL_USDC_UNITS) {
+      ctx.addIssue("That amount is too large. Check it and try again.");
+      return z.NEVER;
+    }
+    return units;
+  });
 
 /**
  * Not paid and no payment in progress: the admin can still change the
@@ -146,17 +190,24 @@ const fileIds = z
 
 const dueOn = z.iso.date({ error: "Enter the due date as YYYY-MM-DD." });
 
+const oneCurrency = {
+  message: "Enter the amount in KES or in USD, not both.",
+  path: ["amountUsd"],
+};
+
 /**
  * A one-off bill (spec §6.20). A variable bill (e.g. PAYE or electricity)
  * can be saved without its amount, which is entered before it's paid.
- * The heading defaults from the payee: Subscriptions for a subscription
- * vendor, Transactions otherwise.
+ * The amount is in KES, or in USD (`amountUsd`) when the payee is paid in
+ * USDC (spec §6.19); the API checks which. The heading defaults from the
+ * payee: Subscriptions for a subscription vendor, Transactions otherwise.
  */
 export const createBillRequestSchema = z
   .object({
     payeeId: z.uuid({ error: "Pick who the bill is for." }),
     variable: z.boolean().default(false),
     amountKes: kesAmountSchema.nullish(),
+    amountUsd: usdAmountSchema.nullish(),
     dueOn,
     overviewHeading: billHeadingSchema.optional(),
     categoryId: z.uuid({ error: "Pick a category." }),
@@ -165,10 +216,17 @@ export const createBillRequestSchema = z
     /** Uploaded invoices to attach. */
     invoiceFileIds: fileIds.default([]),
   })
-  .refine((bill) => bill.variable || bill.amountKes != null, {
-    message: "Enter the amount, or mark the bill as variable.",
-    path: ["amountKes"],
-  });
+  .refine(
+    (bill) => bill.variable || bill.amountKes != null || bill.amountUsd != null,
+    {
+      message: "Enter the amount, or mark the bill as variable.",
+      path: ["amountKes"],
+    },
+  )
+  .refine(
+    (bill) => bill.amountKes == null || bill.amountUsd == null,
+    oneCurrency,
+  );
 
 export type CreateBillRequest = z.input<typeof createBillRequestSchema>;
 export type CreateBillFields = z.output<typeof createBillRequestSchema>;
@@ -176,18 +234,26 @@ export type CreateBillFields = z.output<typeof createBillRequestSchema>;
 /**
  * Changes to an unpaid bill. A field left out is unchanged; null clears
  * the reference, the notes, or a variable bill's amount. Changing a fixed
- * bill's amount needs `adjustmentReason`.
+ * bill's amount needs `adjustmentReason`. The amount goes in `amountUsd`
+ * for a payee paid in USDC; a new payee paid in the other currency needs
+ * the amount again in theirs.
  */
-export const updateBillRequestSchema = z.object({
-  payeeId: z.uuid({ error: "Pick who the bill is for." }).optional(),
-  amountKes: kesAmountSchema.nullable().optional(),
-  dueOn: dueOn.optional(),
-  overviewHeading: billHeadingSchema.optional(),
-  categoryId: z.uuid({ error: "Pick a category." }).optional(),
-  reference,
-  notes,
-  adjustmentReason: reasonSchema("Say why the amount changed.").optional(),
-});
+export const updateBillRequestSchema = z
+  .object({
+    payeeId: z.uuid({ error: "Pick who the bill is for." }).optional(),
+    amountKes: kesAmountSchema.nullable().optional(),
+    amountUsd: usdAmountSchema.nullable().optional(),
+    dueOn: dueOn.optional(),
+    overviewHeading: billHeadingSchema.optional(),
+    categoryId: z.uuid({ error: "Pick a category." }).optional(),
+    reference,
+    notes,
+    adjustmentReason: reasonSchema("Say why the amount changed.").optional(),
+  })
+  .refine(
+    (bill) => bill.amountKes === undefined || bill.amountUsd === undefined,
+    oneCurrency,
+  );
 
 export type UpdateBillRequest = z.input<typeof updateBillRequestSchema>;
 export type UpdateBillFields = z.output<typeof updateBillRequestSchema>;
@@ -271,8 +337,12 @@ export const billSchema = z.object({
   category: z.object({ id: z.uuid(), name: z.string() }),
   /** The amount is entered each time, e.g. PAYE or electricity. */
   variable: z.boolean(),
-  /** KES cents as a decimal string; null on a variable bill until it's entered. */
+  /** USD for a payee paid in USDC, whose bill pays exactly `amountUsdc`. */
+  currency: billCurrencySchema,
+  /** KES cents as a decimal string; null on a variable bill until it's entered, and on a USD bill. */
   amountKes: z.string().regex(/^\d+$/).nullable(),
+  /** A USD bill's amount in USDC base units (6 decimals); null otherwise. */
+  amountUsdc: z.string().regex(/^\d+$/).nullable(),
   reference: z.string().nullable(),
   notes: z.string().nullable(),
   dueOn: z.iso.date(),

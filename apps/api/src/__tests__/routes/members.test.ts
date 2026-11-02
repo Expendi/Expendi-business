@@ -17,6 +17,7 @@ import {
   inviteMemberResponseSchema,
   memberSchema,
   membersResponseSchema,
+  WEB_DASHBOARD_URL,
 } from "@expendi-business/shared";
 
 import type { App } from "../../app.js";
@@ -349,7 +350,7 @@ describe("POST /organizations/:organizationId/members", () => {
     ]);
   });
 
-  it("adds an accountant by email alone: active, with no login and no install email", async () => {
+  it("invites an accountant like anyone else, emailing them the web dashboard instead of the app", async () => {
     // #given
     const address = randomEmail();
 
@@ -364,46 +365,132 @@ describe("POST /organizations/:organizationId/members", () => {
 
     // #then
     expect(result).toMatchObject({
-      emailSent: false,
+      emailSent: true,
       member: {
         name: "Grace CPA",
         email: address,
         role: "accountant",
-        status: "active",
+        status: "invited",
         payoutPhoneConfirmed: false,
       },
     });
-    expect(await userByEmail(address)).toBeUndefined();
-    expect(email.state.sent).toEqual([]);
+    const user = await userByEmail(address);
+    expect(user).toMatchObject({ privyUserId: null, fullName: "Grace CPA" });
+    expect(email.state.sent).toHaveLength(1);
+    const [message] = email.state.sent;
+    expect(message?.to).toBe(address);
+    expect(message?.subject).toBe(
+      "View-only access to Acme Logistics on Expendi Business",
+    );
+    expect(message?.text).toContain(
+      `${company.admin.email} has given you view-only access to Acme Logistics on the Expendi Business web dashboard.`,
+    );
+    expect(message?.text).toContain(WEB_DASHBOARD_URL);
+    expect(message?.text).not.toContain(TEST_APP_INSTALL_URL);
     expect(await membershipAudit(result.member.id)).toMatchObject([
       {
         action: "membership.invited",
-        after: { userId: null, role: "accountant", status: "active" },
+        after: { userId: user?.id, role: "accountant", status: "invited" },
       },
     ]);
   });
 
+  it("activates an accountant's invite when they first sign in", async () => {
+    // #given
+    const address = randomEmail();
+    const { member: accountant } = await invited(
+      await invite({ email: address, fullName: "Grace", role: "accountant" }),
+    );
+    const login = newPrivyLogin(address);
+
+    // #when
+    const response = await getCompany(login);
+
+    // #then
+    expect(response.status).toBe(200);
+    expect(await userByEmail(address)).toMatchObject({
+      privyUserId: login.privyUserId,
+    });
+    expect(
+      (await listed()).find(({ id }) => id === accountant.id),
+    ).toMatchObject({ role: "accountant", status: "active" });
+  });
+
+  it("resends an accountant's invite with the dashboard link", async () => {
+    // #given
+    const address = randomEmail();
+    const first = await invited(
+      await invite({ email: address, fullName: "Grace", role: "accountant" }),
+    );
+    email.state.reset();
+
+    // #when
+    const again = await invited(
+      await invite({ email: address, fullName: "Grace", role: "accountant" }),
+    );
+
+    // #then
+    expect(again.member).toEqual(first.member);
+    expect(email.state.sent.map(({ text }) => text)).toEqual([
+      expect.stringContaining(WEB_DASHBOARD_URL),
+    ]);
+    expect(await membershipAudit(first.member.id)).toHaveLength(1);
+  });
+
   it("returns 409 when the email already belongs to someone in the company in another role", async () => {
+    // #given
+    const accountantEmail = randomEmail();
+    await invited(
+      await invite({
+        email: accountantEmail,
+        fullName: "Grace",
+        role: "accountant",
+      }),
+    );
+    const employeeEmail = randomEmail();
+    await invited(
+      await invite({
+        email: employeeEmail,
+        fullName: "Jane",
+        role: "employee",
+      }),
+    );
+
+    // #when
+    const accountantAsEmployee = await invite({
+      email: accountantEmail,
+      fullName: "Grace",
+      role: "employee",
+    });
+    const employeeAsAccountant = await invite({
+      email: employeeEmail,
+      fullName: "Jane",
+      role: "accountant",
+    });
+
+    // #then
+    expect([accountantAsEmployee.status, employeeAsAccountant.status]).toEqual([
+      409, 409,
+    ]);
+  });
+
+  it("returns 409 for an accountant who has already signed in", async () => {
     // #given
     const address = randomEmail();
     await invited(
       await invite({ email: address, fullName: "Grace", role: "accountant" }),
     );
+    expect((await getCompany(newPrivyLogin(address))).status).toBe(200);
 
     // #when
-    const asAccountant = await invite({
+    const response = await invite({
       email: address,
       fullName: "Grace",
       role: "accountant",
     });
-    const asEmployee = await invite({
-      email: address,
-      fullName: "Grace",
-      role: "employee",
-    });
 
     // #then
-    expect([asAccountant.status, asEmployee.status]).toEqual([409, 409]);
+    expect(response.status).toBe(409);
   });
 
   it.each([

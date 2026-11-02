@@ -7,6 +7,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  smallint,
   text,
   timestamp,
   unique,
@@ -87,6 +88,12 @@ export const payouts = pgTable(
     walletId: uuid("wallet_id").notNull(),
     subjectType: payoutSubjectType("subject_type").notNull(),
     subjectId: uuid("subject_id").notNull(),
+    /**
+     * Which of the subject's orders this is. A salary above Paycrest's
+     * largest order is paid as several (spec §7.5), parts 1, 2, …, each its
+     * own payout under one approval; every other payment is part 1.
+     */
+    subjectPart: smallint("subject_part").notNull().default(1),
     payrollRunId: uuid("payroll_run_id"),
     /** Stable per attempt; preparing the same key again returns this row. */
     idempotencyKey: text("idempotency_key").notNull(),
@@ -166,11 +173,22 @@ export const payouts = pgTable(
       table.organizationId,
       table.idempotencyKey,
     ),
-    // A subject has at most one payout that isn't failed: it can't be paid
-    // twice, and a retry is a new payout only after the last one failed.
+    // A subject (each part of a split salary) has at most one payout that
+    // isn't failed: it can't be paid twice, and a retry is a new payout only
+    // after the last one failed.
     uniqueIndex("payouts_one_live_per_subject")
-      .on(table.organizationId, table.subjectType, table.subjectId)
+      .on(
+        table.organizationId,
+        table.subjectType,
+        table.subjectId,
+        table.subjectPart,
+      )
       .where(sql`${table.status} <> 'failed'`),
+    // Only a salary in a payroll run is ever split.
+    check(
+      "payouts_subject_part",
+      sql`${table.subjectPart} >= 1 AND (${table.subjectPart} = 1 OR (${table.subjectType} = 'bill' AND ${table.payrollRunId} IS NOT NULL))`,
+    ),
     uniqueIndex("payouts_provider_order_id_unique").on(table.providerOrderId),
     index("payouts_status_idx").on(table.status),
     index("payouts_gateway_order_id_idx").on(table.gatewayOrderId),

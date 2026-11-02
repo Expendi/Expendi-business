@@ -292,10 +292,8 @@ const spendingColumns = {
   noReceiptReason: expenses.noReceiptReason,
   warnings: expenses.warnings,
   membershipId: expenses.membershipId,
-  recorderName: sql<
-    string | null
-  >`coalesce(${users.fullName}, ${memberships.fullName})`,
-  recorderEmail: sql<string>`coalesce(${users.email}, ${memberships.email})`,
+  recorderName: users.fullName,
+  recorderEmail: users.email,
   receiptCount: sql<number>`${ownReceiptCount} + ${billFileCount}`,
   createdAt: expenses.createdAt,
   updatedAt: expenses.updatedAt,
@@ -309,7 +307,7 @@ const selectSpending = (tx: Transaction, where: SQL | undefined) =>
     .from(expenses)
     .innerJoin(categories, eq(categories.id, expenses.categoryId))
     .innerJoin(memberships, eq(memberships.id, expenses.membershipId))
-    .leftJoin(users, eq(users.id, memberships.userId))
+    .innerJoin(users, eq(users.id, memberships.userId))
     .leftJoin(
       paidFromAccounts,
       eq(paidFromAccounts.id, expenses.paidFromAccountId),

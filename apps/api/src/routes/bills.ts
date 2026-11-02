@@ -1,3 +1,4 @@
+import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { Effect } from "effect";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -9,15 +10,20 @@ import {
   createBillRequestSchema,
   listBillsQuerySchema,
   markBillPaidOutsideRequestSchema,
+  passkeyAssertionSchema,
+  payBillsRequestSchema,
+  retryPaymentRequestSchema,
   updateBillRequestSchema,
 } from "@expendi-business/shared";
 
 import type { TenantVariables } from "../middleware/tenant.js";
 import type { AppRuntime } from "../runtime.js";
-import { BadRequest, NotFound } from "../errors.js";
-import { readBody } from "../http/body.js";
+import type { PayoutRejected } from "../services/payout/payout-errors.js";
+import { BadRequest, NotFound, ServiceUnavailable } from "../errors.js";
+import { readBody, readOptionalBody } from "../http/body.js";
+import { payoutRejectionAsClientError } from "../http/payout-rejection.js";
 import { runEffect } from "../http/respond.js";
-import { requireRole } from "../middleware/tenant.js";
+import { requireAdminOrReader, requireRole } from "../middleware/tenant.js";
 import {
   attachBillInvoices,
   cancelBill,
@@ -28,6 +34,11 @@ import {
   updateBill,
 } from "../services/bills/bills.js";
 import { requestBillFileUpload } from "../services/bills/files.js";
+import {
+  confirmBillPayment,
+  requestBillPayment,
+  requestBillRetry,
+} from "../services/bills/pay.js";
 
 const uuid = z.uuid();
 
@@ -36,6 +47,36 @@ function billIdFrom(raw: string): Effect.Effect<string, NotFound> {
     ? Effect.succeed(raw)
     : Effect.fail(new NotFound({ message: "That bill wasn't found." }));
 }
+
+const paymentNotFound = new NotFound({
+  message: "That payment wasn't found. Start paying again.",
+});
+
+const confirmSchema = z.object({
+  response: z.custom<AuthenticationResponseJSON>(
+    (value) => passkeyAssertionSchema.safeParse(value).success,
+    "Your passkey's confirmation couldn't be read. Try again.",
+  ),
+});
+
+/** Why the engine wouldn't prepare a payment, as the app shows it. */
+const PREPARATION_FAILURES = {
+  PayoutRejected: (error: PayoutRejected) =>
+    Effect.fail(payoutRejectionAsClientError(error)),
+  PaycrestError: () =>
+    Effect.fail(
+      new ServiceUnavailable({
+        message:
+          "Couldn't get today's KES rate from Paycrest. Try again in a minute.",
+      }),
+    ),
+  AmountTooSmall: () =>
+    Effect.fail(
+      new BadRequest({
+        message: "This bill is below the smallest amount Paycrest pays.",
+      }),
+    ),
+} as const;
 
 function parseQuery(
   query: Record<string, string>,
@@ -51,14 +92,15 @@ function parseQuery(
 }
 
 /**
- * Mounted at `/organizations/:organizationId/bills`. Admins only (spec §4);
- * row-level security hides bills from every other role as well.
+ * Mounted at `/organizations/:organizationId/bills`. Admins, and accountants
+ * read-only (spec §4); row-level security hides bills from every other role
+ * as well.
  */
 export function createBillRoutes(
   runtime: AppRuntime,
 ): Hono<{ Variables: TenantVariables }> {
   return new Hono<{ Variables: TenantVariables }>()
-    .use(requireRole("admin"))
+    .use(requireAdminOrReader())
     .get("/", (c) =>
       runEffect(
         runtime,
@@ -66,6 +108,56 @@ export function createBillRoutes(
         parseQuery(c.req.query()).pipe(
           Effect.flatMap((filters) => listBills(c.get("tenant"), filters)),
         ),
+      ),
+    )
+    .post("/payment", requireRole("admin"), (c) =>
+      runEffect(
+        runtime,
+        c,
+        readBody(c.req.raw, payBillsRequestSchema).pipe(
+          Effect.flatMap(({ billIds, secondConfirmation }) =>
+            requestBillPayment(c.get("tenant"), billIds, {
+              secondConfirmation,
+            }),
+          ),
+          Effect.catchTags(PREPARATION_FAILURES),
+        ),
+        201,
+      ),
+    )
+    .post("/payment/:challengeId/confirm", requireRole("admin"), (c) => {
+      const challengeId = c.req.param("challengeId");
+      return runEffect(
+        runtime,
+        c,
+        (uuid.safeParse(challengeId).success
+          ? Effect.void
+          : Effect.fail(paymentNotFound)
+        ).pipe(
+          Effect.zipRight(readBody(c.req.raw, confirmSchema)),
+          Effect.flatMap(({ response }) =>
+            confirmBillPayment(c.get("tenant"), challengeId, response),
+          ),
+          Effect.catchTag("PayoutRejected", (error) =>
+            Effect.fail(payoutRejectionAsClientError(error)),
+          ),
+        ),
+      );
+    })
+    .post("/:billId/retry", requireRole("admin"), (c) =>
+      runEffect(
+        runtime,
+        c,
+        Effect.all([
+          billIdFrom(c.req.param("billId")),
+          readOptionalBody(c.req.raw, retryPaymentRequestSchema),
+        ]).pipe(
+          Effect.flatMap(([billId, { secondConfirmation }]) =>
+            requestBillRetry(c.get("tenant"), billId, { secondConfirmation }),
+          ),
+          Effect.catchTags(PREPARATION_FAILURES),
+        ),
+        201,
       ),
     )
     .post("/upload-url", (c) =>

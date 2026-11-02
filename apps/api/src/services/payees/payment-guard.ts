@@ -34,6 +34,17 @@ export class PayeeChangeUnconfirmed extends Data.TaggedError(
   readonly message: string;
 }> {}
 
+/**
+ * The payee's details changed after the payment was prepared, so the
+ * approval no longer pays the details the admin reviewed.
+ */
+export class PayeeChangedSincePrepared extends Data.TaggedError(
+  "PayeeChangedSincePrepared",
+)<{
+  readonly payeeId: string;
+  readonly message: string;
+}> {}
+
 export type PayeeNotPayableReason =
   "archived" | "no_details" | "paid_outside" | "no_confirmed_phone";
 
@@ -144,8 +155,55 @@ export function resolvePayeeRecipient(
   PayoutRecipient,
   PayeeNotFound | PayeeNotPayable | PayeeChangeUnconfirmed | DatabaseError
 > {
+  return loadForPayment(tx, payeeId).pipe(
+    Effect.flatMap((payee) =>
+      recipientOf(tx, payee, checkChangeHold(payee, confirmation)),
+    ),
+  );
+}
+
+/**
+ * The same recipient, for a payment being approved: the 24-hour rule was
+ * applied when it was prepared (`resolvePayeeRecipient`), so here the
+ * payee's details must simply be unchanged since then (`preparedAt`, on
+ * the database's clock). Called under the approval's locks.
+ */
+export function resolveApprovedPayeeRecipient(
+  tx: Transaction,
+  payeeId: string,
+  preparedAt: Date,
+): Effect.Effect<
+  PayoutRecipient,
+  PayeeNotFound | PayeeNotPayable | PayeeChangedSincePrepared | DatabaseError
+> {
+  return loadForPayment(tx, payeeId).pipe(
+    Effect.flatMap((payee) =>
+      recipientOf(tx, payee, checkUnchangedSince(payee.row, preparedAt)),
+    ),
+  );
+}
+
+function checkUnchangedSince(
+  row: PayeeRow,
+  preparedAt: Date,
+): Effect.Effect<void, PayeeChangedSincePrepared> {
+  if (row.detailsChangedAt === null || row.detailsChangedAt <= preparedAt) {
+    return Effect.void;
+  }
+  return Effect.fail(
+    new PayeeChangedSincePrepared({
+      payeeId: row.id,
+      message: `${row.name}'s payment details changed after this payment was prepared. Nothing was sent. Check them, then pay again.`,
+    }),
+  );
+}
+
+function recipientOf<E>(
+  tx: Transaction,
+  payee: PayeeForPayment,
+  changeCheck: Effect.Effect<void, E>,
+): Effect.Effect<PayoutRecipient, PayeeNotPayable | E | DatabaseError> {
   return Effect.gen(function* () {
-    const payee = yield* loadForPayment(tx, payeeId);
     const { row } = payee;
     if (row.archived) {
       return yield* notPayable(row, "archived", `${row.name} is archived.`);
@@ -165,7 +223,7 @@ export function resolvePayeeRecipient(
         `${row.name} is paid outside Expendi.`,
       );
     }
-    yield* checkChangeHold(payee, confirmation);
+    yield* changeCheck;
 
     switch (details.method) {
       case "mpesa_phone": {

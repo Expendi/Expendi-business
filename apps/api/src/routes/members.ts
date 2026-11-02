@@ -12,7 +12,7 @@ import type { AppRuntime } from "../runtime.js";
 import { NotFound } from "../errors.js";
 import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
-import { requireRole } from "../middleware/tenant.js";
+import { requireAdminOrReader } from "../middleware/tenant.js";
 import {
   changeMemberRole,
   inviteMember,
@@ -32,14 +32,15 @@ function membershipIdFrom(raw: string): Effect.Effect<string, NotFound> {
 }
 
 /**
- * Mounted at `/organizations/:organizationId/members`. Admins only (spec §4,
- * §6.2): the team list, invites, role changes and removals.
+ * Mounted at `/organizations/:organizationId/members`. Admins (spec §4,
+ * §6.2): the team list, invites, role changes and removals. Accountants see
+ * the list.
  */
 export function createMemberRoutes(
   runtime: AppRuntime,
 ): Hono<{ Variables: TenantVariables }> {
   return new Hono<{ Variables: TenantVariables }>()
-    .use(requireRole("admin"))
+    .use(requireAdminOrReader())
     .get("/", (c) => runEffect(runtime, c, listMembers(c.get("tenant"))))
     .post("/", (c) => {
       const tenant = c.get("tenant");

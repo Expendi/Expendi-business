@@ -4,6 +4,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { Effect } from "effect";
 
 import type {
+  BillCurrency,
   BillStatus,
   CreateBillFields,
   MarkBillPaidOutsideFields,
@@ -13,6 +14,7 @@ import type {
   UpdateBillFields,
 } from "@expendi-business/shared";
 import {
+  currencyForPayeeMethod,
   DATED_BILL_STATUSES,
   defaultBillHeading,
   UNPAID_BILL_STATUSES,
@@ -21,7 +23,7 @@ import {
 import type { DatabaseService } from "../../db/client.js";
 import type { BillRow } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
-import type { DatabaseError, ServiceUnavailable } from "../../errors.js";
+import type { DatabaseError } from "../../errors.js";
 import type { Tenant } from "../../middleware/tenant.js";
 import type { AuditActor } from "../audit/audit-log.js";
 import type { FileStorage } from "../storage/file-storage.js";
@@ -34,9 +36,16 @@ import {
   users,
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
-import { BadRequest, Conflict, NotFound } from "../../errors.js";
+import {
+  BadRequest,
+  Conflict,
+  NotFound,
+  ServiceUnavailable,
+} from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { recordBillSpending } from "../expenses/company.js";
+import { kesCentsFor } from "../paycrest/amounts.js";
+import { Paycrest } from "../paycrest/paycrest-client.js";
 import { onRecurringBillSettled } from "../recurring/next-bill.js";
 import {
   attachBillFiles,
@@ -44,6 +53,7 @@ import {
   checkAttachableBillFiles,
   readBillFiles,
 } from "./files.js";
+import { billAmountOf } from "./payable.js";
 import { nairobiDate, scheduledStatus } from "./status.js";
 
 /**
@@ -78,7 +88,9 @@ export interface BillView {
   readonly overviewHeading: OverviewHeading;
   readonly category: { readonly id: string; readonly name: string };
   readonly variable: boolean;
+  readonly currency: BillCurrency;
   readonly amountKes: bigint | null;
+  readonly amountUsdc: bigint | null;
   readonly reference: string | null;
   readonly notes: string | null;
   readonly dueOn: string;
@@ -134,6 +146,21 @@ const noAmount = new Conflict({
 const futurePayment = new BadRequest({
   message: "The date it was paid can't be in the future.",
 });
+const rateUnavailable = new ServiceUnavailable({
+  message:
+    "Couldn't get today's KES rate from Paycrest to record this USD bill in KES. Try again in a minute.",
+});
+const changedMeanwhile = new Conflict({
+  message: "This bill changed while you were marking it paid. Try again.",
+});
+
+/** Paycrest's marginal rate, as the payout engine values USDC in KES. */
+const RATE_PROBE_USDC = "1";
+
+const CURRENCY_NAMES: Readonly<Record<BillCurrency, string>> = {
+  kes: "KES",
+  usd: "USD",
+};
 
 const SETTLED_MESSAGES: Partial<Record<BillStatus, string>> = {
   paying: "This bill is being paid, so it can't be changed.",
@@ -207,7 +234,9 @@ function toBillView(row: SelectedBill): BillView {
     overviewHeading: bill.overviewHeading,
     category: { id: bill.categoryId, name: row.categoryName },
     variable: bill.variable,
+    currency: bill.currency,
     amountKes: bill.amountKes,
+    amountUsdc: bill.amountUsdc,
     reference: bill.reference,
     notes: bill.notes,
     dueOn: bill.dueOn,
@@ -302,16 +331,31 @@ export function getBill(
 
 // ── Checks ───────────────────────────────────────────────────────────────
 
+interface BillPayee {
+  readonly name: string;
+  readonly kind: PayeeKind;
+  readonly method: PayeeMethod | null;
+  readonly archived: boolean;
+}
+
+const selectBillPayee = (tx: Transaction) =>
+  tx
+    .select({
+      name: payees.name,
+      kind: payees.kind,
+      method: payees.method,
+      archived: payees.archived,
+    })
+    .from(payees);
+
 /** An archived payee keeps its bills but can't be given new ones. */
 function findPayee(
   tx: Transaction,
   organizationId: string,
   payeeId: string,
-): Effect.Effect<{ readonly kind: PayeeKind }, BadRequest | DatabaseError> {
+): Effect.Effect<BillPayee, BadRequest | DatabaseError> {
   return query(() =>
-    tx
-      .select({ kind: payees.kind, archived: payees.archived })
-      .from(payees)
+    selectBillPayee(tx)
       .where(
         and(eq(payees.organizationId, organizationId), eq(payees.id, payeeId)),
       )
@@ -325,6 +369,77 @@ function findPayee(
     }),
   );
 }
+
+/** The bill's own payee, archived or not. */
+function payeeOfBill(
+  tx: Transaction,
+  row: BillRow,
+): Effect.Effect<BillPayee, DatabaseError> {
+  return query(() =>
+    selectBillPayee(tx)
+      .where(
+        and(
+          eq(payees.organizationId, row.organizationId),
+          eq(payees.id, row.payeeId),
+        ),
+      )
+      .limit(1),
+  ).pipe(
+    Effect.flatMap(([payee]) =>
+      payee
+        ? Effect.succeed(payee)
+        : Effect.dieMessage(`bill ${row.id} lost its payee`),
+    ),
+  );
+}
+
+interface TypedAmount {
+  readonly currency: BillCurrency;
+  /** Null clears it, making a variable bill wait for its amount. */
+  readonly value: bigint | null;
+}
+
+/** The amount the request typed, if any, and the currency it was typed in. */
+function typedAmount(fields: {
+  readonly amountKes?: bigint | null | undefined;
+  readonly amountUsd?: bigint | null | undefined;
+}): TypedAmount | undefined {
+  if (fields.amountUsd !== undefined) {
+    return { currency: "usd", value: fields.amountUsd };
+  }
+  if (fields.amountKes !== undefined) {
+    return { currency: "kes", value: fields.amountKes };
+  }
+  return undefined;
+}
+
+/**
+ * A payee paid in USDC is billed in USD and paid exactly that USDC; every
+ * other payee in KES (spec §6.19). An amount typed in the other currency is
+ * refused rather than converted.
+ */
+function checkCurrency(
+  payee: BillPayee,
+  currency: BillCurrency,
+  typed: TypedAmount | undefined,
+): Effect.Effect<void, BadRequest> {
+  if (typed === undefined || typed.currency === currency) return Effect.void;
+  return Effect.fail(
+    new BadRequest({
+      message:
+        currency === "usd"
+          ? `${payee.name} is paid in USDC, so enter the amount in USD.`
+          : `${payee.name} is paid in KES, so enter the amount in KES.`,
+    }),
+  );
+}
+
+/** The amount columns for `value` in `currency`; the other currency's is null. */
+const amountColumns = (currency: BillCurrency, value: bigint | null) => ({
+  currency,
+  amountKes: currency === "kes" ? value : null,
+  amountUsdc: currency === "usd" ? value : null,
+});
 
 function checkCategory(
   tx: Transaction,
@@ -413,13 +528,16 @@ export function createBill(
         const audit = yield* AuditLog;
         const payee = yield* findPayee(tx, organizationId, fields.payeeId);
         yield* checkCategory(tx, organizationId, fields.categoryId);
+        const currency = currencyForPayeeMethod(payee.method);
+        const typed = typedAmount(fields);
+        yield* checkCurrency(payee, currency, typed);
         const values = {
           payeeId: fields.payeeId,
           overviewHeading:
             fields.overviewHeading ?? defaultBillHeading(payee.kind),
           categoryId: fields.categoryId,
           variable: fields.variable,
-          amountKes: fields.amountKes ?? null,
+          ...amountColumns(currency, typed?.value ?? null),
           reference: fields.reference ?? null,
           notes: fields.notes ?? null,
           dueOn: fields.dueOn,
@@ -456,7 +574,9 @@ export function createBill(
 
 const CHANGEABLE = [
   "payeeId",
+  "currency",
   "amountKes",
+  "amountUsdc",
   "dueOn",
   "status",
   "overviewHeading",
@@ -490,6 +610,10 @@ function diff(
  * Changes an unpaid bill. Changing a fixed amount needs a reason, kept on
  * the bill and in the audit log; a variable bill's amount is entered (or
  * corrected) without one. A new due date resets the dated status.
+ *
+ * The amount is in the payee's currency (spec §6.19). A new payee paid in
+ * the other currency, or a payee whose method changed since, needs the
+ * amount again in theirs: a fixed bill's in the same request.
  */
 export function updateBill(
   tenant: Tenant,
@@ -504,14 +628,36 @@ export function updateBill(
         const audit = yield* AuditLog;
         const row = yield* lockUnpaidBill(tx, organizationId, billId);
 
-        const amountChanged =
-          changes.amountKes !== undefined &&
-          changes.amountKes !== row.amountKes;
-        if (changes.amountKes === null && !row.variable) {
+        const payeeChanged =
+          changes.payeeId !== undefined && changes.payeeId !== row.payeeId;
+        const payee =
+          payeeChanged && changes.payeeId !== undefined
+            ? yield* findPayee(tx, organizationId, changes.payeeId)
+            : yield* payeeOfBill(tx, row);
+        const currency = currencyForPayeeMethod(payee.method);
+        const typed = typedAmount(changes);
+        yield* checkCurrency(payee, currency, typed);
+        const switching = currency !== row.currency;
+        const current = currency === "usd" ? row.amountUsdc : row.amountKes;
+        if (typed?.value === null && !row.variable) {
           return yield* Effect.fail(
             new BadRequest({ message: "A fixed bill needs an amount." }),
           );
         }
+        if (switching && typed === undefined && !row.variable) {
+          return yield* Effect.fail(
+            new BadRequest({
+              message: `${payee.name} is paid in ${currency === "usd" ? "USDC" : "KES"}, so enter this bill's amount in ${CURRENCY_NAMES[currency]}.`,
+            }),
+          );
+        }
+        const amounts = amountColumns(
+          currency,
+          typed !== undefined ? typed.value : switching ? null : current,
+        );
+        const amountChanged =
+          amounts.amountKes !== row.amountKes ||
+          amounts.amountUsdc !== row.amountUsdc;
         if (amountChanged && !row.variable && !changes.adjustmentReason) {
           return yield* Effect.fail(
             new BadRequest({ message: "Say why the amount changed." }),
@@ -524,9 +670,6 @@ export function updateBill(
             }),
           );
         }
-        if (changes.payeeId !== undefined && changes.payeeId !== row.payeeId) {
-          yield* findPayee(tx, organizationId, changes.payeeId);
-        }
         if (
           changes.categoryId !== undefined &&
           changes.categoryId !== row.categoryId
@@ -537,7 +680,7 @@ export function updateBill(
 
         const { before, after } = diff(row, {
           payeeId: changes.payeeId,
-          amountKes: changes.amountKes,
+          ...amounts,
           dueOn: changes.dueOn,
           status: followsDueDate(row.status)
             ? scheduledStatus(dueOn, nairobiDate(now))
@@ -602,28 +745,74 @@ export function attachBillInvoices(
 }
 
 /**
+ * Paycrest's KES rate now, when the bill is in USD: its company spending
+ * record is in KES at the rate of the day it's recorded (spec §6.19).
+ * Asked before the bill is locked, so no lock waits on Paycrest.
+ */
+function rateForUsdBill(
+  tenant: Tenant,
+  billId: string,
+): Effect.Effect<
+  string | null,
+  ServiceUnavailable | DatabaseError,
+  DatabaseService | Paycrest
+> {
+  return Effect.gen(function* () {
+    const [bill] = yield* withScope(tenant, (tx) =>
+      query(() =>
+        tx
+          .select({ currency: bills.currency })
+          .from(bills)
+          .where(
+            and(
+              eq(bills.organizationId, tenant.organizationId),
+              eq(bills.id, billId),
+            ),
+          ),
+      ),
+    );
+    if (bill?.currency !== "usd") return null;
+    const paycrest = yield* Paycrest;
+    const { rate } = yield* paycrest
+      .rate(RATE_PROBE_USDC)
+      .pipe(Effect.mapError(() => rateUnavailable));
+    return rate;
+  });
+}
+
+/**
  * The admin paid the bill some other way, e.g. by card or from the bank
  * (spec §6.20): records who, the day it was paid, an optional note and
  * proof. The bill needs its amount first. Company spending (T41) records
- * the matching spending entry in this same transaction.
+ * the matching spending entry in this same transaction, in KES: a USD
+ * bill's at Paycrest's rate today.
  */
 export function markBillPaidOutside(
   tenant: Tenant,
   billId: string,
   fields: MarkBillPaidOutsideFields,
   now: Date = new Date(),
-): Effect.Effect<BillDetailView, BillError, BillDeps> {
+): Effect.Effect<BillDetailView, BillError, BillDeps | Paycrest> {
   const { organizationId } = tenant;
   return Effect.gen(function* () {
     if (fields.paidOn > nairobiDate(now)) {
       return yield* Effect.fail(futurePayment);
     }
     yield* checkAttachableBillFiles(tenant, fields.receiptFileIds, billId);
+    const rate = yield* rateForUsdBill(tenant, billId);
     yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
         const audit = yield* AuditLog;
         const row = yield* lockUnpaidBill(tx, organizationId, billId);
-        if (row.amountKes === null) return yield* Effect.fail(noAmount);
+        const amount = billAmountOf(row);
+        if (amount === null) return yield* Effect.fail(noAmount);
+        if (amount.currency === "usd" && rate === null) {
+          return yield* Effect.fail(changedMeanwhile);
+        }
+        const spendingKes =
+          amount.currency === "kes"
+            ? amount.amountKes
+            : kesCentsFor(amount.amountUsdc, rate ?? "0");
         const [updated] = yield* query(() =>
           tx
             .update(bills)
@@ -652,7 +841,13 @@ export function markBillPaidOutside(
           before: { status: row.status },
           after: {
             status: "paid_outside",
+            currency: row.currency,
             amountKes: row.amountKes,
+            ...(amount.currency === "usd" && {
+              amountUsdc: amount.amountUsdc,
+              kesEquivalent: spendingKes,
+              rate,
+            }),
             paidOn: fields.paidOn,
             paidAt: updated?.paidAt ?? null,
             markedPaidBy: tenant.userId,
@@ -660,11 +855,16 @@ export function markBillPaidOutside(
             proofFileIds,
           },
         });
-        yield* recordBillSpending(tx, tenant, row, {
-          paidOn: fields.paidOn,
-          note: fields.note ?? null,
-          paidFromAccountId: fields.paidFromAccountId ?? null,
-        });
+        yield* recordBillSpending(
+          tx,
+          tenant,
+          { ...row, amountKes: spendingKes },
+          {
+            paidOn: fields.paidOn,
+            note: fields.note ?? null,
+            paidFromAccountId: fields.paidFromAccountId ?? null,
+          },
+        );
         yield* onRecurringBillSettled(tx, row, now);
       }),
     );

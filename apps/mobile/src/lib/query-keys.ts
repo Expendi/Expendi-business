@@ -52,6 +52,21 @@ export const queryKeys = {
     ["organizations", organizationId, "bills", "list", view] as const,
   bill: (organizationId: string, billId: string) =>
     ["organizations", organizationId, "bills", "detail", billId] as const,
+  /** Preparing Pay / Pay all; outside `bills` so refreshing bills never prepares again. */
+  billPayment: (
+    organizationId: string,
+    billIds: string,
+    retry: boolean,
+    secondConfirmation: boolean,
+  ) =>
+    [
+      "organizations",
+      organizationId,
+      "bill-payment",
+      billIds,
+      retry,
+      secondConfirmation,
+    ] as const,
   /** Prefix of the recurring payment list and each one, so one invalidation refreshes both. */
   recurringItems: (organizationId: string) =>
     ["organizations", organizationId, "recurring-items"] as const,
@@ -103,6 +118,39 @@ export const queryKeys = {
     ["organizations", organizationId, "payroll", "runs"] as const,
   payrollRun: (organizationId: string, runId: string) =>
     ["organizations", organizationId, "payroll", "runs", runId] as const,
+  /** Preparing Approve & pay all or one person's retry; outside `payroll` so refreshing never prepares again. */
+  payrollPayment: (
+    organizationId: string,
+    runId: string,
+    retryBillId: string | null,
+    secondConfirmation: boolean,
+  ) =>
+    [
+      "organizations",
+      organizationId,
+      "payroll-payment",
+      runId,
+      retryBillId,
+      secondConfirmation,
+    ] as const,
+  payrollMargin: (organizationId: string) =>
+    ["organizations", organizationId, "payroll-margin"] as const,
   mySalaryPayments: (organizationId: string) =>
     ["organizations", organizationId, "my-salary-payments"] as const,
+  /** Prefix of every float list and float, so one invalidation refreshes both. */
+  floats: (organizationId: string) =>
+    ["organizations", organizationId, "floats"] as const,
+  floatList: (organizationId: string, mine: boolean) =>
+    ["organizations", organizationId, "floats", "list", mine] as const,
+  float: (organizationId: string, floatId: string) =>
+    ["organizations", organizationId, "floats", "detail", floatId] as const,
+  /** Preparing a float payment; outside `floats` so refreshing floats never prepares again. */
+  floatPayment: (organizationId: string, floatId: string, movementId: string) =>
+    [
+      "organizations",
+      organizationId,
+      "float-payment",
+      floatId,
+      movementId,
+    ] as const,
 };

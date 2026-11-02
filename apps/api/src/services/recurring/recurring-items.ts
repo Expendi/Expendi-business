@@ -4,6 +4,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { Effect } from "effect";
 
 import type {
+  BillCurrency,
   BillStatus,
   CreateRecurringItemFields,
   OverviewHeading,
@@ -15,6 +16,7 @@ import type {
   UpdateRecurringItemFields,
 } from "@expendi-business/shared";
 import {
+  currencyForPayeeMethod,
   defaultBillHeading,
   OUTSTANDING_BILL_STATUSES,
 } from "@expendi-business/shared";
@@ -68,7 +70,9 @@ export interface RecurringItemView {
   readonly overviewHeading: OverviewHeading;
   readonly category: { readonly id: string; readonly name: string };
   readonly variable: boolean;
+  readonly currency: BillCurrency;
   readonly amountKes: bigint | null;
+  readonly amountUsdc: bigint | null;
   readonly schedule: RecurringSchedule;
   readonly scheduleDay: number;
   readonly startsOn: string;
@@ -82,6 +86,7 @@ export interface RecurringItemView {
     readonly status: BillStatus;
     readonly dueOn: string;
     readonly amountKes: bigint | null;
+    readonly amountUsdc: bigint | null;
   } | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -145,6 +150,7 @@ const itemColumns = {
   nextBillStatus: nextBill.status,
   nextBillDueOn: nextBill.dueOn,
   nextBillAmountKes: nextBill.amountKes,
+  nextBillAmountUsdc: nextBill.amountUsdc,
 };
 
 /** Each item with its bill still owed; the unique index allows at most one. */
@@ -179,8 +185,10 @@ function toView(row: SelectedItem): RecurringItemView {
     },
     overviewHeading: item.overviewHeading,
     category: { id: item.categoryId, name: row.categoryName },
-    variable: item.amountKes === null,
+    variable: item.amountKes === null && item.amountUsdc === null,
+    currency: item.currency,
     amountKes: item.amountKes,
+    amountUsdc: item.amountUsdc,
     schedule: item.schedule,
     scheduleDay: item.scheduleDay,
     startsOn: item.startsOn,
@@ -199,6 +207,7 @@ function toView(row: SelectedItem): RecurringItemView {
             status: row.nextBillStatus,
             dueOn: row.nextBillDueOn,
             amountKes: row.nextBillAmountKes,
+            amountUsdc: row.nextBillAmountUsdc,
           },
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
@@ -308,6 +317,70 @@ function checkCategory(
   );
 }
 
+/**
+ * A payee paid in USDC is billed in USD, every other payee in KES (spec
+ * §6.19). An amount typed in the other currency is refused, not converted.
+ */
+function checkCurrency(
+  payeeName: string,
+  currency: BillCurrency,
+  fields: {
+    readonly amountKes?: bigint | null | undefined;
+    readonly amountUsd?: bigint | null | undefined;
+  },
+): Effect.Effect<void, BadRequest> {
+  const typedIn: BillCurrency | null =
+    fields.amountUsd !== undefined && fields.amountUsd !== null
+      ? "usd"
+      : fields.amountKes !== undefined && fields.amountKes !== null
+        ? "kes"
+        : null;
+  if (typedIn === null || typedIn === currency) return Effect.void;
+  return Effect.fail(
+    new BadRequest({
+      message:
+        currency === "usd"
+          ? `${payeeName} is paid in USDC, so enter the amount in USD.`
+          : `${payeeName} is paid in KES, so enter the amount in KES.`,
+    }),
+  );
+}
+
+/** The amount columns for `value` in `currency`; the other currency's is null. */
+const amountColumns = (currency: BillCurrency, value: bigint | null) => ({
+  currency,
+  amountKes: currency === "kes" ? value : null,
+  amountUsdc: currency === "usd" ? value : null,
+});
+
+/** The item's payee's name and method, archived or not. */
+function payeeOfItem(
+  tx: Transaction,
+  row: RecurringItemRow,
+): Effect.Effect<
+  { readonly name: string; readonly method: PayeeMethod | null },
+  DatabaseError
+> {
+  return query(() =>
+    tx
+      .select({ name: payees.name, method: payees.method })
+      .from(payees)
+      .where(
+        and(
+          eq(payees.organizationId, row.organizationId),
+          eq(payees.id, row.payeeId),
+        ),
+      )
+      .limit(1),
+  ).pipe(
+    Effect.flatMap(([payee]) =>
+      payee
+        ? Effect.succeed(payee)
+        : Effect.dieMessage(`recurring item ${row.id} lost its payee`),
+    ),
+  );
+}
+
 /** An item that hasn't ended: it still has a next due date. */
 type ScheduledItem = RecurringItemRow & { readonly nextDueOn: string };
 
@@ -382,12 +455,19 @@ export function createRecurringItem(
           );
         }
         yield* checkCategory(tx, organizationId, fields.categoryId);
+        const currency = currencyForPayeeMethod(payee.method);
+        yield* checkCurrency(payee.name, currency, fields);
         const values = {
           payeeId: fields.payeeId,
           overviewHeading:
             fields.overviewHeading ?? defaultBillHeading(payee.kind),
           categoryId: fields.categoryId,
-          amountKes: fields.variable ? null : (fields.amountKes ?? null),
+          ...amountColumns(
+            currency,
+            fields.variable
+              ? null
+              : (fields.amountKes ?? fields.amountUsd ?? null),
+          ),
           ...schedule,
           payVia: fields.payVia,
           reminderDays: fields.reminderDays,
@@ -418,7 +498,9 @@ export function createRecurringItem(
 }
 
 const CHANGEABLE = [
+  "currency",
   "amountKes",
+  "amountUsdc",
   "categoryId",
   "overviewHeading",
   "reminderDays",
@@ -448,7 +530,9 @@ function diff(
 
 /**
  * Changes what the bills still to come will be. An end date before the
- * next due date ends the payment there.
+ * next due date ends the payment there. A new amount is in the payee's
+ * currency as it is now: if their method changed between KES and USDC,
+ * entering it moves the payment to that currency.
  */
 export function updateRecurringItem(
   tenant: Tenant,
@@ -472,8 +556,21 @@ export function updateRecurringItem(
         if (endsOn !== null && endsOn < row.startsOn) {
           return yield* Effect.fail(endsBeforeStart);
         }
+        const typed =
+          changes.amountUsd !== undefined
+            ? changes.amountUsd
+            : changes.amountKes;
+        const amounts =
+          typed === undefined
+            ? {}
+            : yield* Effect.gen(function* () {
+                const payee = yield* payeeOfItem(tx, row);
+                const currency = currencyForPayeeMethod(payee.method);
+                yield* checkCurrency(payee.name, currency, changes);
+                return amountColumns(currency, typed);
+              });
         const { before, after } = diff(row, {
-          amountKes: changes.amountKes,
+          ...amounts,
           categoryId: changes.categoryId,
           overviewHeading: changes.overviewHeading,
           reminderDays: changes.reminderDays,

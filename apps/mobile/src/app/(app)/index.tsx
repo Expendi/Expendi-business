@@ -67,6 +67,12 @@ export default function HomeScreen(): JSX.Element {
       />
 
       <ListRow
+        title="My petty cash"
+        subtitle="What’s left on your float, and what you spent"
+        onPress={() => router.push("/petty-cash")}
+      />
+
+      <ListRow
         title="My salary payments"
         subtitle="Your pay from this company"
         onPress={() => router.push("/salary-payments")}
@@ -103,6 +109,11 @@ export default function HomeScreen(): JSX.Element {
             title="Payroll"
             subtitle="Salaries and payroll runs. Only admins see them."
             onPress={() => router.push("/payroll")}
+          />
+          <ListRow
+            title="Petty cash floats"
+            subtitle="Issue, top up and close floats; see what’s left"
+            onPress={() => router.push("/petty-cash/floats")}
           />
           <ListRow
             title="Company spending"

@@ -1,4 +1,5 @@
 import type {
+  BillCurrency,
   BillHeading,
   CreateRecurringItemRequest,
   RecurringItem,
@@ -9,16 +10,23 @@ import type {
 } from "@expendi-business/shared";
 import {
   describeSchedule,
-  parseKesToCents,
   REMINDER_DAYS_DEFAULT,
 } from "@expendi-business/shared";
 
-import { blankToNull, centsToTyped } from "../bills/bill-draft";
+import {
+  currencyOfPayee,
+  parseTyped,
+  storedAmount,
+  toTyped,
+} from "../bills/bill-amount";
+import { blankToNull } from "../bills/bill-draft";
 
 /** The recurring payment form as typed; the API parses the amount into integer cents. */
 export interface RecurringDraft {
   payeeId: string | null;
   variable: boolean;
+  /** USD for a payee paid in USDC (spec §6.19), KES otherwise. */
+  currency: BillCurrency;
   amount: string;
   schedule: RecurringSchedule;
   /** The ISO weekday for weekly (1 is Monday), the day of the month otherwise. */
@@ -53,6 +61,7 @@ export function blankDraft(today: string): RecurringDraft {
   return {
     payeeId: null,
     variable: false,
+    currency: "kes",
     amount: "",
     schedule: "monthly",
     scheduleDay: String(Number(today.slice(8, 10))),
@@ -84,7 +93,9 @@ export function toCreateRequest(
   return {
     payeeId: draft.payeeId ?? "",
     variable: draft.variable,
-    amountKes: draft.variable ? null : blankToNull(draft.amount),
+    ...(draft.currency === "usd"
+      ? { amountUsd: draft.variable ? null : blankToNull(draft.amount) }
+      : { amountKes: draft.variable ? null : blankToNull(draft.amount) }),
     schedule: draft.schedule,
     scheduleDay: wholeNumber(draft.scheduleDay),
     startsOn: draft.startsOn.trim(),
@@ -96,11 +107,18 @@ export function toCreateRequest(
   };
 }
 
+/**
+ * The payment as its form starts, its amount in the payee's currency as it
+ * is now: blank if their method moved between KES and USDC since.
+ */
 export function draftFromItem(item: RecurringItem): RecurringDraft {
+  const currency = currencyOfPayee(item.payee.method, item.currency);
+  const stored = currency === item.currency ? storedAmount(item) : null;
   return {
     payeeId: item.payee.id,
     variable: item.variable,
-    amount: item.amountKes === null ? "" : centsToTyped(item.amountKes),
+    currency,
+    amount: stored === null ? "" : toTyped(currency, stored),
     schedule: item.schedule,
     scheduleDay: String(item.scheduleDay),
     startsOn: item.startsOn,
@@ -123,11 +141,14 @@ export function toUpdateRequest(
 ): UpdateRecurringItemRequest {
   const request: UpdateRecurringItemRequest = {};
   const typedAmount = draft.variable ? null : draft.amount.trim();
-  const typedCents =
+  const typedUnits =
     typedAmount === null
       ? null
-      : (parseKesToCents(typedAmount)?.toString() ?? typedAmount);
-  if (typedCents !== item.amountKes) request.amountKes = typedAmount;
+      : (parseTyped(draft.currency, typedAmount) ?? typedAmount);
+  if (draft.currency !== item.currency || typedUnits !== storedAmount(item)) {
+    if (draft.currency === "usd") request.amountUsd = typedAmount;
+    else request.amountKes = typedAmount;
+  }
   if (draft.categoryId !== null && draft.categoryId !== item.category.id) {
     request.categoryId = draft.categoryId;
   }

@@ -445,7 +445,10 @@ export const claimDetailSchema = claimSchema.extend({
 
 export type ClaimDetail = z.infer<typeof claimDetailSchema>;
 
-/** Newest first. Employees get only their own claims; admins get everyone's. */
+/**
+ * Newest first. Employees get only their own claims; admins and accountants
+ * get everyone's.
+ */
 export const claimsPageSchema = z.object({
   claims: z.array(claimSchema),
   nextCursor: z.string().nullable(),

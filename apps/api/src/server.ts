@@ -6,6 +6,10 @@ import { makeRuntime } from "./runtime.js";
 import { billStatusJob } from "./station/bill-status.js";
 import { confirmOnchainJob } from "./station/confirm-onchain.js";
 import { payrollDraftsJob } from "./station/payroll-drafts.js";
+import {
+  pushNotificationsJob,
+  pushReceiptsJob,
+} from "./station/push-notifications.js";
 import { reconcilePaycrestJob } from "./station/reconcile-paycrest.js";
 import { recurringBillsJob } from "./station/recurring-bills.js";
 import { startStation } from "./station/scheduler.js";
@@ -27,6 +31,8 @@ const stopStation = startStation(runtime, [
   billStatusJob,
   recurringBillsJob,
   payrollDraftsJob,
+  pushNotificationsJob,
+  pushReceiptsJob,
 ]);
 
 function shutdown(signal: NodeJS.Signals): void {

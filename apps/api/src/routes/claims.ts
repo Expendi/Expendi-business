@@ -83,8 +83,9 @@ const PREPARATION_FAILURES = {
 
 /**
  * Mounted at `/organizations/:organizationId/claims` (spec §5, §6.3, §6.7).
- * Any member submits their own; employees see only theirs and admins see
- * all. Only the person who submitted a claim edits it, until it's approved.
+ * Admins and employees submit their own; employees see only theirs, and
+ * admins and accountants see all. Only the person who submitted a claim
+ * edits it, until it's approved.
  * Only admins approve, pay, retry and reject.
  */
 export function createClaimRoutes(
