@@ -148,7 +148,7 @@ T45 → T46 → T47 → T49 → T48 → T50 → T51. T45 and T46 can start at on
 ## Handoff notes (fill in before ending each session)
 
 - **Status (2026-11-02):** T45 and T46 code done (uncommitted at the time of writing). T47–T51 are next, each after its API (T42 for T50, T22 for T51).
-- **Status (2026-11-02, fifth wave):** T47–T51 code done and included in the local release commit. All of Phase 3B is built; Checkpoint D2 hasn't run. The older web release is live at `business.expendi.app` on Vercel (Hobby, from a mirror repo; see Built). The fifth wave awaits the provider setup and deployment in `next-session.md`.
+- **Status (2026-11-02, fifth wave):** T47–T51 code deployed from `15978ee` to `business.expendi.app` on Vercel (Hobby, from the mirror repo). Deployment `dpl_3tj1sLhcxvPEwS2juRv9EJTH1YqQ` is Ready. Home, overview and reports returned HTTP 200; both passkey association files returned JSON without redirects. All of Phase 3B is built; authenticated browser flows and Checkpoint D2 haven't run.
 - **Built:**
   - **T47 expenses and approvals (EXP-318):**
     - **API:** `GET /organizations/:id/expenses` and `/:expenseId` (admins and accountants). Filters: `membershipId`, `kind` (`claim`, `petty_cash`, `company`), `categoryId`, `month`, `etimsStatus`, `cursor`, `limit` up to 100. A claim has no `float_id`; petty cash is float spending plus claims with a `float_id`; a bill paid outside appears once, as company spending. The detail returns receipts through presigned downloads.
@@ -209,4 +209,4 @@ T45 → T46 → T47 → T49 → T48 → T50 → T51. T45 and T46 can start at on
   - **R2 CORS:** the PDF invoice upload from the browser needs a bucket CORS rule (PUT and GET from `https://business.expendi.app` and `http://localhost:3002`, header `content-type`). Not set yet.
   - **Deploying migration 0050:** the old release reads the dropped columns, so expect a few seconds of errors while the new release replaces it.
 - **QA results (2026-11-02, OpenCode):** 153 web, 272 mobile and 174 shared tests passed; web typecheck/lint/format and production build passed. The final eTIMS rejected-claim filter and web/mobile outside total are included. No real-browser or device QA was performed; Checkpoint D2 remains pending.
-- **Next session starts with:** finish provider setup, deploy the API and web fifth wave, then run Checkpoint D2 against real uploads and passkeys.
+- **Next session starts with:** finish the remaining provider setup (R2 CORS and Resend DNS), then run Checkpoint D2 against real uploads and passkeys. See `next-session.md` for API deployment status.

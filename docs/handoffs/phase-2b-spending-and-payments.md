@@ -186,7 +186,7 @@ None new. This phase reuses Paycrest, Privy, Resend, Expo push and R2.
   - 2026-11-02: started early, in parallel with Phase 2 code (Dennis's decision; see the Phase 2 Handoff notes, "QA deferred"). The Phase 2B gate of Checkpoint B (Till, Paybill, bank, USDC address, payroll cap) hasn't run yet.
   - T34: the API and tests are done (uncommitted); the app screens are in progress.
   - T34–T41 code done (2026-11-02), app screens included. T42 and T43 remain. The Phase 2B live gate (Checkpoint B) and QA haven't run yet.
-- **Status (2026-11-02, fifth wave):** T42 and T43 code done, plus the T40 overspend fixes, included in the local release commit. Final automated verification passed (see `next-session.md`). All of Phase 2B is built; Checkpoint C2 and the live gate haven't run. Migrations 0055 and 0056 aren't deployed yet. A second session's unidentified drafts for T42 and T43 were taken over and reworked.
+- **Status (2026-11-02, fifth wave):** T42 and T43 code done, plus the T40 overspend fixes, committed in `15978ee`. API/web are deployed and migrations 0055 and 0056 are applied on dev; mobile still needs a current build/Metro session for device QA. Final automated verification passed (see `next-session.md`). All of Phase 2B is built; Checkpoint C2 and the live gate haven't run. A second session's unidentified drafts for T42 and T43 were taken over and reworked.
 - **Built:**
   - **T34 payees API:**
     - **Table:** `payees` (migrations 0024/0025), with a check constraint per method and RLS FORCE. The routes are admin only.

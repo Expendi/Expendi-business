@@ -194,7 +194,7 @@ T23 → T27 → T24 → T22 → T25 → T30 → T31 → T44 → T26
 - **Status (2026-11-02, fifth wave):**
   - T22, T31, T44 and T26 code done. T26 includes the admin alerts and system health pages. See `next-session.md` for final release verification and deployment status.
   - T25 (spreadsheet import) is the only Phase 3 task not built; it needs the pilot's spreadsheet sample.
-  - Migrations 0057–0064 aren't deployed yet. A second session's drafts for T22, T31 and T44 (migrations 0057–0058) were taken over and reworked; `0057_salty_bloodstrike` was renamed `0057_accounting_sync_columns` (journal tag updated).
+  - Migrations 0057–0064 are applied on dev with release `15978ee`; API health and migration count were verified. The internal admin app is still local-only. A second session's drafts for T22, T31 and T44 (migrations 0057–0058) were taken over and reworked; `0057_salty_bloodstrike` was renamed `0057_accounting_sync_columns` before deployment.
   - Zoho and the monthly export haven't run against real services.
 - **Built:**
   - **T22 monthly export (EXP-299):**
@@ -300,4 +300,4 @@ T23 → T27 → T24 → T22 → T25 → T30 → T31 → T44 → T26
   - **T22 export recipients:** done (invited accountants are included).
   - **Zoho:** the unconfirmed behaviours under T31 and T44 need a live check.
 - **QA results (2026-11-02, OpenCode):** final API suites passed 2,044 main and 169 serial tests on a fresh local database through migration 0064; no schema drift. API/shared checks and admin build pass. Fixed the staff-health test's fixture cleanup to age both open and resolved webhook incidents left by earlier serial files; a deterministic regression failed before the fix and passes after it. Live provider and Checkpoint D QA remain pending. See `next-session.md` for the complete release results.
-- **Next session starts with:** replace Doppler provider placeholders, then release the locally committed fifth wave; configure Zoho and `ALERT_EMAILS` for live QA. T25 still needs the pilot spreadsheet.
+- **Next session starts with:** finish R2 CORS and Resend DNS setup, configure Zoho, and verify alert delivery to the now-configured `ALERT_EMAILS`. See `next-session.md` for release status. T25 still needs the pilot spreadsheet.
