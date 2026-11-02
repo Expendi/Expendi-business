@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -20,10 +21,16 @@ import { payrollRuns } from "./payroll-runs.js";
 import { users } from "./users.js";
 import { wallets } from "./wallets.js";
 
+/**
+ * What a payout pays. A `withdrawal` is the company moving its own USDC to
+ * an address on its allowlist (spec §6.9); its subject ID is the
+ * withdrawal request's ID.
+ */
 export const payoutSubjectType = pgEnum("payout_subject_type", [
   "claim",
   "bill",
   "float",
+  "withdrawal",
 ]);
 
 export const payoutProvider = pgEnum("payout_provider", [
@@ -129,6 +136,12 @@ export const payouts = pgTable(
     providerCheckedAt: timestamp("provider_checked_at", {
       withTimezone: true,
     }),
+    /**
+     * The order's ID on Paycrest's Gateway contract (bytes32, lowercased),
+     * from Paycrest's transaction logs. A Gateway refund names it, which
+     * links the refund to this payout. Set once by sync, never changed.
+     */
+    gatewayOrderId: text("gateway_order_id"),
     failureReason: text("failure_reason"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     ...timestamps,
@@ -144,6 +157,11 @@ export const payouts = pgTable(
       columns: [table.payrollRunId, table.organizationId],
       foreignColumns: [payrollRuns.id, payrollRuns.organizationId],
     }),
+    // Target of bills' composite foreign key.
+    unique("payouts_id_organization_id_unique").on(
+      table.id,
+      table.organizationId,
+    ),
     uniqueIndex("payouts_idempotency_key_unique").on(
       table.organizationId,
       table.idempotencyKey,
@@ -155,6 +173,11 @@ export const payouts = pgTable(
       .where(sql`${table.status} <> 'failed'`),
     uniqueIndex("payouts_provider_order_id_unique").on(table.providerOrderId),
     index("payouts_status_idx").on(table.status),
+    index("payouts_gateway_order_id_idx").on(table.gatewayOrderId),
+    check(
+      "payouts_gateway_order_id_is_bytes32",
+      sql`${table.gatewayOrderId} ~ '^0x[0-9a-f]{64}$'`,
+    ),
     check(
       "payouts_whole_shillings",
       sql`${table.provider} <> 'paycrest' OR ${table.amountKes} % 100 = 0`,

@@ -1,0 +1,41 @@
+{
+  "receipts": [
+    {
+      "file": "supermarket-till.jpg",
+      "readable": true,
+      "kind": "paper_receipt",
+      "merchant": "Example Supermarket Westlands",
+      "amount": "1,234.50",
+      "currency": "KES",
+      "date": "2026-10-30",
+      "mpesaCode": null,
+      "etimsInvoiceNumber": "0040799830000012345",
+      "supplierKraPin": "P000000000A"
+    },
+    {
+      "file": "buy-goods-screenshot.png",
+      "readable": true,
+      "kind": "mpesa_screenshot",
+      "merchant": "EXAMPLE CAFE",
+      "amount": "850.00",
+      "currency": "KES",
+      "date": "2026-10-28",
+      "mpesaCode": "TJK0EXAMPL",
+      "etimsInvoiceNumber": null,
+      "supplierKraPin": null
+    },
+    {
+      "file": "conference-invoice.jpg",
+      "readable": true,
+      "kind": "invoice",
+      "merchant": "Example Events Ltd",
+      "amount": "120.00",
+      "currency": "USD",
+      "date": "2026-10-15",
+      "mpesaCode": null,
+      "etimsInvoiceNumber": null,
+      "supplierKraPin": null
+    },
+    { "file": "too-blurry.jpg", "readable": false }
+  ]
+}

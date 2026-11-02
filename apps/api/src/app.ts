@@ -6,7 +6,10 @@ import type { AppRuntime } from "./runtime.js";
 import { internalErrorResponse } from "./http/respond.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { createAlchemyWebhookRoutes } from "./routes/alchemy-webhooks.js";
+import { createApprovalPasskeyRoutes } from "./routes/approval-passkey.js";
 import { createHealthRoutes } from "./routes/health.js";
+import { createZohoIntegrationRoutes } from "./routes/integrations/zoho.js";
+import { createInternalRoutes } from "./routes/internal/index.js";
 import { createMeRoutes } from "./routes/me.js";
 import {
   createOrganizationRoutes,
@@ -31,11 +34,15 @@ export function createApp({ runtime }: { readonly runtime: AppRuntime }): App {
   // Signed by the provider, not a user, so no login middleware.
   app.route("/webhooks", createAlchemyWebhookRoutes(runtime));
   app.route("/webhooks", createPaycrestWebhookRoutes(runtime));
+  // Opened by a company's accountant, who has no Expendi login: the connect
+  // link's token and Zoho's signed state authorize each step.
+  app.route("/integrations/zoho", createZohoIntegrationRoutes(runtime));
 
   const authenticate = authMiddleware(runtime);
   // Also matches `/me` itself.
   app.use("/me/*", authenticate);
   app.route("/me", createMeRoutes(runtime));
+  app.route("/me/approval-passkey", createApprovalPasskeyRoutes(runtime));
 
   // Also matches `/organizations` itself, so sign-up is authenticated too.
   app.use("/organizations/*", authenticate);
@@ -44,6 +51,9 @@ export function createApp({ runtime }: { readonly runtime: AppRuntime }): App {
     "/organizations/:organizationId",
     createOrganizationRoutes(runtime),
   );
+
+  // Staff login, separate from customer login (spec §6.15).
+  app.route("/internal", createInternalRoutes(runtime));
 
   return app;
 }

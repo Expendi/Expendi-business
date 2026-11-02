@@ -16,11 +16,12 @@ const HTML_ESCAPES: Readonly<Record<string, string>> = {
 };
 
 /** Company and inviter names are typed by users, so they're escaped. */
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char] ?? char);
 }
 
-const oneLine = (value: string) => value.replace(/\s+/g, " ").trim();
+export const oneLine = (value: string): string =>
+  value.replace(/\s+/g, " ").trim();
 
 /** The invite (spec §6.2): who asked, which company, and the install link. */
 export function inviteEmail(input: InviteEmailInput): EmailMessage {

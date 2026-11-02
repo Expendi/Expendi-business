@@ -1,7 +1,12 @@
 import type { ConfigError } from "effect";
 import { Config, Context, Data, Effect, Layer, Redacted } from "effect";
 
-import type { TransactionReceipt } from "./base.js";
+import type { ReceiptLog, TransactionReceipt, UsdcTransfer } from "./base.js";
+import {
+  ERC20_TRANSFER_TOPIC,
+  USDC_BASE_ADDRESS,
+  usdcTransfersIn,
+} from "./base.js";
 
 export class BaseRpcError extends Data.TaggedError("BaseRpcError")<{
   readonly message: string;
@@ -13,6 +18,22 @@ export interface BaseRpcShape {
   readonly getTransactionReceipt: (
     txHash: string,
   ) => Effect.Effect<TransactionReceipt | null, BaseRpcError>;
+  /** A read-only `eth_call` at the latest block: the raw return data. */
+  readonly ethCall: (
+    to: string,
+    data: string,
+  ) => Effect.Effect<string, BaseRpcError>;
+  /** The latest block's number. */
+  readonly blockNumber: () => Effect.Effect<bigint, BaseRpcError>;
+  /**
+   * Every USDC transfer from `from` to `to` mined since `fromBlock`
+   * (`eth_getLogs`; only successful transactions leave logs).
+   */
+  readonly usdcTransfersBetween: (filter: {
+    readonly from: string;
+    readonly to: string;
+    readonly fromBlock: bigint;
+  }) => Effect.Effect<UsdcTransfer[], BaseRpcError>;
 }
 
 export class BaseRpc extends Context.Tag("BaseRpc")<BaseRpc, BaseRpcShape>() {}
@@ -59,8 +80,75 @@ export function makeBaseRpc(
   return {
     getTransactionReceipt: (txHash) =>
       call<TransactionReceipt>("eth_getTransactionReceipt", [txHash]),
+    ethCall: (to, data) =>
+      call<string>("eth_call", [{ to, data }, "latest"]).pipe(
+        Effect.flatMap((result) =>
+          result === null
+            ? Effect.fail(
+                new BaseRpcError({
+                  message: "Base RPC eth_call returned nothing",
+                }),
+              )
+            : Effect.succeed(result),
+        ),
+      ),
+    blockNumber: () =>
+      call<string>("eth_blockNumber", []).pipe(
+        Effect.flatMap((result) =>
+          result === null
+            ? Effect.fail(
+                new BaseRpcError({
+                  message: "Base RPC eth_blockNumber returned nothing",
+                }),
+              )
+            : Effect.succeed(BigInt(result)),
+        ),
+      ),
+    usdcTransfersBetween: ({ from, to, fromBlock }) =>
+      call<readonly LogEntry[]>("eth_getLogs", [
+        {
+          address: USDC_BASE_ADDRESS,
+          topics: [ERC20_TRANSFER_TOPIC, addressTopic(from), addressTopic(to)],
+          fromBlock: `0x${fromBlock.toString(16)}`,
+          toBlock: "latest",
+        },
+      ]).pipe(
+        Effect.flatMap((logs) =>
+          logs === null
+            ? Effect.fail(
+                new BaseRpcError({
+                  message: "Base RPC eth_getLogs returned nothing",
+                }),
+              )
+            : Effect.succeed(
+                logs
+                  .flatMap((log) =>
+                    usdcTransfersIn({
+                      transactionHash: log.transactionHash,
+                      status: "0x1",
+                      blockNumber: log.blockNumber,
+                      logs: [log],
+                    }),
+                  )
+                  .filter(
+                    (transfer) =>
+                      transfer.from === from.toLowerCase() &&
+                      transfer.to === to.toLowerCase(),
+                  ),
+              ),
+        ),
+      ),
   };
 }
+
+/** An `eth_getLogs` entry: a receipt log that also names its transaction. */
+interface LogEntry extends ReceiptLog {
+  readonly transactionHash: string;
+  readonly blockNumber: string;
+}
+
+const addressTopic = (address: string): string =>
+  `0x${address.slice(2).toLowerCase().padStart(64, "0")}`;
 
 /** BASE_RPC_URL usually embeds a provider API key, so it is redacted. */
 export const BaseRpcLive: Layer.Layer<BaseRpc, ConfigError.ConfigError> =

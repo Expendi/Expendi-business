@@ -1,8 +1,21 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { Effect, Layer, Redacted } from "effect";
 
-import type { TransactionReceipt } from "../../services/chain/base.js";
+import type {
+  TransactionReceipt,
+  UsdcTransfer,
+} from "../../services/chain/base.js";
 import type { EmailMessage } from "../../services/email/email-sender.js";
+import type {
+  RawExtraction,
+  ReceiptExtraction,
+  ReceiptExtractionErrorCode,
+  UnreadableReason,
+} from "../../services/extraction/receipt-extractor.js";
+import type {
+  ReceiptFields,
+  ReceiptFlag,
+} from "../../services/extraction/receipt-schema.js";
 import type {
   PaycrestOrder,
   PaycrestOrderRequest,
@@ -11,6 +24,7 @@ import type {
   OtpProviderErrorCode,
   VerificationCheckResult,
 } from "../../services/phone-verification/otp-provider.js";
+import type { StoredObject } from "../../services/storage/file-storage.js";
 import type {
   CreatePolicyInput,
   CreateWalletInput,
@@ -18,6 +32,11 @@ import type {
   SendUsdcInput,
   SentTransaction,
 } from "../../services/wallet/privy-wallets.js";
+import type {
+  ZohoBooksAccount,
+  ZohoBooksOrganization,
+  ZohoErrorCode,
+} from "../../services/zoho/zoho-client.js";
 import {
   AlchemyWebhook,
   makeAlchemyWebhook,
@@ -28,6 +47,10 @@ import {
   EmailSender,
   EmailSendError,
 } from "../../services/email/email-sender.js";
+import {
+  ReceiptExtractionError,
+  ReceiptExtractor,
+} from "../../services/extraction/receipt-extractor.js";
 import { fromMicro, toMicro } from "../../services/paycrest/amounts.js";
 import {
   Paycrest,
@@ -38,6 +61,10 @@ import {
   OtpProvider,
   OtpProviderError,
 } from "../../services/phone-verification/otp-provider.js";
+import {
+  FileStorage,
+  StorageError,
+} from "../../services/storage/file-storage.js";
 import { WalletSettings } from "../../services/wallet/company-wallet.js";
 import {
   PrivyWalletError,
@@ -45,6 +72,7 @@ import {
   SendOutcomeUnknown,
   SendRefused,
 } from "../../services/wallet/privy-wallets.js";
+import { Zoho, ZohoError } from "../../services/zoho/zoho-client.js";
 
 export const TEST_WALLET_SETTINGS = {
   managementQuorumId: "kq-management",
@@ -249,15 +277,42 @@ export function makeFakeAlchemyWebhook() {
   return { layer, state };
 }
 
-/** Receipts keyed by lowercased transaction hash. */
+/**
+ * Receipts keyed by lowercased transaction hash; `eth_call` results keyed
+ * by `callKey(to, data)`. A call nobody set returns "0x", as a call to an
+ * address with no code does.
+ */
 export function makeFakeBaseRpc() {
   const receipts = new Map<string, TransactionReceipt>();
+  const callResults = new Map<string, string>();
+  /** What `eth_getLogs` finds: USDC transfers on chain, in any order. */
+  const transfers: UsdcTransfer[] = [];
   let failures = 0;
+  let callFailures = 0;
+  let searchFailures = 0;
   const state = {
     receipts,
+    callResults,
+    transfers,
+    latestBlock: 40_000_000n,
     failNext(times = 1) {
       failures = times;
     },
+    /** The next `times` eth_calls fail; receipts are unaffected. */
+    failNextCalls(times = 1) {
+      callFailures = times;
+    },
+    /** The next `times` block number reads and log searches fail. */
+    failNextSearches(times = 1) {
+      searchFailures = times;
+    },
+  };
+  const searchFailure = () => {
+    if (searchFailures === 0) return null;
+    searchFailures -= 1;
+    return Effect.fail(
+      new BaseRpcError({ message: "fake log search failure" }),
+    );
   };
   const layer = Layer.succeed(BaseRpc, {
     getTransactionReceipt: (txHash) => {
@@ -267,9 +322,32 @@ export function makeFakeBaseRpc() {
       }
       return Effect.succeed(receipts.get(txHash.toLowerCase()) ?? null);
     },
+    ethCall: (to, data) => {
+      if (callFailures > 0) {
+        callFailures -= 1;
+        return Effect.fail(
+          new BaseRpcError({ message: "fake eth_call failure" }),
+        );
+      }
+      return Effect.succeed(callResults.get(callKey(to, data)) ?? "0x");
+    },
+    blockNumber: () => searchFailure() ?? Effect.succeed(state.latestBlock),
+    usdcTransfersBetween: ({ from, to, fromBlock }) =>
+      searchFailure() ??
+      Effect.succeed(
+        transfers.filter(
+          (transfer) =>
+            transfer.from === from.toLowerCase() &&
+            transfer.to === to.toLowerCase() &&
+            transfer.blockNumber >= fromBlock,
+        ),
+      ),
   });
   return { layer, state };
 }
+
+export const callKey = (to: string, data: string): string =>
+  `${to.toLowerCase()}:${data.toLowerCase()}`;
 
 export const TEST_PAYCREST_SECRET = "pc_test_webhook_secret";
 
@@ -496,6 +574,333 @@ export function makeFakeOtpProvider() {
         return { approved: true };
       });
     },
+  });
+  return { layer, state };
+}
+
+/** What the fake reads when nothing is queued: a plain KES till receipt. */
+export const FAKE_RECEIPT_FIELDS: ReceiptFields = {
+  kind: "paper_receipt",
+  merchant: "Naivas Supermarket",
+  amountCents: "123450",
+  currency: "KES",
+  date: "2026-10-30",
+  mpesaCode: null,
+  etimsInvoiceNumber: null,
+  supplierKraPin: null,
+  confidence: {
+    merchant: "high",
+    amount: "high",
+    currency: "high",
+    date: "high",
+  },
+};
+
+type FakeReceiptOutcome =
+  | {
+      readonly kind: "read";
+      readonly fields: ReceiptFields;
+      readonly flags: readonly ReceiptFlag[];
+    }
+  | { readonly kind: "unreadable"; readonly reason: UnreadableReason }
+  | { readonly kind: "error"; readonly code: ReceiptExtractionErrorCode };
+
+/**
+ * In-memory receipt reading. Each call reads `FAKE_RECEIPT_FIELDS` unless
+ * `nextRead`, `nextUnreadable` or `failNext` queued another outcome. It
+ * records each image's type and size, never its bytes.
+ */
+export function makeFakeReceiptExtractor() {
+  const calls: { readonly mediaType: string; readonly byteLength: number }[] =
+    [];
+  const queued: FakeReceiptOutcome[] = [];
+  const state = {
+    calls,
+    nextRead(fields: ReceiptFields, flags: readonly ReceiptFlag[] = []) {
+      queued.push({ kind: "read", fields, flags });
+    },
+    nextUnreadable(reason: UnreadableReason) {
+      queued.push({ kind: "unreadable", reason });
+    },
+    failNext(code: ReceiptExtractionErrorCode) {
+      queued.push({ kind: "error", code });
+    },
+    reset() {
+      calls.length = 0;
+      queued.length = 0;
+    },
+  };
+  const raw = (reply: unknown): RawExtraction => ({
+    model: "fake-receipt-model",
+    messageId: `msg_fake_${randomBytes(6).toString("hex")}`,
+    stopReason: "end_turn",
+    reply,
+    usage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadInputTokens: 0,
+      cacheCreationInputTokens: 0,
+    },
+  });
+  const layer = Layer.succeed(ReceiptExtractor, {
+    extract: ({ bytes, mediaType }) => {
+      calls.push({ mediaType, byteLength: bytes.byteLength });
+      const outcome = queued.shift() ?? {
+        kind: "read",
+        fields: FAKE_RECEIPT_FIELDS,
+        flags: [],
+      };
+      if (outcome.kind === "error") {
+        return Effect.fail(
+          new ReceiptExtractionError({
+            code: outcome.code,
+            message: `fake ${outcome.code}`,
+          }),
+        );
+      }
+      const result: ReceiptExtraction =
+        outcome.kind === "read"
+          ? {
+              status: "read",
+              fields: outcome.fields,
+              flags: outcome.flags,
+              raw: raw(outcome.fields),
+            }
+          : { status: "unreadable", reason: outcome.reason, raw: raw(null) };
+      return Effect.succeed(result);
+    },
+  });
+  return { layer, state };
+}
+
+export const FAKE_STORAGE_ORIGIN = "https://storage.expendi.test";
+
+/**
+ * In-memory receipt storage. Presigned URLs name their key, and `put`
+ * stands in for the phone's upload: `head` only finds what was put.
+ */
+export function makeFakeFileStorage() {
+  const objects = new Map<string, StoredObject>();
+  const contents = new Map<string, Uint8Array>();
+  const signedUploads: {
+    readonly key: string;
+    readonly contentType: string;
+    readonly byteSize: number;
+  }[] = [];
+  const state = {
+    objects,
+    signedUploads,
+    /** `get` fails while set, as when R2 is down. */
+    failGets: false,
+    put(
+      key: string,
+      byteSize: number,
+      contentType = "image/jpeg",
+      bytes: Uint8Array = new Uint8Array(byteSize),
+    ) {
+      objects.set(key, { byteSize, contentType });
+      contents.set(key, bytes);
+    },
+    reset() {
+      objects.clear();
+      contents.clear();
+      signedUploads.length = 0;
+      state.failGets = false;
+    },
+  };
+  const presigned = (key: string, signature: string, ttlMs: number) => ({
+    url: `${FAKE_STORAGE_ORIGIN}/${key}?signature=${signature}`,
+    expiresAt: new Date(Date.now() + ttlMs),
+  });
+  const layer = Layer.succeed(FileStorage, {
+    presignUpload: (file) =>
+      Effect.sync(() => {
+        signedUploads.push(file);
+        return presigned(file.key, "upload", 5 * 60_000);
+      }),
+    presignDownload: (key) =>
+      Effect.succeed(presigned(key, "download", 15 * 60_000)),
+    head: (key) => Effect.succeed(objects.get(key) ?? null),
+    get: (key) => {
+      if (state.failGets) {
+        return Effect.fail(
+          new StorageError({ code: "UNAVAILABLE", message: "fake R2 down" }),
+        );
+      }
+      const bytes = contents.get(key);
+      return Effect.succeed(
+        bytes
+          ? { bytes, contentType: objects.get(key)?.contentType ?? null }
+          : null,
+      );
+    },
+  });
+  return { layer, state };
+}
+
+export const FAKE_ZOHO_API_DOMAIN = "https://www.zohoapis.eu";
+export const FAKE_ZOHO_ACCOUNTS_SERVER = "https://accounts.zoho.eu";
+export const FAKE_ZOHO_CONNECT_ORIGIN = "https://api.expendi.test";
+
+export const FAKE_ZOHO_ORGANIZATIONS: readonly ZohoBooksOrganization[] = [
+  { id: "60001", name: "Acme Kenya Ltd", currencyCode: "KES" },
+  { id: "60002", name: "Acme Holdings Inc", currencyCode: "USD" },
+];
+
+export const FAKE_ZOHO_ACCOUNTS: readonly ZohoBooksAccount[] = [
+  { id: "acc-travel", name: "Travel Expense", code: "6100", type: "expense" },
+  {
+    id: "acc-meals",
+    name: "Meals and Entertainment",
+    code: null,
+    type: "expense",
+  },
+  { id: "acc-fees", name: "Bank Fees", code: null, type: "other_expense" },
+  {
+    id: "acc-cogs",
+    name: "Cost of Goods Sold",
+    code: null,
+    type: "cost_of_goods_sold",
+  },
+  { id: "acc-wallet", name: "Expendi Wallet", code: null, type: "bank" },
+  { id: "acc-petty", name: "Petty Cash", code: null, type: "cash" },
+  { id: "acc-sales", name: "Sales", code: null, type: "income" },
+  {
+    id: "acc-payable",
+    name: "Accounts Payable",
+    code: null,
+    type: "accounts_payable",
+  },
+];
+
+type FakeZohoOperation =
+  | "exchangeCode"
+  | "refreshAccessToken"
+  | "revokeToken"
+  | "listOrganizations"
+  | "listAccounts";
+
+/**
+ * In-memory Zoho: sign-in, tokens and Books reads. A code is good unless
+ * it's in `refusedCodes`; a revoked refresh token is refused the way Zoho
+ * refuses one (`INVALID_GRANT`), and an access token in `refusedAccessTokens`
+ * gets Books' 401.
+ */
+export function makeFakeZoho() {
+  let issued = 0;
+  const failures = new Map<FakeZohoOperation, ZohoErrorCode>();
+  const state = {
+    organizations: [...FAKE_ZOHO_ORGANIZATIONS],
+    accounts: [...FAKE_ZOHO_ACCOUNTS],
+    apiDomain: FAKE_ZOHO_API_DOMAIN,
+    refusedCodes: new Set<string>(),
+    revokedTokens: new Set<string>(),
+    refusedAccessTokens: new Set<string>(),
+    issuedRefreshTokens: [] as string[],
+    issuedAccessTokens: [] as string[],
+    exchanges: [] as { accountsServer: string; code: string }[],
+    refreshes: [] as { accountsServer: string; refreshToken: string }[],
+    failNext(operation: FakeZohoOperation, code: ZohoErrorCode) {
+      failures.set(operation, code);
+    },
+    reset() {
+      failures.clear();
+      state.organizations = [...FAKE_ZOHO_ORGANIZATIONS];
+      state.accounts = [...FAKE_ZOHO_ACCOUNTS];
+      state.apiDomain = FAKE_ZOHO_API_DOMAIN;
+      state.refusedCodes.clear();
+      state.revokedTokens.clear();
+      state.refusedAccessTokens.clear();
+      state.issuedRefreshTokens.length = 0;
+      state.issuedAccessTokens.length = 0;
+      state.exchanges.length = 0;
+      state.refreshes.length = 0;
+    },
+  };
+  const injected = (operation: FakeZohoOperation) => {
+    const code = failures.get(operation);
+    if (code === undefined) return null;
+    failures.delete(operation);
+    return Effect.fail(
+      new ZohoError({ code, message: `fake Zoho ${operation}: ${code}` }),
+    );
+  };
+  const newAccessToken = () => {
+    issued += 1;
+    const accessToken = `1000.access.${issued}.${randomBytes(4).toString("hex")}`;
+    state.issuedAccessTokens.push(accessToken);
+    return {
+      accessToken: Redacted.make(accessToken),
+      apiDomain: state.apiDomain,
+      expiresInSeconds: 3600,
+    };
+  };
+  const booksAccess = (
+    accessToken: Redacted.Redacted,
+  ): Effect.Effect<void, ZohoError> =>
+    state.refusedAccessTokens.has(Redacted.value(accessToken))
+      ? Effect.fail(
+          new ZohoError({
+            code: "UNAUTHORIZED",
+            message: "fake Zoho Books: HTTP 401",
+          }),
+        )
+      : Effect.void;
+
+  const layer = Layer.succeed(Zoho, {
+    configured: true,
+    authorizeUrl: (oauthState) =>
+      Effect.succeed(
+        `https://accounts.zoho.com/oauth/v2/auth?state=${encodeURIComponent(oauthState)}`,
+      ),
+    connectLinkUrl: (token) =>
+      Effect.succeed(
+        `${FAKE_ZOHO_CONNECT_ORIGIN}/integrations/zoho/connect?token=${token}`,
+      ),
+    exchangeCode: ({ accountsServer, code }) =>
+      injected("exchangeCode") ??
+      Effect.suspend(() => {
+        state.exchanges.push({ accountsServer, code });
+        if (state.refusedCodes.has(code)) {
+          return Effect.fail(
+            new ZohoError({
+              code: "INVALID_GRANT",
+              message: "fake Zoho token exchange: invalid_code",
+            }),
+          );
+        }
+        const refreshToken = `1000.refresh.${randomBytes(8).toString("hex")}`;
+        state.issuedRefreshTokens.push(refreshToken);
+        return Effect.succeed({
+          ...newAccessToken(),
+          refreshToken: Redacted.make(refreshToken),
+        });
+      }),
+    refreshAccessToken: ({ accountsServer, refreshToken }) =>
+      injected("refreshAccessToken") ??
+      Effect.suspend(() => {
+        const raw = Redacted.value(refreshToken);
+        state.refreshes.push({ accountsServer, refreshToken: raw });
+        return state.revokedTokens.has(raw)
+          ? Effect.fail(
+              new ZohoError({
+                code: "INVALID_GRANT",
+                message: "fake Zoho token refresh: invalid_code",
+              }),
+            )
+          : Effect.succeed(newAccessToken());
+      }),
+    revokeToken: ({ token }) =>
+      injected("revokeToken") ??
+      Effect.sync(() => {
+        state.revokedTokens.add(Redacted.value(token));
+      }),
+    listOrganizations: ({ accessToken }) =>
+      injected("listOrganizations") ??
+      booksAccess(accessToken).pipe(Effect.map(() => [...state.organizations])),
+    listAccounts: ({ accessToken }) =>
+      injected("listAccounts") ??
+      booksAccess(accessToken).pipe(Effect.map(() => [...state.accounts])),
   });
   return { layer, state };
 }

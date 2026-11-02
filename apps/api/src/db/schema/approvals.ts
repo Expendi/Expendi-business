@@ -49,6 +49,7 @@ export const webauthnPurpose = pgEnum("webauthn_purpose", [
   "register_passkey",
   "approve_payouts",
   "change_allowlist",
+  "change_payee",
 ]);
 
 /**

@@ -40,7 +40,7 @@ export function maxDebitFor(quotedUsdc: bigint): bigint {
 }
 
 interface PayoutRequestBase {
-  readonly subjectType: "claim" | "bill" | "float";
+  readonly subjectType: Payout["subjectType"];
   readonly subjectId: string;
   readonly payrollRunId?: string;
   /** Stable for this attempt, e.g. `claim:<id>:1`; a retry uses a new one. */
@@ -128,6 +128,18 @@ export function preparePayouts(input: {
     const runs = new Set(requests.map((request) => request.payrollRunId));
     if (runs.size > 1) {
       return yield* reject("mixed_batch", "A payroll run is paid on its own.");
+    }
+    if (
+      requests.some(
+        (request) =>
+          request.subjectType === "withdrawal" &&
+          (!isUsdcRequest(request) || request.payrollRunId !== undefined),
+      )
+    ) {
+      return yield* reject(
+        "invalid_recipient",
+        "A withdrawal is USDC to an allowlisted address.",
+      );
     }
 
     const [wallet] = yield* withScope(scope, (tx) =>

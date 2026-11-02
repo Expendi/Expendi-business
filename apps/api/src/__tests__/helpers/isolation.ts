@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import { expect } from "vitest";
 
+import type { MembershipRole } from "@expendi-business/shared";
+
 import type { App } from "../../app.js";
 import type { Database } from "../../db/client.js";
 import type { TestCompany } from "./db.js";
@@ -33,17 +35,23 @@ export async function createIsolationFixture(
  * Proves the database itself enforces isolation: a deliberately unfiltered
  * SELECT running as company A sees only A's rows, and with no company in
  * context it sees nothing. Seed rows for both companies before calling.
+ * Pass `role` for tables only that role can read, e.g. admin-only bills.
  */
 export async function expectTableIsolation(
   { db, companyA, companyB }: IsolationFixture,
   table: string,
   organizationColumn = "organization_id",
+  role?: MembershipRole,
 ): Promise<void> {
   const unfiltered = sql`SELECT ${sql.identifier(organizationColumn)}::text AS organization_id FROM ${sql.identifier(table)}`;
 
   const asCompanyA = await runInScope(
     db,
-    { organizationId: companyA.organizationId, userId: companyA.admin.id },
+    {
+      organizationId: companyA.organizationId,
+      userId: companyA.admin.id,
+      role,
+    },
     (tx) => tx.execute<{ organization_id: string }>(unfiltered),
   );
   const seen = new Set(asCompanyA.rows.map((row) => row.organization_id));

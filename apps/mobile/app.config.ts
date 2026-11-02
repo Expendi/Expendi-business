@@ -41,5 +41,23 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-secure-store",
     "expo-web-browser",
     ["expo-splash-screen", { backgroundColor: "#FFFFFF" }],
+    [
+      "expo-image-picker",
+      {
+        cameraPermission:
+          "Expendi Business uses the camera to photograph your receipts.",
+        photosPermission:
+          "Expendi Business uses your photos to attach receipt images and M-Pesa screenshots.",
+        microphonePermission: false,
+      },
+    ],
+    [
+      "expo-camera",
+      {
+        cameraPermission:
+          "Expendi Business uses the camera to photograph your receipts and scan eTIMS QR codes.",
+        recordAudioAndroid: false,
+      },
+    ],
   ],
 });

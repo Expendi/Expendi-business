@@ -25,6 +25,10 @@ import {
   makeFakePrivyWallets,
 } from "../helpers/fakes.js";
 import {
+  gatewayRefundReceipt,
+  LIVE_GATEWAY_ORDER_ID,
+} from "../helpers/gateway-receipts.js";
+import {
   claimRequest,
   createPayingCompany,
   ledgerBalance,
@@ -492,6 +496,60 @@ describe("refunds and retries", () => {
           .where(eq(walletTransactions.txHash, receipt.transactionHash)),
     );
     expect(rows).toEqual([{ type: "refund", payoutId: payout.id }]);
+  });
+
+  it("links a refund from Paycrest's Gateway to its payout once reconcile has its Gateway order ID", async () => {
+    // #given Paycrest logs the on-chain order while it holds our USDC
+    const payout = await payingPayout();
+    const fee = payout.feeUsdc ?? 0n;
+    const refund = (payout.amountToTransferUsdc ?? 0n) - fee;
+    setOrder(payout, {
+      status: "pending",
+      transactionLogs: [
+        { status: "crypto_deposited", gateway_id: "" },
+        { status: "order_created", gateway_id: LIVE_GATEWAY_ORDER_ID },
+      ],
+    });
+    await reconcile();
+    setOrder(payout, { status: "refunded" });
+    const receipt = gatewayRefundReceipt({
+      to: paying.wallet.address,
+      amount: refund,
+      orderId: LIVE_GATEWAY_ORDER_ID,
+    });
+    rpc.state.receipts.set(receipt.transactionHash, receipt);
+
+    // #when the Gateway's refund arrives and Paycrest reports it
+    await runtime.runPromise(
+      creditUsdcDeposits([receipt.transactionHash], {
+        type: "system",
+        id: "alchemy-webhook",
+      }),
+    );
+    await reconcile();
+
+    // #then
+    const rows = await runInScope(
+      db,
+      { organizationId: paying.company.organizationId },
+      (tx) =>
+        tx
+          .select({
+            type: walletTransactions.type,
+            payoutId: walletTransactions.payoutId,
+          })
+          .from(walletTransactions)
+          .where(eq(walletTransactions.txHash, receipt.transactionHash)),
+    );
+    expect({
+      rows,
+      status: (await reload(payout)).status,
+      balance: await ledgerBalance(db, paying.company),
+    }).toEqual({
+      rows: [{ type: "refund", payoutId: payout.id }],
+      status: "failed",
+      balance: 100n * USDC - fee,
+    });
   });
 
   it("retries a failed payout as a new payout with a new key, paid exactly once", async () => {

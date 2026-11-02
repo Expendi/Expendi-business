@@ -78,6 +78,10 @@ const expired = new Forbidden({
 const notVerified = new Forbidden({
   message: "Your passkey couldn't be verified. Confirm again.",
 });
+const alreadyEnrolled = new Forbidden({
+  message:
+    "You already have an approval passkey. Contact Expendi support to replace it.",
+});
 
 export function sha256Hex(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
@@ -124,14 +128,7 @@ export function startPasskeyEnrolment(
           .where(eq(approvalPasskeys.userId, userId))
           .limit(1),
       );
-      if (existing.length > 0) {
-        return yield* Effect.fail(
-          new Forbidden({
-            message:
-              "You already have an approval passkey. Contact Expendi support to replace it.",
-          }),
-        );
-      }
+      if (existing.length > 0) return yield* Effect.fail(alreadyEnrolled);
       const [user] = yield* query(() =>
         tx
           .select({ email: users.email })
@@ -177,6 +174,24 @@ export function finishPasskeyEnrolment(
     Effect.gen(function* () {
       const settings = yield* ApprovalSettings;
       const audit = yield* AuditLog;
+      // Two enrolments started side by side queue on the user's row, so the
+      // second finds the first passkey and is refused.
+      yield* query(() =>
+        tx
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.id, userId))
+          .for("update"),
+      );
+      const existing = yield* query(() =>
+        tx
+          .select({ id: approvalPasskeys.id })
+          .from(approvalPasskeys)
+          .where(eq(approvalPasskeys.userId, userId))
+          .limit(1),
+      );
+      if (existing.length > 0) return yield* Effect.fail(alreadyEnrolled);
+
       const [challenge] = yield* query(() =>
         tx
           .update(webauthnChallenges)
@@ -267,7 +282,8 @@ export interface ApprovalChallenge {
  * the intent itself, not just a random value mapped to it.
  */
 /** What a confirmation is for; enrolment has its own flow. */
-export type ConfirmationPurpose = "approve_payouts" | "change_allowlist";
+export type ConfirmationPurpose =
+  "approve_payouts" | "change_allowlist" | "change_payee";
 
 export function startApproval(input: {
   readonly organizationId: string;

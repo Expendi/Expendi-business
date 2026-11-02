@@ -1,5 +1,14 @@
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
-import { and, eq, gte, inArray, isNull, notInArray, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  ne,
+  notInArray,
+  sql,
+} from "drizzle-orm";
 import { Effect } from "effect";
 
 import type { DatabaseService } from "../../db/client.js";
@@ -91,6 +100,15 @@ function awaitingBatch(
     if (new Set(batch.map((payout) => payout.payrollRunId)).size > 1) {
       return yield* reject("mixed_batch", "A payroll run is paid on its own.");
     }
+    if (
+      batch.length > 1 &&
+      batch.some((payout) => payout.subjectType === "withdrawal")
+    ) {
+      return yield* reject(
+        "mixed_batch",
+        "A withdrawal is approved on its own.",
+      );
+    }
     return batch;
   });
 }
@@ -148,6 +166,12 @@ export function requestPayoutApproval(input: {
 /** Start of today in Nairobi, where "today" for the daily cap is (§7.4). */
 const startOfNairobiDay = sql`(date_trunc('day', now() AT TIME ZONE 'Africa/Nairobi') AT TIME ZONE 'Africa/Nairobi')`;
 
+/**
+ * The daily cap covers claims, floats and bills (§7.4). A withdrawal moves
+ * the company's own money to its own allowlisted address, so it neither
+ * needs room under the cap nor uses any; the per-transaction cap still
+ * bounds it.
+ */
 function checkCaps(
   tx: Transaction,
   organizationId: string,
@@ -155,6 +179,7 @@ function checkCaps(
   dailyCapKes: bigint,
 ): Effect.Effect<void, PayoutRejected | DatabaseError> {
   return Effect.gen(function* () {
+    if (batch.every((payout) => payout.subjectType === "withdrawal")) return;
     const batchKes = batch.reduce((sum, payout) => sum + payout.amountKes, 0n);
     const payrollRunId = batch[0]?.payrollRunId ?? null;
     const counted = notInArray(payouts.status, ["awaiting_approval", "failed"]);
@@ -197,6 +222,7 @@ function checkCaps(
           and(
             eq(payouts.organizationId, organizationId),
             isNull(payouts.payrollRunId),
+            ne(payouts.subjectType, "withdrawal"),
             counted,
             gte(payouts.approvedAt, startOfNairobiDay),
           ),

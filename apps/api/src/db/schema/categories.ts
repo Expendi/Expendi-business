@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { boolean, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  pgTable,
+  text,
+  unique,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 import { timestamps } from "./columns.js";
 import { organizations } from "./organizations.js";
@@ -29,6 +36,11 @@ export const categories = pgTable(
     uniqueIndex("categories_active_name_unique")
       .on(table.organizationId, sql`lower(${table.name})`)
       .where(sql`NOT ${table.archived}`),
+    // Target of expenses' composite foreign key.
+    unique("categories_id_organization_id_unique").on(
+      table.id,
+      table.organizationId,
+    ),
   ],
 );
 

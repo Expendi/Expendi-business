@@ -15,9 +15,10 @@ import { isPaused, lockPayout } from "./guards.js";
 import { FUNDING_STUCK_MS } from "./sync.js";
 
 /**
- * USDC payees (spec §6.19): a direct transfer from the company wallet to an
- * address on its allowlist (`provider = onchain`). No Paycrest: the payout
- * is exactly the approved USDC, and Expendi pays the gas.
+ * USDC payees (spec §6.19) and withdrawals (§6.9): a direct transfer from
+ * the company wallet to an address on its allowlist (`provider = onchain`).
+ * No Paycrest: the payout is exactly the approved USDC, and Expendi pays
+ * the gas.
  */
 
 const ENGINE = { type: "system", id: "payout-engine" } as const;
@@ -134,6 +135,8 @@ export function fundOnchainPayout(input: {
           address,
           amount: payout.quotedUsdc,
           walletId: payout.walletId,
+          ledgerType:
+            payout.subjectType === "withdrawal" ? "withdrawal" : "payout",
         } as const;
       }),
     );
@@ -196,7 +199,7 @@ export function fundOnchainPayout(input: {
           tx.insert(walletTransactions).values({
             organizationId,
             walletId: barrier.walletId,
-            type: "payout",
+            type: barrier.ledgerType,
             usdcAmount: -barrier.amount,
             txHash: sent.right.txHash,
             counterpartyAddress: barrier.address,

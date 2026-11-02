@@ -15,6 +15,12 @@ export interface AuthenticatedUser {
   readonly userId: string;
 }
 
+export interface AuthenticatedRequest extends AuthenticatedUser {
+  readonly privyUserId: string;
+  /** When the presented access token was minted (not the sign-in time). */
+  readonly tokenIssuedAt: Date;
+}
+
 const unauthorized = new Unauthorized({ message: "Unauthorized" });
 
 /** Emails are stored lowercased so invites and logins match regardless of case. */
@@ -117,18 +123,19 @@ function registerUser(
 export function authenticate(
   accessToken: string,
 ): Effect.Effect<
-  AuthenticatedUser,
+  AuthenticatedRequest,
   Unauthorized | Forbidden | PrivyApiError | DatabaseError,
   PrivyAuth | DatabaseService | AuditLog
 > {
   return Effect.gen(function* () {
     const privy = yield* PrivyAuth;
-    const { privyUserId } = yield* privy
+    const { privyUserId, issuedAt } = yield* privy
       .verifyAccessToken(accessToken)
       .pipe(Effect.mapError(() => unauthorized));
+    const session = { privyUserId, tokenIssuedAt: issuedAt };
 
     const existingUserId = yield* findUserByPrivyId(privyUserId);
-    if (existingUserId) return { userId: existingUserId };
+    if (existingUserId) return { userId: existingUserId, ...session };
 
     const rawEmail = yield* privy.getEmail(privyUserId);
     const email = rawEmail === null ? null : normalizeEmail(rawEmail);
@@ -139,6 +146,6 @@ export function authenticate(
     }
     const user = yield* registerUser(privyUserId, email);
     yield* activateInvitedMemberships(user.userId);
-    return user;
+    return { ...user, ...session };
   });
 }

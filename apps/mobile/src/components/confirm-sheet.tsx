@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -14,6 +14,10 @@ interface ConfirmSheetProps {
   error: string | null;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Shown under the message, e.g. a field for a reason. */
+  children?: ReactNode;
+  /** For when "Cancel" would be ambiguous, e.g. on "Cancel bill". */
+  dismissLabel?: string;
 }
 
 export function ConfirmSheet({
@@ -25,6 +29,8 @@ export function ConfirmSheet({
   error,
   onConfirm,
   onCancel,
+  children,
+  dismissLabel = "Cancel",
 }: ConfirmSheetProps): JSX.Element {
   return (
     <Modal
@@ -51,6 +57,7 @@ export function ConfirmSheet({
             {title}
           </Text>
           <Text className="text-base text-gray-600">{message}</Text>
+          {children}
           <ErrorMessage message={error} />
           <Button
             label={confirmLabel}
@@ -59,7 +66,7 @@ export function ConfirmSheet({
             onPress={onConfirm}
           />
           <Button
-            label="Cancel"
+            label={dismissLabel}
             variant="ghost"
             disabled={busy}
             onPress={onCancel}

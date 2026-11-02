@@ -73,6 +73,38 @@ const ORDER_REQUEST = {
   },
 } as const;
 
+/** Order c0bc8726 as Paycrest returned it once refunded, trimmed. */
+const REFUNDED_ORDER = {
+  id: "c0bc8726-30a8-4638-9f4f-4c5e8bc2ab02",
+  status: "refunded",
+  direction: "offramp",
+  amount: "0.777062",
+  rate: "128.69",
+  reference: "e7a3189b-93a4-4498-b8de-70cfc1470dab",
+  transactionFee: "0.02",
+  senderFee: "0",
+  source: {
+    type: "crypto",
+    currency: "USDC",
+    network: "base",
+    refundAddress: "0x69685f698f002120af8185722a3c364a265bd0c3",
+  },
+  destination: {
+    type: "fiat",
+    currency: "KES",
+    country: "KE",
+    recipient: {
+      institution: "SAFAKEPC",
+      accountIdentifier: "254700000000",
+      accountName: "Forced Failure",
+    },
+  },
+  txHash: "0x2cf51a57c72d3a1e9a8c4e4797e9aa97d573f23b8489a7c5d37adc44ae61240d",
+} as const;
+
+const GATEWAY_ID =
+  "0xe5f673d6acc1f3f317e121ad1c35835e3d5fc512ef1187ee757b75b0ef7835b0";
+
 describe("makePaycrest", () => {
   it("reads the sell rate for a USDC amount, authenticating with the API key", async () => {
     // #given
@@ -161,5 +193,53 @@ describe("makePaycrest", () => {
     const { paycrest } = client(() => json({}, 401));
     const failure = await failureOf(paycrest.getOrder("order-1"));
     expect(failure?.message).not.toContain(API_KEY);
+  });
+
+  it("reads an order's transaction logs, whatever their status", async () => {
+    // #given
+    const { paycrest } = client(() =>
+      json({
+        status: "success",
+        data: {
+          ...REFUNDED_ORDER,
+          transactionLogs: [
+            { status: "crypto_deposited", gateway_id: "", tx_hash: "0x01" },
+            { status: "order_created", gateway_id: GATEWAY_ID },
+            { status: "a_status_paycrest_adds_later", gateway_id: null },
+            { gateway_id: GATEWAY_ID, created_at: "2026-11-01T22:20:35Z" },
+          ],
+        },
+      }),
+    );
+
+    // #when
+    const order = await Effect.runPromise(paycrest.getOrder(REFUNDED_ORDER.id));
+
+    // #then
+    expect(order.transactionLogs?.map((log) => log.gateway_id)).toEqual([
+      "",
+      GATEWAY_ID,
+      null,
+      GATEWAY_ID,
+    ]);
+  });
+
+  it("still reads an order whose transaction logs it can't read", async () => {
+    // #given
+    const { paycrest } = client(() =>
+      json({
+        status: "success",
+        data: { ...REFUNDED_ORDER, transactionLogs: [{ gateway_id: 42 }] },
+      }),
+    );
+
+    // #when
+    const order = await Effect.runPromise(paycrest.getOrder(REFUNDED_ORDER.id));
+
+    // #then
+    expect({ status: order.status, logs: order.transactionLogs }).toEqual({
+      status: "refunded",
+      logs: null,
+    });
   });
 });

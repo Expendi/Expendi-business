@@ -71,10 +71,10 @@ export const walletTransactions = pgTable(
       "wallet_transactions_payout_has_payout",
       sql`${table.type} <> 'payout' OR ${table.payoutId} IS NOT NULL`,
     ),
-    // A payout is debited once.
+    // A payout or withdrawal is debited once.
     uniqueIndex("wallet_transactions_payout_debit_unique")
       .on(table.payoutId)
-      .where(sql`${table.type} = 'payout'`),
+      .where(sql`${table.type} IN ('payout', 'withdrawal')`),
     check(
       "wallet_transactions_deposit_is_onchain",
       sql`${table.type} <> 'deposit' OR (${table.txHash} IS NOT NULL AND ${table.logIndex} IS NOT NULL AND ${table.blockNumber} IS NOT NULL)`,

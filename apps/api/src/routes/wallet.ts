@@ -1,8 +1,10 @@
 import { eq, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { Hono } from "hono";
+import { z } from "zod";
 
 import type { WalletChain } from "@expendi-business/shared";
+import { WALLET_HISTORY_PAGE_SIZE } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../db/client.js";
 import type { DatabaseError } from "../errors.js";
@@ -10,11 +12,12 @@ import type { Tenant, TenantVariables } from "../middleware/tenant.js";
 import type { AppRuntime } from "../runtime.js";
 import { wallets, walletTransactions } from "../db/schema/index.js";
 import { query, withScope } from "../db/scope.js";
-import { NotFound } from "../errors.js";
+import { BadRequest, NotFound } from "../errors.js";
 import { runEffect } from "../http/respond.js";
 import { requireRole } from "../middleware/tenant.js";
 import { kesCentsFor } from "../services/paycrest/amounts.js";
 import { Paycrest } from "../services/paycrest/paycrest-client.js";
+import { walletHistory } from "../services/wallet/history.js";
 import {
   readyAddress,
   setUpCompanyWallet,
@@ -118,6 +121,26 @@ function getCompanyWallet(
   );
 }
 
+function parseQuery<T>(
+  schema: z.ZodType<T>,
+  raw: Record<string, string>,
+): Effect.Effect<T, BadRequest> {
+  const parsed = schema.safeParse(raw);
+  return parsed.success
+    ? Effect.succeed(parsed.data)
+    : Effect.fail(new BadRequest({ message: "Invalid history page request" }));
+}
+
+const historyQuerySchema = z.object({
+  before: z.uuid().optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(WALLET_HISTORY_PAGE_SIZE),
+});
+
 /**
  * Mounted at `/organizations/:organizationId/wallet`. Admins only (spec §4).
  * POST finishes a wallet whose setup stopped at sign-up; it's safe to repeat.
@@ -128,6 +151,18 @@ export function createWalletRoutes(
   return new Hono<{ Variables: TenantVariables }>()
     .use(requireRole("admin"))
     .get("/", (c) => runEffect(runtime, c, getCompanyWallet(c.get("tenant"))))
+    .get("/history", (c) => {
+      const organizationId = c.get("tenant").organizationId;
+      return runEffect(
+        runtime,
+        c,
+        parseQuery(historyQuerySchema, c.req.query()).pipe(
+          Effect.flatMap(({ before, limit }) =>
+            walletHistory({ organizationId, before: before ?? null, limit }),
+          ),
+        ),
+      );
+    })
     .post("/", (c) => {
       const tenant = c.get("tenant");
       return runEffect(

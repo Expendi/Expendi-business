@@ -14,9 +14,12 @@ import { authenticate } from "../services/auth/authenticate.js";
  */
 export interface AuthVariables extends RequestIdVariables {
   userId: string;
+  privyUserId: string;
+  /** When the access token was minted; see `requireRecentSignIn` for sign-in time. */
+  tokenIssuedAt: Date;
 }
 
-const BEARER = /^Bearer (\S+)$/;
+export const BEARER = /^Bearer (\S+)$/;
 
 const missingToken = new Unauthorized({ message: "Unauthorized" });
 
@@ -37,6 +40,8 @@ export function authMiddleware(runtime: AppRuntime) {
     if (Exit.isFailure(exit)) return failureResponse(c, exit.cause);
 
     c.set("userId", exit.value.userId);
+    c.set("privyUserId", exit.value.privyUserId);
+    c.set("tokenIssuedAt", exit.value.tokenIssuedAt);
     await next();
   });
 }

@@ -5,16 +5,22 @@ const REQUEST_TIMEOUT_MS = 20_000;
 /** Mirrors `clientErrorResponse` / `internalErrorResponse` in `apps/api/src/http/respond.ts`. */
 const errorBodySchema = z.object({
   success: z.literal(false),
-  error: z.object({ _tag: z.string(), message: z.string() }),
+  error: z.object({
+    _tag: z.string(),
+    message: z.string(),
+    details: z.unknown().optional(),
+  }),
 });
 
 export class ApiError extends Error {
   override readonly name = "ApiError";
 
+  /** Extra context some errors carry, e.g. the claim a duplicate matches. */
   constructor(
     readonly status: number,
     readonly tag: string,
     message: string,
+    readonly details: unknown = undefined,
   ) {
     super(message);
   }
@@ -23,9 +29,20 @@ export class ApiError extends Error {
 type ApiPath = `/${string}`;
 type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
+/** For a slow call the person can stop, e.g. reading a receipt. */
+export interface RequestOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
 export interface ApiClient {
   get<T>(path: ApiPath, schema: z.ZodType<T>): Promise<T>;
-  post<T>(path: ApiPath, body: unknown, schema: z.ZodType<T>): Promise<T>;
+  post<T>(
+    path: ApiPath,
+    body: unknown,
+    schema: z.ZodType<T>,
+    options?: RequestOptions,
+  ): Promise<T>;
   patch<T>(path: ApiPath, body: unknown, schema: z.ZodType<T>): Promise<T>;
   delete<T>(path: ApiPath, schema: z.ZodType<T>): Promise<T>;
 }
@@ -46,6 +63,7 @@ export function createApiClient({
     path: ApiPath,
     schema: z.ZodType<T>,
     body?: unknown,
+    options: RequestOptions = {},
   ): Promise<T> {
     const token = await getAccessToken();
     if (!token) {
@@ -62,11 +80,15 @@ export function createApiClient({
     };
     if (body !== undefined) headers["Content-Type"] = "application/json";
 
-    const response = await fetchWithTimeout(`${origin}${path}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    const response = await fetchWithTimeout(
+      `${origin}${path}`,
+      {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      },
+      options,
+    );
     const payload = await readJson(response);
 
     if (!response.ok) throw toApiError(response.status, payload);
@@ -86,7 +108,8 @@ export function createApiClient({
 
   return {
     get: (path, schema) => request("GET", path, schema),
-    post: (path, body, schema) => request("POST", path, schema, body),
+    post: (path, body, schema, options) =>
+      request("POST", path, schema, body, options),
     patch: (path, body, schema) => request("PATCH", path, schema, body),
     delete: (path, schema) => request("DELETE", path, schema),
   };
@@ -100,13 +123,18 @@ export function describeApiError(error: unknown): string {
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,
+  { signal, timeoutMs = REQUEST_TIMEOUT_MS }: RequestOptions,
 ): Promise<Response> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const abort = () => controller.abort();
+  const timeout = setTimeout(abort, timeoutMs);
+  if (signal?.aborted) abort();
+  signal?.addEventListener("abort", abort);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timeout);
+    signal?.removeEventListener("abort", abort);
   }
 }
 
@@ -128,6 +156,7 @@ function toApiError(status: number, payload: unknown): ApiError {
       status,
       parsed.data.error._tag,
       parsed.data.error.message,
+      parsed.data.error.details,
     );
   }
   return new ApiError(

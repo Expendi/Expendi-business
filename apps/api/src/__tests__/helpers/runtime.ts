@@ -12,9 +12,12 @@ import {
   makeFakeAlchemyWebhook,
   makeFakeBaseRpc,
   makeFakeEmailSender,
+  makeFakeFileStorage,
   makeFakeOtpProvider,
   makeFakePaycrest,
   makeFakePrivyWallets,
+  makeFakeReceiptExtractor,
+  makeFakeZoho,
   TestApprovalSettings,
   TestWalletSettings,
 } from "./fakes.js";
@@ -45,18 +48,37 @@ export function barrier(parties: number): () => Promise<void> {
 }
 
 /**
+ * When the fake says a Privy user's token was minted and when they last
+ * signed in, keyed by Privy user ID. Unset means just now.
+ */
+export const fakePrivyTokenIssuedAt = new Map<string, Date>();
+export const fakePrivyLastSignInAt = new Map<string, Date | null>();
+
+/**
  * Accepts `test-token:<privyUserId>`. Real token verification is covered
  * separately against locally signed JWTs.
  */
 export const FakePrivyAuth = Layer.succeed(PrivyAuth, {
-  verifyAccessToken: (accessToken) =>
-    accessToken.startsWith(TOKEN_PREFIX)
-      ? Effect.succeed({ privyUserId: accessToken.slice(TOKEN_PREFIX.length) })
-      : Effect.fail(new InvalidAccessToken({ cause: "not a test token" })),
+  verifyAccessToken: (accessToken) => {
+    if (!accessToken.startsWith(TOKEN_PREFIX)) {
+      return Effect.fail(new InvalidAccessToken({ cause: "not a test token" }));
+    }
+    const privyUserId = accessToken.slice(TOKEN_PREFIX.length);
+    return Effect.succeed({
+      privyUserId,
+      issuedAt: fakePrivyTokenIssuedAt.get(privyUserId) ?? new Date(),
+    });
+  },
   getEmail: (privyUserId) =>
     Effect.promise(
       () => fakePrivyEmailLookupGates.get(privyUserId)?.() ?? Promise.resolve(),
     ).pipe(Effect.as(fakePrivyEmails.get(privyUserId) ?? null)),
+  lastSignInAt: (privyUserId) =>
+    Effect.sync(() =>
+      fakePrivyLastSignInAt.has(privyUserId)
+        ? (fakePrivyLastSignInAt.get(privyUserId) ?? null)
+        : new Date(),
+    ),
 });
 
 /** The test environment with `env` laid over it; `undefined` unsets a variable. */
@@ -88,6 +110,9 @@ export function makeTestRuntime(
     approvalSettings: TestApprovalSettings,
     emailSender: makeFakeEmailSender().layer,
     otpProvider: makeFakeOtpProvider().layer,
+    fileStorage: makeFakeFileStorage().layer,
+    receiptExtractor: makeFakeReceiptExtractor().layer,
+    zoho: makeFakeZoho().layer,
     ...overrides,
   });
   return makeRuntime(

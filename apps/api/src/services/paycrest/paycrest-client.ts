@@ -43,6 +43,14 @@ export interface PaycrestRate {
   readonly providerIds: readonly string[];
 }
 
+/** Paycrest's TransactionLog; any status, including ones not seen yet. */
+const transactionLogSchema = z.looseObject({
+  status: z.string().optional(),
+  gateway_id: z.string().nullish(),
+  tx_hash: z.string().nullish(),
+  created_at: z.string().nullish(),
+});
+
 const orderSchema = z.looseObject({
   id: z.string().min(1),
   status: z.string(),
@@ -88,6 +96,16 @@ const orderSchema = z.looseObject({
   txHash: z.string().nullish(),
   /** The payout receipt, e.g. the M-Pesa code; null until paid. */
   paymentReference: z.string().nullish(),
+  /**
+   * The order's on-chain steps, each with the Gateway's order ID once it
+   * has one. Only used to link Gateway refunds, so logs this can't read are
+   * dropped (`null`) instead of failing the whole order.
+   */
+  transactionLogs: z
+    .array(transactionLogSchema)
+    .nullable()
+    .catch(null)
+    .optional(),
 });
 export type PaycrestOrder = z.infer<typeof orderSchema>;
 

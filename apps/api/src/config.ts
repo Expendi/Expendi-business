@@ -10,6 +10,11 @@ export interface AppConfig {
    * Optional: without it, invites are still created but not emailed.
    */
   readonly appInstallUrl: Option.Option<string>;
+  /**
+   * Origins of the internal admin app (spec §6.15), allowed to call
+   * `/internal/*` from the browser. Empty: no cross-origin access.
+   */
+  readonly adminAppOrigins: readonly string[];
 }
 
 export class ConfigService extends Context.Tag("ConfigService")<
@@ -26,6 +31,17 @@ export const ConfigLive: Layer.Layer<ConfigService, ConfigError.ConfigError> =
       const appInstallUrl = yield* Config.option(
         Config.url("APP_INSTALL_URL").pipe(Config.map((url) => url.href)),
       );
-      return { port, databaseUrl, appInstallUrl };
+      const adminAppOrigins = yield* Config.withDefault(
+        Config.string("ADMIN_APP_ORIGINS"),
+        "",
+      ).pipe(
+        Config.map((raw) =>
+          raw
+            .split(",")
+            .map((origin) => origin.trim())
+            .filter((origin) => origin.length > 0),
+        ),
+      );
+      return { port, databaseUrl, appInstallUrl, adminAppOrigins };
     }),
   );

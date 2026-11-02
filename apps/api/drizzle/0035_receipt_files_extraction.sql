@@ -1,0 +1,1 @@
+ALTER TABLE "receipt_files" ADD COLUMN "extraction" jsonb;

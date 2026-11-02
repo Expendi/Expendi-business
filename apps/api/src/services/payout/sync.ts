@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { Cause, Effect, Either, Exit } from "effect";
 
 import type { DatabaseService } from "../../db/client.js";
@@ -12,6 +12,7 @@ import type {
 import { payouts, walletTransactions } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { GATEWAY_ORDER_ID } from "../paycrest/gateway.js";
 import { Paycrest } from "../paycrest/paycrest-client.js";
 import { lockPayout } from "./guards.js";
 
@@ -147,6 +148,39 @@ function nextFor(
   }
 }
 
+/**
+ * The Gateway order ID to save from the order's transaction logs, if any.
+ * It is set once and never changed: logs that name two orders, or another
+ * order than the one saved, are reported and left for a person.
+ */
+function gatewayOrderIdToSave(
+  payout: Payout,
+  order: PaycrestOrder,
+): string | null {
+  const logged = [
+    ...new Set(
+      (order.transactionLogs ?? []).flatMap((log) =>
+        log.gateway_id ? [log.gateway_id.toLowerCase()] : [],
+      ),
+    ),
+  ];
+  const [gatewayOrderId] = logged;
+  if (!gatewayOrderId) return null;
+  if (logged.length > 1 || !GATEWAY_ORDER_ID.test(gatewayOrderId)) {
+    console.error(
+      `[paycrest-sync] order ${order.id} logs Gateway order IDs ${logged.join(", ")}; none saved on payout ${payout.id}`,
+    );
+    return null;
+  }
+  if (payout.gatewayOrderId === null) return gatewayOrderId;
+  if (payout.gatewayOrderId !== gatewayOrderId) {
+    console.error(
+      `[paycrest-sync] order ${order.id} logs Gateway order ID ${gatewayOrderId}, but payout ${payout.id} has ${payout.gatewayOrderId}; kept`,
+    );
+  }
+  return null;
+}
+
 function recordFundingDebit(
   tx: Transaction,
   payout: Payout,
@@ -181,7 +215,7 @@ export function syncPayoutOrder(input: {
   readonly organizationId: string;
   readonly payoutId: string;
   readonly order: PaycrestOrder;
-  readonly source: "webhook" | "reconcile";
+  readonly source: "webhook" | "reconcile" | "staff";
   readonly touch: boolean;
 }): Effect.Effect<SyncOutcome, DatabaseError, DatabaseService | AuditLog> {
   const { organizationId, payoutId, order } = input;
@@ -200,6 +234,18 @@ export function syncPayoutOrder(input: {
           `[paycrest-sync] order ${order.id} doesn't match payout ${payoutId}; ignored`,
         );
         return { changed: false } as const;
+      }
+
+      const gatewayOrderId = gatewayOrderIdToSave(payout, order);
+      if (gatewayOrderId) {
+        yield* query(() =>
+          tx
+            .update(payouts)
+            .set({ gatewayOrderId })
+            .where(
+              and(eq(payouts.id, payoutId), isNull(payouts.gatewayOrderId)),
+            ),
+        );
       }
 
       const now = Date.now();

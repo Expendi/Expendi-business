@@ -55,7 +55,22 @@ function RootNavigator(): JSX.Element {
           name="select-company"
           options={withHeader("Choose a company")}
         />
-        <Stack.Screen name="(admin)/wallet" options={withHeader("Wallet")} />
+        <Stack.Screen
+          name="(admin)/wallet/index"
+          options={withHeader("Wallet")}
+        />
+        <Stack.Screen
+          name="(admin)/wallet/history"
+          options={withHeader("Wallet history")}
+        />
+        <Stack.Screen
+          name="(admin)/wallet/withdraw"
+          options={withHeader("Withdraw")}
+        />
+        <Stack.Screen
+          name="(admin)/wallet/addresses"
+          options={withHeader("Withdrawal addresses")}
+        />
         <Stack.Screen name="(admin)/team/index" options={withHeader("Team")} />
         <Stack.Screen
           name="(admin)/team/invite"
@@ -64,6 +79,74 @@ function RootNavigator(): JSX.Element {
         <Stack.Screen
           name="(admin)/team/[membershipId]"
           options={withHeader("Team member")}
+        />
+        <Stack.Screen
+          name="(admin)/payees/index"
+          options={withHeader("Payees")}
+        />
+        <Stack.Screen
+          name="(admin)/payees/new"
+          options={withHeader("New payee")}
+        />
+        <Stack.Screen
+          name="(admin)/payees/[payeeId]/index"
+          options={withHeader("Payee")}
+        />
+        <Stack.Screen
+          name="(admin)/payees/[payeeId]/details"
+          options={withHeader("Payment details")}
+        />
+        <Stack.Screen
+          name="(admin)/bills/index"
+          options={withHeader("Bills")}
+        />
+        <Stack.Screen
+          name="(admin)/bills/new"
+          options={withHeader("New bill")}
+        />
+        <Stack.Screen
+          name="(admin)/bills/[billId]/index"
+          options={withHeader("Bill")}
+        />
+        <Stack.Screen
+          name="(admin)/bills/[billId]/edit"
+          options={withHeader("Edit bill")}
+        />
+        <Stack.Screen
+          name="(admin)/bills/[billId]/mark-paid"
+          options={withHeader("Mark paid")}
+        />
+        <Stack.Screen
+          name="(admin)/recurring/index"
+          options={withHeader("Recurring payments")}
+        />
+        <Stack.Screen
+          name="(admin)/recurring/new"
+          options={withHeader("New recurring payment")}
+        />
+        <Stack.Screen
+          name="(admin)/recurring/[itemId]/index"
+          options={withHeader("Recurring payment")}
+        />
+        <Stack.Screen
+          name="(admin)/recurring/[itemId]/edit"
+          options={withHeader("Edit recurring payment")}
+        />
+        <Stack.Screen
+          name="(employee)/claims/index"
+          options={withHeader("Claims")}
+        />
+        <Stack.Screen
+          name="(employee)/claims/new"
+          options={withHeader("New claim")}
+        />
+        <Stack.Screen
+          name="(employee)/claims/[claimId]/index"
+          options={withHeader("Claim")}
+        />
+        <Stack.Screen
+          name="(employee)/claims/[claimId]/edit"
+          options={withHeader("Edit claim")}
         />
       </Stack.Protected>
       <Stack.Protected guard={!isSignedIn}>

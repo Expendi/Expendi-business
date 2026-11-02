@@ -1,0 +1,3 @@
+ALTER TABLE "receipt_files" ALTER COLUMN "storage_key" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "receipt_files" ADD COLUMN "sms_text" text;--> statement-breakpoint
+ALTER TABLE "receipt_files" ADD CONSTRAINT "receipt_files_sms_inline" CHECK (("receipt_files"."kind" = 'sms_text') = ("receipt_files"."sms_text" IS NOT NULL) AND ("receipt_files"."sms_text" IS NULL) = ("receipt_files"."storage_key" IS NOT NULL));

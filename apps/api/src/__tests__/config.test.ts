@@ -86,6 +86,31 @@ describe("ConfigLive", () => {
     expect(Exit.isFailure(exit)).toBe(true);
   });
 
+  it("reads ADMIN_APP_ORIGINS as a comma-separated list", async () => {
+    // #given
+    const env = {
+      DATABASE_URL,
+      ADMIN_APP_ORIGINS: " https://ops.expendi.app, ,http://localhost:3001 ",
+    };
+
+    // #when
+    const config = await Effect.runPromise(loadConfig(env));
+
+    // #then
+    expect(config.adminAppOrigins).toEqual([
+      "https://ops.expendi.app",
+      "http://localhost:3001",
+    ]);
+  });
+
+  it("allows no admin app origins without ADMIN_APP_ORIGINS", async () => {
+    // #when
+    const config = await Effect.runPromise(loadConfig({ DATABASE_URL }));
+
+    // #then
+    expect(config.adminAppOrigins).toEqual([]);
+  });
+
   it.each(["not-a-number", "0", "70000", ""])(
     "fails to load when PORT is invalid (%j)",
     async (port) => {

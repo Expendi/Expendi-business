@@ -27,9 +27,14 @@ export class NotFound extends Data.TaggedError("NotFound")<{
   readonly status = 404;
 }
 
-/** The request clashes with the current state, e.g. inviting an existing member. */
+/**
+ * The request clashes with the current state, e.g. inviting an existing
+ * member. `details` goes to the client too, e.g. which claim a duplicate
+ * matches.
+ */
 export class Conflict extends Data.TaggedError("Conflict")<{
   readonly message: string;
+  readonly details?: Readonly<Record<string, unknown>>;
 }> {
   readonly status = 409;
 }
@@ -39,6 +44,13 @@ export class Gone extends Data.TaggedError("Gone")<{
   readonly message: string;
 }> {
   readonly status = 410;
+}
+
+/** The upload is bigger than the action accepts, e.g. a receipt too large to read. */
+export class PayloadTooLarge extends Data.TaggedError("PayloadTooLarge")<{
+  readonly message: string;
+}> {
+  readonly status = 413;
 }
 
 /** A limit was hit, e.g. asking for SMS codes too often. */
@@ -55,13 +67,27 @@ export class ServiceUnavailable extends Data.TaggedError("ServiceUnavailable")<{
   readonly status = 503;
 }
 
+/**
+ * The action needs a sign-in from the last few minutes, e.g. enrolling an
+ * approval passkey; the app asks the person to sign in again.
+ */
+export class RecentLoginRequired extends Data.TaggedError(
+  "RecentLoginRequired",
+)<{
+  readonly message: string;
+}> {
+  readonly status = 403;
+}
+
 export type ClientError =
   | BadRequest
   | Unauthorized
   | Forbidden
+  | RecentLoginRequired
   | NotFound
   | Conflict
   | Gone
+  | PayloadTooLarge
   | TooManyRequests
   | ServiceUnavailable;
 
@@ -70,9 +96,11 @@ export function isClientError(error: unknown): error is ClientError {
     error instanceof BadRequest ||
     error instanceof Unauthorized ||
     error instanceof Forbidden ||
+    error instanceof RecentLoginRequired ||
     error instanceof NotFound ||
     error instanceof Conflict ||
     error instanceof Gone ||
+    error instanceof PayloadTooLarge ||
     error instanceof TooManyRequests ||
     error instanceof ServiceUnavailable
   );

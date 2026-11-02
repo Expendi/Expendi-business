@@ -37,3 +37,18 @@ export function describeDbError(error: unknown): string {
 
   return parts.length > 0 ? parts.join(" <- ") : String(error);
 }
+
+/** The unique constraint or index a failed write hit, if that's why it failed. */
+export function violatedUniqueConstraint(error: unknown): string | null {
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const e = current as PgLikeError;
+    if (e.code === "23505" && typeof e.constraint === "string") {
+      return e.constraint;
+    }
+    current = e.cause;
+  }
+  return null;
+}

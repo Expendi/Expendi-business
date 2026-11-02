@@ -16,9 +16,15 @@ import { runEffect } from "../http/respond.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { signUpCompany } from "../services/organization/create-organization.js";
 import { createAllowlistRoutes } from "./allowlist.js";
+import { createBillRoutes } from "./bills.js";
 import { createCategoryRoutes } from "./categories.js";
+import { createClaimRoutes } from "./claims.js";
 import { createMemberRoutes } from "./members.js";
+import { createPayeeRoutes } from "./payees.js";
+import { createReceiptRoutes } from "./receipts.js";
+import { createRecurringItemRoutes } from "./recurring-items.js";
 import { createWalletRoutes } from "./wallet.js";
+import { createWithdrawalRoutes } from "./withdrawals.js";
 
 /**
  * Mounted at `/organizations`, for a signed-in user who may not belong to
@@ -77,8 +83,14 @@ export function createOrganizationRoutes(
         ),
       );
     })
+    .route("/bills", createBillRoutes(runtime))
     .route("/categories", createCategoryRoutes(runtime))
+    .route("/claims", createClaimRoutes(runtime))
     .route("/members", createMemberRoutes(runtime))
+    .route("/payees", createPayeeRoutes(runtime))
+    .route("/receipts", createReceiptRoutes(runtime))
+    .route("/recurring-items", createRecurringItemRoutes(runtime))
     .route("/wallet", createWalletRoutes(runtime))
-    .route("/withdrawal-addresses", createAllowlistRoutes(runtime));
+    .route("/withdrawal-addresses", createAllowlistRoutes(runtime))
+    .route("/withdrawals", createWithdrawalRoutes(runtime));
 }

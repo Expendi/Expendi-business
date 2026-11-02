@@ -56,8 +56,23 @@ export default function HomeScreen(): JSX.Element {
         onSwitch={() => router.push("/select-company")}
       />
 
+      <ListRow
+        title="Claims"
+        subtitle={
+          company.role === "admin"
+            ? "Everyone’s claims, and your own"
+            : "Submit a receipt and get paid back"
+        }
+        onPress={() => router.push("/claims")}
+      />
+
       {company.role === "admin" ? (
         <View className="gap-3">
+          <ListRow
+            title="Bills"
+            subtitle="What’s due, overdue and paid"
+            onPress={() => router.push("/bills")}
+          />
           <ListRow
             title="Wallet"
             subtitle="Deposit USDC and see the balance"
@@ -67,6 +82,11 @@ export default function HomeScreen(): JSX.Element {
             title="Team"
             subtitle="Invite people and manage roles"
             onPress={() => router.push("/team")}
+          />
+          <ListRow
+            title="Payees"
+            subtitle="Suppliers, subscriptions and others the company pays"
+            onPress={() => router.push("/payees")}
           />
         </View>
       ) : null}

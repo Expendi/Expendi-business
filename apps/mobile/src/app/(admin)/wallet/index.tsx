@@ -9,6 +9,7 @@ import type { Company } from "~/features/company/company-provider";
 import { Button } from "~/components/button";
 import { CopyButton } from "~/components/copy-button";
 import { ErrorMessage } from "~/components/error-message";
+import { ListRow } from "~/components/list-row";
 import { Screen } from "~/components/screen";
 import { RequireAdmin } from "~/features/company/require-admin";
 import {
@@ -137,6 +138,7 @@ function FinishSetup({
 }
 
 function WalletDetails({ wallet }: { wallet: ActiveWallet }): JSX.Element {
+  const router = useRouter();
   return (
     <View className="gap-8">
       <View className="gap-1">
@@ -151,6 +153,24 @@ function WalletDetails({ wallet }: { wallet: ActiveWallet }): JSX.Element {
             ? `≈ KES ${formatKesCents(wallet.kesEquivalent.kesCents)} at ${wallet.kesEquivalent.rate} KES per USDC`
             : "KES rate unavailable"}
         </Text>
+      </View>
+
+      <View className="gap-3">
+        <ListRow
+          title="History"
+          subtitle="Deposits, payments, refunds and withdrawals"
+          onPress={() => router.push("/wallet/history")}
+        />
+        <ListRow
+          title="Withdraw"
+          subtitle="Send USDC to an allowlisted address"
+          onPress={() => router.push("/wallet/withdraw")}
+        />
+        <ListRow
+          title="Withdrawal addresses"
+          subtitle="The only addresses you can withdraw to"
+          onPress={() => router.push("/wallet/addresses")}
+        />
       </View>
 
       <View className="gap-4">

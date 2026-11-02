@@ -45,6 +45,13 @@ export const auditLog = pgTable(
       table.occurredAt,
     ),
     index("audit_log_entity_idx").on(table.entityType, table.entityId),
+    // The staff viewer's keyset pages (newest first) and actor search.
+    index("audit_log_occurred_at_id_idx").on(table.occurredAt, table.id),
+    index("audit_log_actor_idx").on(
+      table.actorType,
+      table.actorId,
+      table.occurredAt,
+    ),
   ],
 );
 

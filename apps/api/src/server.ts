@@ -3,8 +3,10 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { ConfigService } from "./config.js";
 import { makeRuntime } from "./runtime.js";
+import { billStatusJob } from "./station/bill-status.js";
 import { confirmOnchainJob } from "./station/confirm-onchain.js";
 import { reconcilePaycrestJob } from "./station/reconcile-paycrest.js";
+import { recurringBillsJob } from "./station/recurring-bills.js";
 import { startStation } from "./station/scheduler.js";
 
 const runtime = makeRuntime();
@@ -21,6 +23,8 @@ const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
 const stopStation = startStation(runtime, [
   reconcilePaycrestJob,
   confirmOnchainJob,
+  billStatusJob,
+  recurringBillsJob,
 ]);
 
 function shutdown(signal: NodeJS.Signals): void {

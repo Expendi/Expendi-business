@@ -50,6 +50,11 @@ export const memberships = pgTable(
       table.organizationId,
       table.userId,
     ),
+    // Target of expenses' composite foreign key.
+    unique("memberships_id_organization_id_unique").on(
+      table.id,
+      table.organizationId,
+    ),
     index("memberships_user_id_idx").on(table.userId),
     uniqueIndex("memberships_organization_email_unique")
       .on(table.organizationId, table.email)
