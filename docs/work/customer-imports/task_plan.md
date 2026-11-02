@@ -9,7 +9,7 @@ Ship company-admin imports for paid expenses and unpaid bills, with previews, de
 - [x] Commit and push verified Shanga changes; verify Railway / Ops deployment.
 - [x] Extend importer authorization, tenant-scoped provenance/history and historical dates.
 - [x] Build customer upload/mapping/review/history flow and entry points.
-- [ ] Test authorization, isolation, replay safety and UI; migrate/build/deploy and verify.
+- [x] Test authorization, isolation, replay safety and UI; migrate/build/deploy and verify.
 
 ## Decisions
 
@@ -20,7 +20,7 @@ Ship company-admin imports for paid expenses and unpaid bills, with previews, de
 
 ## Status
 
-Shanga release `c45ea94` is live: Railway `0806fbd0-31d0-4fb7-9577-a8715bed6734` SUCCESS, Ops `dpl_HwhLHSWpFXR89fZuQyu9ELBZDvUG` Ready. Self-service implementation complete; running bounded API regression suite before builds/release.
+Complete. Self-service release `b508d61` is pushed to both repositories and deployed. Exact-commit builds/typechecks passed in a clean worktree with the committed lockfile. Railway deployment `1629e2dd-1924-459b-a242-b1f832ad416b` is SUCCESS; its logs confirm migration completion, API startup and disabled receipt reading. Read-only database verification confirmed migration 0066 (journal row 67), nullable staff/member provenance and all four member RLS policies. Customer web deployment `dpl_2ccyb3EyYkCXJBp2f636DYNk2BR1` and Ops deployment `dpl_33dfapxgho1LALDwx8MPZp81JHVt` are Ready. Public import pages and both Ops hostnames return 200; API health is OK, unauthenticated import requests return 401 and expected customer/Ops CORS headers are present. No client records were imported. See the runbook for test evidence and remaining live-client validation.
 
 ## Errors resolved
 

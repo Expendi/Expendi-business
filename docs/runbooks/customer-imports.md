@@ -38,4 +38,13 @@ Only company admins access upload, preview, commit and import history. Accountan
 - Shared/API/web/admin builds and API/web/admin typechecks passed; changed-file lint and formatting checked. Drizzle reports no schema drift after migration 0066.
 - Chromium smoke with mocked HTTP responses exercised real upload, mapping suggestions, preview without commit, confirmation gating, successful commit/history, row-error blocking, accountant restriction and bills entry. Desktop and 390px mobile layouts were inspected; mobile has no page-level horizontal overflow. This is separate from signed-in live-provider testing.
 
+## Deployed — 2026-11-02
+
+- Release `b508d61b8af491be33e4e09cef1420adac884c52` pushed to `Expendi/Expendi-business` and `DennohKim/expendi-admin`. A clean detached worktree passed all seven build/typecheck tasks using the committed lockfile.
+- Railway dev API: `1629e2dd-1924-459b-a242-b1f832ad416b` **SUCCESS**. Logs confirm `[migrate] migrations applied` and healthy startup. A read-only database query confirmed migration journal row 67 (`1793643203411`), both actor columns and all four member import policies.
+- Customer web: `dpl_2ccyb3EyYkCXJBp2f636DYNk2BR1` **Ready**, published from the clean release worktree to <https://business.expendi.app>. Paid expenses: <https://business.expendi.app/imports?kind=history>; unpaid bills: <https://business.expendi.app/imports?kind=bill>.
+- Ops: `dpl_33dfapxgho1LALDwx8MPZp81JHVt` **Ready** at <https://expendibiz-admin.expendi.app> and <https://expendi-admin.vercel.app>. The custom hostname now resolves and serves HTTP 200.
+- API health returns 200/OK. Import history, preview and commit require authentication (401 without a token). Customer CORS and both Ops origins pass on their respective API routes.
+- Anthropic receipt reading remains disabled, confirmed by deployment startup logs. Authenticated live-client imports and Zoho posting were not exercised by this release verification.
+
 No live client records were imported as part of development or deployment. The provided Shanga inputs still need a populated client export.
