@@ -9,6 +9,8 @@ import type {
   CompanySearchQuery,
   CompanySearchResponse,
   ControlsResponse,
+  ImportReport,
+  ImportRequest,
   OpsAlertsResponse,
   PauseConfirmed,
   PausePrepared,
@@ -35,6 +37,8 @@ import {
   companyDetailSchema,
   companySearchResponseSchema,
   controlsResponseSchema,
+  importReportSchema,
+  importResultSchema,
   opsAlertsResponseSchema,
   pauseConfirmedSchema,
   pausePreparedSchema,
@@ -55,6 +59,14 @@ import type { ApiClient } from "./api";
 
 /** The API's `/internal/*` routes (spec §6.15). */
 export interface InternalApi {
+  imports: {
+    preview: (companyId: string, input: ImportRequest) => Promise<ImportReport>;
+    commit: (
+      companyId: string,
+      input: ImportRequest,
+      previewToken: string,
+    ) => Promise<{ runId: string; imported: number; skipped: number }>;
+  };
   /** Audits this sign-in; called once per sign-in, before anything else. */
   startSession: () => Promise<StaffMeResponse>;
   getMe: () => Promise<StaffMeResponse>;
@@ -142,6 +154,20 @@ export function toQueryString(params: object): string {
 
 export function createInternalApi(client: ApiClient): InternalApi {
   return {
+    imports: {
+      preview: (id, input) =>
+        client.post(
+          `/internal/companies/${encodeURIComponent(id)}/imports/preview`,
+          input,
+          importReportSchema,
+        ),
+      commit: (id, input, previewToken) =>
+        client.post(
+          `/internal/companies/${encodeURIComponent(id)}/imports/commit`,
+          { ...input, previewToken },
+          importResultSchema,
+        ),
+    },
     startSession: () =>
       client.post("/internal/session", {}, staffMeResponseSchema),
     getMe: () => client.get("/internal/me", staffMeResponseSchema),

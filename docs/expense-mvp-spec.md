@@ -312,6 +312,8 @@ Payroll bills get no per-person due reminders; the run's "ready to review" notic
   - **Paid rows from the last 3 months** come in as `paid_outside` history, so the overview has a starting picture. They're read-only and get no eTIMS status. The duplicate check, the overview and the export use them.
 - Rows with no M-Pesa code still import; for those, the duplicate check falls back to the warning rule.
 - Staff map the spreadsheet's columns for each company. A dry run produces a report for the founder to review before anything is written, and re-running is safe (keyed on a hash of each source row).
+- **Import storage (T25 implementation, 2026-11-02):** previews use read-only transactions and are not persisted. Completed runs store the source filename/hash, column mapping, row report and counts in `import_runs`; `import_rows` links each source-row hash to its entity. The original CSV is not uploaded to R2. This keeps previews free of storage writes and retains the reviewed evidence without depending on upload-provider availability. Imported payee methods stay unset until a company admin supplies and confirms their details in the existing passkey flow.
+- **Opening floats:** immutable `imported_issued_kes` and `imported_spent_kes` preserve their opening totals without inventing a payout or wallet movement. Historical itemized purchases are imported separately as `paid_outside` history; they are included in the overview/export but do not reduce the opening balance again.
 - **Switch-over:** any day. The spreadsheet is frozen that day: no new rows.
 
 ### 6.13 Audit log

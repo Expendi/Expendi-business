@@ -10,7 +10,9 @@ Written 2026-11-02 after the fifth build wave and setup steps 1–4. This one do
 
 ## 1. Where things stand
 
-**Code:** every task from Phase 0 to Phase 3B is built except T25 (needs the pilot spreadsheet). T28 and T29 remain for Phase 4. T26 includes the completed admin alerts and system health pages. The fifth-wave API and web dashboard are deployed from `15978ee`; migrations 0055–0064 are applied on dev. Final automated verification and deployment smoke checks passed. Internal admin deployment and real-device/provider QA remain pending.
+**Code:** every task from Phase 0 to Phase 3B now has an implementation, including T25's staff CSV importer (included in this release; migration 0065; deployment unverified). T28 has production build/submission and OTA commands plus release checks; actual store distribution and T29's live pilot remain pending. The last verified API and web deployment is `15978ee`, with migrations through 0064 applied on dev. Internal admin deployment and real-device/provider QA remain pending. See `docs/runbooks/pilot-release.md` for the importer and launch procedure.
+
+**Local T25/T28 verification (2026-11-02):** API main 2,062 + serial 169 tests passed (main uses `--maxWorkers=2` on a dedicated local database); shared 181, mobile 272 and web 153 tests passed. API/admin/web builds and all workspace typechecks passed. API/mobile/shared lint/format and targeted import admin lint/format passed. Full-workspace lint/format reported errors in separately added admin/web dashboard/UI scaffolding; those concurrent changes were not modified by this task. Four release-config smoke checks and schema drift check passed. Client mapping review and live UI/device/provider QA are still required. Exact checks and the resolved flaky SMS fixture are recorded in `docs/work/remaining-tasks/task_plan.md`.
 
 **Release follow-up (2026-11-02):** session `10863844-27a6-4b66-9ede-badb816e01ad` ended at its usage limit after both final builders finished. The eTIMS rejected-claim filter, web/mobile outside total, and T26 staff pages are present. Dennis subsequently populated R2, Resend and Telnyx credentials plus `ALERT_EMAILS`, and removed `ANTHROPIC_API_KEY` to keep AI receipt reading disabled. A read-only Doppler check confirmed those states without printing values. Commit `15978ee` was pushed to both `origin main` and `web-deploy main`. Credential presence does not validate provider behaviour.
 
@@ -34,15 +36,15 @@ Final combined verification (2026-11-02, OpenCode; real providers and device QA 
 
 **QA:** almost none has run on real devices. Dennis deferred it on 2026-11-02. The only live money tests so far are Checkpoint B's Phase 2 gate, which passed (see the Phase 1 handoff).
 
-| Phase                       | Code                   | QA                                          |
-| --------------------------- | ---------------------- | ------------------------------------------- |
-| 0 Foundation                | ✅                     | ✅                                          |
-| 1 Money path                | ✅                     | Phase 2 gate ✅. **Phase 2B gate not run.** |
-| 2 Claim flow (T11–T21, T32) | ✅                     | **Checkpoint C not run**                    |
-| 2B Spending (T34–T43)       | ✅                     | **Checkpoint C2 not run**                   |
-| 3 Internal tools            | ✅ except T25          | **Checkpoint D not run**                    |
-| 3B Web dashboard (T45–T51)  | ✅                     | **Checkpoint D2 not run**                   |
-| 4 Pilot launch              | not started (T28, T29) | —                                           |
+| Phase                       | Code                                             | QA                                          |
+| --------------------------- | ------------------------------------------------ | ------------------------------------------- |
+| 0 Foundation                | ✅                                               | ✅                                          |
+| 1 Money path                | ✅                                               | Phase 2 gate ✅. **Phase 2B gate not run.** |
+| 2 Claim flow (T11–T21, T32) | ✅                                               | **Checkpoint C not run**                    |
+| 2B Spending (T34–T43)       | ✅                                               | **Checkpoint C2 not run**                   |
+| 3 Internal tools            | ✅ (T25 local)                                   | **Checkpoint D not run**                    |
+| 3B Web dashboard (T45–T51)  | ✅                                               | **Checkpoint D2 not run**                   |
+| 4 Pilot launch              | T28 config/tooling ready; T29 operations pending | Store installs, OTA and go-live unverified  |
 
 **Linear:**
 
@@ -51,7 +53,7 @@ Final combined verification (2026-11-02, OpenCode; real providers and device QA 
   - Phase 2B: EXP-305 to 314
   - Phase 3: EXP-280, 283, 290, 299, 301, 302, 315, and EXP-291 (T26: API and admin pages built; live QA pending)
   - Phase 3B: EXP-316 to 322
-- **Not started (Backlog):** EXP-297 (T25), EXP-284 (T28), EXP-300 (T29)
+- **Status updates owed:** EXP-297 (T25) now implemented locally; EXP-284 (T28) release tooling prepared; EXP-300 (T29) still needs live execution. Linear was not updated in this session.
 - **EXP-278 (T6)** should be Done; auto mode blocked Claude from setting it, twice. Dennis: set it by hand.
 
 ---
@@ -103,7 +105,7 @@ Do these in order; each says what it unblocks.
      - `ALERT_EMAILS` (T26): comma-separated; now set. Confirm delivery in Checkpoint D.
    - **Optional:** `EXPO_ACCESS_TOKEN` (only with enhanced push security).
 5. **Privy dashboard:**
-   - passkeys on
+   - **Passkeys enabled and verified through Privy's public app config (2026-11-02).** This fixed the disabled-provider setting found during sign-in setup troubleshooting; successful device setup still needs confirmation.
    - native client allowed IDs `app.expendi.business` (iOS and Android) and scheme `expendi-business`
    - web origins `https://business.expendi.app`, `http://localhost:3001`, `http://localhost:3002`
    - the Android key hash from step 3
@@ -196,7 +198,7 @@ Every item is now runnable (T42 and T43 are built). Full list in `phase-2b-spend
 
 ### 4.4 Checkpoint D: Phase 3
 
-Needs the Zoho setup (section 6) and `ALERT_EMAILS`. T25's item stays blocked until T25 is built. Full list in `phase-3-accountant-and-internal-tools.md`.
+Needs the Zoho setup (section 6) and `ALERT_EMAILS`. T25's local code must be deployed before client import QA. Full list in `phase-3-accountant-and-internal-tools.md`.
 
 - [ ] Admin app:
   - a non-staff email can't sign in
@@ -214,7 +216,7 @@ Needs the Zoho setup (section 6) and `ALERT_EMAILS`. T25's item stays blocked un
   - amounts, the self-approved column (filled only for claims) and receipt names match the zip
   - the admin app's export screen gives three 30-day links
   - the monthly email arrives from `expendi.app`, one per non-removed accountant (invited included), each with their own link; removing the accountant stops theirs
-- [ ] **Blocked until T25 is built:** import the pilot's sample spreadsheet: dry run → import → a re-run imports nothing → an imported M-Pesa code blocks a duplicate.
+- [ ] **T25 built locally; client QA pending:** import the pilot's sample spreadsheet: dry run → import → a re-run imports nothing → an imported M-Pesa code blocks a duplicate. The public UKEF fixture has passed this flow locally with test-only KES values.
 - [ ] Trigger each of the 6 alerts once (T26), with `ALERT_EMAILS` set:
   - one email each, and resolving clears it
   - the first run after deploy emails existing `needs_review` and recently failed payouts once
@@ -257,13 +259,13 @@ T28 (production builds, TestFlight and Play testing, a week before go-live), the
 
 ## 5. Code still to build
 
-Only these are left. T25 waits for an input from Dennis; T28 starts a week before go-live. T26's API and admin pages are built and await live QA.
+T25 is implemented locally using configurable CSV mapping and a public expense fixture. T28's configuration/tooling is prepared; its store/device acceptance criteria and T29 are operational work. T26's API and admin pages await live QA.
 
-| Wave  | Task                         | Linear  | Depends on                                                                         |
-| ----- | ---------------------------- | ------- | ---------------------------------------------------------------------------------- |
-| Ready | T25 Spreadsheet import       | EXP-297 | 18, 23, 34, 36, 38, 40 (all built). Needs the pilot's spreadsheet sample.          |
-| Last  | T28 Getting the app to staff | EXP-284 | none. Needs real Expendi Business artwork first (the dev build uses placeholders). |
-| Last  | T29 Pilot go-live            | EXP-300 | everything                                                                         |
+| Wave     | Task                         | Linear  | Depends on                                                                        |
+| -------- | ---------------------------- | ------- | --------------------------------------------------------------------------------- |
+| Local    | T25 Spreadsheet import       | EXP-297 | Deploy migration 0065/API/admin; verify the client's actual sample and mapping.   |
+| Prepared | T28 Getting the app to staff | EXP-284 | Real artwork, target platforms, production env/push credentials and store access. |
+| Last     | T29 Pilot go-live            | EXP-300 | everything                                                                        |
 
 **Small fixes still open, which can ride along with any wave:**
 

@@ -32,9 +32,20 @@
       "autoIncrement": true,
       "channel": "production",
       "environment": "production",
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
         "EXPO_NO_DEV_CLIENT": "true"
       }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal"
+      },
+      "ios": {}
     }
   }
 }

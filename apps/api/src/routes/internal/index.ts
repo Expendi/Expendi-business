@@ -10,6 +10,7 @@ import { createAuditRoutes } from "./audit.js";
 import { createStaffAuthRoutes } from "./auth.js";
 import { createCompanyRoutes } from "./companies.js";
 import { createControlRoutes } from "./controls.js";
+import { createImportRoutes } from "./imports.js";
 import { createPayoutRoutes } from "./payouts.js";
 
 /**
@@ -32,6 +33,7 @@ export function createInternalRoutes(
     .route("/", createAlertRoutes(runtime))
     .route("/companies/:organizationId/zoho", createZohoStaffRoutes(runtime))
     .route("/", createCompanyRoutes(runtime))
+    .route("/", createImportRoutes(runtime))
     .route("/", createPayoutRoutes(runtime))
     .route("/", createControlRoutes(runtime));
 }

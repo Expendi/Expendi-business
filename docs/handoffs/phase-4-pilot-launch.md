@@ -89,7 +89,7 @@ Work through the checklist below with the pilot company.
 
 ## Handoff notes
 
-- **Status:**
+- **Status (2026-11-02, local/uncommitted):** T28 now has explicit production AAB/Play internal-track submission config, production-environment OTA/build/submit commands, and an EAS post-install configuration check. Detailed store, signing-fingerprint, OTA and cutover steps are in `docs/runbooks/pilot-release.md`. Real artwork, selected pilot platforms, production env/push/store credentials, store installs and delivered OTA remain pending. T29 is not complete: no pilot go-live or 30-day observation has been performed.
 - **Go-live date, first claim ID, M-Pesa reference:**
 - **Platforms shipped (iOS / Android):**
 - **Known issues at launch:**

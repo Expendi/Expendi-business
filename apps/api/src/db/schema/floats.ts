@@ -52,6 +52,13 @@ export const floats = pgTable(
     /** Who holds it: an employee, or an admin keeping the office cash box. */
     membershipId: uuid("membership_id").notNull(),
     status: floatStatus("status").notNull().default("open"),
+    /** Immutable spreadsheet opening totals; never an Expendi payout. */
+    importedIssuedKes: bigint("imported_issued_kes", { mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
+    importedSpentKes: bigint("imported_spent_kes", { mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
     openedAt: timestamp("opened_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -60,6 +67,10 @@ export const floats = pgTable(
     ...timestamps,
   },
   (table) => [
+    check(
+      "floats_imported_totals",
+      sql`${table.importedIssuedKes} >= ${table.importedSpentKes} AND ${table.importedSpentKes} >= 0`,
+    ),
     foreignKey({
       name: "floats_membership_organization_fk",
       columns: [table.membershipId, table.organizationId],

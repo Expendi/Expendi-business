@@ -193,10 +193,11 @@ T23 → T27 → T24 → T22 → T25 → T30 → T31 → T44 → T26
   - T22, T25, T26, T31 and T44 wait for T19 and Phase 2B code.
 - **Status (2026-11-02, fifth wave):**
   - T22, T31, T44 and T26 code done. T26 includes the admin alerts and system health pages. See `next-session.md` for final release verification and deployment status.
-  - T25 (spreadsheet import) is the only Phase 3 task not built; it needs the pilot's spreadsheet sample.
+  - T25 (spreadsheet import) was subsequently built locally on 2026-11-02; see the implementation note below. The client's actual sample is still needed for live mapping QA.
   - Migrations 0057–0064 are applied on dev with release `15978ee`; API health and migration count were verified. The internal admin app is still local-only. A second session's drafts for T22, T31 and T44 (migrations 0057–0058) were taken over and reworked; `0057_salty_bloodstrike` was renamed `0057_accounting_sync_columns` before deployment.
   - Zoho and the monthly export haven't run against real services.
 - **Built:**
+  - **T25 spreadsheet import (2026-11-02, local/uncommitted):** company-specific staff page at `/companies/[id]/imports`; seven record types (payees, salaries, recurring items, unpaid bills/claims, opening floats, paid history); bounded UTF-8 CSV upload and column mapping; row-level previews with no DB writes; a signed 30-minute preview token; transactional import, audit and source-row deduplication. Migration 0065 adds `import_runs`, `import_rows`, RLS and immutable float opening totals. Payment methods remain unset for imported payees. The UKEF public fixture (25 payments, documented test-only GBP→KES conversion) exercises a complete local import/re-run. Client data and live UI QA remain pending. See `docs/runbooks/pilot-release.md`.
   - **T22 monthly export (EXP-299):**
     - **Routes:** `GET /organizations/:id/reports/exports` (list; admins and accountants), `POST …/reports/exports {month}` (generate; admins; returns three 30-day links; audited `report_export.generated`), `GET …/reports/exports/:exportId/files/:file` (15-minute R2 link) and the public `GET /downloads/reports/:token/:file` (redirects to a fresh R2 link; 410 expired, 404 invalid or revoked).
     - **Links:** the token is stored hashed. The 30-day link isn't a presigned R2 URL (SigV4 allows 7 days at most).

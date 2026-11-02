@@ -8,6 +8,13 @@
     "dev": "expo start --dev-client",
     "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path ../../.prettierignore --ignore-path .gitignore",
     "ios": "expo run:ios",
+    "eas-build-post-install": "node scripts/check-release.mjs",
+    "release:check": "node scripts/check-release.mjs --production",
+    "release:build:android": "pnpm dlx eas-cli build --profile production --platform android",
+    "release:build:ios": "pnpm dlx eas-cli build --profile production --platform ios",
+    "release:submit:android": "pnpm dlx eas-cli submit --profile production --platform android",
+    "release:submit:ios": "pnpm dlx eas-cli submit --profile production --platform ios",
+    "release:update": "pnpm dlx eas-cli update --channel production --environment production",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

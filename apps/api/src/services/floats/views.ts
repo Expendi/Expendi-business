@@ -161,6 +161,8 @@ const SPENDING_WITHOUT_RECEIPT = sql`NOT EXISTS (SELECT 1 FROM ${receiptFiles} W
 const FLOAT_SPENDING = sql`${expenses.floatId} = ${floats.id} AND ${expenses.kind} = 'float'`;
 
 const summaryColumns = {
+  importedIssuedKes: floats.importedIssuedKes,
+  importedSpentKes: floats.importedSpentKes,
   id: floats.id,
   status: floats.status,
   membershipId: floats.membershipId,
@@ -192,8 +194,8 @@ type SummaryRow = Awaited<ReturnType<typeof selectSummaries>>[number];
 
 function toSummary(tenant: Tenant, row: SummaryRow): FloatSummaryView {
   const totals: FloatTotals = {
-    issuedKes: BigInt(row.issuedKes),
-    spentKes: BigInt(row.spentKes),
+    issuedKes: BigInt(row.issuedKes) + row.importedIssuedKes,
+    spentKes: BigInt(row.spentKes) + row.importedSpentKes,
     returnedKes: BigInt(row.returnedKes),
     writtenOffKes: BigInt(row.writtenOffKes),
   };

@@ -57,6 +57,11 @@ export function CompanyView({ companyId }: { companyId: string }) {
         <span className="font-mono text-xs">{company.id}</span>
       </p>
       <p className="mt-2 flex flex-wrap gap-4 text-sm">
+        {canAct ? (
+          <Link href={`/companies/${company.id}/imports`} className={linkClass}>
+            Import spreadsheet
+          </Link>
+        ) : null}
         <Link href={`/payouts?companyId=${company.id}`} className={linkClass}>
           Payouts to review
         </Link>
