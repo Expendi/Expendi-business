@@ -1,6 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
+import Link from "next/link";
 import { useState } from "react";
 
 import type {
@@ -182,13 +183,18 @@ function CompanyBills({
           </p>
         </div>
         {canAct ? (
-          <button
-            type="button"
-            onClick={() => setPanel({ kind: "new" })}
-            className={primaryButton}
-          >
-            New bill
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/imports?kind=bill" className={secondaryButton}>
+              Import spreadsheet
+            </Link>
+            <button
+              type="button"
+              onClick={() => setPanel({ kind: "new" })}
+              className={primaryButton}
+            >
+              New bill
+            </button>
+          </div>
         ) : null}
       </div>
 

@@ -1,12 +1,35 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  companyImportRequestSchema,
   parseImportCsv,
   parseImportSpreadsheet,
   suggestImportMapping,
 } from "../imports.js";
 
 describe("CSV import", () => {
+  it("limits self-service imports to paid expenses and unpaid bills", () => {
+    const base = {
+      fileName: "example.csv",
+      csv: "name\nShop",
+      mapping: { name: "name" },
+    };
+    for (const kind of ["history", "bill"])
+      expect(
+        companyImportRequestSchema.safeParse({ ...base, kind }).success,
+      ).toBe(true);
+    for (const kind of ["claim", "salary", "recurring", "float", "payee"])
+      expect(
+        companyImportRequestSchema.safeParse({ ...base, kind }).success,
+      ).toBe(false);
+    expect(
+      companyImportRequestSchema.safeParse({
+        ...base,
+        kind: "history",
+        mapping: { email: "name" },
+      }).success,
+    ).toBe(false);
+  });
   it("reads BOM, CRLF, quoted commas/newlines and escaped quotes", () => {
     expect(
       parseImportCsv(

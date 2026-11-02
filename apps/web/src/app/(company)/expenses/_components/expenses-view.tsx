@@ -2,6 +2,7 @@
 
 import type { FormEvent, JSX } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
@@ -47,7 +48,7 @@ export function ExpensesView(): JSX.Element {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { company } = useDashboard();
+  const { company, canAct } = useDashboard();
   const filters = filtersFromParams(searchParams);
   const filtersKey = filtersToParams(filters).toString();
 
@@ -66,6 +67,14 @@ export function ExpensesView(): JSX.Element {
         Every claim, petty cash purchase and company spending record, with its
         receipt. Months follow the purchase date.
       </p>
+      {canAct ? (
+        <Link
+          href="/imports?kind=history"
+          className={`${secondaryButton} mt-4`}
+        >
+          Import spreadsheet
+        </Link>
+      ) : null}
 
       <ExpenseFilterForm
         key={`${company.organizationId}?${filtersKey}`}

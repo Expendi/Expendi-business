@@ -50,6 +50,7 @@ const fields: Record<ImportRequest["kind"], ImportField[]> = {
     "date",
     "description",
     "status",
+    "reference",
   ],
   claim: [
     "status",
@@ -92,6 +93,7 @@ const labels: Record<ImportField, string> = {
   issued: "Total float issued in KES",
   left: "Float balance left in KES",
   status: "Payment status (paid / unpaid)",
+  reference: "Bill reference (optional)",
 };
 
 function suggestedMapping(headers: string[], kind: ImportRequest["kind"]) {
@@ -239,8 +241,9 @@ export function ImportView({ companyId }: { companyId: string }) {
         </p>
         <p className="mt-2 max-w-2xl text-sm text-stone-600">
           Payment details remain unset until a company admin adds and confirms
-          them. History covers the last three months. Float totals are opening
-          balances; import individual historic purchases separately as history.
+          them. History supports earlier financial periods. Float totals are
+          opening balances; import individual historic purchases separately as
+          history.
         </p>
       </header>
       <fieldset disabled={busy} className="space-y-4">
@@ -283,8 +286,8 @@ export function ImportView({ companyId }: { companyId: string }) {
             <p>
               Receipt flags and Drive links do not upload receipts. Personnel
               expenses are not salary schedules, and past subscription payments
-              are not recurring instructions. Q2 2026 history falls outside the
-              current three-month import window.
+              are not recurring instructions. Review the dates and totals for
+              the financial period being imported.
             </p>
           </div>
         ) : null}

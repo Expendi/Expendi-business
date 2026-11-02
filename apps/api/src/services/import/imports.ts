@@ -8,7 +8,12 @@ import {
 import { and, eq, ne, sql } from "drizzle-orm";
 import { Effect } from "effect";
 
-import type { ImportReport, ImportRequest } from "@expendi-business/shared";
+import type {
+  CompanyImportRequest,
+  ImportReport,
+  ImportRequest,
+} from "@expendi-business/shared";
+import { BILL_REFERENCE_MAX_LENGTH } from "@expendi-business/shared";
 
 import type {
   NewBill,
@@ -18,6 +23,8 @@ import type {
   NewRecurringItem,
 } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
+import type { Tenant } from "../../middleware/tenant.js";
+import type { AuditActor } from "../audit/audit-log.js";
 import type { StaffMember } from "../staff/staff-auth.js";
 import {
   bills,
@@ -86,18 +93,6 @@ function validToken(token: string, digest: string): boolean {
     Buffer.from(sig, "hex"),
     Buffer.from(signature(digest, expires), "hex"),
   );
-}
-
-function oldestHistoryDate(today: string): string {
-  const d = new Date(`${today}T00:00:00Z`);
-  const day = d.getUTCDate();
-  d.setUTCDate(1);
-  d.setUTCMonth(d.getUTCMonth() - 3);
-  const last = new Date(
-    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0),
-  ).getUTCDate();
-  d.setUTCDate(Math.min(day, last));
-  return d.toISOString().slice(0, 10);
 }
 
 function loadContext(tx: Transaction, organizationId: string) {
@@ -190,6 +185,7 @@ function actionFor(
   ctx: Context,
   organizationId: string,
   today: string,
+  tenant?: Tenant,
 ): Action {
   const person = () => {
     const email = required(row, "email").toLowerCase();
@@ -285,16 +281,30 @@ function actionFor(
       table: "expense",
       data: {
         organizationId,
-        membershipId: person().id,
+        membershipId:
+          tenant && input.kind === "history"
+            ? tenant.membershipId
+            : person().id,
         categoryId,
-        kind: "claim",
+        kind: tenant && input.kind === "history" ? "company" : "claim",
         overviewHeading: heading(),
         merchant: name(),
         amountKes,
         spentOn: date,
         description: optionalValue(row.description) ?? null,
         source: "import",
-        status: input.kind === "claim" ? "submitted" : "paid_outside",
+        status:
+          input.kind === "claim"
+            ? "submitted"
+            : tenant
+              ? "recorded"
+              : "paid_outside",
+        ...(tenant
+          ? {
+              noReceiptReason:
+                "Imported from spreadsheet; receipt not attached.",
+            }
+          : {}),
         mpesaCode,
         etimsStatus: "none",
         paidAt:
@@ -304,6 +314,15 @@ function actionFor(
   }
   const target = payee();
   if (input.kind === "bill") {
+    if (target.method === "usdc")
+      throw new Error(
+        "This payee is paid in USDC. Create its USD bill manually; spreadsheet imports accept KES only.",
+      );
+    const reference = optionalValue(row.reference);
+    if (reference && reference.length > BILL_REFERENCE_MAX_LENGTH)
+      throw new Error(
+        `Keep the bill reference to ${BILL_REFERENCE_MAX_LENGTH} characters or fewer.`,
+      );
     const h = heading();
     if (h === "petty_cash" || h === "salaries")
       throw new Error(
@@ -320,6 +339,7 @@ function actionFor(
         dueOn: date,
         status: date < today ? "overdue" : date === today ? "due" : "upcoming",
         notes: optionalValue(row.description) ?? null,
+        ...(reference ? { reference } : {}),
       },
     };
   }
@@ -373,6 +393,7 @@ function plan(
   raw: Record<string, string>[],
   ctx: Context,
   organizationId: string,
+  tenant?: Tenant,
 ): PlannedRow[] {
   const today = nairobiToday();
   const seen = new Set(ctx.existing.map((r) => r.rowHash));
@@ -402,12 +423,21 @@ function plan(
       };
     try {
       validateImportStatus(input, values);
-      const action = actionFor(input, values, ctx, organizationId, today);
+      const action = actionFor(
+        input,
+        values,
+        ctx,
+        organizationId,
+        today,
+        tenant,
+      );
       // Date-derived bill status is not source identity and changes overnight.
       const identity =
         action.table === "bill"
           ? { ...action.data, status: undefined }
-          : action.data;
+          : tenant && action.table === "expense"
+            ? { ...action.data, membershipId: undefined }
+            : action.data;
       const rowHash = hash([input.kind, values.$source, identity]);
       if (seen.has(rowHash))
         return {
@@ -420,20 +450,6 @@ function plan(
           },
         };
       seen.add(rowHash);
-      if (
-        input.kind === "history" &&
-        action.table === "expense" &&
-        action.data.spentOn < oldestHistoryDate(today)
-      )
-        return {
-          action,
-          hash: rowHash,
-          report: {
-            ...report,
-            status: "skipped",
-            message: "Older than the last three months.",
-          },
-        };
       if (action.table === "expense" && action.data.mpesaCode) {
         if (codes.has(action.data.mpesaCode))
           throw new Error(
@@ -514,11 +530,56 @@ export function spreadsheetImport(
   input: ImportRequest,
   previewToken?: string,
 ) {
+  return runImport(
+    { type: "staff", staff },
+    organizationId,
+    input,
+    previewToken,
+  );
+}
+
+export function companySpreadsheetImport(
+  tenant: Tenant,
+  input: CompanyImportRequest,
+  previewToken?: string,
+) {
+  return runImport(
+    { type: "member", tenant },
+    tenant.organizationId,
+    input,
+    previewToken,
+  );
+}
+
+type ImportActor =
+  { type: "staff"; staff: StaffMember } | { type: "member"; tenant: Tenant };
+
+function runImport(
+  caller: ImportActor,
+  organizationId: string,
+  input: ImportRequest,
+  previewToken?: string,
+) {
   return Effect.gen(function* () {
-    if (staff.role !== "ops_admin")
+    const tenant = caller.type === "member" ? caller.tenant : undefined;
+    const staff = caller.type === "staff" ? caller.staff : undefined;
+    if (staff ? staff.role !== "ops_admin" : tenant?.role !== "admin")
       return yield* Effect.fail(
-        new Forbidden({ message: "Only ops admins can import." }),
+        new Forbidden({
+          message: "Only company admins or ops admins can import.",
+        }),
       );
+    if (tenant && !["history", "bill"].includes(input.kind))
+      return yield* Effect.fail(
+        new Forbidden({
+          message:
+            "Company imports support paid expenses and unpaid bills only.",
+        }),
+      );
+    const actor: AuditActor =
+      caller.type === "staff"
+        ? { type: "staff", id: caller.staff.staffUserId }
+        : { type: "user", id: caller.tenant.userId };
     const raw = yield* Effect.try({
       try: () => mappedRows(input),
       catch: (e) =>
@@ -527,7 +588,7 @@ export function spreadsheetImport(
         }),
     });
     const audit = yield* AuditLog;
-    return yield* withScope({ organizationId, role: "admin" }, (tx) =>
+    return yield* withScope(tenant ?? { organizationId, role: "admin" }, (tx) =>
       Effect.gen(function* () {
         if (!previewToken)
           yield* query(() => tx.execute(sql`SET TRANSACTION READ ONLY`));
@@ -539,21 +600,24 @@ export function spreadsheetImport(
             ),
           );
         }
-        yield* query(() =>
-          tx.execute(
-            sql`SELECT set_config('app.import_staff_id', ${staff.staffUserId}, true)`,
-          ),
-        );
+        if (staff)
+          yield* query(() =>
+            tx.execute(
+              sql`SELECT set_config('app.import_staff_id', ${staff.staffUserId}, true)`,
+            ),
+          );
         const ctx = yield* loadContext(tx, organizationId);
-        const planned = plan(input, raw, ctx, organizationId);
+        const planned = plan(input, raw, ctx, organizationId, tenant);
         const rows = planned.map((r) => r.report);
         const errors = rows.filter((r) => r.status === "error").length;
         const ready = rows.filter((r) => r.status === "ready").length;
         const skipped = rows.length - errors - ready;
         const digest = hash([
-          staff.staffUserId,
+          actor,
           organizationId,
           input.kind,
+          input.layout ?? "standard",
+          input.fileName,
           input.csv,
           Object.entries(input.mapping).sort(),
           planned.map((r) => r.hash),
@@ -566,6 +630,18 @@ export function spreadsheetImport(
               ready,
               skipped,
               errors,
+              totalKes: planned
+                .reduce(
+                  (sum, r) =>
+                    sum +
+                    (r.report.status === "ready" &&
+                    r.action &&
+                    "amountKes" in r.action.data
+                      ? (r.action.data.amountKes ?? 0n)
+                      : 0n),
+                  0n,
+                )
+                .toString(),
               previewToken: errors ? null : issueToken(digest),
             },
           };
@@ -581,7 +657,8 @@ export function spreadsheetImport(
           tx.insert(importRuns).values({
             id: runId,
             organizationId,
-            staffUserId: staff.staffUserId,
+            staffUserId: staff?.staffUserId ?? null,
+            membershipId: tenant?.membershipId ?? null,
             fileName: input.fileName,
             fileHash: hash(input.csv),
             kind: input.kind,
@@ -605,7 +682,7 @@ export function spreadsheetImport(
             }),
           );
           yield* audit.record(tx, {
-            actor: { type: "staff", id: staff.staffUserId },
+            actor,
             organizationId,
             action: `${row.action.table}.imported`,
             entity: { type: row.action.table, id },
@@ -613,7 +690,7 @@ export function spreadsheetImport(
           });
         }
         yield* audit.record(tx, {
-          actor: { type: "staff", id: staff.staffUserId },
+          actor,
           organizationId,
           action: "import.completed",
           entity: { type: "import_run", id: runId },

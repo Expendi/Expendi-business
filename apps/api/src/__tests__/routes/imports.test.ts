@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import pg from "pg";
 import {
   afterAll,
@@ -15,6 +15,8 @@ import {
 import type { ImportRequest } from "@expendi-business/shared";
 import {
   floatsResponseSchema,
+  importHistoryDetailSchema,
+  importHistoryPageSchema,
   importReportSchema,
   importResultSchema,
   parseImportCsv,
@@ -28,6 +30,8 @@ import type { TestStaff } from "../helpers/staff.js";
 import { createApp } from "../../app.js";
 import { DatabaseService } from "../../db/client.js";
 import {
+  accountingConnections,
+  accountingSyncs,
   bills,
   expenses,
   importRows,
@@ -46,7 +50,7 @@ import {
   pasteSms,
   sendJson,
 } from "../helpers/claims.js";
-import { createCompany } from "../helpers/db.js";
+import { addMember, createCompany, createUser } from "../helpers/db.js";
 import { makeTestRuntime } from "../helpers/runtime.js";
 import { createStaff } from "../helpers/staff.js";
 import { TEST_DATABASE_URL_MIGRATE } from "../setup/test-database.js";
@@ -453,10 +457,10 @@ describe("spreadsheet import", () => {
     expect(res.status, await res.clone().text()).toBe(409);
   });
 
-  it("skips old history, rejects future expenses, and deduplicates identical rows", async () => {
+  it("supports older financial periods, rejects future expenses, and deduplicates identical rows", async () => {
     const old = expenseInput();
     old.csv = old.csv.replace(today, "2020-01-01");
-    expect((await preview(old)).skipped).toBe(1);
+    expect((await preview(old)).ready).toBe(1);
     const future = expenseInput();
     future.csv = future.csv.replace(today, "2099-01-01");
     expect((await preview(future)).errors).toBe(1);
@@ -504,5 +508,348 @@ describe("spreadsheet import", () => {
       },
     );
     expect(elsewhere).toEqual([]);
+  });
+});
+
+describe("company-admin imports", () => {
+  const input = () =>
+    request("history", {
+      name: "Company supplier",
+      category: "Office",
+      amount: "1250.50",
+      date: "2026-06-15",
+      status: "paid",
+    });
+  const customerCall = (
+    body: ImportRequest,
+    token?: string,
+    actor = company.admin,
+    org = company.organizationId,
+  ) =>
+    sendJson(
+      app,
+      `/organizations/${org}/imports/${token ? "commit" : "preview"}`,
+      actor,
+      {
+        method: "POST",
+        body: { ...body, ...(token ? { previewToken: token } : {}) },
+      },
+    );
+  async function customerPreview(body: ImportRequest, actor = company.admin) {
+    const res = await customerCall(body, undefined, actor);
+    expect(res.status, await res.clone().text()).toBe(200);
+    return importReportSchema.parse(
+      ((await res.json()) as { data: unknown }).data,
+    );
+  }
+  async function customerCommit(body: ImportRequest, actor = company.admin) {
+    const report = await customerPreview(body, actor);
+    expect(report.errors).toBe(0);
+    const res = await customerCall(
+      body,
+      report.previewToken ?? "invalid",
+      actor,
+    );
+    expect(res.status, await res.clone().text()).toBe(200);
+    return importResultSchema.parse(
+      ((await res.json()) as { data: unknown }).data,
+    );
+  }
+  it("imports older paid expenses as company spending with member provenance, exact total and no payout", async () => {
+    // Even pending Zoho connections would queue newly recorded spending.
+    await runInScope(
+      db,
+      { organizationId: company.organizationId, role: "admin" },
+      (tx) =>
+        tx
+          .insert(accountingConnections)
+          .values({ organizationId: company.organizationId }),
+    );
+    const body = input();
+    const before = await readState();
+    const report = await customerPreview(body);
+    expect(report.totalKes).toBe("125050");
+    expect(await readState()).toEqual(before);
+    const result = await customerCommit(body);
+    const state = await readState();
+    expect(state.expenses[0]).toMatchObject({
+      kind: "company",
+      status: "recorded",
+      source: "import",
+      spentOn: "2026-06-15",
+      membershipId: company.adminMembershipId,
+      amountKes: 125050n,
+    });
+    expect(state.payouts).toHaveLength(0);
+    expect(state.runs[0]).toMatchObject({
+      staffUserId: null,
+      membershipId: company.adminMembershipId,
+    });
+    const syncs = await runInScope(
+      db,
+      { organizationId: company.organizationId, role: "admin" },
+      (tx) => tx.select().from(accountingSyncs),
+    );
+    expect(syncs).toHaveLength(0);
+    const audit = await owner.query(
+      "SELECT actor_type, actor_id FROM audit_log WHERE entity_id=$1 AND action='import.completed'",
+      [result.runId],
+    );
+    expect(audit.rows).toEqual([
+      { actor_type: "user", actor_id: company.admin.id },
+    ]);
+    const list = await sendJson(
+      app,
+      `/organizations/${company.organizationId}/imports`,
+      company.admin,
+    );
+    expect(list.status).toBe(200);
+    const history = importHistoryPageSchema.parse(
+      ((await list.json()) as { data: unknown }).data,
+    );
+    expect(history.imports[0]).toMatchObject({
+      id: result.runId,
+      importedBy: company.admin.email,
+      rowsImported: 1,
+    });
+    const detail = await sendJson(
+      app,
+      `/organizations/${company.organizationId}/imports/${result.runId}`,
+      company.admin,
+    );
+    expect(
+      importHistoryDetailSchema.parse(
+        ((await detail.json()) as { data: unknown }).data,
+      ).rows[0]?.status,
+    ).toBe("ready");
+    const expensesList = await sendJson(
+      app,
+      `/organizations/${company.organizationId}/expenses?month=2026-06`,
+      company.admin,
+    );
+    expect(expensesList.status).toBe(200);
+    expect(await expensesList.text()).toContain("Company supplier");
+  });
+  it("keeps preview tokens actor/company/content bound and deduplicates across admins and concurrent retries", async () => {
+    const body = input();
+    const report = await customerPreview(body);
+    const token = report.previewToken ?? "invalid";
+    const other = await createUser(db);
+    await addMember(db, company, other, { role: "admin" });
+    expect((await customerCall(body, token, other)).status).toBe(409);
+    expect(
+      (await customerCall({ ...body, fileName: "changed.csv" }, token)).status,
+    ).toBe(409);
+    expect(
+      (
+        await customerCall(
+          { ...body, csv: body.csv.replace("1250.50", "2000") },
+          token,
+        )
+      ).status,
+    ).toBe(409);
+    const results = await Promise.all([
+      customerCall(body, token),
+      customerCall(body, token),
+    ]);
+    expect(results.map((r) => r.status)).toEqual([200, 200]);
+    expect(
+      (await customerCommit({ ...body, fileName: "renamed.csv" }, other))
+        .imported,
+    ).toBe(0);
+    expect((await readState()).expenses).toHaveLength(1);
+  });
+  it("imports unpaid bills without paying, and blocks invalid or paid bill rows atomically", async () => {
+    await commit(request("payee", { name: "Supplier" }));
+    const bill = request("bill", {
+      payee: "Supplier",
+      category: "Office",
+      amount: "3000",
+      date: "2026-06-15",
+      status: "unpaid",
+      reference: "INV-TEST-001",
+    });
+    expect((await customerCommit(bill)).imported).toBe(1);
+    const state = await readState();
+    expect(state.bills[0]).toMatchObject({
+      amountKes: 300000n,
+      status: "overdue",
+      reference: "INV-TEST-001",
+    });
+    expect(state.expenses).toHaveLength(0);
+    expect(state.payouts).toHaveLength(0);
+    const bad = { ...bill, csv: bill.csv.replace('"unpaid"', '"paid"') };
+    expect((await customerPreview(bad)).errors).toBe(1);
+    expect((await customerCall(bad, "forged")).status).toBe(409);
+    const mixed = input();
+    mixed.csv += '\n"Unknown","Missing category","50","2026-06-15","paid"';
+    const report = await customerPreview(mixed);
+    expect(report.ready).toBe(1);
+    expect(report.errors).toBe(1);
+    expect(report.previewToken).toBeNull();
+    expect((await customerCall(mixed, "forged")).status).toBe(409);
+    expect((await readState()).expenses).toHaveLength(0);
+  });
+  it("rejects other roles, unsupported kinds, removed members, cross-company reads and writes", async () => {
+    const body = input();
+    const result = await customerCommit(body);
+    const savedRun = (await readState()).runs[0];
+    if (!savedRun) throw new Error("Expected import provenance");
+    await expect(
+      runInScope(
+        db,
+        {
+          organizationId: company.organizationId,
+          userId: company.admin.id,
+          role: "admin",
+        },
+        (tx) =>
+          tx.insert(importRuns).values({
+            ...savedRun,
+            id: randomUUID(),
+            staffUserId: staff.staffUserId,
+            membershipId: null,
+          }),
+      ),
+    ).rejects.toThrow();
+    for (const role of ["employee", "accountant"] as const) {
+      const user = await createUser(db);
+      await addMember(db, company, user, { role });
+      expect((await customerCall(body, undefined, user)).status).toBe(403);
+      expect((await customerCall(body, "forged", user)).status).toBe(403);
+      expect(
+        (
+          await sendJson(
+            app,
+            `/organizations/${company.organizationId}/imports`,
+            user,
+          )
+        ).status,
+      ).toBe(403);
+      const direct = await runInScope(
+        db,
+        { organizationId: company.organizationId, userId: user.id, role },
+        (tx) => tx.select().from(importRuns),
+      );
+      expect(direct).toEqual([]);
+    }
+    const removed = await createUser(db);
+    await addMember(db, company, removed, { role: "admin", status: "removed" });
+    expect((await customerCall(body, undefined, removed)).status).toBe(403);
+    for (const kind of [
+      "payee",
+      "salary",
+      "recurring",
+      "claim",
+      "float",
+    ] as const)
+      expect((await customerCall({ ...body, kind })).status).toBe(400);
+    const other = await createCompany(db);
+    expect(
+      (await customerCall(body, undefined, company.admin, other.organizationId))
+        .status,
+    ).toBe(403);
+    expect(
+      (
+        await sendJson(
+          app,
+          `/organizations/${other.organizationId}/imports/${result.runId}`,
+          other.admin,
+        )
+      ).status,
+    ).toBe(404);
+    const list = await sendJson(
+      app,
+      `/organizations/${other.organizationId}/imports`,
+      other.admin,
+    );
+    expect(
+      importHistoryPageSchema.parse(
+        ((await list.json()) as { data: unknown }).data,
+      ).imports,
+    ).toEqual([]);
+    const scoped = await runInScope(
+      db,
+      {
+        organizationId: other.organizationId,
+        userId: other.admin.id,
+        role: "admin",
+      },
+      (tx) => tx.select().from(importRows),
+    );
+    expect(scoped).toEqual([]);
+  });
+  it("reports currency mismatches and preserves company separation in history pagination", async () => {
+    await commit(request("payee", { name: "USDC vendor" }));
+    await runInScope(
+      db,
+      { organizationId: company.organizationId, role: "admin" },
+      (tx) =>
+        tx
+          .update(payees)
+          .set({
+            method: "usdc",
+            usdcAddress: "0x1111111111111111111111111111111111111111",
+            detailsChangedAt: new Date(),
+          })
+          .where(eq(payees.name, "USDC vendor")),
+    );
+    const report = await customerPreview(
+      request("bill", {
+        payee: "USDC vendor",
+        category: "Office",
+        amount: "100",
+        date: today,
+      }),
+    );
+    expect(report.errors).toBe(1);
+    expect(report.rows[0]?.message).toContain("USDC");
+    expect((await readState()).bills).toHaveLength(0);
+    const result = await customerCommit(input());
+    const savedRun = (await readState()).runs.find(
+      (r) => r.id === result.runId,
+    );
+    if (!savedRun) throw new Error("Expected completed import");
+    await runInScope(
+      db,
+      {
+        organizationId: company.organizationId,
+        userId: company.admin.id,
+        role: "admin",
+      },
+      (tx) =>
+        tx.insert(importRuns).values(
+          Array.from({ length: 20 }, () => ({
+            ...savedRun,
+            id: randomUUID(),
+          })),
+        ),
+    );
+    const first = await sendJson(
+      app,
+      `/organizations/${company.organizationId}/imports`,
+      company.admin,
+    );
+    const page = importHistoryPageSchema.parse(
+      ((await first.json()) as { data: unknown }).data,
+    );
+    expect(page.imports).toHaveLength(20);
+    expect(page.nextOffset).toBe(20);
+    const second = await sendJson(
+      app,
+      `/organizations/${company.organizationId}/imports?offset=20`,
+      company.admin,
+    );
+    const next = importHistoryPageSchema.parse(
+      ((await second.json()) as { data: unknown }).data,
+    );
+    expect(next.imports).toHaveLength(2); // One staff payee import plus 21 customer imports.
+    expect(next.nextOffset).toBeNull();
+    expect(
+      new Set([...page.imports, ...next.imports].map((r) => r.id)).size,
+    ).toBe(22);
+    expect(
+      [...page.imports, ...next.imports].some((r) => r.id === result.runId),
+    ).toBe(true);
   });
 });

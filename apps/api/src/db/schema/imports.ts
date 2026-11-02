@@ -11,6 +11,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import { memberships } from "./memberships.js";
 import { organizations } from "./organizations.js";
 import { staffUsers } from "./staff-users.js";
 
@@ -22,9 +23,8 @@ export const importRuns = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id),
-    staffUserId: uuid("staff_user_id")
-      .notNull()
-      .references(() => staffUsers.id),
+    staffUserId: uuid("staff_user_id").references(() => staffUsers.id),
+    membershipId: uuid("membership_id"),
     fileName: text("file_name").notNull(),
     fileHash: text("file_hash").notNull(),
     kind: text("kind").notNull(),
@@ -38,6 +38,15 @@ export const importRuns = pgTable(
       .defaultNow(),
   },
   (t) => [
+    foreignKey({
+      name: "import_runs_membership_organization_fk",
+      columns: [t.membershipId, t.organizationId],
+      foreignColumns: [memberships.id, memberships.organizationId],
+    }),
+    check(
+      "import_runs_one_actor",
+      sql`(${t.staffUserId} IS NOT NULL) <> (${t.membershipId} IS NOT NULL)`,
+    ),
     unique("import_runs_id_organization_unique").on(t.id, t.organizationId),
     check(
       "import_runs_counts",

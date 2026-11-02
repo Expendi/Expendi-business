@@ -22,6 +22,7 @@ import { createCategoryRoutes } from "./categories.js";
 import { createClaimRoutes } from "./claims.js";
 import { createExpenseRoutes } from "./expenses.js";
 import { createFloatRoutes } from "./floats.js";
+import { createCompanyImportRoutes } from "./imports.js";
 import { createMemberRoutes } from "./members.js";
 import { createOverviewRoutes } from "./overview.js";
 import { createPaidFromAccountRoutes } from "./paid-from-accounts.js";
@@ -103,6 +104,7 @@ export function createOrganizationRoutes(
     .route("/company-spending", createCompanySpendingRoutes(runtime))
     .route("/expenses", createExpenseRoutes(runtime))
     .route("/floats", createFloatRoutes(runtime))
+    .route("/imports", createCompanyImportRoutes(runtime))
     .route("/members", createMemberRoutes(runtime))
     .route("/me", createMyCompanyRoutes(runtime))
     .route("/overview", createOverviewRoutes(runtime))

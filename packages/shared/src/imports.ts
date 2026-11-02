@@ -26,6 +26,7 @@ export const IMPORT_FIELDS = [
   "issued",
   "left",
   "status",
+  "reference",
 ] as const;
 export type ImportField = (typeof IMPORT_FIELDS)[number];
 export const IMPORT_MAX_ROWS = 500;
@@ -39,6 +40,28 @@ export const importRequestSchema = z.object({
   mapping: z.partialRecord(z.enum(IMPORT_FIELDS), z.string().min(1).max(200)),
 });
 export type ImportRequest = z.infer<typeof importRequestSchema>;
+export const companyImportRequestSchema = importRequestSchema.extend({
+  kind: z.enum(["history", "bill"]),
+  mapping: z.partialRecord(
+    z.enum([
+      "name",
+      "payee",
+      "category",
+      "heading",
+      "amount",
+      "date",
+      "description",
+      "mpesaCode",
+      "status",
+      "reference",
+    ]),
+    z.string().min(1).max(200),
+  ),
+});
+export type CompanyImportRequest = z.infer<typeof companyImportRequestSchema>;
+export const companyImportCommitSchema = companyImportRequestSchema.extend({
+  previewToken: z.string().min(1).max(300),
+});
 export const importCommitSchema = importRequestSchema.extend({
   previewToken: z.string().min(1).max(300),
 });
@@ -53,6 +76,7 @@ export const importReportSchema = z.object({
   ready: z.number().int(),
   skipped: z.number().int(),
   errors: z.number().int(),
+  totalKes: z.string().regex(/^\d+$/).optional(),
   previewToken: z.string().nullable(),
 });
 export type ImportReport = z.infer<typeof importReportSchema>;
@@ -60,6 +84,22 @@ export const importResultSchema = z.object({
   runId: z.uuid(),
   imported: z.number().int(),
   skipped: z.number().int(),
+});
+export const importHistoryEntrySchema = z.object({
+  id: z.uuid(),
+  fileName: z.string(),
+  kind: z.enum(IMPORT_KINDS),
+  importedBy: z.string(),
+  createdAt: z.iso.datetime(),
+  rowsImported: z.number().int(),
+  rowsSkipped: z.number().int(),
+});
+export const importHistoryPageSchema = z.object({
+  imports: z.array(importHistoryEntrySchema),
+  nextOffset: z.number().int().nullable(),
+});
+export const importHistoryDetailSchema = importHistoryEntrySchema.extend({
+  rows: z.array(importRowReportSchema),
 });
 
 /** Backwards-compatible CSV/TSV reader. */

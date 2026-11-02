@@ -387,7 +387,7 @@ describe("company routes for an accountant", () => {
     );
   });
 
-  it("gives an accountant every read an admin gets, salaries included", async () => {
+  it("gives an accountant company-data reads, salaries included, while imports remain admin-only", async () => {
     // #given
     const values = routeValues(books);
     const reads = companyEndpoints(app).filter(({ method }) =>
@@ -413,12 +413,23 @@ describe("company routes for an accountant", () => {
         .filter(({ asAdmin }) => asAdmin.status !== 200)
         .map(({ key, asAdmin }) => [key, asAdmin.status]),
     ).toEqual([]);
-    // and the accountant gets the same status everywhere
+    // Import provenance/results belong to the admin-only migration workspace.
+    const importReads = new Set([
+      `GET ${COMPANY_ROUTES}/imports`,
+      `GET ${COMPANY_ROUTES}/imports/:id`,
+    ]);
     expect(
-      answers.map(({ key, asAccountant }) => [key, asAccountant.status]),
-    ).toEqual(answers.map(({ key, asAdmin }) => [key, asAdmin.status]));
+      answers
+        .filter(({ key }) => importReads.has(key))
+        .map(({ asAccountant }) => asAccountant.status),
+    ).toEqual([403, 403]);
+    const companyReads = answers.filter(({ key }) => !importReads.has(key));
+    // The accountant gets the same status for all other company reads.
+    expect(
+      companyReads.map(({ key, asAccountant }) => [key, asAccountant.status]),
+    ).toEqual(companyReads.map(({ key, asAdmin }) => [key, asAdmin.status]));
     // and the same records, except where the answer is about the caller
-    const aboutTheCompany = answers.filter(
+    const aboutTheCompany = companyReads.filter(
       ({ key }) => !ABOUT_THE_CALLER.has(key),
     );
     expect(

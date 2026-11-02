@@ -47,11 +47,13 @@ Unmapped cells on transaction rows remain part of the source deduplication ident
 
 - Populated transaction exports and target company ID.
 - Confirm currency, final amount, paid/unpaid meanings, member emails, vendors/categories, due dates and any intended schedules.
-- Resolve the history date range: on 2026-11-02, Q2 2026 predates the current three-month window. Older history is skipped; the window has not been extended.
+- Reconcile the history date range: the customer-import release removes the three-month cutoff for both Ops and customer imports; Q2 and earlier financial periods are supported. Future spending is still rejected.
 - Founder reconciliation and explicit import confirmation.
-- Deploy the Ops/API changes before expecting this workflow on the live site.
+- The original Shanga release `c45ea94` is deployed to Railway and Ops; see `docs/runbooks/customer-imports.md` for the subsequent self-service release.
 
-No client records were imported during implementation. Anthropic receipt reading remains disabled. Imports remain staff-only. Imported history does not create payouts or sync to Zoho. The existing separate limitation for imported claims paid later (Zoho currently restricts claim sync to app-origin claims) is unchanged.
+No client records were imported during implementation. Anthropic receipt reading remains disabled. Company admins can import paid company expenses and unpaid bills in the customer-import release; claims, floats and schedules remain Ops-only. Imported history does not create payouts or sync to Zoho. The existing separate limitation for imported claims paid later (Zoho currently restricts claim sync to app-origin claims) is unchanged.
+
+Customer paid-expense imports are recorded as company spending attributed to the importing admin, so they do not need Member Email. Ops historical claim imports retain their original member-email attribution. Use one workflow consistently for each dataset: changing record semantics between Ops and customer imports is not an update to an earlier import.
 
 ## Verification
 

@@ -104,6 +104,10 @@ function render(role: "admin" | "accountant"): string {
 }
 
 describe("all expenses", () => {
+  it("shows spreadsheet import only to company admins", () => {
+    expect(render("admin")).toContain("/imports?kind=history");
+    expect(render("accountant")).not.toContain("/imports?kind=history");
+  });
   it.each(["admin", "accountant"] as const)(
     "shows a %s the filtered list, with every filter and exact amounts",
     (role) => {
