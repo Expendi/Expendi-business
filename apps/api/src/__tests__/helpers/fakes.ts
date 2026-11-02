@@ -36,6 +36,7 @@ import type {
   ZohoBooksAccount,
   ZohoBooksOrganization,
   ZohoErrorCode,
+  ZohoExpenseDraft,
 } from "../../services/zoho/zoho-client.js";
 import {
   AlchemyWebhook,
@@ -713,6 +714,10 @@ export function makeFakeFileStorage() {
     expiresAt: new Date(Date.now() + ttlMs),
   });
   const layer = Layer.succeed(FileStorage, {
+    put: ({ key, bytes, contentType }) =>
+      Effect.sync(() => {
+        state.put(key, bytes.byteLength, contentType, bytes);
+      }),
     presignUpload: (file) =>
       Effect.sync(() => {
         signedUploads.push(file);
@@ -778,10 +783,13 @@ type FakeZohoOperation =
   | "refreshAccessToken"
   | "revokeToken"
   | "listOrganizations"
-  | "listAccounts";
+  | "listAccounts"
+  | "findExpenses"
+  | "createExpense"
+  | "attachReceipt";
 
 /**
- * In-memory Zoho: sign-in, tokens and Books reads. A code is good unless
+ * In-memory Zoho: sign-in, tokens, Books reads and expenses. A code is good unless
  * it's in `refusedCodes`; a revoked refresh token is refused the way Zoho
  * refuses one (`INVALID_GRANT`), and an access token in `refusedAccessTokens`
  * gets Books' 401.
@@ -792,6 +800,25 @@ export function makeFakeZoho() {
   const state = {
     organizations: [...FAKE_ZOHO_ORGANIZATIONS],
     accounts: [...FAKE_ZOHO_ACCOUNTS],
+    /** Books expenses by Zoho organization, as Zoho would hold them. */
+    expenses: [] as {
+      id: string;
+      organizationId: string;
+      draft: ZohoExpenseDraft;
+      receipt: {
+        bytes: Uint8Array;
+        contentType: string;
+        fileName: string;
+      } | null;
+    }[],
+    /** Every reference searched for, in order. */
+    searches: [] as string[],
+    /** The next create goes through at Zoho, but the reply never arrives. */
+    loseNextCreateReply: false,
+    /** The same, for the next receipt upload. */
+    loseNextReceiptReply: false,
+    /** The expense of every receipt upload that reached Zoho, in order. */
+    receiptUploads: [] as string[],
     apiDomain: FAKE_ZOHO_API_DOMAIN,
     refusedCodes: new Set<string>(),
     revokedTokens: new Set<string>(),
@@ -805,6 +832,11 @@ export function makeFakeZoho() {
     },
     reset() {
       failures.clear();
+      state.expenses.length = 0;
+      state.searches.length = 0;
+      state.loseNextCreateReply = false;
+      state.loseNextReceiptReply = false;
+      state.receiptUploads.length = 0;
       state.organizations = [...FAKE_ZOHO_ORGANIZATIONS];
       state.accounts = [...FAKE_ZOHO_ACCOUNTS];
       state.apiDomain = FAKE_ZOHO_API_DOMAIN;
@@ -849,6 +881,83 @@ export function makeFakeZoho() {
 
   const layer = Layer.succeed(Zoho, {
     configured: true,
+    findExpenses: ({ accessToken }, organizationId, referenceNumber) =>
+      booksAccess(accessToken).pipe(
+        Effect.flatMap(() => {
+          state.searches.push(referenceNumber);
+          return (
+            injected("findExpenses") ??
+            Effect.succeed(
+              state.expenses
+                .filter(
+                  (expense) =>
+                    expense.organizationId === organizationId &&
+                    expense.draft.referenceNumber === referenceNumber,
+                )
+                .map((expense) => ({
+                  id: expense.id,
+                  referenceNumber: expense.draft.referenceNumber,
+                  hasReceipt: expense.receipt !== null,
+                })),
+            )
+          );
+        }),
+      ),
+    createExpense: ({ accessToken }, organizationId, draft) =>
+      booksAccess(accessToken).pipe(
+        Effect.flatMap(() => {
+          const failure = injected("createExpense");
+          if (failure) return failure;
+          issued += 1;
+          const id = `46000000${issued}`;
+          state.expenses.push({ id, organizationId, draft, receipt: null });
+          if (state.loseNextCreateReply) {
+            state.loseNextCreateReply = false;
+            return Effect.fail(
+              new ZohoError({
+                code: "NETWORK_ERROR",
+                message: "Zoho create expense unreachable",
+              }),
+            );
+          }
+          return Effect.succeed({
+            id,
+            referenceNumber: draft.referenceNumber,
+            hasReceipt: false,
+          });
+        }),
+      ),
+    attachReceipt: ({ accessToken }, organizationId, expenseId, file) =>
+      booksAccess(accessToken).pipe(
+        Effect.flatMap(() => {
+          const failure = injected("attachReceipt");
+          if (failure) return failure;
+          const expense = state.expenses.find(
+            (row) =>
+              row.id === expenseId && row.organizationId === organizationId,
+          );
+          if (!expense) {
+            return Effect.fail(
+              new ZohoError({
+                code: "API_ERROR",
+                message: "Zoho attach receipt: HTTP 404",
+              }),
+            );
+          }
+          expense.receipt = { ...file };
+          state.receiptUploads.push(expenseId);
+          if (state.loseNextReceiptReply) {
+            state.loseNextReceiptReply = false;
+            return Effect.fail(
+              new ZohoError({
+                code: "NETWORK_ERROR",
+                message: "Zoho attach receipt unreachable",
+              }),
+            );
+          }
+          return Effect.void;
+        }),
+      ),
     authorizeUrl: (oauthState) =>
       Effect.succeed(
         `https://accounts.zoho.com/oauth/v2/auth?state=${encodeURIComponent(oauthState)}`,

@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import { Hono } from "hono";
 
 import {
+  accountingSyncsQuerySchema,
   chooseZohoOrganizationSchema,
   zohoMappingSchema,
 } from "@expendi-business/shared";
@@ -10,6 +11,7 @@ import {
 import type { StaffVariables } from "../../middleware/staff-auth.js";
 import type { AppRuntime } from "../../runtime.js";
 import { readBody } from "../../http/body.js";
+import { readQuery } from "../../http/query.js";
 import { runEffect } from "../../http/respond.js";
 import { requireStaffRole } from "../../middleware/staff-auth.js";
 import {
@@ -23,6 +25,10 @@ import {
   disconnectZoho,
   zohoStatus,
 } from "../../services/zoho/connections.js";
+import {
+  listAccountingSyncs,
+  requeueAccountingSync,
+} from "../../services/zoho/sync-admin.js";
 
 type StaffContext = Context<{ Variables: StaffVariables }>;
 
@@ -32,7 +38,8 @@ const companyId = (c: StaffContext): string =>
 /**
  * Mounted at `/internal/companies/:organizationId/zoho`, behind staff login
  * (spec §6.15, §6.17). Every staff member can look; changes need
- * `ops_admin`. No response carries a Zoho token or a link's hash.
+ * `ops_admin`. No response carries a Zoho token or a link's hash. Requeuing
+ * a failed sync only books spending that's already paid: it moves no money.
  */
 export function createZohoStaffRoutes(
   runtime: AppRuntime,
@@ -40,6 +47,26 @@ export function createZohoStaffRoutes(
   const opsAdmin = requireStaffRole("ops_admin");
   return new Hono<{ Variables: StaffVariables }>()
     .get("/", (c) => runEffect(runtime, c, zohoStatus(companyId(c))))
+    .get("/syncs", (c) =>
+      runEffect(
+        runtime,
+        c,
+        readQuery(c.req.query(), accountingSyncsQuerySchema).pipe(
+          Effect.flatMap((query) => listAccountingSyncs(companyId(c), query)),
+        ),
+      ),
+    )
+    .post("/syncs/:syncId/requeue", opsAdmin, (c) =>
+      runEffect(
+        runtime,
+        c,
+        requeueAccountingSync(
+          c.get("staff"),
+          companyId(c),
+          c.req.param("syncId"),
+        ),
+      ),
+    )
     .post("/connect-link", opsAdmin, (c) =>
       runEffect(
         runtime,

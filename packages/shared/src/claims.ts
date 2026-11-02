@@ -389,6 +389,11 @@ export const claimSchema = z.object({
   etimsQrPayload: z.string().nullable(),
   etimsStatus: etimsStatusSchema,
   rejectedReason: z.string().nullable(),
+  /**
+   * The petty cash float when this claims what a purchase cost beyond it
+   * (spec §6.22). Its amount comes from that purchase and can't be edited.
+   */
+  floatId: z.uuid().nullable(),
   submittedBy: z.object({
     membershipId: z.uuid(),
     name: z.string().nullable(),

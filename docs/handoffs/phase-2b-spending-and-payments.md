@@ -186,6 +186,7 @@ None new. This phase reuses Paycrest, Privy, Resend, Expo push and R2.
   - 2026-11-02: started early, in parallel with Phase 2 code (Dennis's decision; see the Phase 2 Handoff notes, "QA deferred"). The Phase 2B gate of Checkpoint B (Till, Paybill, bank, USDC address, payroll cap) hasn't run yet.
   - T34: the API and tests are done (uncommitted); the app screens are in progress.
   - T34–T41 code done (2026-11-02), app screens included. T42 and T43 remain. The Phase 2B live gate (Checkpoint B) and QA haven't run yet.
+- **Status (2026-11-02, fifth wave):** T42 and T43 code done, plus the T40 overspend fixes, included in the local release commit. Final automated verification passed (see `next-session.md`). All of Phase 2B is built; Checkpoint C2 and the live gate haven't run. Migrations 0055 and 0056 aren't deployed yet. A second session's unidentified drafts for T42 and T43 were taken over and reworked.
 - **Built:**
   - **T34 payees API:**
     - **Table:** `payees` (migrations 0024/0025), with a check constraint per method and RLS FORCE. The routes are admin only.
@@ -206,6 +207,29 @@ None new. This phase reuses Paycrest, Privy, Resend, Expo push and R2.
     - **Next bill:** `createNextRecurringBill` makes it. Settling a bill (paid outside, cancelled) creates the next one in the same transaction.
     - **T37 must call `onRecurringBillSettled(tx, bill, now)` when a bill becomes `paid`.**
     - Salary items are left to T38: the unique index would block a payroll bill while the previous one is `payout_failed`.
+  - **T42 spending overview (EXP-314):**
+    - **Routes:** `GET /organizations/:id/overview?month=YYYY-MM` and `GET …/overview/people/:personId` (admins and accountants).
+    - **Cash check:** `services/overview/cash-check.ts` has `checkCash({organizationId, today, days})` for jobs (reads as accountant scope, fetches the rate), `readCashCheck(tx, window, rate)` and `liveKesRate`. Status is `covered`, `short` or `unknown` (unknown only when Paycrest's rate is down and something is due).
+    - **Window:** today to today + `days`, inclusive, plus anything overdue. It counts unpaid bills (`upcoming`, `due`, `overdue`, `payout_failed`) minus salary parts already paid, each payroll run as one row, and forecasts from recurring items' `next_due_on` (undrafted salaries included), with USD at the live rate. `paying` bills are left out because they're already reserved.
+    - **App home:** `apps/mobile/src/app/(app)/index.tsx` plus `features/overview/home-content.tsx`. Not `(admin)/index.tsx` and `(employee)/index.tsx`, which would both map to `/`. The employee home reuses `/claims`, `/floats?mine=true` and `/me/salary-payments`.
+    - **Ride-along:** the accountant copy in `roles.ts` now reads "View-only access at business.expendi.app, plus monthly exports by email."
+    - **Tests:** a hand-count test (108,200 cents this month, 1,500 last month) and cash-check boundary and full-obligation tests.
+  - **T43 reminders and spending notifications (EXP-313):**
+    - **Job:** `spending-reminders` (`station/reminders.ts`, lock 72_043, every 15 minutes). Daily reminders go out from 08:00 Nairobi.
+    - **Events:**
+      - bill due soon, due today and overdue: admins, push and email, once per bill and stage, enforced by the database
+      - wallet short for the next 7 days: admins, push and email, uses `checkCash(days: 7)`, only on `short`, at most once per Nairobi day while short, nothing when the rate is unknown
+      - payroll ready to review: admins, push, sent from `draftPayrollRun`
+      - salary paid: that employee only, push, sent from `bill-payout-hooks.ts` (a split salary once all parts are paid)
+      - float issued or topped up: the holder, push, sent from `float-payout-hooks.ts`
+      - payee details changed: already built in T34 (every admin, by email)
+    - **Delivery:** outbox rows can now be email. Each recipient is emailed once, with a Resend idempotency key per recipient. A Resend failure no longer blocks pushes. Salary and payroll messages carry no amounts, because outbox rows aren't admin-only in RLS.
+    - **Migrations:** `0055_spending_notifications` adds outbox `channel`, `dedupe_key` and `email_recipients_sent`, with a unique (organization_id, dedupe_key, channel) as the once-only marker. `0056_reminder_companies` adds the definer `reminder_companies()` and an owner-read policy on `payroll_runs`.
+  - **T40 overspend fixes (ride-along):**
+    - An SMS receipt is now compared with the whole purchase (claim plus float spending).
+    - Amount edits on an overspend claim are refused (409).
+    - `floatId` is on the claim view and in the shared `claimSchema`.
+    - The near-duplicate check skips the paired float row.
 - **Live payment references (bills, payroll, floats):**
 - **Changes from spec or plan, and why:**
   - **T41 company spending:**
@@ -240,6 +264,13 @@ None new. This phase reuses Paycrest, Privy, Resend, Expo push and R2.
     - **Balance:** computed from paid movements minus spending, returns and write-offs; never stored.
     - **Overspend:** splits into the float spending plus a submitted claim for exactly the extra (`expenses.overspend_claim_id`).
     - **Close:** needs a zero balance, or a write-off reason.
+  - **T42 (spec §6.24 updated):**
+    - Bills paid outside Expendi are listed but don't count against the wallet in the cash check. Reason: they're paid from a card or bank account, so they never draw on the wallet. Their total is shown beside the check as "Also due outside Expendi: KES X" (Dennis, 2026-11-02).
+    - A variable bill without an amount doesn't turn the check to "unknown"; `unknownAmounts` is shown beside it. Reason: otherwise a monthly variable bill such as PAYE would leave the check "unknown" for most of the month.
+    - Fees and the whole-shilling round-up aren't predicted, so the check is a few shillings optimistic. Recent payments are the latest 20 across the selected and previous month. The per-person view is claims, salary and bills paid to that person, with the float shown separately. People are admins, employees and personnel, not accountants.
+  - **T43 (spec unchanged):**
+    - Followed spec §6.10 (email only for due-date reminders, low balance and payee changes) rather than the build plan's "push and email" for everything. Dennis approved this on 2026-11-02; payroll-ready, salary-paid and float notices remain push-only.
+    - Payroll bills get no per-person due reminders: the run's "ready to review" notice covers them (§6.10 updated).
   - **Bills to USDC payees are entered in USD (Dennis, 2026-11-02),** and paid exactly that USDC, as USDC payees already work (T33). The overview, cap and export use the KES equivalent at the payment-day rate. T35 built KES-only bills, so this change lands with T37.
   - **`bills` and `recurring_items` (spec §10 updated):**
     - **`bills` columns:** `variable`, `paid_on`, `paid_outside_note`, `cancelled_by`, `cancelled_at`.
@@ -251,13 +282,10 @@ None new. This phase reuses Paycrest, Privy, Resend, Expo push and R2.
     - `method` is nullable (no payment details yet).
     - USDC payees store no `account_name`; the payee's name is used.
     - Employee `mpesa_phone` payees never store the phone.
-- **Environment variables added:**
+- **Environment variables added:** none in the fifth wave for these tasks. (`API_PUBLIC_URL` and `ALERT_EMAILS` are in the Phase 3 notes.)
 - **Known issues and TODOs:**
-  - **Overspend claims (T40) have gaps in `claims.ts`:**
-    - editing one with an SMS receipt fails, because the SMS amount is compared to the extra
-    - amount edits aren't blocked
-    - the claim view doesn't expose `floatId`
-    - a recompute may flag the paired float row as a near-duplicate
+  - **Overspend claims (T40):** the four `claims.ts` gaps are fixed (see T40 overspend fixes above).
+  - **T43 gaps:** no payout-failed notifications for bills or floats (only claims, T20); the app's notification tap only opens claims.
   - **A non-payroll bill above Paycrest's per-order maximum (~3,000 USDC) isn't split.** Paycrest answers "rate unavailable" (503).
   - **For T42 (overview) and T44 (Zoho):**
     - Petty cash = float spending + claims with a `float_id`; don't count float payouts as spending as well.

@@ -15,12 +15,15 @@ import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
 import { tenantMiddleware } from "../middleware/tenant.js";
 import { signUpCompany } from "../services/organization/create-organization.js";
+import { createActivityRoutes } from "./activity.js";
 import { createAllowlistRoutes } from "./allowlist.js";
 import { createBillRoutes } from "./bills.js";
 import { createCategoryRoutes } from "./categories.js";
 import { createClaimRoutes } from "./claims.js";
+import { createExpenseRoutes } from "./expenses.js";
 import { createFloatRoutes } from "./floats.js";
 import { createMemberRoutes } from "./members.js";
+import { createOverviewRoutes } from "./overview.js";
 import { createPaidFromAccountRoutes } from "./paid-from-accounts.js";
 import { createPayeeRoutes } from "./payees.js";
 import {
@@ -30,6 +33,7 @@ import {
 } from "./payroll.js";
 import { createReceiptRoutes } from "./receipts.js";
 import { createRecurringItemRoutes } from "./recurring-items.js";
+import { createReportRoutes } from "./reports.js";
 import { createSettingsRoutes } from "./settings.js";
 import { createCompanySpendingRoutes } from "./spending.js";
 import { createWalletRoutes } from "./wallet.js";
@@ -92,18 +96,22 @@ export function createOrganizationRoutes(
         ),
       );
     })
+    .route("/activity", createActivityRoutes(runtime))
     .route("/bills", createBillRoutes(runtime))
     .route("/categories", createCategoryRoutes(runtime))
     .route("/claims", createClaimRoutes(runtime))
     .route("/company-spending", createCompanySpendingRoutes(runtime))
+    .route("/expenses", createExpenseRoutes(runtime))
     .route("/floats", createFloatRoutes(runtime))
     .route("/members", createMemberRoutes(runtime))
     .route("/me", createMyCompanyRoutes(runtime))
+    .route("/overview", createOverviewRoutes(runtime))
     .route("/paid-from-accounts", createPaidFromAccountRoutes(runtime))
     .route("/payees", createPayeeRoutes(runtime))
     .route("/payroll-runs", createPayrollRunRoutes(runtime))
     .route("/receipts", createReceiptRoutes(runtime))
     .route("/recurring-items", createRecurringItemRoutes(runtime))
+    .route("/reports", createReportRoutes(runtime))
     .route("/salaries", createSalaryRoutes(runtime))
     .route("/settings", createSettingsRoutes(runtime))
     .route("/wallet", createWalletRoutes(runtime))

@@ -85,6 +85,23 @@ export const notificationOutbox = pgTable(
       .references(() => organizations.id),
     /** `NotificationEvent["kind"]`, e.g. `claim_paid`. */
     kind: text("kind").notNull(),
+    /** One row per channel: an email row goes to each recipient's address. */
+    channel: text("channel")
+      .$type<"push" | "email">()
+      .notNull()
+      .default("push"),
+    /**
+     * Set for messages sent once ever, e.g. `bill_due_today:<bill id>`: the
+     * unique index below is the sent-marker, so a re-run or a second
+     * instance queues nothing more. Null for events that may recur, like a
+     * claim submitted again after a rejection.
+     */
+    dedupeKey: text("dedupe_key"),
+    /** Users an email row already reached, so a retry skips them. */
+    emailRecipientsSent: jsonb("email_recipients_sent")
+      .$type<readonly string[]>()
+      .notNull()
+      .default([]),
     audience: notificationAudience("audience").notNull(),
     recipientMembershipId: uuid("recipient_membership_id"),
     exceptMembershipId: uuid("except_membership_id"),
@@ -110,6 +127,15 @@ export const notificationOutbox = pgTable(
       .defaultNow(),
   },
   (table) => [
+    uniqueIndex("notification_outbox_event_channel_unique").on(
+      table.organizationId,
+      table.dedupeKey,
+      table.channel,
+    ),
+    check(
+      "notification_outbox_channel_check",
+      sql`${table.channel} IN ('push', 'email')`,
+    ),
     foreignKey({
       name: "notification_outbox_recipient_organization_fk",
       columns: [table.recipientMembershipId, table.organizationId],

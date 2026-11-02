@@ -10,6 +10,7 @@ import type { AuditActor } from "../audit/audit-log.js";
 import { bills, payrollRuns } from "../../db/schema/index.js";
 import { query } from "../../db/scope.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { enqueuePaidPayrollRun } from "../zoho/enqueue.js";
 
 /**
  * Where an approved payroll run stands (spec §6.21), from its payments:
@@ -17,7 +18,7 @@ import { AuditLog } from "../audit/audit-log.js";
  *
  * - `paying` while any payment is in flight
  * - then `partly_failed` if any failed (each is retried on its own), or
- *   `paid` once everyone is paid
+ *   `paid` once everyone is paid, which queues the run for Zoho Books (T44)
  *
  * A draft stays a draft until its approval moves a payment to `paying`.
  */
@@ -95,5 +96,8 @@ export function refreshPayrollRunStatus(
       before: { status: run.status },
       after: { status, ...firstApproval, ...progress },
     });
+    if (status === "paid") {
+      yield* enqueuePaidPayrollRun(tx, run.organizationId, run.id);
+    }
   });
 }

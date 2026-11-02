@@ -20,7 +20,11 @@ import type {
   ZohoBooksSession,
   ZohoError,
 } from "./zoho-client.js";
-import { accountingConnections, categories } from "../../db/schema/index.js";
+import {
+  accountingConnections,
+  categories,
+  paidFromAccounts,
+} from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { BadRequest, Conflict, ServiceUnavailable } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
@@ -92,7 +96,7 @@ const tokenUnreadable = new ServiceUnavailable({
 });
 
 /** A connection someone has signed in on, whose token Zoho hasn't rejected. */
-interface SignedInConnection {
+export interface SignedInConnection {
   readonly row: AccountingConnectionRow;
   readonly sealedRefreshToken: string;
   readonly accountsServer: string;
@@ -125,7 +129,13 @@ function withOrganization(
     : Effect.fail(chooseOrganizationFirst);
 }
 
-function loadSignedIn(organizationId: string) {
+export function loadSignedIn(
+  organizationId: string,
+): Effect.Effect<
+  SignedInConnection,
+  NotFound | Conflict | DatabaseError,
+  DatabaseService
+> {
   return inCompany(organizationId, (tx) =>
     loadOpenConnection(tx, organizationId),
   ).pipe(Effect.flatMap(signedIn));
@@ -212,7 +222,7 @@ function onZohoFailure(
       : Effect.fail(zohoFailure(error));
 }
 
-type SessionDeps =
+export type SessionDeps =
   Zoho | ZohoAccessTokens | AccountingTokenKey | DatabaseService | AuditLog;
 
 function freshSession(
@@ -266,14 +276,15 @@ function freshSession(
  * Runs a Books call with the connection's access token: the cached one if
  * it's still good, else a fresh one. A cached token Books refuses is
  * replaced once; a fresh one Books refuses means Zoho has rejected the
- * connection.
+ * connection, which is marked first. Any other failure of the call comes
+ * back as Zoho's own error, for the caller to judge.
  */
-function withBooksSession<A>(
+export function callBooks<A>(
   connection: SignedInConnection,
   call: (session: ZohoBooksSession) => Effect.Effect<A, ZohoError>,
 ): Effect.Effect<
   A,
-  Conflict | ServiceUnavailable | DatabaseError,
+  ZohoError | Conflict | ServiceUnavailable | DatabaseError,
   SessionDeps
 > {
   return Effect.gen(function* () {
@@ -283,17 +294,32 @@ function withBooksSession<A>(
       const outcome = yield* Effect.either(call(cached));
       if (Either.isRight(outcome)) return outcome.right;
       if (outcome.left.code !== "UNAUTHORIZED") {
-        return yield* zohoFailure(outcome.left);
+        return yield* outcome.left;
       }
       cache.evict(connection.row.id);
     }
     const session = yield* freshSession(connection);
     return yield* call(session).pipe(
-      Effect.catchAll(
+      Effect.catchIf(
+        (error) => error.code === "UNAUTHORIZED",
         onZohoFailure(connection, "UNAUTHORIZED", "zoho_books_refused_access"),
       ),
     );
   });
+}
+
+/** `callBooks` for staff requests: Zoho's errors become a 503. */
+function withBooksSession<A>(
+  connection: SignedInConnection,
+  call: (session: ZohoBooksSession) => Effect.Effect<A, ZohoError>,
+): Effect.Effect<
+  A,
+  Conflict | ServiceUnavailable | DatabaseError,
+  SessionDeps
+> {
+  return callBooks(connection, call).pipe(
+    Effect.catchTag("ZohoError", (error) => Effect.fail(zohoFailure(error))),
+  );
 }
 
 function byName<T extends { readonly name: string }>(items: readonly T[]): T[] {
@@ -380,6 +406,8 @@ export function chooseZohoOrganization(
               ...(switching && {
                 paidThroughAccountId: null,
                 defaultAccountId: null,
+                pettyCashAccountId: null,
+                salariesAccountId: null,
               }),
             })
             .where(eq(accountingConnections.id, current.id)),
@@ -390,6 +418,12 @@ export function chooseZohoOrganization(
               .update(categories)
               .set({ accountingAccountId: null })
               .where(eq(categories.organizationId, organizationId)),
+          );
+          yield* query(() =>
+            tx
+              .update(paidFromAccounts)
+              .set({ accountingAccountId: null })
+              .where(eq(paidFromAccounts.organizationId, organizationId)),
           );
         }
         yield* audit.record(tx, {
@@ -465,7 +499,8 @@ export function listZohoAccounts(
 /**
  * `PUT /internal/companies/:id/zoho/mapping`. Every account is checked
  * against the organization's chart of accounts as Zoho has it now. Categories
- * left out post to the default account; archived categories are untouched.
+ * left out post to the default account; archived categories and paid-from
+ * accounts are untouched. A T44 field left out keeps what's saved.
  */
 export function saveZohoMapping(
   staff: StaffMember,
@@ -478,18 +513,33 @@ export function saveZohoMapping(
 > {
   return Effect.gen(function* () {
     const audit = yield* AuditLog;
-    const companyCategories = yield* inCompany(organizationId, (tx) =>
-      query(() =>
-        tx
-          .select({ id: categories.id, name: categories.name })
-          .from(categories)
-          .where(
-            and(
-              eq(categories.organizationId, organizationId),
-              eq(categories.archived, false),
-            ),
+    const { companyCategories, companyPaidFrom } = yield* inCompany(
+      organizationId,
+      (tx) =>
+        Effect.all({
+          companyCategories: query(() =>
+            tx
+              .select({ id: categories.id, name: categories.name })
+              .from(categories)
+              .where(
+                and(
+                  eq(categories.organizationId, organizationId),
+                  eq(categories.archived, false),
+                ),
+              ),
           ),
-      ),
+          companyPaidFrom: query(() =>
+            tx
+              .select({ id: paidFromAccounts.id, name: paidFromAccounts.name })
+              .from(paidFromAccounts)
+              .where(
+                and(
+                  eq(paidFromAccounts.organizationId, organizationId),
+                  eq(paidFromAccounts.archived, false),
+                ),
+              ),
+          ),
+        }),
     );
     const categoryNames = new Map(
       companyCategories.map(({ id, name }) => [id, name]),
@@ -498,6 +548,15 @@ export function saveZohoMapping(
     if (mapped.some(([categoryId]) => !categoryNames.has(categoryId))) {
       return yield* new BadRequest({
         message: "One of those categories isn't this company's.",
+      });
+    }
+    const paidFromNames = new Map(
+      companyPaidFrom.map(({ id, name }) => [id, name]),
+    );
+    const mappedPaidFrom = Object.entries(mapping.paidFromAccounts ?? {});
+    if (mappedPaidFrom.some(([id]) => !paidFromNames.has(id))) {
+      return yield* new BadRequest({
+        message: "One of those paid-from accounts isn't this company's.",
       });
     }
 
@@ -524,6 +583,27 @@ export function saveZohoMapping(
     if (badCategory) {
       return yield* new BadRequest({
         message: `${categoryNames.get(badCategory[0]) ?? "A category"}: pick an active expense account in Zoho.`,
+      });
+    }
+    const { pettyCashAccountId, salariesAccountId } = mapping;
+    if (pettyCashAccountId && !paidThroughIds.has(pettyCashAccountId)) {
+      return yield* new BadRequest({
+        message:
+          "The petty cash account must be an active cash, bank or similar account in Zoho.",
+      });
+    }
+    if (salariesAccountId && !expenseIds.has(salariesAccountId)) {
+      return yield* new BadRequest({
+        message:
+          "The salaries account must be an active expense account in Zoho.",
+      });
+    }
+    const badPaidFrom = mappedPaidFrom.find(
+      ([, accountId]) => accountId !== null && !paidThroughIds.has(accountId),
+    );
+    if (badPaidFrom) {
+      return yield* new BadRequest({
+        message: `${paidFromNames.get(badPaidFrom[0]) ?? "A paid-from account"}: pick an active bank, cash or similar account in Zoho.`,
       });
     }
 
@@ -553,30 +633,71 @@ export function saveZohoMapping(
               ),
             ),
         );
+        const existingPaidFrom = yield* query(() =>
+          tx
+            .select({
+              id: paidFromAccounts.id,
+              accountId: paidFromAccounts.accountingAccountId,
+            })
+            .from(paidFromAccounts)
+            .where(
+              and(
+                eq(paidFromAccounts.organizationId, organizationId),
+                eq(paidFromAccounts.archived, false),
+              ),
+            ),
+        );
         const before = {
           paidThroughAccountId: current.paidThroughAccountId,
           defaultAccountId: current.defaultAccountId,
+          pettyCashAccountId: current.pettyCashAccountId,
+          salariesAccountId: current.salariesAccountId,
           categoryAccounts: Object.fromEntries(
             existing.map(({ id, accountId }) => [id, accountId]),
+          ),
+          paidFromAccounts: Object.fromEntries(
+            existingPaidFrom.map(({ id, accountId }) => [id, accountId]),
           ),
         };
         const after = {
           paidThroughAccountId: mapping.paidThroughAccountId,
           defaultAccountId: mapping.defaultAccountId,
+          pettyCashAccountId:
+            pettyCashAccountId === undefined
+              ? current.pettyCashAccountId
+              : pettyCashAccountId,
+          salariesAccountId:
+            salariesAccountId === undefined
+              ? current.salariesAccountId
+              : salariesAccountId,
           categoryAccounts: Object.fromEntries(
             existing.map(({ id }) => [
               id,
               mapping.categoryAccounts[id] ?? null,
             ]),
           ),
+          paidFromAccounts: Object.fromEntries(
+            existingPaidFrom.map(({ id, accountId }) => [
+              id,
+              mapping.paidFromAccounts === undefined
+                ? accountId
+                : (mapping.paidFromAccounts[id] ?? null),
+            ]),
+          ),
         };
         const changedCategories = existing.filter(
           ({ id, accountId }) => after.categoryAccounts[id] !== accountId,
         );
+        const changedPaidFrom = existingPaidFrom.filter(
+          ({ id, accountId }) => after.paidFromAccounts[id] !== accountId,
+        );
         if (
           changedCategories.length === 0 &&
+          changedPaidFrom.length === 0 &&
           before.paidThroughAccountId === after.paidThroughAccountId &&
-          before.defaultAccountId === after.defaultAccountId
+          before.defaultAccountId === after.defaultAccountId &&
+          before.pettyCashAccountId === after.pettyCashAccountId &&
+          before.salariesAccountId === after.salariesAccountId
         ) {
           return;
         }
@@ -588,12 +709,22 @@ export function saveZohoMapping(
               .where(eq(categories.id, id)),
           );
         }
+        for (const { id } of changedPaidFrom) {
+          yield* query(() =>
+            tx
+              .update(paidFromAccounts)
+              .set({ accountingAccountId: after.paidFromAccounts[id] ?? null })
+              .where(eq(paidFromAccounts.id, id)),
+          );
+        }
         yield* query(() =>
           tx
             .update(accountingConnections)
             .set({
               paidThroughAccountId: after.paidThroughAccountId,
               defaultAccountId: after.defaultAccountId,
+              pettyCashAccountId: after.pettyCashAccountId,
+              salariesAccountId: after.salariesAccountId,
             })
             .where(eq(accountingConnections.id, current.id)),
         );

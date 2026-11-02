@@ -402,3 +402,174 @@ describe("makeZohoClient", () => {
     expect(sent).toEqual([]);
   });
 });
+
+describe("Zoho Books expenses", () => {
+  const draft = {
+    accountId: "460000000038080",
+    paidThroughAccountId: "460000000038099",
+    date: "2026-10-15",
+    amount: "1500.50",
+    referenceNumber: "8f0b8a52-3c8e-4f63-9b0e-0f1c2d3e4f50",
+    description: "Java House · Lunch · Jane Wanjiku",
+  };
+
+  it("creates an expense with the amount as an exact JSON number", async () => {
+    // #given
+    const { zoho, sent } = client(
+      json(
+        {
+          code: 0,
+          message: "The expense has been recorded.",
+          expense: {
+            expense_id: 982000000030049,
+            reference_number: draft.referenceNumber,
+            expense_receipt_name: "",
+          },
+        },
+        201,
+      ),
+    );
+
+    // #when
+    const created = await Effect.runPromise(
+      zoho.createExpense(session, "10234695", draft),
+    );
+
+    // #then
+    expect(created).toEqual({
+      id: "982000000030049",
+      referenceNumber: draft.referenceNumber,
+      hasReceipt: false,
+    });
+    expect(sent[0]?.init?.method).toBe("POST");
+    expect(sent[0]?.url.href).toBe(
+      "https://www.zohoapis.eu/books/v3/expenses?organization_id=10234695",
+    );
+    const sentBody = sent[0]?.init?.body;
+    const body = typeof sentBody === "string" ? sentBody : "";
+    expect(body).toContain('"amount":1500.50}');
+    expect(JSON.parse(body)).toEqual({
+      account_id: draft.accountId,
+      paid_through_account_id: draft.paidThroughAccountId,
+      date: draft.date,
+      reference_number: draft.referenceNumber,
+      description: draft.description,
+      amount: 1500.5,
+    });
+    expect(new Headers(sent[0]?.init?.headers).get("content-type")).toBe(
+      "application/json",
+    );
+  });
+
+  it("refuses an amount that isn't a 2-decimal KES string, without calling Zoho", async () => {
+    // #given
+    const { zoho, sent } = client();
+
+    // #when
+    const error = await failureOf(
+      zoho.createExpense(session, "10234695", { ...draft, amount: "1e3" }),
+    );
+
+    // #then
+    expect(error?.code).toBe("API_ERROR");
+    expect(sent).toEqual([]);
+  });
+
+  it("searches by the exact reference and keeps only exact matches", async () => {
+    // #given
+    const { zoho, sent } = client(
+      json({
+        code: 0,
+        expenses: [
+          {
+            expense_id: "1",
+            reference_number: draft.referenceNumber,
+            expense_receipt_name: "receipt.jpg",
+          },
+          { expense_id: "2", reference_number: `${draft.referenceNumber}-x` },
+        ],
+        page_context: { has_more_page: false },
+      }),
+    );
+
+    // #when
+    const found = await Effect.runPromise(
+      zoho.findExpenses(session, "10234695", draft.referenceNumber),
+    );
+
+    // #then
+    expect(found).toEqual([
+      { id: "1", referenceNumber: draft.referenceNumber, hasReceipt: true },
+    ]);
+    expect(sent[0]?.init?.method).toBe("GET");
+    expect(Object.fromEntries(sent[0]?.url.searchParams ?? [])).toEqual({
+      organization_id: "10234695",
+      reference_number: draft.referenceNumber,
+      per_page: "25",
+    });
+  });
+
+  it("attaches the receipt as the multipart `receipt` field", async () => {
+    // #given
+    const { zoho, sent } = client(
+      json({ code: 0, message: "The expense receipt has been attached." }),
+    );
+    const bytes = new Uint8Array([0xff, 0xd8, 0xff]);
+
+    // #when
+    await Effect.runPromise(
+      zoho.attachReceipt(session, "10234695", "982000000030049", {
+        bytes,
+        contentType: "image/jpeg",
+        fileName: "expendi-claim.jpg",
+      }),
+    );
+
+    // #then
+    expect(sent[0]?.url.href).toBe(
+      "https://www.zohoapis.eu/books/v3/expenses/982000000030049/receipt?organization_id=10234695",
+    );
+    const form = sent[0]?.init?.body;
+    expect(form).toBeInstanceOf(FormData);
+    const receipt = (form as FormData).get("receipt");
+    expect(receipt).toBeInstanceOf(File);
+    expect((receipt as File).name).toBe("expendi-claim.jpg");
+    expect(new Uint8Array(await (receipt as File).arrayBuffer())).toEqual(
+      bytes,
+    );
+  });
+
+  it("reports Zoho's own reason for a refused expense, without the token", async () => {
+    // #given
+    const { zoho } = client(
+      json({ code: 4, message: "Invalid value passed for account_id" }, 400),
+    );
+
+    // #when
+    const error = await failureOf(
+      zoho.createExpense(session, "10234695", draft),
+    );
+
+    // #then
+    expect(error?.code).toBe("API_ERROR");
+    expect(error?.message).toBe(
+      "Zoho create expense: HTTP 400 (code 4: Invalid value passed for account_id)",
+    );
+    expect(error?.message).not.toContain(ACCESS_TOKEN);
+  });
+
+  it("reports Zoho's rate limit as RATE_LIMITED", async () => {
+    // #given
+    const { zoho } = client(
+      json({ code: 44, message: "For security reasons…" }, 429),
+    );
+
+    // #when
+    const error = await failureOf(
+      zoho.findExpenses(session, "10234695", draft.referenceNumber),
+    );
+
+    // #then
+    expect(error?.code).toBe("RATE_LIMITED");
+  });
+});

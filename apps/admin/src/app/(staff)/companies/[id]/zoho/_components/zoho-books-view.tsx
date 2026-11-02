@@ -16,6 +16,7 @@ import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiTime } from "~/lib/format";
 import { queryKeys } from "~/lib/query-keys";
+import { AccountingSyncsPanel } from "./accounting-syncs";
 
 const inputClass =
   "mt-1 w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm focus:border-brand-600 focus:outline-none disabled:bg-stone-100";
@@ -108,6 +109,10 @@ function ZohoBooksPanels({
         />
       ) : null}
 
+      {connection ? (
+        <AccountingSyncsPanel companyId={companyId} canAct={canAct} />
+      ) : null}
+
       {connection?.status === "active" ? (
         <MappingPanel
           key={mappingKey(connection)}
@@ -128,7 +133,10 @@ function mappingKey(connection: ZohoConnection): string {
     connection.organization?.id,
     connection.paidThroughAccountId,
     connection.defaultAccountId,
+    connection.pettyCashAccountId,
+    connection.salariesAccountId,
     connection.categoryAccounts,
+    connection.paidFromAccounts,
   ]);
 }
 
@@ -405,6 +413,10 @@ function OrganizationPanel({
 }
 
 const USE_DEFAULT = "";
+const NOT_CHOSEN = "";
+
+const chosen = (accountId: string): string | null =>
+  accountId === NOT_CHOSEN ? null : accountId;
 
 function MappingPanel({
   companyId,
@@ -433,6 +445,22 @@ function MappingPanel({
   const [defaultAccountId, setDefaultAccountId] = useState(
     connection.defaultAccountId ?? "",
   );
+  const [pettyCashAccountId, setPettyCashAccountId] = useState(
+    connection.pettyCashAccountId ?? NOT_CHOSEN,
+  );
+  const [salariesAccountId, setSalariesAccountId] = useState(
+    connection.salariesAccountId ?? NOT_CHOSEN,
+  );
+  const [paidFromAccounts, setPaidFromAccounts] = useState<
+    Record<string, string>
+  >(() =>
+    Object.fromEntries(
+      connection.paidFromAccounts.map(({ paidFromAccountId, accountId }) => [
+        paidFromAccountId,
+        accountId ?? NOT_CHOSEN,
+      ]),
+    ),
+  );
   const accounts = useQuery({
     queryKey: queryKeys.zohoAccounts(companyId),
     queryFn: () => api.zoho.accounts(companyId),
@@ -448,6 +476,14 @@ function MappingPanel({
         ),
         paidThroughAccountId,
         defaultAccountId,
+        pettyCashAccountId: chosen(pettyCashAccountId),
+        salariesAccountId: chosen(salariesAccountId),
+        paidFromAccounts: Object.fromEntries(
+          Object.entries(paidFromAccounts).map(([id, accountId]) => [
+            id,
+            chosen(accountId),
+          ]),
+        ),
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKeys.zoho(companyId), updated);
@@ -522,6 +558,37 @@ function MappingPanel({
               {accountOptions(expenseAccounts)}
             </select>
           </label>
+          <label className="block">
+            Petty cash account
+            <span className="block text-stone-500">
+              The Paid Through account for spending from petty cash floats, e.g.
+              a cash account called &ldquo;Petty Cash&rdquo;.
+            </span>
+            <select
+              value={pettyCashAccountId}
+              onChange={(event) => setPettyCashAccountId(event.target.value)}
+              className={inputClass}
+            >
+              <option value={NOT_CHOSEN}>
+                Not chosen: petty cash spending waits
+              </option>
+              {accountOptions(paidThroughAccounts)}
+            </select>
+          </label>
+          <label className="block">
+            Salaries account
+            <span className="block text-stone-500">
+              Each payroll run posts here as one expense for its total.
+            </span>
+            <select
+              value={salariesAccountId}
+              onChange={(event) => setSalariesAccountId(event.target.value)}
+              className={inputClass}
+            >
+              <option value={NOT_CHOSEN}>Not chosen: payroll runs wait</option>
+              {accountOptions(expenseAccounts)}
+            </select>
+          </label>
 
           <div>
             <p className="font-medium">Categories</p>
@@ -547,6 +614,45 @@ function MappingPanel({
                       >
                         <option value={USE_DEFAULT}>Default account</option>
                         {accountOptions(expenseAccounts)}
+                      </select>
+                    </label>
+                  ),
+                )}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <p className="font-medium">Paid-from accounts</p>
+            <p className="mt-1 text-stone-500">
+              Where company spending, and bills paid outside Expendi, came from.
+            </p>
+            {connection.paidFromAccounts.length === 0 ? (
+              <p className="mt-1 text-stone-500">
+                This company has no paid-from accounts yet.
+              </p>
+            ) : (
+              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {connection.paidFromAccounts.map(
+                  ({ paidFromAccountId, name }) => (
+                    <label key={paidFromAccountId} className="block">
+                      {name}
+                      <select
+                        value={
+                          paidFromAccounts[paidFromAccountId] ?? NOT_CHOSEN
+                        }
+                        onChange={(event) =>
+                          setPaidFromAccounts((current) => ({
+                            ...current,
+                            [paidFromAccountId]: event.target.value,
+                          }))
+                        }
+                        className={inputClass}
+                      >
+                        <option value={NOT_CHOSEN}>
+                          Not mapped: its spending waits
+                        </option>
+                        {accountOptions(paidThroughAccounts)}
                       </select>
                     </label>
                   ),

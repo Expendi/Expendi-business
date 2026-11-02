@@ -295,9 +295,15 @@ async function answer(
     method,
     body: isReadRequest(method) ? undefined : {},
   });
+  const download = response.headers
+    .get("content-disposition")
+    ?.startsWith("attachment");
   return {
     status: response.status,
-    body: withoutExpiry(await response.text()),
+    // A downloaded file is compared byte for byte.
+    body: download
+      ? Buffer.from(await response.arrayBuffer()).toString("base64")
+      : withoutExpiry(await response.text()),
   };
 }
 
@@ -316,6 +322,10 @@ const companyPath = (company: TestCompany, rest = "") =>
 
 const routeValues = (target: Books): Record<string, string> => ({
   organizationId: target.company.organizationId,
+  personId: target.amina.membershipId,
+  expenseId: target.ids.claimId,
+  month: "2026-10",
+  format: "workbook",
   ...target.ids,
 });
 
@@ -324,15 +334,29 @@ describe("company routes for an accountant", () => {
     // #then
     expect(companyEndpoints(app).map(keyOf)).toEqual(
       expect.arrayContaining([
+        `GET ${COMPANY_ROUTES}/activity`,
+        `GET ${COMPANY_ROUTES}/categories`,
+        `POST ${COMPANY_ROUTES}/categories`,
+        `PATCH ${COMPANY_ROUTES}/categories/:categoryId`,
+        `POST ${COMPANY_ROUTES}/categories/:categoryId/archive`,
+        `POST ${COMPANY_ROUTES}/categories/:categoryId/restore`,
         `GET ${COMPANY_ROUTES}/claims`,
         `POST ${COMPANY_ROUTES}/claims`,
         `POST ${COMPANY_ROUTES}/claims/approval`,
+        `GET ${COMPANY_ROUTES}/expenses`,
+        `GET ${COMPANY_ROUTES}/expenses/:expenseId`,
+        `GET ${COMPANY_ROUTES}/overview`,
+        `GET ${COMPANY_ROUTES}/overview/people/:personId`,
         `GET ${COMPANY_ROUTES}/payroll-runs/:runId`,
         `GET ${COMPANY_ROUTES}/salaries`,
         `PATCH ${COMPANY_ROUTES}/salaries/:salaryId`,
         `POST ${COMPANY_ROUTES}/withdrawals`,
         `DELETE ${COMPANY_ROUTES}/members/:membershipId`,
         `POST ${COMPANY_ROUTES}/receipts/upload-url`,
+        `GET ${COMPANY_ROUTES}/reports/:month/:format`,
+        `GET ${COMPANY_ROUTES}/reports/exports`,
+        `POST ${COMPANY_ROUTES}/reports/exports`,
+        `GET ${COMPANY_ROUTES}/reports/exports/:exportId/files/:file`,
       ]),
     );
   });

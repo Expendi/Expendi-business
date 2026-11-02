@@ -15,3 +15,10 @@ export const cardClass =
 
 export const alertClass =
   "mt-4 rounded-md bg-error-50 px-3 py-2 text-sm text-error-700";
+
+export const linkClass =
+  "font-medium text-brand-700 underline-offset-4 hover:underline";
+
+export const tableClass = "w-full text-left text-sm";
+export const headCellClass = "px-3 py-2 font-medium";
+export const cellClass = "px-3 py-2";

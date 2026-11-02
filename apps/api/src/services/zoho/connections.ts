@@ -17,6 +17,7 @@ import {
   accountingConnections,
   categories,
   organizations,
+  paidFromAccounts,
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import {
@@ -121,23 +122,45 @@ function describeConnection(
   row: AccountingConnectionRow,
   now: Date,
 ): Effect.Effect<ZohoConnection, DatabaseError> {
-  return query(() =>
-    tx
-      .select({
-        id: categories.id,
-        name: categories.name,
-        accountId: categories.accountingAccountId,
-      })
-      .from(categories)
-      .where(
-        and(
-          eq(categories.organizationId, row.organizationId),
-          eq(categories.archived, false),
+  return Effect.all([
+    query(() =>
+      tx
+        .select({
+          id: categories.id,
+          name: categories.name,
+          accountId: categories.accountingAccountId,
+        })
+        .from(categories)
+        .where(
+          and(
+            eq(categories.organizationId, row.organizationId),
+            eq(categories.archived, false),
+          ),
+        )
+        .orderBy(sql`lower(${categories.name}) COLLATE "C"`, categories.id),
+    ),
+    query(() =>
+      tx
+        .select({
+          paidFromAccountId: paidFromAccounts.id,
+          name: paidFromAccounts.name,
+          kind: paidFromAccounts.kind,
+          accountId: paidFromAccounts.accountingAccountId,
+        })
+        .from(paidFromAccounts)
+        .where(
+          and(
+            eq(paidFromAccounts.organizationId, row.organizationId),
+            eq(paidFromAccounts.archived, false),
+          ),
+        )
+        .orderBy(
+          sql`lower(${paidFromAccounts.name}) COLLATE "C"`,
+          paidFromAccounts.id,
         ),
-      )
-      .orderBy(sql`lower(${categories.name}) COLLATE "C"`, categories.id),
-  ).pipe(
-    Effect.map((companyCategories) => ({
+    ),
+  ]).pipe(
+    Effect.map(([companyCategories, companyPaidFromAccounts]) => ({
       id: row.id,
       status: row.status,
       connectedAt: row.connectedAt?.toISOString() ?? null,
@@ -157,11 +180,14 @@ function describeConnection(
       apiDomain: row.apiDomain,
       paidThroughAccountId: row.paidThroughAccountId,
       defaultAccountId: row.defaultAccountId,
+      pettyCashAccountId: row.pettyCashAccountId,
+      salariesAccountId: row.salariesAccountId,
       categoryAccounts: companyCategories.map((category) => ({
         categoryId: category.id,
         categoryName: category.name,
         accountId: category.accountId,
       })),
+      paidFromAccounts: companyPaidFromAccounts,
     })),
   );
 }

@@ -19,6 +19,9 @@ const HEAD_TIMEOUT_MS = 10_000;
 const GET_URL_TTL_SECONDS = 60;
 /** A shrunk receipt is a few hundred KB; the slowest R2 answer still fits. */
 const GET_TIMEOUT_MS = 20_000;
+const PUT_URL_TTL_SECONDS = 5 * 60;
+/** A month's receipts zip can run to tens of MB. */
+const PUT_TIMEOUT_MS = 2 * 60_000;
 
 export interface R2Settings {
   readonly accountId: string;
@@ -60,6 +63,31 @@ export function makeR2Storage(
     new StorageError({ code: "UNAVAILABLE", message });
 
   return {
+    put: ({ key, bytes, contentType }) =>
+      Effect.tryPromise({
+        try: () => {
+          const headers = { "content-type": contentType };
+          return fetchImpl(sign("PUT", key, PUT_URL_TTL_SECONDS, headers).url, {
+            method: "PUT",
+            headers,
+            body: Buffer.from(bytes),
+            signal: AbortSignal.timeout(PUT_TIMEOUT_MS),
+            redirect: "error",
+          });
+        },
+        catch: () => unavailable("R2 unreachable"),
+      }).pipe(
+        Effect.flatMap((response) =>
+          response.ok
+            ? Effect.void
+            : Effect.fail(unavailable(`R2 answered HTTP ${response.status}`)),
+        ),
+        Effect.tapError((error) =>
+          Effect.sync(() => {
+            console.warn(`[r2] PUT failed: ${error.message}`);
+          }),
+        ),
+      ),
     presignUpload: ({ key, contentType, byteSize }) =>
       Effect.sync(() =>
         sign("PUT", key, UPLOAD_URL_TTL_SECONDS, {
@@ -142,6 +170,7 @@ const notConfigured = Effect.fail(
 );
 
 const unconfigured: FileStorageShape = {
+  put: () => notConfigured,
   presignUpload: () => notConfigured,
   presignDownload: () => notConfigured,
   head: () => notConfigured,

@@ -10,6 +10,10 @@ import { z } from "zod";
  *   - data centres: https://www.zoho.com/accounts/protocol/oauth/multi-dc.html
  *   - scopes and revoking: https://www.zoho.com/books/api/v3/oauth/
  *   - https://www.zoho.com/books/api/v3/organizations/ and …/chart-of-accounts/
+ *   - https://www.zoho.com/books/api/v3/expenses/: create, list by
+ *     `reference_number`, and "Add receipt to an expense" (`receipt`, scope
+ *     ZohoBooks.expenses.CREATE)
+ *   - limits: https://www.zoho.com/books/api/v3/introduction/ (HTTP 429)
  *
  * Zoho runs several data centres. Sign-in starts at accounts.zoho.com; the
  * callback names the person's accounts server and the token reply names the
@@ -127,6 +131,32 @@ export interface ZohoBooksSession {
   readonly accessToken: Redacted.Redacted;
 }
 
+/** One Zoho expense as Expendi posts it (spec §6.17). */
+export interface ZohoExpenseDraft {
+  readonly accountId: string;
+  readonly paidThroughAccountId: string;
+  /** YYYY-MM-DD. */
+  readonly date: string;
+  /** KES with exactly two decimals, e.g. "1500.50", from integer cents. */
+  readonly amount: string;
+  /** Up to 100 characters; Expendi's ID for what's posted. */
+  readonly referenceNumber: string;
+  /** Up to 100 characters. */
+  readonly description: string;
+}
+
+export interface ZohoExpense {
+  readonly id: string;
+  readonly referenceNumber: string | null;
+  readonly hasReceipt: boolean;
+}
+
+export interface ZohoReceiptFile {
+  readonly bytes: Uint8Array;
+  readonly contentType: string;
+  readonly fileName: string;
+}
+
 export interface ZohoShape {
   /** False when the Zoho client settings are missing and every call fails. */
   readonly configured: boolean;
@@ -154,6 +184,23 @@ export interface ZohoShape {
     session: ZohoBooksSession,
     organizationId: string,
   ) => Effect.Effect<readonly ZohoBooksAccount[], ZohoError>;
+  /** Every expense whose reference number is exactly `referenceNumber`. */
+  readonly findExpenses: (
+    session: ZohoBooksSession,
+    organizationId: string,
+    referenceNumber: string,
+  ) => Effect.Effect<readonly ZohoExpense[], ZohoError>;
+  readonly createExpense: (
+    session: ZohoBooksSession,
+    organizationId: string,
+    draft: ZohoExpenseDraft,
+  ) => Effect.Effect<ZohoExpense, ZohoError>;
+  readonly attachReceipt: (
+    session: ZohoBooksSession,
+    organizationId: string,
+    expenseId: string,
+    file: ZohoReceiptFile,
+  ) => Effect.Effect<void, ZohoError>;
 }
 
 export class Zoho extends Context.Tag("Zoho")<Zoho, ZohoShape>() {}
@@ -168,6 +215,7 @@ export interface ZohoSettings {
 const REQUEST_TIMEOUT_MS = 20_000;
 const ACCOUNTS_PAGE_SIZE = 200;
 const MAX_ACCOUNT_PAGES = 25;
+const EXPENSE_SEARCH_PAGE_SIZE = 25;
 
 const zohoId = z.union([z.string().min(1), z.number().int()]).transform(String);
 
@@ -181,7 +229,55 @@ const tokenReplySchema = z.looseObject({
 
 const booksReplySchema = z.looseObject({
   code: z.number().int(),
+  message: z.string().optional(),
 });
+
+const expenseReplySchema = z.looseObject({
+  expense_id: zohoId,
+  reference_number: z.string().nullish(),
+  /** Blank when the expense has no receipt. */
+  expense_receipt_name: z.string().nullish(),
+});
+
+const expensesReplySchema = z.looseObject({
+  expenses: z.array(expenseReplySchema),
+  page_context: z
+    .looseObject({ has_more_page: z.boolean().optional() })
+    .optional(),
+});
+
+const createdExpenseReplySchema = z.looseObject({
+  expense: expenseReplySchema,
+});
+
+function toExpense(reply: z.infer<typeof expenseReplySchema>): ZohoExpense {
+  return {
+    id: reply.expense_id,
+    referenceNumber: reply.reference_number ?? null,
+    hasReceipt: (reply.expense_receipt_name ?? "").trim() !== "",
+  };
+}
+
+const KES_AMOUNT = /^\d+\.\d{2}$/;
+
+/**
+ * Books' JSON body for a new expense. The amount goes in as a JSON number
+ * spliced from its decimal text, so it never passes through a float here.
+ */
+function expenseBody(draft: ZohoExpenseDraft): string | null {
+  if (!KES_AMOUNT.test(draft.amount)) return null;
+  const fields = JSON.stringify({
+    account_id: draft.accountId,
+    paid_through_account_id: draft.paidThroughAccountId,
+    date: draft.date,
+    reference_number: draft.referenceNumber,
+    description: draft.description,
+  });
+  return `${fields.slice(0, -1)},"amount":${draft.amount}}`;
+}
+
+/** Zoho's own explanation of a refusal, shortened for logs and staff. */
+const MAX_ZOHO_MESSAGE_LENGTH = 200;
 
 const organizationsReplySchema = z.looseObject({
   organizations: z.array(
@@ -312,6 +408,10 @@ export function makeZohoClient(
     path: string,
     params: Record<string, string>,
     schema: z.ZodType<T>,
+    request: {
+      readonly method: "GET" | "POST";
+      readonly body?: string | FormData;
+    } = { method: "GET" },
   ) =>
     Effect.gen(function* () {
       const origin = zohoApiDomain(session.apiDomain);
@@ -323,14 +423,23 @@ export function makeZohoClient(
         url.searchParams.set(name, value);
       }
       const reply = yield* send(label, url, {
-        method: "GET",
+        method: request.method,
         headers: {
           Authorization: `Zoho-oauthtoken ${Redacted.value(session.accessToken)}`,
           Accept: "application/json",
+          ...(typeof request.body === "string" && {
+            "Content-Type": "application/json",
+          }),
         },
+        body: request.body,
       });
       const envelope = booksReplySchema.safeParse(reply.body);
-      const booksCode = envelope.success ? ` (code ${envelope.data.code})` : "";
+      const zohoMessage = envelope.success
+        ? envelope.data.message?.slice(0, MAX_ZOHO_MESSAGE_LENGTH)
+        : undefined;
+      const booksCode = envelope.success
+        ? ` (code ${envelope.data.code}${zohoMessage ? `: ${zohoMessage}` : ""})`
+        : "";
       if (reply.status === 401) {
         return yield* fail(
           "UNAUTHORIZED",
@@ -463,6 +572,62 @@ export function makeZohoClient(
           "Zoho chart of accounts: more pages than expected",
         );
       }),
+    findExpenses: (session, organizationId, referenceNumber) =>
+      books(
+        "expense search",
+        session,
+        "/expenses",
+        {
+          organization_id: organizationId,
+          reference_number: referenceNumber,
+          per_page: String(EXPENSE_SEARCH_PAGE_SIZE),
+        },
+        expensesReplySchema,
+      ).pipe(
+        Effect.flatMap((reply) =>
+          // A reference is one item's, so a second page means something's off.
+          reply.page_context?.has_more_page
+            ? fail(
+                "INVALID_RESPONSE",
+                "Zoho expense search: more matches than expected",
+              )
+            : Effect.succeed(
+                reply.expenses
+                  .map(toExpense)
+                  .filter((found) => found.referenceNumber === referenceNumber),
+              ),
+        ),
+      ),
+    createExpense: (session, organizationId, draft) => {
+      const body = expenseBody(draft);
+      if (body === null) {
+        return fail("API_ERROR", "Zoho create expense: malformed amount");
+      }
+      return books(
+        "create expense",
+        session,
+        "/expenses",
+        { organization_id: organizationId },
+        createdExpenseReplySchema,
+        { method: "POST", body },
+      ).pipe(Effect.map(({ expense }) => toExpense(expense)));
+    },
+    attachReceipt: (session, organizationId, expenseId, file) => {
+      const form = new FormData();
+      form.set(
+        "receipt",
+        new Blob([new Uint8Array(file.bytes)], { type: file.contentType }),
+        file.fileName,
+      );
+      return books(
+        "attach receipt",
+        session,
+        `/expenses/${encodeURIComponent(expenseId)}/receipt`,
+        { organization_id: organizationId },
+        booksReplySchema,
+        { method: "POST", body: form },
+      ).pipe(Effect.asVoid);
+    },
   };
 }
 
@@ -481,6 +646,9 @@ const unconfigured: ZohoShape = {
   revokeToken: notConfigured,
   listOrganizations: notConfigured,
   listAccounts: notConfigured,
+  findExpenses: notConfigured,
+  createExpense: notConfigured,
+  attachReceipt: notConfigured,
 };
 
 /**

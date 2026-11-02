@@ -106,6 +106,8 @@ describe("internal routes", () => {
         "GET /internal/me",
         "POST /internal/session",
         "GET /internal/audit",
+        "GET /internal/alerts",
+        "GET /internal/health",
         "GET /internal/companies",
         "GET /internal/companies/:organizationId",
         "GET /internal/payouts",
@@ -118,6 +120,8 @@ describe("internal routes", () => {
         "POST /internal/controls/pause/confirm",
         "POST /internal/controls/unpause/prepare",
         "POST /internal/controls/unpause/confirm",
+        "GET /internal/companies/:organizationId/zoho/syncs",
+        "POST /internal/companies/:organizationId/zoho/syncs/:syncId/requeue",
       ]),
     );
   });

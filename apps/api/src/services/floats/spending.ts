@@ -39,6 +39,7 @@ import {
   nairobiToday,
 } from "../expenses/rules.js";
 import { reconcileWithSms, smsTextAmong } from "../expenses/sms-evidence.js";
+import { enqueueRecordedSpending } from "../zoho/enqueue.js";
 import {
   floatNotFound,
   readFloatSummary,
@@ -353,6 +354,7 @@ export function recordFloatSpending(
               leftBeforeKes: before.leftKes,
             },
           });
+          yield* enqueueRecordedSpending(tx, organizationId, spending.id);
         }
         return { spendingId, claimId };
       }),

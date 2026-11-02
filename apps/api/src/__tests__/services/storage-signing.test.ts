@@ -171,6 +171,68 @@ describe("makeR2Storage", () => {
     expect(methods).toEqual(["GET", "GET"]);
   });
 
+  it("stores a file the API made through a signed PUT that names its content type", async () => {
+    // #given
+    const requests: { url: URL; init: RequestInit | undefined }[] = [];
+    const fakeR2: typeof fetch = (input, init) => {
+      requests.push({
+        url: new URL(input instanceof Request ? input.url : String(input)),
+        init,
+      });
+      return Promise.resolve(new Response(null, { status: 200 }));
+    };
+    const storage = makeR2Storage(settings, fakeR2, () => signedAt);
+
+    // #when
+    await Effect.runPromise(
+      storage.put({
+        key: "org/1/exports/2/expendi-2026-10.xlsx",
+        bytes: new Uint8Array([1, 2, 3]),
+        contentType: "application/zip",
+      }),
+    );
+
+    // #then
+    const [request] = requests;
+    expect(request?.init?.method).toBe("PUT");
+    expect(request?.url.pathname).toBe(
+      "/expendi-receipts/org/1/exports/2/expendi-2026-10.xlsx",
+    );
+    expect(request?.url.searchParams.get("X-Amz-SignedHeaders")).toBe(
+      "content-type;host",
+    );
+    expect(new Headers(request?.init?.headers).get("content-type")).toBe(
+      "application/zip",
+    );
+    expect(new Uint8Array(request?.init?.body as Buffer)).toEqual(
+      new Uint8Array([1, 2, 3]),
+    );
+  });
+
+  it("fails an upload R2 refuses", async () => {
+    // #given
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const storage = makeR2Storage(
+      settings,
+      () => Promise.resolve(new Response(null, { status: 403 })),
+      () => signedAt,
+    );
+
+    // #when
+    const result = await Effect.runPromise(
+      Effect.either(
+        storage.put({
+          key: "org/1/exports/2/expendi-2026-10.xlsx",
+          bytes: new Uint8Array([1]),
+          contentType: "application/zip",
+        }),
+      ),
+    );
+
+    // #then
+    expect(result).toMatchObject({ left: { code: "UNAVAILABLE" } });
+  });
+
   it("fails a download R2 refuses", async () => {
     // #given
     vi.spyOn(console, "warn").mockImplementation(() => undefined);

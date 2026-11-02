@@ -50,6 +50,10 @@ function RootNavigator(): JSX.Element {
       <Stack.Protected guard={isSignedIn}>
         <Stack.Screen name="(app)" />
         <Stack.Screen
+          name="(admin)/export"
+          options={withHeader("Monthly export")}
+        />
+        <Stack.Screen
           name="(onboarding)/create-company"
           options={withHeader("Create a company")}
         />

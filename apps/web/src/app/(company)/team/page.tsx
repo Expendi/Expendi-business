@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import type { JSX } from "react";
 
-import { PlaceholderPage } from "~/components/placeholder-page";
+import { TeamView } from "./_components/team-view";
 
 export const metadata: Metadata = { title: "Team" };
 
 export default function TeamPage(): JSX.Element {
-  return <PlaceholderPage title="Team" task="T49" />;
+  return <TeamView />;
 }

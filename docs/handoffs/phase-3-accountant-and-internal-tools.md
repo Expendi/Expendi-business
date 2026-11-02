@@ -191,7 +191,54 @@ T23 → T27 → T24 → T22 → T25 → T30 → T31 → T44 → T26
   - 2026-11-02: started early, in parallel with Phase 2 code (Dennis's decision; see the Phase 2 Handoff notes, "QA deferred").
   - T23 is in progress; T27, T24 and T30 follow it.
   - T22, T25, T26, T31 and T44 wait for T19 and Phase 2B code.
+- **Status (2026-11-02, fifth wave):**
+  - T22, T31, T44 and T26 code done. T26 includes the admin alerts and system health pages. See `next-session.md` for final release verification and deployment status.
+  - T25 (spreadsheet import) is the only Phase 3 task not built; it needs the pilot's spreadsheet sample.
+  - Migrations 0057–0064 aren't deployed yet. A second session's drafts for T22, T31 and T44 (migrations 0057–0058) were taken over and reworked; `0057_salty_bloodstrike` was renamed `0057_accounting_sync_columns` (journal tag updated).
+  - Zoho and the monthly export haven't run against real services.
 - **Built:**
+  - **T22 monthly export (EXP-299):**
+    - **Routes:** `GET /organizations/:id/reports/exports` (list; admins and accountants), `POST …/reports/exports {month}` (generate; admins; returns three 30-day links; audited `report_export.generated`), `GET …/reports/exports/:exportId/files/:file` (15-minute R2 link) and the public `GET /downloads/reports/:token/:file` (redirects to a fresh R2 link; 410 expired, 404 invalid or revoked).
+    - **Links:** the token is stored hashed. The 30-day link isn't a presigned R2 URL (SigV4 allows 7 days at most).
+    - **Job:** `monthly-export` (lock 72_022). On its first run in a new Nairobi month it makes last month's export and emails each non-removed accountant (invited included) their own link, once per company per month. `fflate` was added; the xlsx is written by hand.
+    - **Migrations:** `0059_report_exports` and `0060_report_exports_rls`: `report_exports` and `report_export_links` (RLS FORCE, no DELETE; admins and accountants read, admins write), plus the definers `report_export_by_token(hash)` and `monthly_export_companies()`.
+    - **App:** `(admin)/export.tsx`.
+    - **Gaps:** a receipt missing from R2 fails the whole export (503); if recording a sent email fails, the next run re-sends with a new link; the receipts zip is built in memory (fine at pilot scale).
+  - **T31 push paid claims to Zoho (EXP-302):**
+    - **Queue:** a claim moving to `paid` queues a sync in the payout's transaction (`claim-payout-hooks.ts` → `services/zoho/enqueue.ts`).
+    - **Job:** `zoho-sync` (lock 72_031, every 60 seconds) posts with the mapped account, searches Zoho by reference before every create, and attaches the receipt (`POST /expenses/{id}/receipt`, no new scope needed).
+    - **Retries:** 6 tries (1 minute, 5 minutes, 15 minutes, 1 hour, 3 hours), then `failed` and an `accounting_sync.failed` audit entry. Rate limits and paused connections don't use tries. `needs_reconnect` pauses syncing, and the backlog syncs after reconnecting.
+    - **Staff:** `GET /internal/companies/:id/zoho/syncs?status=failed|pending|synced` and `POST …/zoho/syncs/:syncId/requeue` (ops_admin, audited `accounting_sync.requeued`), with a "Syncs to Zoho" panel in the admin app.
+    - **Migrations:** `0057_accounting_sync_columns` (also T44): `accounting_syncs.external_organization_id` and `next_attempt_at`, `accounting_connections.petty_cash_account_id` and `salaries_account_id`. `0058_zoho_sync_queue`: an owner-read policy on `accounting_syncs` and `accounting_syncs_due(max_rows)`.
+    - **Unconfirmed against live Zoho:** the exact-match `reference_number` filter, the amount as a JSON number, "add receipt" when one exists, size limits, and daily call limits (1,000 a day free; 2–4 calls per claim).
+  - **T44 push other paid spending to Zoho (EXP-315):**
+    - **Queues:**
+      - petty cash (float spending, and claims with a float)
+      - company spending, through its mapped paid-from account
+      - bills paid through Expendi (wallet account, invoice attached, USD at the payout's KES)
+      - bills paid outside (once, as the bill, through its paid-from account)
+      - each payroll run, as one expense for the total to the salaries account, described "Salaries · payroll run for <pay date>" with no names or per-person amounts
+    - **Never synced:** float issues and top-ups, and imported history.
+    - **No new migration:** it uses 0057's columns and `paid_from_accounts.accounting_account_id`.
+    - **Admin Zoho page:** petty cash Paid Through, salaries account, and a mapping per paid-from account.
+    - **Defaults:** bill date is the day paid; payroll run date is the pay date; the invoice is preferred over proof; zero-total runs aren't queued; missing mappings defer with a message.
+    - **Confirm against live Zoho:** which Paid Through account types it accepts, PDF receipts, and (with the accountant) payroll on the pay date versus the paid date.
+  - **T26 alerts (EXP-291):**
+    - **Status:** API and admin pages are built; live QA remains.
+    - **Staff reads:** `GET /internal/alerts` and `GET /internal/health`, behind staff login, available to `ops_viewer` and `ops_admin`, read-only. Alerts show open incidents first, then those resolved in the last 7 days, up to 200 with a truncation flag. Health shows the last reconciliation run, its 5-minute overdue status, and the open or latest webhook signature-failure incident.
+    - **Admin pages:** `/alerts` and `/health`, linked from staff navigation, refresh every minute. Alerts link to the relevant payout, company, Zoho or health page. Only `reconcile-paycrest` currently records a heartbeat.
+    - **Tests:** `internal-alerts.serial.test.ts` covers 20 cases for staff access, viewer access, read-only routes, customer isolation, incident ordering and health. These run serially because alerts and heartbeats are platform-wide. The admin app has no component-test setup.
+    - **Job:** `alert-checks` (lock 72_026, every minute), emailing `ALERT_EMAILS`. One open incident per kind and subject (database index), a send lease, a Resend idempotency key and retry backoff.
+    - **The 6 alerts:**
+      - payout needs review (per payout; resolves when it leaves the state)
+      - payout failed (approved, failed in the last 24 hours, once per payout ever)
+      - Paycrest webhook signature failure (raised inline; resolves after 60 quiet minutes)
+      - reconciliation stopped (heartbeat older than 5 minutes; reconcile now writes a heartbeat)
+      - low company balance (spendable below unpaid claims plus 7-day cash-check obligations)
+      - Zoho sync failing (`needs_reconnect`, or any failed sync)
+    - **Migrations:** `0062_ops_alerts` and `0063_ops_alerts_access`: the `ops_alert_kind` enum, `ops_alerts`, `station_heartbeats`, system-only RLS on alerts, an `expenses_owner_reads` policy, and the definers `ops_alert_payouts`, `ops_alert_balance_companies` and `ops_alert_zoho_companies`.
+    - **Migration 0064:** `0064_staff_ops_alerts_reads` adds `staff_ops_alerts(...)` to include company names without extra owner access to `ops_alerts`. Customer and signed-in-user scopes return no rows.
+    - **Gaps:** only Paycrest signature failures alert; staff-resolved failed payouts also email; the Zoho alert shows counts, not error text; low-balance shows only the spendable balance; if the whole API is down nothing alerts (needs external uptime monitoring); the first run on deploy emails existing `needs_review` and recently failed payouts once.
   - **T23 (2026-11-02, uncommitted):**
     - **`staff_users`** (migrations 0020/0021). The app role has no grant on the table; staff login resolves only through `active_staff_by_email()` (SECURITY DEFINER), so the API can't list, add or re-enable staff.
     - **`/internal/*`:**
@@ -226,12 +273,31 @@ T23 → T27 → T24 → T22 → T25 → T30 → T31 → T44 → T26
 - **Spreadsheet column mapping for the pilot:**
 - **Zoho test organization, and the pilot's category-to-account mapping:**
 - **Changes from spec or plan, and why:**
+  - **T22 (spec §6.11 updated):**
+    - The CSV download is a zip of three CSVs, and each month has three links (workbook, CSV zip, receipts). Reason: one month has several sheets, and CSV has one table per file.
+    - Each accountant gets their own link, which stops working when they're removed; an admin's export has one shareable link. Reason: a removed accountant must lose access.
+    - Self-approved is filled only for claims (No for bills and salaries), and company spending leaves "Payee or employee" blank. Reason: neither has an approver or a payee in the data.
+    - Dennis approved the third sheet "Float transfers" on 2026-11-02; spec §6.11 records it. Float issues and top-ups move money rather than count as spending.
+  - **T31 (spec §6.17 updated):**
+    - Only companies with a connection that isn't disconnected queue syncs, so nothing from before connecting is pushed. Reason: history is already in the books.
+    - The job searches Zoho by reference before every create, not only before a retry. Reason: it removes the duplicate risk on a first call that timed out.
+    - The description is cut to Zoho's 100 characters, keeping name, M-Pesa code, eTIMS invoice number and PIN. A sync is tied to the Zoho organization of its first try.
+    - JPEG, PNG, GIF, BMP and PDF receipts attach; WebP and HEIC post without a receipt. Confirm PDF attachment support against live Zoho.
+  - **T44:** Dennis approved posting overspend claims through the Expendi wallet account on 2026-11-02, because the wallet paid the extra. Spec §6.17 records it; confirm with the accountant during live QA.
+  - **T26 (spec §6.16):** the admin Alerts and System health pages completed after the API and email work; both are read-only, preserving the rule that staff never move company money.
 - **Environment variables added:**
+  - **API (fifth wave):**
+    - `API_PUBLIC_URL` (T22): the API's public address, used for export links. Without it, generating answers 503 and the monthly job fails.
+    - `ALERT_EMAILS` (T26): comma-separated. Without it, alerts are only logged.
   - **API:** `ADMIN_APP_ORIGINS`, optional and comma-separated.
   - **Admin app:** `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_PRIVY_APP_ID`, `NEXT_PUBLIC_PRIVY_CLIENT_ID` (optional).
   - **API, Zoho, all optional (without them, connect answers 503):** `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REDIRECT_URI`, `ACCOUNTING_TOKEN_KEY` (`openssl rand -base64 32`; never change it once tokens are stored).
   - **Zoho console:** a server-based client, redirect `<api>/integrations/zoho/callback`, Multi-DC on with "same credentials for all data centres".
   - **Privy dashboard:** add the admin app's origins (e.g. `http://localhost:3001` and the deployed URL) as allowed domains.
 - **Known issues and TODOs:**
-- **QA results (date, who ran it):**
-- **Next session starts with:**
+  - **T25** isn't built; it needs the pilot's spreadsheet sample.
+  - **T26:** admin pages are built; configure `ALERT_EMAILS` and run the live checks, including the operational gaps above.
+  - **T22 export recipients:** done (invited accountants are included).
+  - **Zoho:** the unconfirmed behaviours under T31 and T44 need a live check.
+- **QA results (2026-11-02, OpenCode):** final API suites passed 2,044 main and 169 serial tests on a fresh local database through migration 0064; no schema drift. API/shared checks and admin build pass. Fixed the staff-health test's fixture cleanup to age both open and resolved webhook incidents left by earlier serial files; a deterministic regression failed before the fix and passes after it. Live provider and Checkpoint D QA remain pending. See `next-session.md` for the complete release results.
+- **Next session starts with:** replace Doppler provider placeholders, then release the locally committed fifth wave; configure Zoho and `ALERT_EMAILS` for live QA. T25 still needs the pilot spreadsheet.

@@ -18,6 +18,7 @@ import {
 import { query, withScope } from "../../db/scope.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { nairobiDate, scheduledStatus } from "../bills/status.js";
+import { notify } from "../notification/notify.js";
 import { dueAfter } from "../recurring/schedule.js";
 import { payrollCapKes } from "./cap.js";
 
@@ -39,6 +40,9 @@ import { payrollCapKes } from "./cap.js";
  *
  * The cap is fixed here: the net pay of the salaries drafted in, plus the
  * company's margin (`payroll_runs.salaries_kes`, `cap_kes`).
+ *
+ * A new run tells the admins it's ready to review (spec §6.10), in the
+ * transaction that drafts it.
  */
 
 const PAYROLL_DRAFTS: AuditActor = { type: "system", id: "payroll-drafts" };
@@ -323,6 +327,13 @@ export function draftPayrollRun(
         payments: inserted,
       },
     });
+    if (created) {
+      yield* notify(tx, {
+        kind: "payroll_ready",
+        organizationId,
+        payrollRunId: run.id,
+      });
+    }
     return {
       kind: "drafted",
       runId: run.id,
@@ -383,10 +394,7 @@ export function draftDuePayroll(
 export interface PayrollDraftsRun {
   /** The Nairobi day the run used. */
   readonly today: string;
-  /**
-   * Runs drafted by this run, for the admins' notification (T43):
-   * "payroll for <payDate> is ready to review".
-   */
+  /** Runs drafted by this run; each told its admins it's ready to review. */
   readonly drafted: readonly {
     readonly organizationId: string;
     readonly runId: string;

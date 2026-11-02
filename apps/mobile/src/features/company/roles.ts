@@ -10,5 +10,6 @@ export const ROLE_LABELS: Record<MembershipRole, string> = {
 export const ROLE_DESCRIPTIONS: Record<MembershipRole, string> = {
   admin: "Approves and pays claims, and manages the wallet and team.",
   employee: "Submits their own claims and gets paid to M-Pesa.",
-  accountant: "No app login. Receives the monthly export.",
+  accountant:
+    "View-only access at business.expendi.app, plus monthly exports by email.",
 };

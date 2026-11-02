@@ -148,7 +148,31 @@ T45 → T46 → T47 → T49 → T48 → T50 → T51. T45 and T46 can start at on
 ## Handoff notes (fill in before ending each session)
 
 - **Status (2026-11-02):** T45 and T46 code done (uncommitted at the time of writing). T47–T51 are next, each after its API (T42 for T50, T22 for T51).
+- **Status (2026-11-02, fifth wave):** T47–T51 code done and included in the local release commit. All of Phase 3B is built; Checkpoint D2 hasn't run. The older web release is live at `business.expendi.app` on Vercel (Hobby, from a mirror repo; see Built). The fifth wave awaits the provider setup and deployment in `next-session.md`.
 - **Built:**
+  - **T47 expenses and approvals (EXP-318):**
+    - **API:** `GET /organizations/:id/expenses` and `/:expenseId` (admins and accountants). Filters: `membershipId`, `kind` (`claim`, `petty_cash`, `company`), `categoryId`, `month`, `etimsStatus`, `cursor`, `limit` up to 100. A claim has no `float_id`; petty cash is float spending plus claims with a `float_id`; a bill paid outside appears once, as company spending. The detail returns receipts through presigned downloads.
+    - **Web:** the expenses and approvals pages; batch approve with one passkey (`@simplewebauthn/browser` added); reject; retry.
+    - **Shared helpers:** `lib/{money,dates,approval,use-approval,passkeys}.ts` and `components/{receipt-viewer,expense-status,approval-passkey-gate}.tsx`.
+    - **Gaps:** stored passkey `transports` are stripped so an app passkey offers "use a phone or tablet"; the person filter lacks removed members; archived categories can't be picked in the filter; one detail request per queue card; `ApprovalPasskeyGate` still says to set up the passkey in the app (Settings can now do it).
+  - **T48 bills, recurring, payees, payroll (EXP-319):**
+    - Pages on the existing APIs, with no API changes. Desktop PDF invoice upload; Pay and Pay all (up to 20, with the 24-hour hold's second confirmation); payroll adjust and Approve & pay all; recurring pause, resume and end. Accountants are read-only, salaries included.
+    - **Decisions:** the web shows full payee account numbers (Dennis approved on 2026-11-02; the app masks to the last 4). Unpaid USD bills show "≈ KES X today"; paid ones show USD only, because the bill read lacks the payment-day KES. Failed bills are retried one at a time.
+  - **T49 wallet, team, settings, activity (EXP-320):**
+    - **API:** `POST /organizations/:id/categories`, `PATCH …/categories/:categoryId` (rename, eTIMS-exempt), `POST …/:categoryId/archive` and `/restore` (admins; audited `category.created`, `updated`, `archived`, `restored`; 409 on a name clash or editing an archived one) and `GET …/categories?archived=true`. `GET /organizations/:id/activity` (admins and accountants; keyset paging; Nairobi dates).
+    - **Migration:** `0061_company_activity_log`: the definer `company_activity_log(...)`, current company only, admin and accountant only, with no request ID, IP or device.
+    - **Web:** wallet (withdraw and allowlist with a passkey, copy address, no QR), team, settings (categories, approval passkey set-up in the browser) and activity.
+  - **T50 spending overview (EXP-321):** the overview page on T42's API. The shared display helpers moved to `packages/shared/src/overview.ts` (`heading` is now required), and the mobile app re-exports them. The API returns required `cash.outsideKes`; web and mobile show "Also due outside Expendi: KES X" when non-zero, using the shared `cashOutsideLine` helper (Dennis approved on 2026-11-02).
+  - **T51 accountant downloads and eTIMS report (EXP-322):**
+    - `GET /organizations/:id/reports/:month/:format` (`workbook`, `csv`, `receipts`, `etims`) now returns the file itself (attachment, `private, no-store`), built in a read-only transaction. Admins and accountants; employees get 403.
+    - The eTIMS CSV has a BOM and the statuses "Attached", "Not required" and "None". It excludes rejected claims (Dennis approved on 2026-11-02; spec §6.14 updated). For an overspend whose extra claim was rejected, the float row still carries the whole purchase amount, matching the receipt.
+    - The Reports page has a month picker and four downloads; admins can make shareable 30-day links.
+    - **Gaps:** a future month isn't refused (it gives empty files); the web doesn't list stored exports.
+  - **Vercel setup (done 2026-11-02):**
+    - Project `expendi-business-web` (`prj_XuDDe4IkVsq9l4iKx9K6sGqtj2l8`) in the personal scope `dennohkims-projects` (Hobby). Root `apps/web`, Node 22.x, Next.js, "include files outside root" on. Env, all targets: `NEXT_PUBLIC_API_URL=https://api-dev-dcdc.up.railway.app` and `NEXT_PUBLIC_PRIVY_APP_ID`.
+    - Deploys come from a private mirror, `github.com/DennohKim/expendi-business-web` (git remote `web-deploy`), a full copy of the monorepo.
+    - **Release:** `git push origin main && git push web-deploy main`. Vercel deploys `main` of the mirror.
+    - `business.expendi.app` was moved from a scratch project `business-page`. DNS is Cloudflare, CNAMEd to Vercel. The two passkey files serve `application/json` with no redirect.
   - **T45:**
     - **The app:** `apps/web` (Next.js 16, port 3002), copied from `apps/admin`.
     - **Sign-in:** an email code or a passkey, with a passkey offer after an email sign-in.
@@ -169,13 +193,20 @@ T45 → T46 → T47 → T49 → T48 → T50 → T51. T45 and T46 can start at on
     - **RLS (0051):** accountants can read bills, recurring items, payroll runs, payroll payouts and floats.
     - **Test:** a route-listing test proves every action refuses accountants, and every read matches the admin's.
 - **Changes from spec or plan, and why:**
+  - **Vercel Hobby and the mirror repo:** Hobby can't connect the private org repo `Expendi/Expendi-business`, and the `expendi` team (Pro) is suspended for a missing payment method. So Vercel deploys from a mirror. Before the pilot, move to a Pro team (reactivate `expendi` or upgrade): Hobby's terms don't allow commercial use.
+  - **T49 (spec §6.14 updated):**
+    - Category **restore** was added, which isn't in the spec's list. Reason: a mistaken archive shouldn't lose its Zoho mapping. Kept (Dennis, 2026-11-02); spec §6.14 lists it.
+    - The activity page hides request ID, IP and device, and shows staff as "Expendi team" and systems as "Expendi (automatic)". Reason: customers shouldn't see staff identities or other people's network details.
+    - Company details are read-only (no API for editing them), and the eTIMS-exempt flag isn't retroactive. Reason: the first needs a new API; the second keeps past claims' statuses unchanged.
 - **Environment variables added:**
   - **API:** `DASHBOARD_ORIGINS` (optional, comma-separated).
   - **Web:** `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_PRIVY_APP_ID`, `NEXT_PUBLIC_PRIVY_CLIENT_ID` (optional).
-  - **Vercel project:** root `apps/web`, Node 22, domain `business.expendi.app`.
+  - **Vercel project:** root `apps/web`, Node 22, domain `business.expendi.app`. Set in the fifth wave (see Vercel setup above).
 - **Known issues and TODOs:**
-  - **Mobile copy:** `apps/mobile/src/features/company/roles.ts` still says accountants have "No app login". Update it to point them at the dashboard.
-  - **Export recipients:** T22 should send the export to accountants whose membership isn't removed, not only active ones (an invited accountant may not have signed in yet).
+  - **Mobile copy:** done (T42): `roles.ts` now reads "View-only access at business.expendi.app, plus monthly exports by email."
+  - **Export recipients:** done (T22): the export goes to every non-removed accountant, invited ones included.
+  - **Vercel Hobby:** move to a Pro team before the pilot (see Changes above). The scratch project `business-page` can be deleted.
+  - **R2 CORS:** the PDF invoice upload from the browser needs a bucket CORS rule (PUT and GET from `https://business.expendi.app` and `http://localhost:3002`, header `content-type`). Not set yet.
   - **Deploying migration 0050:** the old release reads the dropped columns, so expect a few seconds of errors while the new release replaces it.
-- **QA results (date, who ran it, browsers used):**
-- **Next session starts with:**
+- **QA results (2026-11-02, OpenCode):** 153 web, 272 mobile and 174 shared tests passed; web typecheck/lint/format and production build passed. The final eTIMS rejected-claim filter and web/mobile outside total are included. No real-browser or device QA was performed; Checkpoint D2 remains pending.
+- **Next session starts with:** finish provider setup, deploy the API and web fifth wave, then run Checkpoint D2 against real uploads and passkeys.

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import type { JSX } from "react";
 
-import { PlaceholderPage } from "~/components/placeholder-page";
+import { RecurringView } from "./_components/recurring-view";
 
 export const metadata: Metadata = { title: "Recurring" };
 
 export default function RecurringPage(): JSX.Element {
-  return <PlaceholderPage title="Recurring" task="T48" />;
+  return <RecurringView />;
 }

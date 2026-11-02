@@ -61,6 +61,24 @@ export const claimNotificationDataSchema = z.object({
 export type ClaimNotificationData = z.infer<typeof claimNotificationDataSchema>;
 
 /**
+ * Bills, payroll, the wallet and floats (spec §6.10). Each push names the
+ * company and the record: `billId` (bill reminders, salary paid),
+ * `payrollRunId`, `floatId`; `wallet_short` names only the company.
+ */
+export const SPENDING_NOTIFICATION_TYPES = [
+  "bill_due_soon",
+  "bill_due_today",
+  "bill_overdue",
+  "payroll_ready",
+  "wallet_short",
+  "salary_paid",
+  "float_issued",
+  "float_topped_up",
+] as const;
+export type SpendingNotificationType =
+  (typeof SPENDING_NOTIFICATION_TYPES)[number];
+
+/**
  * What a push carries for the app to open when it's tapped. Bills, payroll
  * and floats (T43) add their own shapes here.
  */

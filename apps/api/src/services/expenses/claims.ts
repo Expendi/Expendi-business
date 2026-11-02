@@ -73,6 +73,7 @@ export interface ClaimView {
   readonly etimsQrPayload: string | null;
   readonly etimsStatus: EtimsStatus;
   readonly rejectedReason: string | null;
+  readonly floatId: string | null;
   readonly submittedBy: {
     readonly membershipId: string;
     readonly name: string | null;
@@ -121,6 +122,10 @@ const notYourClaim = new Forbidden({
 });
 const notEditable = new Conflict({
   message: "This claim can't be changed after it's approved.",
+});
+const overspendAmountFixed = new Conflict({
+  message:
+    "This claim is the part of a petty cash purchase over the float, so its amount comes from that purchase and can't be changed.",
 });
 const unknownCategory = new BadRequest({
   message: "Pick one of the company's categories.",
@@ -222,6 +227,7 @@ const claimColumns = {
   etimsQrPayload: expenses.etimsQrPayload,
   etimsStatus: expenses.etimsStatus,
   rejectedReason: expenses.rejectedReason,
+  floatId: expenses.floatId,
   membershipId: expenses.membershipId,
   warnings: expenses.warnings,
   submitterName: users.fullName,
@@ -264,6 +270,7 @@ function toClaimView(tenant: Tenant, row: ClaimRow): ClaimView {
     etimsQrPayload: row.etimsQrPayload,
     etimsStatus: row.etimsStatus,
     rejectedReason: row.rejectedReason,
+    floatId: row.floatId,
     submittedBy: {
       membershipId: row.membershipId,
       name: row.submitterName,
@@ -576,6 +583,7 @@ function lockOwnEditableClaim(
           etimsStatus: expenses.etimsStatus,
           rejectedReason: expenses.rejectedReason,
           warnings: expenses.warnings,
+          floatId: expenses.floatId,
         })
         .from(expenses)
         .where(and(visibleClaims(tenant), eq(expenses.id, claimId)))
@@ -645,6 +653,32 @@ function countReceipts(
 }
 
 /**
+ * What the purchase behind a claim cost, which its M-Pesa SMS states. For a
+ * claim over a petty cash float (spec §6.22) that's the claim plus the
+ * float spending it was split from.
+ */
+function purchaseTotalKes(
+  tx: Transaction,
+  organizationId: string,
+  claimId: string,
+  claimedKes: bigint,
+): Effect.Effect<bigint, DatabaseError> {
+  return query(() =>
+    tx
+      .select({
+        fromFloatKes: sql<string>`coalesce(sum(${expenses.amountKes}), 0)::text`,
+      })
+      .from(expenses)
+      .where(
+        and(
+          eq(expenses.organizationId, organizationId),
+          eq(expenses.overspendClaimId, claimId),
+        ),
+      ),
+  ).pipe(Effect.map(([row]) => claimedKes + BigInt(row?.fromFloatKes ?? "0")));
+}
+
+/**
  * The owner's edit (spec §5). A field left out stays; null clears an
  * optional one. Editing a rejected claim resubmits it: it goes back to
  * `submitted` and its rejection reason moves to the audit log.
@@ -693,13 +727,24 @@ export function updateClaim(
           : null;
 
         const amountKes = changes.amountKes ?? claim.amountKes;
+        if (claim.floatId !== null && amountKes !== claim.amountKes) {
+          return yield* Effect.fail(overspendAmountFixed);
+        }
         const mpesaCode = yield* reconcileWithSms(
           {
             mpesaCode:
               changes.mpesaCode === undefined
                 ? claim.mpesaCode
                 : changes.mpesaCode,
-            amountKes,
+            amountKes:
+              claim.floatId === null
+                ? amountKes
+                : yield* purchaseTotalKes(
+                    tx,
+                    organizationId,
+                    claimId,
+                    amountKes,
+                  ),
           },
           yield* smsTextAmong(tx, organizationId, { expenseId: claimId }),
         );

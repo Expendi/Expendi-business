@@ -5,6 +5,7 @@ import type { AppRuntime } from "../../runtime.js";
 import { adminAppCors } from "../../middleware/admin-app-cors.js";
 import { staffAuthMiddleware } from "../../middleware/staff-auth.js";
 import { createZohoStaffRoutes } from "./accounting.js";
+import { createAlertRoutes } from "./alerts.js";
 import { createAuditRoutes } from "./audit.js";
 import { createStaffAuthRoutes } from "./auth.js";
 import { createCompanyRoutes } from "./companies.js";
@@ -28,6 +29,7 @@ export function createInternalRoutes(
     .use(staffAuthMiddleware(runtime))
     .route("/", createStaffAuthRoutes(runtime))
     .route("/", createAuditRoutes(runtime))
+    .route("/", createAlertRoutes(runtime))
     .route("/companies/:organizationId/zoho", createZohoStaffRoutes(runtime))
     .route("/", createCompanyRoutes(runtime))
     .route("/", createPayoutRoutes(runtime))

@@ -1,4 +1,4 @@
-import { and, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { Cause, Effect, Either, Exit } from "effect";
 
 import type { DatabaseService } from "../../db/client.js";
@@ -9,8 +9,15 @@ import type {
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { PushSendError, PushTicket } from "./push-sender.js";
-import { memberships, notificationOutbox } from "../../db/schema/index.js";
+import {
+  memberships,
+  notificationOutbox,
+  organizations,
+  users,
+} from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
+import { EmailSender } from "../email/email-sender.js";
+import { notificationEmail } from "../email/notification-email.js";
 import { PushSender } from "./push-sender.js";
 
 /**
@@ -19,7 +26,8 @@ import { PushSender } from "./push-sender.js";
  * holding its row: a second run skips a row being sent, and finds a sent
  * one marked. A crash before the mark rolls it back, so it is sent on the
  * next run; Expo accepting it just before such a crash is the one way a
- * notification arrives twice, never none.
+ * notification arrives twice, never none. Email rows (`channel`) go to each
+ * recipient's address instead, and Resend's idempotency key closes that gap.
  *
  * Recipients are worked out at send time: someone removed from the company
  * since gets nothing.
@@ -43,7 +51,12 @@ interface MemberToken extends Record<string, unknown> {
 type OutboxChanges = Partial<
   Pick<
     NotificationOutboxRow,
-    "sentAt" | "abandonedAt" | "lastError" | "deviceCount" | "tickets"
+    | "sentAt"
+    | "abandonedAt"
+    | "lastError"
+    | "deviceCount"
+    | "tickets"
+    | "emailRecipientsSent"
   >
 >;
 
@@ -52,11 +65,17 @@ export interface SendSummary {
   readonly considered: number;
   readonly sent: number;
   readonly abandoned: number;
-  /** Expo or the database failed; the rest wait for the next run. */
+  /** Expo, Resend or the database failed; the rest wait for the next run. */
   readonly failed: number;
 }
 
-type SendOutcome = "sent" | "abandoned" | "taken" | "failed";
+/**
+ * `failed`: Expo or the database, so the run stops. `email_failed`: Resend
+ * only, so the run goes on without email. `skipped`: an email row left for
+ * the next run, after Resend failed in this one.
+ */
+type SendOutcome =
+  "sent" | "abandoned" | "taken" | "failed" | "email_failed" | "skipped";
 
 const idList = (ids: readonly string[]) =>
   sql.join(
@@ -154,9 +173,73 @@ function readTickets(
   return { refs, gone };
 }
 
+interface EmailProgress {
+  /** Users the row has reached, this attempt and earlier ones. */
+  readonly sentTo: readonly string[];
+  /** Why the attempt stopped short; null once everyone was emailed. */
+  readonly error: string | null;
+}
+
+/**
+ * Emails each recipient the row hasn't reached yet, stopping at the first
+ * failure (Resend unreachable or not configured): the next attempt resumes
+ * from there. Resend's idempotency key covers a crash between its accepting
+ * a message and the row recording it.
+ */
+function sendEmails(
+  tx: Transaction,
+  row: NotificationOutboxRow,
+  userIds: readonly string[],
+): Effect.Effect<EmailProgress, DatabaseError, EmailSender> {
+  return Effect.gen(function* () {
+    const sentTo = [...row.emailRecipientsSent];
+    const remaining = userIds.filter((id) => !sentTo.includes(id));
+    if (remaining.length === 0) return { sentTo, error: null };
+    const recipients = yield* query(() =>
+      tx
+        .select({ id: users.id, email: users.email })
+        .from(users)
+        .where(inArray(users.id, remaining)),
+    );
+    const [company] = yield* query(() =>
+      tx
+        .select({ name: organizations.name })
+        .from(organizations)
+        .where(eq(organizations.id, row.organizationId)),
+    );
+    const sender = yield* EmailSender;
+    for (const recipient of recipients) {
+      const sent = yield* Effect.either(
+        sender.send(
+          notificationEmail({
+            to: recipient.email,
+            companyName: company?.name ?? "Your company",
+            title: row.title,
+            body: row.body,
+            idempotencyKey: `notification:${row.id}:${recipient.id}`,
+          }),
+        ),
+      );
+      if (Either.isLeft(sent)) {
+        console.warn(
+          `[email] notification ${row.id} not sent to user ${recipient.id}: ${sent.left.message}`,
+        );
+        return { sentTo, error: sent.left.message };
+      }
+      sentTo.push(recipient.id);
+    }
+    return { sentTo, error: null };
+  });
+}
+
 function sendOne(
   ref: OutboxRef,
-): Effect.Effect<SendOutcome, DatabaseError, DatabaseService | PushSender> {
+  emailDown: boolean,
+): Effect.Effect<
+  SendOutcome,
+  DatabaseError,
+  DatabaseService | PushSender | EmailSender
+> {
   return withScope({ organizationId: ref.organization_id }, (tx) =>
     Effect.gen(function* () {
       const [row] = yield* query(() =>
@@ -173,6 +256,7 @@ function sendOne(
           .for("update", { skipLocked: true }),
       );
       if (!row) return "taken";
+      if (row.channel === "email" && emailDown) return "skipped";
 
       const attemptedAt = new Date();
       const mark = (changes: OutboxChanges) =>
@@ -195,7 +279,24 @@ function sendOne(
         return "abandoned";
       }
 
-      const tokens = yield* tokensOf(tx, yield* recipientsOf(tx, row));
+      const userIds = yield* recipientsOf(tx, row);
+      if (row.channel === "email") {
+        const progress = yield* sendEmails(tx, row, userIds);
+        yield* mark(
+          progress.error === null
+            ? {
+                sentAt: attemptedAt,
+                emailRecipientsSent: progress.sentTo,
+                lastError: null,
+              }
+            : {
+                emailRecipientsSent: progress.sentTo,
+                lastError: progress.error,
+              },
+        );
+        return progress.error === null ? "sent" : "email_failed";
+      }
+      const tokens = yield* tokensOf(tx, userIds);
       if (tokens.length === 0) {
         yield* mark({ sentAt: attemptedAt, deviceCount: 0, lastError: null });
         return "sent";
@@ -249,18 +350,24 @@ function sweep(
 /**
  * Sends up to `maxRows` waiting notifications, least recently tried first.
  * Stops at the first failure (Expo unreachable, most likely): the rest wait
- * for the next run, and the failed one goes to the back of the queue.
+ * for the next run, and the failed one goes to the back of the queue. An
+ * email failure stops only the email: pushes go on.
  */
 export function sendPendingNotifications(
   maxRows = 50,
-): Effect.Effect<SendSummary, DatabaseError, DatabaseService | PushSender> {
+): Effect.Effect<
+  SendSummary,
+  DatabaseError,
+  DatabaseService | PushSender | EmailSender
+> {
   return Effect.gen(function* () {
     const refs = yield* sweep("notifications_to_send", maxRows);
     let sent = 0;
     let abandoned = 0;
     let failed = 0;
+    let emailDown = false;
     for (const ref of refs) {
-      const exit = yield* Effect.exit(sendOne(ref));
+      const exit = yield* Effect.exit(sendOne(ref, emailDown));
       if (Exit.isFailure(exit)) {
         console.error(
           `[push] notification ${ref.notification_id} failed`,
@@ -271,6 +378,10 @@ export function sendPendingNotifications(
       if (outcome === "failed") {
         failed += 1;
         break;
+      }
+      if (outcome === "email_failed") {
+        failed += 1;
+        emailDown = true;
       }
       if (outcome === "sent") sent += 1;
       if (outcome === "abandoned") abandoned += 1;

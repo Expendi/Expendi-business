@@ -3,8 +3,10 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { ConfigService } from "./config.js";
 import { makeRuntime } from "./runtime.js";
+import { alertChecksJob } from "./station/alert-checks.js";
 import { billStatusJob } from "./station/bill-status.js";
 import { confirmOnchainJob } from "./station/confirm-onchain.js";
+import { monthlyExportJob } from "./station/monthly-export.js";
 import { payrollDraftsJob } from "./station/payroll-drafts.js";
 import {
   pushNotificationsJob,
@@ -12,7 +14,9 @@ import {
 } from "./station/push-notifications.js";
 import { reconcilePaycrestJob } from "./station/reconcile-paycrest.js";
 import { recurringBillsJob } from "./station/recurring-bills.js";
+import { spendingRemindersJob } from "./station/reminders.js";
 import { startStation } from "./station/scheduler.js";
+import { zohoSyncJob } from "./station/zoho-sync.js";
 
 const runtime = makeRuntime();
 // The first run builds every layer: loads config (incl. Privy), connects to
@@ -31,8 +35,12 @@ const stopStation = startStation(runtime, [
   billStatusJob,
   recurringBillsJob,
   payrollDraftsJob,
+  monthlyExportJob,
+  spendingRemindersJob,
   pushNotificationsJob,
   pushReceiptsJob,
+  zohoSyncJob,
+  alertChecksJob,
 ]);
 
 function shutdown(signal: NodeJS.Signals): void {

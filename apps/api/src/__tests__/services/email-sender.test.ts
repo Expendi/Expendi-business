@@ -55,6 +55,21 @@ async function failureOf<E>(effect: Effect.Effect<void, E>): Promise<E | null> {
 }
 
 describe("makeResendEmailSender", () => {
+  it("sends a message's idempotency key, so Resend drops a retry it already accepted", async () => {
+    // #given
+    const { email, sent } = sender(() => Promise.resolve(new Response("{}")));
+
+    // #when
+    await Effect.runPromise(
+      email.send({ ...MESSAGE, idempotencyKey: "notification:event:user" }),
+    );
+
+    // #then
+    expect(new Headers(sent[0]?.init?.headers).get("Idempotency-Key")).toBe(
+      "notification:event:user",
+    );
+  });
+
   it("posts the message to Resend's emails endpoint with the API key", async () => {
     // #given
     const { email, sent } = sender(() =>

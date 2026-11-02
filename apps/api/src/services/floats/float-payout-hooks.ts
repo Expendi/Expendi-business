@@ -15,6 +15,7 @@ import {
 } from "../../db/schema/index.js";
 import { query } from "../../db/scope.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { notify } from "../notification/notify.js";
 import { PayoutRejected } from "../payout/payout-errors.js";
 import { requireConfirmedPayoutPhone } from "../phone-verification/payout-phone.js";
 
@@ -207,6 +208,7 @@ function followPayout(
         .returning({
           id: floatMovements.id,
           floatId: floatMovements.floatId,
+          type: floatMovements.type,
           paidAt: floatMovements.paidAt,
         }),
     );
@@ -231,6 +233,13 @@ function followPayout(
           : { reason: payout.failureReason }),
       },
     });
+    if (outcome.status === "paid") {
+      yield* notify(tx, {
+        kind: moved.type === "issue" ? "float_issued" : "float_topped_up",
+        organizationId: payout.organizationId,
+        movementId: moved.id,
+      });
+    }
   });
 }
 

@@ -47,6 +47,7 @@ import { recordBillSpending } from "../expenses/company.js";
 import { kesCentsFor } from "../paycrest/amounts.js";
 import { Paycrest } from "../paycrest/paycrest-client.js";
 import { onRecurringBillSettled } from "../recurring/next-bill.js";
+import { enqueuePaidBill } from "../zoho/enqueue.js";
 import {
   attachBillFiles,
   billFileLinks,
@@ -785,7 +786,8 @@ function rateForUsdBill(
  * (spec §6.20): records who, the day it was paid, an optional note and
  * proof. The bill needs its amount first. Company spending (T41) records
  * the matching spending entry in this same transaction, in KES: a USD
- * bill's at Paycrest's rate today.
+ * bill's at Paycrest's rate today. The bill, not that entry, is queued for
+ * Zoho Books (T44), so the payment is posted once.
  */
 export function markBillPaidOutside(
   tenant: Tenant,
@@ -865,6 +867,7 @@ export function markBillPaidOutside(
             paidFromAccountId: fields.paidFromAccountId ?? null,
           },
         );
+        yield* enqueuePaidBill(tx, organizationId, row.id);
         yield* onRecurringBillSettled(tx, row, now);
       }),
     );

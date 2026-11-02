@@ -32,6 +32,12 @@ export interface StoredFile {
 }
 
 export interface FileStorageShape {
+  /** Stores a file the API made itself, e.g. a monthly export. */
+  readonly put: (file: {
+    readonly key: string;
+    readonly bytes: Uint8Array;
+    readonly contentType: string;
+  }) => Effect.Effect<void, StorageError>;
   /** A PUT that only accepts exactly this content type and size. */
   readonly presignUpload: (file: {
     readonly key: string;

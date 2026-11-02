@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import type { JSX } from "react";
 
-import { PlaceholderPage } from "~/components/placeholder-page";
+import { ReportsView } from "./_components/reports-view";
 
 export const metadata: Metadata = { title: "Reports" };
 
 export default function ReportsPage(): JSX.Element {
-  return <PlaceholderPage title="Reports" task="T51" />;
+  return <ReportsView />;
 }

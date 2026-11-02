@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -15,6 +16,10 @@ import { useAuth } from "~/features/auth/auth-provider";
 import { useCompanySession } from "~/features/company/company-provider";
 import { ROLE_LABELS } from "~/features/company/roles";
 import { useMe } from "~/features/me/use-me";
+import {
+  AdminHomeContent,
+  EmployeeHomeContent,
+} from "~/features/overview/home-content";
 
 type Membership = MeResponse["memberships"][number];
 
@@ -29,6 +34,7 @@ export default function HomeScreen(): JSX.Element {
   const { signOut } = useAuth();
   const { state } = useCompanySession();
   const meQuery = useMe();
+  const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
 
   if (state.status !== "ready") {
@@ -48,13 +54,30 @@ export default function HomeScreen(): JSX.Element {
   return (
     <Screen
       refreshing={meQuery.isRefetching}
-      onRefresh={() => void meQuery.refetch()}
+      onRefresh={() => {
+        void meQuery.refetch();
+        void queryClient.invalidateQueries({
+          queryKey: ["organizations", company.organizationId],
+        });
+      }}
     >
       <CompanyHeader
         company={company}
         canSwitch={companies.length > 1}
         onSwitch={() => router.push("/select-company")}
       />
+
+      {company.role === "admin" ? (
+        <AdminHomeContent
+          key={company.organizationId}
+          organizationId={company.organizationId}
+        />
+      ) : company.role === "employee" ? (
+        <EmployeeHomeContent
+          key={company.organizationId}
+          organizationId={company.organizationId}
+        />
+      ) : null}
 
       <ListRow
         title="Claims"
@@ -119,6 +142,11 @@ export default function HomeScreen(): JSX.Element {
             title="Company spending"
             subtitle="Spending already paid from the bank, card or cash"
             onPress={() => router.push("/spending")}
+          />
+          <ListRow
+            title="Monthly export"
+            subtitle="Download and share reports and receipts"
+            onPress={() => router.push("/export")}
           />
         </View>
       ) : null}

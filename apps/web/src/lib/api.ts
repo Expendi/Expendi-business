@@ -5,7 +5,11 @@ const REQUEST_TIMEOUT_MS = 20_000;
 /** Mirrors `clientErrorResponse` / `internalErrorResponse` in `apps/api/src/http/respond.ts`. */
 const errorBodySchema = z.object({
   success: z.literal(false),
-  error: z.object({ _tag: z.string(), message: z.string() }),
+  error: z.object({
+    _tag: z.string(),
+    message: z.string(),
+    details: z.unknown().optional(),
+  }),
 });
 
 export class ApiError extends Error {
@@ -15,6 +19,8 @@ export class ApiError extends Error {
     readonly status: number,
     readonly tag: string,
     message: string,
+    /** A 409's specifics, e.g. the top-up a payment needs. */
+    readonly details?: unknown,
   ) {
     super(message);
   }
@@ -131,6 +137,7 @@ function toApiError(status: number, payload: unknown): ApiError {
       status,
       parsed.data.error._tag,
       parsed.data.error.message,
+      parsed.data.error.details,
     );
   }
   return new ApiError(

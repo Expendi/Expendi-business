@@ -9,11 +9,13 @@
     "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path ../../.prettierignore --ignore-path .gitignore",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
     "start": "next start -p 3002",
+    "test": "vitest run",
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@expendi-business/shared": "workspace:*",
     "@privy-io/react-auth": "^3.50.0",
+    "@simplewebauthn/browser": "^13.3.0",
     "@tanstack/react-query": "5.90.19",
     "next": "^16.4.3",
     "react": "19.1.4",
@@ -32,7 +34,8 @@
     "postcss": "^8.5.6",
     "prettier": "catalog:",
     "tailwindcss": "^4.1.16",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "prettier": "@expendi-business/prettier-config"
 }

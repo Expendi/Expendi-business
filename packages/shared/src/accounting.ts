@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import { expenseKindSchema } from "./claims.js";
+import { paidFromAccountKindSchema } from "./company-spending.js";
+
 /** Accounting systems paid spending is pushed to (spec §6.17). */
 export const ACCOUNTING_PROVIDERS = ["zoho_books"] as const;
 export const accountingProviderSchema = z.enum(ACCOUNTING_PROVIDERS);
@@ -58,6 +61,17 @@ export const zohoCategoryAccountSchema = z.object({
 
 export type ZohoCategoryAccount = z.infer<typeof zohoCategoryAccountSchema>;
 
+/** A company spending source account and the Paid Through account it posts through. */
+export const zohoPaidFromAccountSchema = z.object({
+  paidFromAccountId: z.uuid(),
+  name: z.string(),
+  kind: paidFromAccountKindSchema,
+  /** Null: its spending waits in the queue until it's mapped. */
+  accountId: z.string().nullable(),
+});
+
+export type ZohoPaidFromAccount = z.infer<typeof zohoPaidFromAccountSchema>;
+
 /** A company's Zoho Books connection, as staff see it. Never carries a token. */
 export const zohoConnectionSchema = z.object({
   id: z.uuid(),
@@ -73,8 +87,14 @@ export const zohoConnectionSchema = z.object({
   apiDomain: z.string().nullable(),
   paidThroughAccountId: z.string().nullable(),
   defaultAccountId: z.string().nullable(),
+  /** Paid Through for petty cash spending (T44). */
+  pettyCashAccountId: z.string().nullable(),
+  /** The expense account each payroll run posts to (T44). */
+  salariesAccountId: z.string().nullable(),
   /** The company's categories that aren't archived, by name. */
   categoryAccounts: z.array(zohoCategoryAccountSchema),
+  /** The company's paid-from accounts that aren't archived, by name (T44). */
+  paidFromAccounts: z.array(zohoPaidFromAccountSchema),
 });
 
 export type ZohoConnection = z.infer<typeof zohoConnectionSchema>;
@@ -146,6 +166,11 @@ const zohoAccountId = (message: string) =>
 /**
  * `PUT /internal/companies/:id/zoho/mapping`: the whole mapping. A category
  * left out, or mapped to null, posts to the default account.
+ *
+ * The T44 fields may be left out, which keeps what's saved, so a client
+ * that predates them can't clear them. Null clears one; spending that needs
+ * it then waits in the queue. Given `paidFromAccounts` is the whole list: an
+ * account left out of it is unmapped.
  */
 export const zohoMappingSchema = z.object({
   categoryAccounts: z.record(
@@ -154,6 +179,83 @@ export const zohoMappingSchema = z.object({
   ),
   paidThroughAccountId: zohoAccountId("Pick the Paid Through account."),
   defaultAccountId: zohoAccountId("Pick the default expense account."),
+  pettyCashAccountId: zohoAccountId("Pick the petty cash account.")
+    .nullable()
+    .optional(),
+  salariesAccountId: zohoAccountId("Pick the salaries account.")
+    .nullable()
+    .optional(),
+  paidFromAccounts: z
+    .record(
+      z.uuid({ error: "Unknown paid-from account." }),
+      zohoAccountId("Pick an account for every paid-from account.").nullable(),
+    )
+    .optional(),
 });
 
 export type ZohoMapping = z.infer<typeof zohoMappingSchema>;
+
+const kesCents = z.string().regex(/^\d+$/);
+
+/** What a sync posts, so staff can recognise it. */
+export const accountingSyncSubjectSchema = z.object({
+  /** A claim, petty cash spending or company spending. */
+  expenseKind: expenseKindSchema,
+  /** e.g. the claim's merchant. */
+  label: z.string(),
+  /** The date the expense is posted with. */
+  date: z.iso.date(),
+  amountKesCents: kesCents,
+});
+
+export type AccountingSyncSubject = z.infer<typeof accountingSyncSubjectSchema>;
+
+/** One paid item's push to Zoho Books, as staff see it (spec §6.15, §6.17). */
+export const accountingSyncSchema = z.object({
+  id: z.uuid(),
+  subjectType: accountingSyncSubjectTypeSchema,
+  subjectId: z.uuid(),
+  /**
+   * Null if the item can't be read any more, and always for bills and
+   * payroll runs, which only the company's admins and accountants see.
+   */
+  subject: accountingSyncSubjectSchema.nullable(),
+  status: accountingSyncStatusSchema,
+  /** Attempts since it was queued or staff last retried it. */
+  attempts: z.number().int().nonnegative(),
+  lastError: z.string().nullable(),
+  /** Zoho's expense ID once it's created. */
+  externalId: z.string().nullable(),
+  receiptAttached: z.boolean(),
+  /** When a pending sync is next tried. */
+  nextAttemptAt: z.iso.datetime(),
+  syncedAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+  /** For a failed sync, when it failed. */
+  updatedAt: z.iso.datetime(),
+});
+
+export type AccountingSync = z.infer<typeof accountingSyncSchema>;
+
+/** `GET /internal/companies/:id/zoho/syncs`. */
+export const accountingSyncsQuerySchema = z.object({
+  status: accountingSyncStatusSchema.default("failed"),
+});
+
+export type AccountingSyncsQuery = z.infer<typeof accountingSyncsQuerySchema>;
+
+export const ACCOUNTING_SYNCS_PAGE_SIZE = 100;
+
+export const accountingSyncsResponseSchema = z.object({
+  counts: z.object({
+    pending: z.number().int().nonnegative(),
+    synced: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+  }),
+  /** The most recently changed syncs with the status asked for. */
+  syncs: z.array(accountingSyncSchema).max(ACCOUNTING_SYNCS_PAGE_SIZE),
+});
+
+export type AccountingSyncsResponse = z.infer<
+  typeof accountingSyncsResponseSchema
+>;

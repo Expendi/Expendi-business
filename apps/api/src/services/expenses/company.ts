@@ -36,6 +36,7 @@ import { BadRequest, Conflict, NotFound } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { readBillFiles } from "../bills/files.js";
 import { FileStorage } from "../storage/file-storage.js";
+import { enqueueRecordedSpending } from "../zoho/enqueue.js";
 import { etimsStatusFor, resolveEtims } from "./etims.js";
 import { extractionsOf } from "./extraction.js";
 import { findPaidFromAccount } from "./paid-from-accounts.js";
@@ -670,6 +671,7 @@ export function recordCompanySpending(
             receiptFileIds: fields.receiptFileIds,
           },
         });
+        yield* enqueueRecordedSpending(tx, organizationId, created.id);
         return created.id;
       }),
     ).pipe(Effect.catchTag("DatabaseError", duplicateCodeConflict));

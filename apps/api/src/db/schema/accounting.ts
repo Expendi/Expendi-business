@@ -70,6 +70,8 @@ export const accountingConnections = pgTable(
     refreshTokenEncrypted: text("refresh_token_encrypted"),
     paidThroughAccountId: text("paid_through_account_id"),
     defaultAccountId: text("default_account_id"),
+    pettyCashAccountId: text("petty_cash_account_id"),
+    salariesAccountId: text("salaries_account_id"),
     status: accountingConnectionStatus("status").notNull().default("pending"),
     connectTokenHash: text("connect_token_hash"),
     connectTokenExpiresAt: timestamp("connect_token_expires_at", {
@@ -126,8 +128,13 @@ export const accountingSyncs = pgTable(
     provider: accountingProvider("provider").notNull().default("zoho_books"),
     /** The accounting system's ID for what was created, e.g. Zoho's expense_id. */
     externalId: text("external_id"),
+    /** Bound before the first provider call; never reuse an ID in a different ledger. */
+    externalOrganizationId: text("external_organization_id"),
     status: accountingSyncStatus("status").notNull().default("pending"),
     attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     lastError: text("last_error"),
     receiptAttached: boolean("receipt_attached").notNull().default(false),
     syncedAt: timestamp("synced_at", { withTimezone: true }),

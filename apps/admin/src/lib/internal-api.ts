@@ -1,4 +1,7 @@
 import type {
+  AccountingSync,
+  AccountingSyncsQuery,
+  AccountingSyncsResponse,
   AuditSearchQuery,
   AuditSearchResponse,
   ChooseZohoOrganization,
@@ -6,6 +9,7 @@ import type {
   CompanySearchQuery,
   CompanySearchResponse,
   ControlsResponse,
+  OpsAlertsResponse,
   PauseConfirmed,
   PausePrepared,
   PausePrepareRequest,
@@ -17,6 +21,7 @@ import type {
   ResolvePrepareRequest,
   StaffMeResponse,
   StaffPayoutDetail,
+  SystemHealth,
   ZohoAccountsResponse,
   ZohoConnectLinkResponse,
   ZohoMapping,
@@ -24,10 +29,13 @@ import type {
   ZohoStatusResponse,
 } from "@expendi-business/shared";
 import {
+  accountingSyncSchema,
+  accountingSyncsResponseSchema,
   auditSearchResponseSchema,
   companyDetailSchema,
   companySearchResponseSchema,
   controlsResponseSchema,
+  opsAlertsResponseSchema,
   pauseConfirmedSchema,
   pausePreparedSchema,
   payoutQueueResponseSchema,
@@ -36,6 +44,7 @@ import {
   resolvePreparedSchema,
   staffMeResponseSchema,
   staffPayoutDetailSchema,
+  systemHealthSchema,
   zohoAccountsResponseSchema,
   zohoConnectLinkResponseSchema,
   zohoOrganizationsResponseSchema,
@@ -51,6 +60,11 @@ export interface InternalApi {
   getMe: () => Promise<StaffMeResponse>;
   /** Read-only, for every staff role (T27). */
   searchAudit: (query: AuditSearchQuery) => Promise<AuditSearchResponse>;
+  /** Read-only, for every staff role (T26): alerts open and resolve on their own. */
+  alerts: {
+    list: () => Promise<OpsAlertsResponse>;
+    health: () => Promise<SystemHealth>;
+  };
   /** Companies, the payout queue and the pause (T24); actions need `ops_admin`. */
   ops: {
     searchCompanies: (
@@ -93,6 +107,13 @@ export interface InternalApi {
       mapping: ZohoMapping,
     ) => Promise<ZohoStatusResponse>;
     disconnect: (companyId: string) => Promise<ZohoStatusResponse>;
+    /** Paid spending pushed to Zoho (T31): counts, and the latest of a status. */
+    syncs: (
+      companyId: string,
+      query: AccountingSyncsQuery,
+    ) => Promise<AccountingSyncsResponse>;
+    /** Puts a failed sync back in the queue; the API's job retries it. */
+    requeueSync: (companyId: string, syncId: string) => Promise<AccountingSync>;
   };
 }
 
@@ -129,6 +150,10 @@ export function createInternalApi(client: ApiClient): InternalApi {
         `/internal/audit${toQueryString(query)}`,
         auditSearchResponseSchema,
       ),
+    alerts: {
+      list: () => client.get("/internal/alerts", opsAlertsResponseSchema),
+      health: () => client.get("/internal/health", systemHealthSchema),
+    },
     ops: {
       searchCompanies: (query) =>
         client.get(
@@ -215,6 +240,17 @@ export function createInternalApi(client: ApiClient): InternalApi {
           zohoPath(companyId, "/disconnect"),
           {},
           zohoStatusResponseSchema,
+        ),
+      syncs: (companyId, query) =>
+        client.get(
+          zohoPath(companyId, `/syncs${toQueryString(query)}`),
+          accountingSyncsResponseSchema,
+        ),
+      requeueSync: (companyId, syncId) =>
+        client.post(
+          zohoPath(companyId, `/syncs/${encodeURIComponent(syncId)}/requeue`),
+          {},
+          accountingSyncSchema,
         ),
     },
   };

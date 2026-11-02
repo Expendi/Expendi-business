@@ -6,6 +6,8 @@ import { z } from "zod";
 
 import type { AppRuntime } from "../runtime.js";
 import { RequestMeta, requestMetaFrom } from "../http/request-meta.js";
+import { webhookSignatureFailure } from "../services/alerts/alert-checks.js";
+import { raiseAlert } from "../services/alerts/ops-alerts.js";
 import { Paycrest } from "../services/paycrest/paycrest-client.js";
 import { payoutForOrder, syncPayoutOrder } from "../services/payout/sync.js";
 
@@ -41,6 +43,16 @@ function handleDelivery(
     if (!paycrest.verifyWebhookSignature(rawBody, signature)) {
       console.warn(
         `[paycrest-webhook] request ${requestId} rejected: bad signature`,
+      );
+      yield* raiseAlert(webhookSignatureFailure("paycrest")).pipe(
+        Effect.catchAll((error) =>
+          Effect.sync(() =>
+            console.error(
+              `[paycrest-webhook] request ${requestId}: alert not recorded`,
+              error.message,
+            ),
+          ),
+        ),
       );
       return {
         status: 401,

@@ -1,72 +1,83 @@
 # Next session: QA, setup and everything still pending
 
-Written 2026-11-02 after the fourth build wave. This one document is enough to start a new session; the phase handoffs hold the detail behind each item.
+Written 2026-11-02 after the fifth build wave and setup steps 1–4. This one document is enough to start a new session; the phase handoffs hold the detail behind each item.
 
 ## Start prompt
 
-> Read `docs/handoffs/README.md`, then `docs/handoffs/next-session.md`, then the Handoff notes in each phase handoff (`phase-1` to `phase-3b`). Tell me where things stand in five lines, then start with "Setup before any device QA" step 1 and go through it with me. Build the remaining tasks with parallel subagents, following "How to build in parallel" below.
+> Read `docs/handoffs/README.md`, then `docs/handoffs/next-session.md`, then the Handoff notes in each phase handoff (`phase-1` to `phase-3b`). Tell me where things stand in five lines, then start with "Setup before any device QA" step 4 (replace the `test` placeholders in Doppler) and go through the rest with me. Build the remaining tasks with parallel subagents, following "How to build in parallel" below.
 
 ---
 
 ## 1. Where things stand
 
-**Code:** every task from Phase 0 to Phase 2B is built except T42 and T43. Phase 3 has T23, T24, T27 and T30. Phase 3B has T45 and T46. All of it passes:
+**Code:** every task from Phase 0 to Phase 3B is built except T25 (needs the pilot spreadsheet). T28 and T29 remain for Phase 4. T26 includes the completed admin alerts and system health pages. The fifth wave, migrations 0055–0064 and these handoff updates are included in this local release commit. Final automated verification passed; pushing and deployment remain blocked on the Doppler placeholders below.
+
+**Release follow-up (2026-11-02):** session `10863844-27a6-4b66-9ede-badb816e01ad` ended at its usage limit after both final builders finished. The eTIMS rejected-claim filter, web/mobile outside total, and T26 staff pages are present. A read-only Doppler check confirmed that all eight provider values listed in setup step 4 are still `test`, and `ALERT_EMAILS` is absent. Do not push either release remote until the provider placeholders are replaced (or the optional Anthropic key removed). Local checks do not validate real providers.
+
+Final combined verification (2026-11-02, OpenCode; real providers and device QA not exercised):
 
 | Check                   | Count                                   |
 | ----------------------- | --------------------------------------- |
-| API, main suite         | 1,853 tests                             |
-| API, serial suite       | 110 tests                               |
+| API, main suite         | 2,044 tests / 96 files                  |
+| API, serial suite       | 169 tests / 15 files                    |
 | Shared                  | 174 tests                               |
-| Mobile                  | 260 tests                               |
+| Mobile                  | 272 tests                               |
+| Web                     | 153 tests                               |
 | Typecheck, lint, format | 20/20 tasks                             |
 | Builds                  | API, admin, web                         |
-| Migrations              | 0000–0054 from scratch, no schema drift |
+| Migrations              | 0000–0064 from scratch, no schema drift |
+
+- **2,812 tests passed in total.** All 20 typecheck/lint/format tasks and API/admin/web builds were run uncached. Frozen-lockfile validation passed. The dedicated local database was `expendi_business_test_release_20261102`; both API suites rebuild its schema from migrations. All 65 journal entries have SQL and snapshots, and the fifth-wave snapshot chain is valid.
+- **Integration fix:** the first serial run found an order-dependent fixture in `internal-alerts.serial.test.ts`: cleanup aged only open webhook incidents, so a recently resolved incident from another file correctly outranked the test's older incident. A deterministic regression reproduced it; cleanup now ages all earlier webhook incidents. The 20-test file and all 169 serial tests pass; API typecheck and the changed test's lint/format were checked again. Production code did not need a change.
+- **Release remaining:** after Dennis replaces the placeholders, recheck their presence without printing values, then push `origin main` and `web-deploy main`. Confirm Railway's pre-deploy migrations 0055–0064 and API health, then Vercel's successful deployment and the dashboard. No push, Railway restart or deployed migration was performed in this verification pass. The unrelated root `task_plan.md` and `notes.md` remain outside the commit.
 
 **QA:** almost none has run on real devices. Dennis deferred it on 2026-11-02. The only live money tests so far are Checkpoint B's Phase 2 gate, which passed (see the Phase 1 handoff).
 
-| Phase                       | Code               | QA                                          |
-| --------------------------- | ------------------ | ------------------------------------------- |
-| 0 Foundation                | ✅                 | ✅                                          |
-| 1 Money path                | ✅                 | Phase 2 gate ✅. **Phase 2B gate not run.** |
-| 2 Claim flow (T11–T21, T32) | ✅                 | **Checkpoint C not run**                    |
-| 2B Spending (T34–T41)       | ✅ except T42, T43 | **Checkpoint C2 not run**                   |
-| 3 Internal tools            | T23, T24, T27, T30 | **Checkpoint D not run**                    |
-| 3B Web dashboard            | T45, T46           | **Checkpoint D2 not run**                   |
-| 4 Pilot launch              | not started        | —                                           |
+| Phase                       | Code                   | QA                                          |
+| --------------------------- | ---------------------- | ------------------------------------------- |
+| 0 Foundation                | ✅                     | ✅                                          |
+| 1 Money path                | ✅                     | Phase 2 gate ✅. **Phase 2B gate not run.** |
+| 2 Claim flow (T11–T21, T32) | ✅                     | **Checkpoint C not run**                    |
+| 2B Spending (T34–T43)       | ✅                     | **Checkpoint C2 not run**                   |
+| 3 Internal tools            | ✅ except T25          | **Checkpoint D not run**                    |
+| 3B Web dashboard (T45–T51)  | ✅                     | **Checkpoint D2 not run**                   |
+| 4 Pilot launch              | not started (T28, T29) | —                                           |
 
 **Linear:**
 
 - **Code done, waiting for QA (In Progress):**
   - Phase 2: EXP-279, 282, 286, 303, 289, 292, 293, 294, 295, 296, 298, 287
-  - Phase 2B: EXP-305 to 312
-  - Phase 3: EXP-280, 283, 290, 301
-  - Phase 3B: EXP-316, 317
-- **Not started (Backlog):**
-  - Phase 2B: EXP-313 (T43), 314 (T42)
-  - Phase 3: EXP-299 (T22), 297 (T25), 291 (T26), 302 (T31), 315 (T44)
-  - Phase 3B: EXP-318 to 322 (T47–T51)
-  - Phase 4: EXP-284 (T28), 300 (T29)
-- **EXP-278 (T6)** should be Done; auto mode blocked Claude from setting it.
+  - Phase 2B: EXP-305 to 314
+  - Phase 3: EXP-280, 283, 290, 299, 301, 302, 315, and EXP-291 (T26: API and admin pages built; live QA pending)
+  - Phase 3B: EXP-316 to 322
+- **Not started (Backlog):** EXP-297 (T25), EXP-284 (T28), EXP-300 (T29)
+- **EXP-278 (T6)** should be Done; auto mode blocked Claude from setting it, twice. Dennis: set it by hand.
 
 ---
 
 ## 2. Where everything lives
 
-| What                 | Value                                                                                                                                                                                             |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API (dev)            | `https://api-dev-dcdc.up.railway.app`. Railway project `expendi-business`, environment `dev`, service `api`.                                                                                      |
-| Deploys              | Every push to `main` deploys. The pre-deploy step `pnpm --filter @expendi-business/api migrate` is set in the dashboard, and deploy logs show `[migrate] migrations applied`.                     |
-| Secrets              | Doppler `expendi-business` / `dev`. Railway holds only the Doppler token. Claude can't write secrets: Dennis sets them.                                                                           |
-| Dev database         | No public address. Tunnel: `npx -y @railway/cli@5.71.0 connect Postgres -e dev --tunnel-only -P 55432`. If the port listens but connections are refused, kill whatever holds 55432 and reconnect. |
-| Scripts against dev  | `doppler run -p expendi-business -c dev -- sh -c '…'`. Inside it, set `SECRETS_MANAGER=env` and rewrite `DATABASE_URL` / `DATABASE_URL_MIGRATE` to `localhost:55432`.                             |
-| Test company (dev)   | "Expendi Test Co" `3881397e-cff4-4904-aa96-5fa0a8529a7d`, admin `hello@cradlelabs.io` (software passkey in `apps/api/.cache/checkpoint-b/`)                                                       |
-| Test wallet          | `0x69685f698F002120af8185722A3C364A265BD0C3` on Base. **0.831325 USDC, nothing reserved.**                                                                                                        |
-| Staff (dev)          | `hello@cradlelabs.io` as `ops_admin`, added 2026-11-02                                                                                                                                            |
-| Mobile app           | EAS project `@chizaalabs/expendi-business` (`3c092318-4971-433e-b238-6b4586e09bac`), bundle ID and package `app.expendi.business`, Apple Team `46XB9S9YV6`. **No build exists yet.**              |
-| Privy                | One app for every environment. Native client `client-WY6eucYDNEuaLXcZD1xccakbSZBYh1SU6kjnkkZRwgxbH`. Passkey relying party `business.expendi.app`.                                                |
-| Web dashboard        | `apps/web`, to be on Vercel at `business.expendi.app`. It also serves the passkey files from `apps/web/public/.well-known/`.                                                                      |
-| Internal admin       | `apps/admin` (port 3001). Not deployed.                                                                                                                                                           |
-| Local test databases | `expendi_business_test` (default), plus `_sync`, `_t14`, `_t16`, `_t21`, `_t23`, `_t32`, `_t34`, one per parallel builder                                                                         |
+| What                  | Value                                                                                                                                                                                                                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API (dev)             | `https://api-dev-dcdc.up.railway.app`. Railway project `expendi-business`, environment `dev`, service `api`.                                                                                                                                                                                    |
+| Deploys               | Every push to `main` deploys (the fifth wave, migrations 0055–0064, hasn't been pushed). The pre-deploy step `pnpm --filter @expendi-business/api migrate` is set in the dashboard, and previous deploy logs show `[migrate] migrations applied`.                                               |
+| Secrets               | Doppler `expendi-business` / `dev`. Railway holds only the Doppler token. Claude can't write secrets: Dennis sets them.                                                                                                                                                                         |
+| Dev database          | No public address. Tunnel: `npx -y @railway/cli@5.71.0 connect Postgres -e dev --tunnel-only -P 55432`. If the port listens but connections are refused, kill whatever holds 55432 and reconnect.                                                                                               |
+| Scripts against dev   | `doppler run -p expendi-business -c dev -- sh -c '…'`. Inside it, set `SECRETS_MANAGER=env` and rewrite `DATABASE_URL` / `DATABASE_URL_MIGRATE` to `localhost:55432`.                                                                                                                           |
+| Test company (dev)    | "Expendi Test Co" `3881397e-cff4-4904-aa96-5fa0a8529a7d`, admin `hello@cradlelabs.io` (software passkey in `apps/api/.cache/checkpoint-b/`)                                                                                                                                                     |
+| Test wallet           | `0x69685f698F002120af8185722A3C364A265BD0C3` on Base. **0.831325 USDC, nothing reserved.**                                                                                                                                                                                                      |
+| Staff (dev)           | `hello@cradlelabs.io` as `ops_admin`, added 2026-11-02                                                                                                                                                                                                                                          |
+| Mobile app            | EAS project `@chizaalabs/expendi-business` (`3c092318-4971-433e-b238-6b4586e09bac`), bundle ID and package `app.expendi.business`, Apple Team `46XB9S9YV6`.                                                                                                                                     |
+| Dev build (Android)   | EAS build `8cc37fda-2ee4-4f90-9a68-32a2f2c637d3` (development profile, internal APK). EAS holds the keystore (remote credentials). Placeholder icons from the consumer app; real Expendi Business artwork is needed before T28.                                                                 |
+| Android fingerprint   | SHA-256 `F1:64:51:AB:5B:D3:08:40:23:3E:A2:72:A9:4E:99:F3:E1:A5:DB:18:F1:EE:73:6E:F7:4B:94:67:9B:C5:74:37`. base64url (for `WEBAUTHN_ORIGINS`): `8WRRq1vTCEAjPqJyqU6Z8-Gl2xjx7nNu90uUZ5vFdDc`. It is in `assetlinks.json` (commit f890a3a, deployed).                                            |
+| Privy                 | One app for every environment. Native client `client-WY6eucYDNEuaLXcZD1xccakbSZBYh1SU6kjnkkZRwgxbH`. Passkey relying party `business.expendi.app`.                                                                                                                                              |
+| Web dashboard         | `apps/web`, live at `business.expendi.app`. It also serves the passkey files from `apps/web/public/.well-known/` (as `application/json`, no redirect).                                                                                                                                          |
+| Vercel                | Project `expendi-business-web` (`prj_XuDDe4IkVsq9l4iKx9K6sGqtj2l8`) in the personal scope `dennohkims-projects` (Hobby). Root `apps/web`, Node 22.x, "include files outside root" on. Env, all targets: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_PRIVY_APP_ID`. DNS is Cloudflare, CNAMEd to Vercel. |
+| Web deploy mirror     | Vercel deploys from a private mirror, `github.com/DennohKim/expendi-business-web` (git remote `web-deploy`), a full copy of the monorepo. Hobby can't connect the private org repo `Expendi/Expendi-business`.                                                                                  |
+| Releasing the web app | `git push origin main && git push web-deploy main`. Vercel deploys `main` of the mirror.                                                                                                                                                                                                        |
+| Internal admin        | `apps/admin` (port 3001). Not deployed.                                                                                                                                                                                                                                                         |
+| Job lock keys         | 72_001 reconcile-paycrest, 72_002 confirm-onchain, 72_020/72_021 push, 72_022 monthly-export, 72_026 alert-checks, 72_031 zoho-sync, 72_035 bill-status, 72_036 recurring-bills, 72_038 payroll-drafts, 72_043 spending-reminders. Pick a new key outside this list.                            |
+| Local test databases  | `expendi_business_test` (default), plus `_sync`, `_t14`, `_t16`, `_t21`, `_t23`, `_t32`, `_t34`, one per parallel builder                                                                                                                                                                       |
 
 ---
 
@@ -74,26 +85,22 @@ Written 2026-11-02 after the fourth build wave. This one document is enough to s
 
 Do these in order; each says what it unblocks.
 
-1. **Vercel and DNS.**
-   - Create a Vercel project from this repo: root `apps/web`, Node 22, keep "include files outside the root".
-   - Env: `NEXT_PUBLIC_API_URL=https://api-dev-dcdc.up.railway.app` and `NEXT_PUBLIC_PRIVY_APP_ID` (the same as Doppler's `PRIVY_APP_ID`).
-   - Point `business.expendi.app` at it.
-   - **Unblocks:** passkey files, the web dashboard.
-2. **First Android dev build:** `cd apps/mobile && npx eas build --profile development --platform android`. Let EAS create the keystore. It needs `expo-camera`, `expo-notifications`, `react-native-passkeys` and `react-native-svg`, so the old plan of no build is moot. **Unblocks:** everything on a phone.
-3. **Android signing fingerprint.**
-   - Get it from `npx eas credentials -p android` (SHA-256).
-   - Replace `<SHA256_CERT_FINGERPRINT>` in `apps/web/public/.well-known/assetlinks.json` (colon form), then commit and redeploy the web app.
-   - For `WEBAUTHN_ORIGINS`, convert it to base64url: `echo "AA:BB:…" | tr -d ':' | xxd -r -p | base64 | tr '+/' '-_' | tr -d '='`.
-   - **Unblocks:** passkeys in the Android app.
-4. **Doppler `dev` values:**
-   - **Passkeys:** `WEBAUTHN_RP_ID=business.expendi.app` and `WEBAUTHN_ORIGINS=https://business.expendi.app,android:apk-key-hash:<base64url from step 3>`
-   - **Browser origins:** `DASHBOARD_ORIGINS=https://business.expendi.app,http://localhost:3002` and `ADMIN_APP_ORIGINS=http://localhost:3001` (plus the admin app's URL once deployed)
-   - **Receipts:** `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, for a private bucket. R2 uploads have never run against a real bucket.
-   - **Email:** `RESEND_API_KEY`, `EMAIL_FROM` (e.g. `Expendi Business <team@expendi.app>`), `APP_INSTALL_URL`. Also SPF and DKIM for `expendi.app` in DNS.
-   - **Payout phone codes:** `TELNYX_API_KEY` and `TELNYX_VERIFY_PROFILE_ID`, from a new Verify profile on the consumer's Telnyx account.
-   - **Optional now:**
-     - `ANTHROPIC_API_KEY` (receipt reading; without it every read is "couldn't read")
-     - `EXPO_ACCESS_TOKEN` (only with enhanced push security)
+1. **Vercel and DNS: done (2026-11-02).**
+   - Project `expendi-business-web` with the env set; `business.expendi.app` moved over from a scratch project `business-page` (default Next.js page, can be deleted). `/.well-known/apple-app-site-association` and `assetlinks.json` serve `application/json` with no redirect.
+   - The `expendi` Vercel team (Pro) is suspended for a missing payment method (`admin.expendi.app` returns 402), so the project lives on Hobby with the mirror repo (see "Where everything lives" and section 7).
+2. **First Android dev build: done.** EAS build `8cc37fda-2ee4-4f90-9a68-32a2f2c637d3`. The first attempt (`db17b94c…`) failed in Gradle (`drawable/splashscreen_logo not found`) because `expo-splash-screen` had no image; fixed by adding placeholder `icon.png` and `icon-foreground.png` and setting `icon`, `android.adaptiveIcon` and the splash `image` in `app.config.ts` (commit f890a3a).
+3. **Android signing fingerprint: done.** Read from the APK's v2 signature block (no JDK on the Mac; `eas credentials` is interactive only). Values are in "Where everything lives". Google's Digital Asset Links API returns it for `get_login_creds`.
+4. **Doppler `dev` values: partly done.**
+   - **Real values set:** `WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGINS` (the web origin plus `android:apk-key-hash:<base64url>`), `DASHBOARD_ORIGINS`, `ADMIN_APP_ORIGINS`, `EMAIL_FROM=Expendi Business <team@expendi.app>`, `API_PUBLIC_URL=https://api-dev-dcdc.up.railway.app`, `APP_INSTALL_URL` (the EAS build page).
+   - **Placeholders set to `test`, for Dennis to replace:** `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `RESEND_API_KEY`, `TELNYX_API_KEY`, `TELNYX_VERIFY_PROFILE_ID`, `ANTHROPIC_API_KEY`.
+   - **Do not restart the Railway `api` until they are real.** It starts with `test`, but those providers then fail at call time instead of answering "not set up".
+   - **Still to do outside Doppler:**
+     - an R2 bucket CORS rule: PUT and GET from `https://business.expendi.app` and `http://localhost:3002`, header `content-type` (the web's invoice uploads need it)
+     - SPF and DKIM for `expendi.app` (Resend) in Cloudflare
+   - **New variables from this wave:**
+     - `API_PUBLIC_URL` (T22): required for export links. Without it, generating answers 503 and the monthly job fails.
+     - `ALERT_EMAILS` (T26): comma-separated. Without it, alerts are only logged. Not set yet.
+   - **Optional:** `EXPO_ACCESS_TOKEN` (only with enhanced push security).
 5. **Privy dashboard:**
    - passkeys on
    - native client allowed IDs `app.expendi.business` (iOS and Android) and scheme `expendi-business`
@@ -103,7 +110,9 @@ Do these in order; each says what it unblocks.
    - **Android:** a Firebase project; upload `google-services.json` as the EAS file variable `GOOGLE_SERVICES_JSON`, and the FCM V1 key via `npx eas credentials`.
    - **iOS:** an APNs key via `eas credentials`.
    - Then rebuild the dev client (step 2).
-7. **Top up the test wallet: about 25 USDC on Base.** It covers the Phase 2B gate, Phase 2 claims, bills, a 3-person payroll and a small float. Use KES 65–100 amounts throughout. Paycrest's minimum is 0.5 USDC.
+7. **Top up the test wallet: about 25 USDC on Base.** (Steps 5–7 haven't started.) It covers the Phase 2B gate, Phase 2 claims, bills, a 3-person payroll and a small float. Use KES 65–100 amounts throughout. Paycrest's minimum is 0.5 USDC.
+
+**Multi-person QA:** a development build needs Metro running. For several testers, build a `preview` APK (`--profile preview`); it uses the same keystore, so the fingerprint stays the same.
 
 ---
 
@@ -122,7 +131,7 @@ Needs step 7. Drive it with `apps/api/scripts/test-payout.ts` (see the Phase 1 r
 
 ### 4.2 Checkpoint C: Phase 2 on real phones
 
-Needs steps 1–7. Full list in `phase-2-claim-flow.md`.
+Needs steps 4–7 (1–3 are done). Full list in `phase-2-claim-flow.md`.
 
 - **Admin:**
   - [ ] Create a company: a bad KRA PIN is rejected and a good one accepted; the deposit address and the USDC + KES balance show.
@@ -158,7 +167,7 @@ Needs steps 1–7. Full list in `phase-2-claim-flow.md`.
 
 ### 4.3 Checkpoint C2: Phase 2B
 
-Needs T42 and T43 built first for the overview and reminder items; the rest can run now. Full list in `phase-2b-spending-and-payments.md`.
+Every item is now runnable (T42 and T43 are built). Full list in `phase-2b-spending-and-payments.md`.
 
 - [ ] One payee per method. Change one payee's details: every admin is emailed, and paying within 24 hours asks for a second confirmation.
 - [ ] A monthly subscription paid through Expendi, due in 2 days: the reminder arrives (T43), pay it, and next month's bill appears.
@@ -175,12 +184,18 @@ Needs T42 and T43 built first for the overview and reminder items; the rest can 
   - two purchases, and the balance is right
   - overspending creates a claim for exactly the extra
   - close it; with money left, closing needs a write-off reason
-- [ ] The overview matches a hand calculation (T42), and the cash check shows Short when the wallet is low.
-- [ ] Every new notification arrives, by push and email (T43).
+- [ ] The overview matches a hand calculation (T42), and the cash check shows Short when the wallet is low. A bill paid outside Expendi is listed but doesn't count against the wallet.
+- [ ] Overspend (T40 fixes): an overspend claim with an SMS receipt submits, an amount edit is refused (409), and the claim view shows `floatId`.
+- [ ] Notifications (T43), from 08:00 Nairobi for the daily ones:
+  - bill due soon, due today and overdue: admins get push and email, once per bill and stage
+  - wallet short for the next 7 days: admins get push and email, at most once per Nairobi day
+  - payroll ready to review: admins get a push
+  - salary paid: only that employee gets a push, with no amount
+  - float issued or topped up: the holder gets a push
 
 ### 4.4 Checkpoint D: Phase 3
 
-Needs T22, T25, T26, T31 and T44 built, plus Zoho setup. Full list in `phase-3-accountant-and-internal-tools.md`.
+Needs the Zoho setup (section 6) and `ALERT_EMAILS`. T25's item stays blocked until T25 is built. Full list in `phase-3-accountant-and-internal-tools.md`.
 
 - [ ] Admin app:
   - a non-staff email can't sign in
@@ -192,29 +207,44 @@ Needs T22, T25, T26, T31 and T44 built, plus Zoho setup. Full list in `phase-3-a
   - try it once on dev, because the on-chain log search may hit Alchemy's block-range limit
 - [ ] Pause all, pause one company, and unpause.
 - [ ] The audit log viewer finds staff actions and allows no edits.
-- [ ] Export a month (T22): it opens in Excel and Sheets; amounts, the self-approved column and receipt names match the zip; the email arrives from `expendi.app`.
-- [ ] Import the pilot's sample spreadsheet (T25): dry run → import → a re-run imports nothing → an imported M-Pesa code blocks a duplicate.
-- [ ] Trigger each of the 6 alerts once (T26).
+- [ ] Export a month (T22), needs `API_PUBLIC_URL` and a real R2 bucket:
+  - the workbook opens in Excel and Sheets; float issues and top-ups are on the third sheet "Float transfers"
+  - the CSV download is a zip of three CSVs
+  - amounts, the self-approved column (filled only for claims) and receipt names match the zip
+  - the admin app's export screen gives three 30-day links
+  - the monthly email arrives from `expendi.app`, one per non-removed accountant (invited included), each with their own link; removing the accountant stops theirs
+- [ ] **Blocked until T25 is built:** import the pilot's sample spreadsheet: dry run → import → a re-run imports nothing → an imported M-Pesa code blocks a duplicate.
+- [ ] Trigger each of the 6 alerts once (T26), with `ALERT_EMAILS` set:
+  - one email each, and resolving clears it
+  - the first run after deploy emails existing `needs_review` and recently failed payouts once
+  - check the Alerts and System health pages as both `ops_viewer` and `ops_admin`; non-staff must be refused
+  - confirm the reconciliation heartbeat and latest webhook incident; only `reconcile-paycrest` currently records a heartbeat
 - [ ] Zoho Books, against a test org in KES:
   - connect via the emailed link; a used link is refused; a non-KES org is refused
   - map categories
   - pay a claim and check it in Zoho (T31)
   - revoke access → `needs_reconnect` + alert; reconnect → the backlog syncs
+  - force a failed sync: it shows under "Syncs to Zoho" in the admin app, and requeueing it works (T31)
   - pay a bill, record petty cash and company spending, and pay a payroll run (T44)
   - confirm Zoho accepts the Paid Through account types; Zoho's docs don't list them
+  - confirm against live Zoho the things the code assumes: the exact-match `reference_number` filter, the amount as a JSON number, "add receipt" when one exists, size limits and the daily call limit (1,000/day free; 2–4 calls per claim)
+  - confirm PDF receipts attach (T44), and with the accountant whether payroll posts on the pay date or the paid date
 
 ### 4.5 Checkpoint D2: web dashboard
 
-Needs T47–T51 built and step 1. Full list in `phase-3b-web-dashboard.md`.
+Needs step 4 (real values) and the R2 CORS rule. Full list in `phase-3b-web-dashboard.md`.
 
 - [ ] Sign in at `business.expendi.app` with an email code, then with a passkey.
 - [ ] Approve 3 claims with one passkey from a desktop browser, using the phone through "use a phone or tablet"; each pays once.
 - [ ] Pay several bills at once; adjust and pay a payroll run; withdraw.
-- [ ] Edit categories (add, rename, archive, eTIMS-exempt).
+- [ ] Upload a PDF invoice to a bill from a desktop browser (needs the R2 CORS rule).
+- [ ] Set up the approval passkey in the browser (Settings), then approve with it.
+- [ ] Edit categories (add, rename, archive, restore, eTIMS-exempt).
+- [ ] The activity page shows the company's entries, with no request ID, IP or device.
 - [ ] Accountant:
   - sees everything, salaries included
   - can't act (the API refuses it too)
-  - downloads the export, the receipts zip and the eTIMS report
+  - downloads the export, the receipts zip and the eTIMS report from the Reports page (month picker, four downloads)
   - switches between two companies
 - [ ] The passkey files validate (Apple and Google checkers), and passkeys work in both apps.
 
@@ -226,37 +256,20 @@ T28 (production builds, TestFlight and Play testing, a week before go-live), the
 
 ## 5. Code still to build
 
-Run these as parallel subagents, as the last four waves did. "Ready now" means everything they depend on is built.
+Only these are left. T25 waits for an input from Dennis; T28 starts a week before go-live. T26's API and admin pages are built and await live QA.
 
-| Wave      | Task                                             | Linear  | Depends on (all built unless noted)                           |
-| --------- | ------------------------------------------------ | ------- | ------------------------------------------------------------- |
-| Ready now | T42 Spending overview                            | EXP-314 | 19, 37, 39, 40, 41                                            |
-| Ready now | T43 Reminders and spending notifications         | EXP-313 | 20, 34, 36, 38, 40. Use `notify(tx, event)`.                  |
-| Ready now | T22 Monthly export                               | EXP-299 | 19, 37, 39, 40, 41                                            |
-| Ready now | T31 Push paid claims to Zoho                     | EXP-302 | 9, 19, 30                                                     |
-| Ready now | T25 Spreadsheet import                           | EXP-297 | 18, 23, 34, 36, 38, 40. Needs the pilot's spreadsheet sample. |
-| Ready now | T47 Expenses and approvals on the web            | EXP-318 | 19, 45                                                        |
-| Ready now | T48 Bills, recurring, payees, payroll on the web | EXP-319 | 34–39, 45                                                     |
-| Ready now | T49 Wallet, team, settings, activity on the web  | EXP-320 | 12, 13, 21, 45, 46                                            |
-| Next      | T26 Alerts                                       | EXP-291 | needs T31                                                     |
-| Next      | T44 Push other paid spending to Zoho             | EXP-315 | needs T31                                                     |
-| Next      | T50 Spending overview on the web                 | EXP-321 | needs T42                                                     |
-| Next      | T51 Accountant downloads and the eTIMS report    | EXP-322 | needs T22                                                     |
-| Last      | T28 Getting the app to staff                     | EXP-284 | none (start a week before go-live)                            |
-| Last      | T29 Pilot go-live                                | EXP-300 | everything                                                    |
+| Wave  | Task                         | Linear  | Depends on                                                                         |
+| ----- | ---------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| Ready | T25 Spreadsheet import       | EXP-297 | 18, 23, 34, 36, 38, 40 (all built). Needs the pilot's spreadsheet sample.          |
+| Last  | T28 Getting the app to staff | EXP-284 | none. Needs real Expendi Business artwork first (the dev build uses placeholders). |
+| Last  | T29 Pilot go-live            | EXP-300 | everything                                                                         |
 
-**Small fixes, which can ride along with any wave:**
+**Small fixes still open, which can ride along with any wave:**
 
-- **Overspend claims (T40):**
-  - editing one with an SMS receipt fails, because the SMS amount is compared to the extra
-  - amount edits aren't blocked
-  - the claim view doesn't show `floatId`
-  - the paired float row may be flagged as a near-duplicate
-- **Mobile accountant copy:** `apps/mobile/src/features/company/roles.ts` still says accountants have "No app login". Point them at the dashboard.
-- **T22 export recipients:** send to accountants whose membership isn't removed, since invited ones may not have signed in yet.
-- **Large bills:** a non-payroll bill above Paycrest's ~3,000 USDC per order isn't split.
 - **Funding tx hash:** not saved on payouts. Paycrest's order has it, so sync could fill it in.
-- **Railway config:** move off `railway.json` (Config as Code stops working 2026-12-01) to Infrastructure as Code, or to dashboard settings.
+- **Large bills:** a non-payroll bill above Paycrest's ~3,000 USDC per order isn't split.
+- **Railway config:** `railway.json` (Config as Code) stops working 2026-12-01. Move to Infrastructure as Code, or to dashboard settings.
+- **Withdrawals:** allowlist changes and withdrawals don't email the other admins.
 
 ---
 
@@ -264,45 +277,69 @@ Run these as parallel subagents, as the last four waves did. "Ready now" means e
 
 | Input                                                                                                                                                                                                                                                                                                                                                                         | Unblocks                                                                                                                                                  |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Setup steps 1–7 above                                                                                                                                                                                                                                                                                                                                                         | All device QA                                                                                                                                             |
+| Setup step 4 (real values for the `test` placeholders, R2 CORS, Resend DNS) and steps 5–7 above                                                                                                                                                                                                                                                                               | All device QA                                                                                                                                             |
 | About 50 redacted, labelled receipts plus `ANTHROPIC_API_KEY`                                                                                                                                                                                                                                                                                                                 | The T16 model eval (`apps/api/scripts/eval-receipts.ts`). The default is Opus 5.5 at ~$0.024 per receipt; Haiku 5.5 would be ~$0.0006 if accurate enough. |
 | Real M-Pesa SMS, one per format (Buy Goods, Send Money, Paybill)                                                                                                                                                                                                                                                                                                              | Real fixtures for T15 (today's are synthetic)                                                                                                             |
 | The pilot spreadsheet: headers and 3 sample rows per part                                                                                                                                                                                                                                                                                                                     | T25 import                                                                                                                                                |
 | Zoho: a server-based client in api-console.zoho.com (redirect `<api>/integrations/zoho/callback`, Multi-DC on, same credentials for all data centres); `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REDIRECT_URI` and `ACCOUNTING_TOKEN_KEY` (`openssl rand -base64 32`, never changed afterwards) in Doppler; a test Books org in KES with an "Expendi Wallet" bank account | T30 QA, T31, T44                                                                                                                                          |
 | The accountant: Zoho expense accounts, the Paid Through account, how to post salaries, eTIMS gross posting                                                                                                                                                                                                                                                                    | T31/T44 mapping, go-live                                                                                                                                  |
-| The alert email list                                                                                                                                                                                                                                                                                                                                                          | T26                                                                                                                                                       |
+| The alert email list, as `ALERT_EMAILS` in Doppler                                                                                                                                                                                                                                                                                                                            | T26                                                                                                                                                       |
 | The pilot's recurring items, card-only subscriptions and statutory Paybills                                                                                                                                                                                                                                                                                                   | Checkpoint C2                                                                                                                                             |
+| Real Expendi Business app artwork (icon, adaptive icon, splash)                                                                                                                                                                                                                                                                                                               | T28                                                                                                                                                       |
 | Apple Developer + App Store Connect, Google Play Console; which phones staff use                                                                                                                                                                                                                                                                                              | T28                                                                                                                                                       |
 
 ---
 
 ## 7. Known issues and open decisions
 
+- **Decisions Dennis made (2026-11-02):**
+  1. **Payee account numbers on the web (T48):** keep full numbers on the web. The app still masks to the last 4.
+  2. **T43 channels:** follow spec §6.10. Push and email only for due-date reminders, low balance and payee changes; push only for payroll-ready, salary-paid and float notices.
+  3. **Overview cash check:** show the total due outside Expendi ("Also due outside Expendi: KES X"). The API now returns `outsideKes`; spec §6.24 updated.
+  4. **eTIMS report (T51):** rejected claims are left out. Spec §6.14 updated.
+  5. **Export float transfers (T22):** keep the third sheet "Float transfers". Spec §6.11 updated.
+  6. **Overspend claims in Zoho (T44):** post through the Expendi wallet account. Spec §6.17 updated; confirm with the accountant at Zoho QA.
+  7. **Category restore (T49):** keep it. Spec §6.14 already lists it.
+- **Hosting:**
+  - The web app runs on Vercel Hobby, whose terms don't allow commercial use. Before the pilot, move to a Pro team: reactivate the suspended `expendi` team (missing payment method; `admin.expendi.app` returns 402 because of it) or upgrade. Then reconnect the org repo and drop the `web-deploy` mirror.
+  - The scratch Vercel project `business-page` can be deleted.
+- **Not deployed:** migrations 0055–0064 and all fifth-wave code await release. Migration `0057_salty_bloodstrike` was renamed `0057_accounting_sync_columns` (journal tag updated) because nothing was deployed. `0064_staff_ops_alerts_reads` adds the company-name lookup for the staff alert list without granting customer access.
+- **Another session's leftovers:** around 13:11–13:27 on 2026-11-02 an unidentified session left drafts for T42/T50, T43, T22/T51, T31/T44 and T47 (migrations 0055–0058) and untracked `task_plan.md` and `notes.md` at the repo root. This session's builders took the drafts over and reworked them. `task_plan.md` and `notes.md` aren't ours: leave them out of commits.
+- **Gaps by task (fifth wave):**
+  - **T42/T50:** fees and whole-shilling round-up aren't predicted in the cash check; bills paid outside are listed but not counted against the wallet; a variable bill without an amount shows `unknownAmounts` instead of making the check "unknown".
+  - **T43:** no payout-failed notifications for bills or floats (only claims); the app's notification tap only opens claims; payroll bills get no per-person due reminders.
+  - **T22:** a receipt missing from R2 fails the whole export (503); if recording a sent email fails, the next run re-sends with a new link; the receipts zip is built in memory (fine at pilot scale).
+  - **T31/T44:** only companies with a connection that isn't disconnected queue syncs (no history push on first connect); JPEG, PNG, GIF, BMP and PDF receipts attach (WebP and HEIC post without one; PDF support still needs live confirmation); a sync is tied to the Zoho org of its first try; missing mappings defer with a message; zero-total payroll runs aren't queued.
+  - **T26:** only Paycrest signature failures alert; staff-resolved failed payouts also email; the Zoho alert shows counts, not error text; low-balance shows only the spendable balance; if the whole API is down nothing alerts (needs external uptime monitoring). The admin alerts and health pages are built; only `reconcile-paycrest` records a heartbeat. The admin app has no component-test setup; staff routes have 20 serial tests.
+  - **T47:** stored passkey `transports` are stripped so an app passkey offers "use a phone or tablet"; the person filter lacks removed members; archived categories can't be picked in the filter; one detail request per queue card; `ApprovalPasskeyGate` still says to set up the passkey in the app (Settings can now do it).
+  - **T48:** unpaid USD bills show "≈ KES X today" (the bill read lacks the payment-day KES); failed bills are retried one at a time.
+  - **T49:** company details are read-only (no API); the eTIMS-exempt flag isn't retroactive; the wallet page has no QR.
+  - **T51:** a future month isn't refused (it gives empty files); the web doesn't list stored exports.
 - **Not yet proven live:**
   - R2 uploads
   - Telnyx codes
   - Resend email
   - Expo push
   - the Privy passkey and `latest_verified_at` behaviour that approval-passkey enrolment relies on (if Privy doesn't update it, enrolment fails closed with "sign in again")
-  - Zoho
-  - the web dashboard
+  - Zoho (including the assumptions listed under Checkpoint D)
+  - the web dashboard's browser uploads and passkeys
 - **Refunds:** Paycrest refunds come from its Gateway and are now linked to their payout. A few corner cases still land as plain deposits; the balance is always right.
 - **Paycrest quirks:**
   - It returns 404 for a refunding order for about 30 minutes. Reconcile only flags a payout for review after its threshold: funding 10 minutes, paying 2 hours.
   - No M-Pesa receipt number comes back (`paymentReference` is null).
 - **Staff resolve (T24)** depends on Alchemy's log search. If the plan limits block ranges, it refuses with a 503 and changes nothing.
-- **Payee responses:** the payee list and detail return full account numbers to admins; only the app masks them. Accepted for now.
-- **Withdrawals:** allowlist changes and withdrawals don't email the other admins (payee changes do).
+- **Payee responses:** the payee list and detail return full account numbers to admins; only the app masks them. Kept on the web too (decision 1).
 - **"Sign in again"** for passkey enrolment is a full sign-out.
 - **T16 / T18 gaps:** a receipt read that finishes after submit isn't copied to the claim; near-duplicate warnings go on the newer claim only.
 - **Payroll gaps:**
   - payroll payout USDC amounts are visible in `wallet_transactions` to any company scope (no employee route reads them)
   - ending a salary and re-creating it for the same pay day can draft a person twice
+- **Overspend (T40):** the earlier gaps are fixed (SMS receipt compared with the whole purchase, amount edits refused with 409, `floatId` on the claim view, near-duplicate check skips the paired float row).
 - **Deploying migration 0050** drops two membership columns; expect a few seconds of errors from the old release during that deploy.
 
 ---
 
-## 8. How to build in parallel (what worked in this session)
+## 8. How to build in parallel (what worked in these sessions)
 
 - **About 5 builders at once.** Seven at once hit the 5-hour usage limit; agents then resume with a message once it resets.
 - **Every builder brief includes:**
@@ -312,6 +349,7 @@ Run these as parallel subagents, as the last four waves did. "Ready now" means e
   - re-reading shared files right before editing them
   - no commits, no `docs/` edits, no Railway/Doppler, no real providers
   - mutation checks on the key guards
+- **Before starting, check for another session's drafts** (untracked files, migration numbers already in `drizzle/`). Builders can take them over, as this wave did.
 - **Expect transient load failures:** a test run that starts while another builder is writing a migration fails to load. Re-run before concluding anything.
 - **Two builders must not change the same hook or service in parallel.** T37 and T39 shared the bill payout hook, so one builder did both.
 - **The main session** verifies each report by re-running its tests, runs the integration pass (`pnpm turbo run typecheck lint format`, the API main + serial suites on a fresh database, `db:generate` for drift, shared and mobile tests, builds), updates the docs, then asks Dennis before committing.

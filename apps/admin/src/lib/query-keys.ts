@@ -1,4 +1,5 @@
 import type {
+  AccountingSyncsQuery,
   AuditSearchQuery,
   CompanySearchQuery,
   PayoutQueueQuery,
@@ -8,6 +9,8 @@ export const queryKeys = {
   staffMe: (privyUserId: string) => ["internal", "me", privyUserId] as const,
   auditSearch: (query: AuditSearchQuery) =>
     ["internal", "audit", query] as const,
+  opsAlerts: () => ["internal", "alerts"] as const,
+  systemHealth: () => ["internal", "health"] as const,
   companies: (query: CompanySearchQuery) =>
     ["internal", "companies", query] as const,
   company: (companyId: string) => ["internal", "company", companyId] as const,
@@ -20,4 +23,8 @@ export const queryKeys = {
     ["internal", "zoho", companyId, "organizations"] as const,
   zohoAccounts: (companyId: string) =>
     ["internal", "zoho", companyId, "accounts"] as const,
+  zohoSyncs: (companyId: string, query?: AccountingSyncsQuery) =>
+    query
+      ? (["internal", "zoho", companyId, "syncs", query] as const)
+      : (["internal", "zoho", companyId, "syncs"] as const),
 };

@@ -1,4 +1,4 @@
-import { and, asc, between, eq, ne } from "drizzle-orm";
+import { and, asc, between, eq, isNull, ne, or } from "drizzle-orm";
 import { Effect } from "effect";
 
 import type {
@@ -73,7 +73,8 @@ export interface RuleSubject {
 /**
  * Another live expense by the same person for the same amount, dated a day
  * either side or the same day. Rejected ones don't count: they were turned
- * down, often for being duplicates.
+ * down, often for being duplicates. Nor does the float spending a petty cash
+ * overspend claim was split from: they're two halves of one purchase.
  */
 export function nearDuplicateWarnings(
   tx: Transaction,
@@ -99,6 +100,12 @@ export function nearDuplicateWarnings(
           ),
           ne(expenses.status, "rejected"),
           subject.id === null ? undefined : ne(expenses.id, subject.id),
+          subject.id === null
+            ? undefined
+            : or(
+                isNull(expenses.overspendClaimId),
+                ne(expenses.overspendClaimId, subject.id),
+              ),
         ),
       )
       .orderBy(asc(expenses.spentOn), asc(expenses.createdAt))

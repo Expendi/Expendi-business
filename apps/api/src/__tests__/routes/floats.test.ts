@@ -11,6 +11,7 @@ import type {
 } from "@expendi-business/shared";
 import {
   claimApprovalSchema,
+  claimDetailSchema,
   floatApprovalSchema,
   floatDetailSchema,
   floatPaymentResultSchema,
@@ -1264,6 +1265,163 @@ describe("POST /organizations/:id/floats/:floatId/spending", () => {
 
     // #then
     expect(response.status).toBe(409);
+  });
+});
+
+describe("an overspend claim", () => {
+  const claimPath = (claimId: string) =>
+    `/organizations/${paying.company.organizationId}/claims/${claimId}`;
+
+  function editClaim(
+    claimId: string,
+    body: Record<string, unknown>,
+  ): Promise<Response> {
+    return sendJson(app, claimPath(claimId), employee, {
+      method: "PATCH",
+      body,
+    });
+  }
+
+  async function claimAs(claimId: string, user: TestUser = admin()) {
+    const response = await sendJson(app, claimPath(claimId), user);
+    expect(response.status).toBe(200);
+    return claimDetailSchema.parse(await dataOf(response));
+  }
+
+  it("can be edited when its receipt is the M-Pesa SMS for the whole purchase", async () => {
+    // #given KES 1,000 on the float and a KES 1,200 purchase paid by M-Pesa
+    const floatId = await issuedFloat();
+    const sms = await pasteSms(
+      app,
+      paying.company,
+      employee,
+      buyGoodsSms({ code: "SKL3OVER01", amount: "1,200.00" }),
+    );
+    const result = await spent(floatId, {
+      amountKes: "1,200",
+      receiptFileIds: [sms.receiptFileId],
+    });
+    const claimId = result.overspendClaim?.id ?? "";
+
+    // #when the holder fixes the description on the KES 200 claim
+    const response = await editClaim(claimId, {
+      description: "Printer paper and toner",
+    });
+
+    // #then
+    expect({
+      status: response.status,
+      claim: await claimAs(claimId).then((claim) => [
+        claim.description,
+        claim.amountKes,
+        claim.mpesaCode,
+      ]),
+    }).toEqual({
+      status: 200,
+      claim: ["Printer paper and toner", "20000", "SKL3OVER01"],
+    });
+  });
+
+  it("still refuses an M-Pesa code that contradicts its SMS", async () => {
+    // #given
+    const floatId = await issuedFloat();
+    const sms = await pasteSms(
+      app,
+      paying.company,
+      employee,
+      buyGoodsSms({ code: "SKL3OVER02", amount: "1,200.00" }),
+    );
+    const result = await spent(floatId, {
+      amountKes: "1,200",
+      receiptFileIds: [sms.receiptFileId],
+    });
+
+    // #when
+    const response = await editClaim(result.overspendClaim?.id ?? "", {
+      mpesaCode: "SKL3WRONG9",
+    });
+
+    // #then
+    expect(response.status).toBe(400);
+  });
+
+  it("refuses an amount change, since the float spending decides the extra", async () => {
+    // #given a KES 1,250 purchase: KES 1,000 from the float, KES 250 claimed
+    const floatId = await issuedFloat();
+    const result = await spent(floatId, { amountKes: "1,250" });
+    const claimId = result.overspendClaim?.id ?? "";
+
+    // #when
+    const changed = await editClaim(claimId, { amountKes: "500" });
+    const unchanged = await editClaim(claimId, {
+      amountKes: "250",
+      description: "Printer paper, receipt attached",
+    });
+
+    // #then
+    expect({
+      changed: changed.status,
+      message: (await errorOf(changed)).message,
+      unchanged: unchanged.status,
+      amount: (await claimAs(claimId)).amountKes,
+    }).toEqual({
+      changed: 409,
+      message:
+        "This claim is the part of a petty cash purchase over the float, so its amount comes from that purchase and can't be changed.",
+      unchanged: 200,
+      amount: "25000",
+    });
+  });
+
+  it("shows which float it came from, and a plain claim shows none", async () => {
+    // #given
+    const floatId = await issuedFloat();
+    const result = await spent(floatId, { amountKes: "1,100" });
+    const plain = await sendJson(
+      app,
+      `/organizations/${paying.company.organizationId}/claims`,
+      employee,
+      {
+        method: "POST",
+        body: {
+          merchant: "Java House",
+          amountKes: "450",
+          spentOn: "2026-10-15",
+          categoryId,
+          description: "Team lunch",
+          receiptFileIds: [
+            (await uploadReceipt(app, storage, paying.company, employee))
+              .receiptFileId,
+          ],
+        },
+      },
+    );
+    expect(plain.status).toBe(201);
+    const plainId = claimDetailSchema.parse(await dataOf(plain)).id;
+
+    // #when
+    const overspend = await claimAs(result.overspendClaim?.id ?? "", employee);
+    const other = await claimAs(plainId, employee);
+
+    // #then
+    expect([overspend.floatId, other.floatId]).toEqual([floatId, null]);
+  });
+
+  it("isn't flagged as a near-duplicate of its own float spending when its warnings are recomputed", async () => {
+    // #given a KES 2,000 purchase: KES 1,000 from the float and KES 1,000
+    // claimed, the same person, amount and day
+    const floatId = await issuedFloat();
+    const result = await spent(floatId, { amountKes: "2,000" });
+    const claimId = result.overspendClaim?.id ?? "";
+
+    // #when an edit recomputes the claim's warnings
+    const response = await editClaim(claimId, {
+      description: "Printer paper for the quarter",
+    });
+
+    // #then
+    expect(response.status).toBe(200);
+    expect((await claimAs(claimId)).warnings).toEqual([]);
   });
 });
 

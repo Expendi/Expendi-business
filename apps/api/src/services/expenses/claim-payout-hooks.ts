@@ -13,6 +13,7 @@ import { AuditLog } from "../audit/audit-log.js";
 import { notify } from "../notification/notify.js";
 import { PayoutRejected } from "../payout/payout-errors.js";
 import { requireConfirmedPayoutPhone } from "../phone-verification/payout-phone.js";
+import { enqueuePaidClaim } from "../zoho/enqueue.js";
 
 /**
  * A claim follows its payout (spec §5, §6.7, §6.8). Approval moves it from
@@ -189,6 +190,9 @@ function followPayout(
           : { reason: payout.failureReason }),
       },
     });
+    if (outcome.status === "paid") {
+      yield* enqueuePaidClaim(tx, payout.organizationId, moved.id);
+    }
     yield* notify(tx, {
       kind: outcome.status === "paid" ? "claim_paid" : "claim_payout_failed",
       organizationId: payout.organizationId,

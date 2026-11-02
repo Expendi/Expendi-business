@@ -643,6 +643,54 @@ describe("POST /organizations/:id/claims/approval", () => {
         sends: 1,
       });
     });
+
+    it("pays each claim of a batch once, even when the batch's confirmation arrives twice at once", async () => {
+      // #given three people's claims, approved together with one passkey
+      const claims = [
+        await submit(),
+        await submit(await payableEmployee(paying.company), "250"),
+        await submit(await payableEmployee(paying.company), "4,000"),
+      ];
+      const claimIds = claims.map((claim) => claim.id);
+      const approval = await approvalFor(claimIds);
+      const signed = paying.passkey.sign(approval.options, TEST_ORIGIN);
+
+      // #when
+      const responses = await Promise.all([
+        sendConfirmation(approval, signed),
+        sendConfirmation(approval, signed),
+      ]);
+      for (const preview of approval.claims) {
+        const payout = await readPayout(db, paying.company, preview.payoutId);
+        setOrder(payout, "settled");
+        await deliverWebhook(payout);
+      }
+      const preparedAgain = await prepare(claimIds);
+
+      // #then
+      expect({
+        statuses: responses.map((response) => response.status).sort(),
+        payoutsPerClaim: await Promise.all(
+          claimIds.map(async (id) => (await payoutsOf(id)).length),
+        ),
+        claimStatuses: await Promise.all(
+          claimIds.map(async (id) => (await claimRow(id)).status),
+        ),
+        distinctSends: new Set(
+          privy.state.sends.map((send) => send.idempotencyKey),
+        ).size,
+        preparedAgain: preparedAgain.status,
+        ...moneyMoved(),
+      }).toEqual({
+        statuses: [200, 403],
+        payoutsPerClaim: [1, 1, 1],
+        claimStatuses: ["paid", "paid", "paid"],
+        distinctSends: 3,
+        preparedAgain: 409,
+        orders: 3,
+        sends: 3,
+      });
+    });
   });
 
   describe("the confirmed payout number (spec §6.18)", () => {

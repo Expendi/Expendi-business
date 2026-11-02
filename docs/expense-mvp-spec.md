@@ -280,21 +280,23 @@ Notifications are sent by push through Expo. Due-date reminders, low-balance war
 | Petty cash float issued or topped up                                         | The employee                             |
 | A payee's payment details added or changed                                   | Every admin, by email                    |
 
+Payroll bills get no per-person due reminders; the run's "ready to review" notice covers them.
+
 ### 6.11 Accountant export
 
-- Monthly Excel/CSV. An admin can generate any month in the app and share it. It's also emailed automatically to the company's accountants on the 1st.
+- Monthly Excel/CSV (the CSV download is a zip of three CSVs). An admin can generate any month in the app and share it. It's also emailed automatically to the company's accountants on the 1st.
 - **What's in it:** all money out in the month:
   - claims
-  - petty cash float issues and spending
+  - petty cash spending (float issues and top-ups go on a separate "Float transfers" sheet, since they move money between the company's own accounts and aren't spending)
   - bills, whether paid through Expendi or marked paid outside
   - salaries, per person
   - company spending
 - **Columns:**
   - what: date, kind (claim, float, bill, salary, company), overview heading, payee or employee, merchant, category, amount (KES)
-  - state: status, source (app or import), approved by, self-approved (yes/no)
+  - state: status, source (app or import), approved by, self-approved (yes/no; filled only for claims, so bills and salaries show No)
   - references: M-Pesa code, eTIMS invoice number, eTIMS status, receipt file, payout reference (Paycrest order ID plus the M-Pesa or bank reference, or the transaction hash)
 - **Outstanding:** a second sheet lists bills that are due or overdue at month end, so the accountant can see what's owed.
-- **Receipts:** the export carries no receipt URLs. Each month comes with a zip of that month's receipts, and the "receipt file" column names the matching file in the zip (e.g. `2026-11-03_jane-wanjiku_java-house_1500.jpg`). The monthly email links to the zip; the link expires after 30 days, and an admin can regenerate it from the app at any time.
+- **Receipts:** the export carries no receipt URLs. Each month comes with a zip of that month's receipts, and the "receipt file" column names the matching file in the zip (e.g. `2026-11-03_jane-wanjiku_java-house_1500.jpg`). The monthly email links to the workbook, the CSV zip and the receipts zip; the links expire after 30 days, and an admin can regenerate them from the app at any time. Each accountant gets their own links, which stop working if they are removed; an admin's export has one shareable link. Company spending leaves "payee or employee" blank.
 - **Retention:** keep receipts for at least 5 years, matching KRA's record-keeping period.
 
 ### 6.12 Spreadsheet import (one-time, per company)
@@ -354,10 +356,10 @@ In the MVP since 2026-11-02 (Dennis). Employees use only the app. Admins can use
   - all expenses (claims, petty cash, company spending), filterable by employee, kind, category, month and eTIMS status
   - wallet: balance, deposit address ("send USDC on Base only"), history, withdrawals and allowed addresses. KES top-ups come after go-live with Qadi.
   - team: invite, change roles, remove; including accountants
-  - activity: the company's own audit log entries, read-only (section 6.13)
+  - activity: the company's own audit log entries, read-only (section 6.13). Request ID, IP and device are not shown; Expendi staff appear as "Expendi team" and the system as "Expendi (automatic)".
   - settings:
-    - company details
-    - the category list: add, rename, archive, and mark eTIMS-exempt (section 6.1)
+    - company details (read-only for now)
+    - the category list: add, rename, archive, restore, and mark eTIMS-exempt (section 6.1); the exempt flag isn't applied to past claims
     - the admin's approval passkey
 - **Passkeys in the browser:**
   - Money actions use the admin's same approval passkey as in the app (section 7). It works in the browser because the passkey belongs to `business.expendi.app`.
@@ -366,7 +368,7 @@ In the MVP since 2026-11-02 (Dennis). Employees use only the app. Admins can use
 - **Accountant:**
   - **View-only:** they see everything an admin sees, salaries and payroll runs included (the monthly export already contains them), and can't trigger any action. This is enforced in the API, not just hidden in the screens.
   - **Downloads:** the monthly export and the receipts zip (section 6.11), for any month.
-  - **eTIMS report:** each expense in a month with its eTIMS status, invoice number and supplier PIN, as a CSV.
+  - **eTIMS report:** each expense in a month with its eTIMS status, invoice number and supplier PIN, as a CSV. Rejected claims are left out.
   - **Switching:** between client companies, since an accountant can be on several.
 - **Security:**
   - The API allows browser requests only from the dashboard's own origin, and every role rule stays in the API.
@@ -394,7 +396,7 @@ A Next.js web app in `apps/admin`, for Expendi staff only. Staff sign in with th
 
 ### 6.16 Alerts
 
-Alerts are emailed to the Expendi team's alert list and also appear in the internal admin app. Slack comes later. Send at most one email per alert for the same payout or company until it's resolved, so a stuck job doesn't flood the inbox.
+Alerts are emailed to the Expendi team's alert list and also appear in the internal admin app (the alerts and system health pages are being built; the alerts are stored meanwhile). Slack comes later. Send at most one email per alert for the same payout or company until it's resolved, so a stuck job doesn't flood the inbox.
 
 | Alert                     | Fires when                                                                                             |
 | ------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -403,7 +405,7 @@ Alerts are emailed to the Expendi team's alert list and also appear in the inter
 | Webhook signature failure | A Paycrest webhook fails signature verification                                                        |
 | Reconciliation stopped    | The reconciliation job hasn't finished a run in 5 minutes                                              |
 | Low company balance       | A company's wallet holds less than its unpaid claims plus the bills and payroll due in the next 7 days |
-| Zoho sync failing         | A claim's sync runs out of retries, or Zoho rejects a company's connection                             |
+| Zoho sync failing         | A sync runs out of retries, or Zoho rejects a company's connection                                     |
 
 ### 6.17 Zoho Books sync
 
@@ -413,13 +415,14 @@ Paid spending goes straight into the company's Zoho Books. The monthly export (s
   - each paid claim, each piece of petty cash spending, each paid bill (through Expendi or marked paid outside) and each piece of company spending, as one Zoho expense
   - salaries as **one expense per payroll run**, posted to a salaries account; the per-person detail stays in the export
   - **Paid Through** account:
-    - petty cash spending: a petty cash account the accountant chooses
+    - petty cash spending: a petty cash account the accountant chooses. A claim for an overspend's extra is posted through the Expendi wallet account, since the wallet paid it.
     - company spending: the account it was paid from, picked when it's recorded from a list the accountant maps
 
 - **Direction:** one way, Expendi → Zoho. Expendi creates one Zoho expense for each paid item listed under **What syncs**, attaches the receipt where there is one, and never updates or deletes it afterwards. Changes the accountant makes in Zoho stay in Zoho.
 - **Not synced:**
   - imported `paid_outside` history, which is already in the books
   - anything not yet paid
+  - anything paid before the company connected Zoho; nothing is pushed for history when a company first connects
   - float issues and top-ups, which move money between the company's own accounts
   - wallet deposits, withdrawals and Paycrest fees The accountant records wallet movements from the wallet history.
 - **Connecting** (during setup, like the spreadsheet import):
@@ -433,9 +436,9 @@ Paid spending goes straight into the company's Zoho Books. The monthly export (s
   - expense account: the category's mapped account, or the default
   - paid through: the chosen account
   - reference: the claim's Expendi ID
-  - description: merchant, the employee's description, employee name, M-Pesa code, and the eTIMS invoice number and supplier PIN where they exist
-  - receipt: the claim's photo or screenshot. Zoho accepts images and PDFs only, so an SMS-only claim attaches nothing.
-- **Retries:** a background job syncs each claim and retries failed calls with backoff. Zoho has no idempotency key, so before retrying a create the job searches Zoho for the claim's reference and reuses the expense if it's there. A retry never creates a duplicate. When retries run out, the sync is marked `failed`, the "Zoho sync failing" alert fires, and staff can retry it from the internal admin app once the cause is fixed.
+  - description: merchant, the employee's description, employee name, M-Pesa code, and the eTIMS invoice number and supplier PIN where they exist, cut to Zoho's 100 characters
+  - receipt: the claim's photo or screenshot. Only JPEG, PNG, GIF and BMP images attach, so an SMS-only claim, or a WebP or HEIC image, attaches nothing.
+- **Retries:** a background job syncs each claim and retries failed calls with backoff. Zoho has no idempotency key, so before every create the job searches Zoho for the claim's reference and reuses the expense if it's there. A sync stays with the Zoho organization of its first try. A retry never creates a duplicate. When retries run out, the sync is marked `failed`, the "Zoho sync failing" alert fires, and staff can retry it from the internal admin app once the cause is fixed.
 - **Lost access:** if Zoho rejects the stored token, the connection is marked `needs_reconnect`, syncing pauses and the alert fires. Claims paid in the meantime sync after reconnecting.
 - **Tokens:** the Zoho refresh token is stored encrypted, with the key in Doppler, and no endpoint returns it. Zoho runs several data centres, so store the accounts server and API domain returned at sign-in and use them for every call.
 - **Audit:** connecting, disconnecting, choosing the organization and changing the account mapping are audited as settings changes. Each claim's sync outcome is recorded in `accounting_syncs`.
@@ -573,8 +576,8 @@ This is the admin's home screen in the app. It answers the pilot's four question
 | What is outstanding?        | Overdue bills, bills due today, claims waiting for approval, and petty cash spending without a receipt                                      |
 | What needs to be paid next? | Bills and payroll runs due in the next 30 days in date order, overdue first, each with **Pay**                                              |
 
-- **Cash check:** at the top, the wallet balance in USDC and KES, compared with everything due in the next 30 days: "Covered" or "Short by KES X".
-- **Per person:** tapping a person shows their salary, payments, claims and float.
+- **Cash check:** at the top, the wallet balance in USDC and KES, compared with everything due in the next 30 days: "Covered" or "Short by KES X". Bills paid outside Expendi don't count against the wallet; their total is shown beside the check as "Also due outside Expendi: KES X". A variable bill with no amount yet is listed beside the check and doesn't change it. Fees and the whole-shilling round-up aren't predicted.
+- **Per person:** tapping a person (an admin, employee or other personnel; not accountants) shows their claims, salary and the bills paid to them, with their float shown separately. Recent payments are the latest 20 across the selected and previous month.
 - **Employees' home screen** shows only their claims, their float balance and their own salary payments.
 
 ---

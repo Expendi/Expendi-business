@@ -18,11 +18,13 @@ import {
 import { query } from "../../db/scope.js";
 import { canonicalJson } from "../approval/passkeys.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { notify } from "../notification/notify.js";
 import { resolveApprovedPayeeRecipient } from "../payees/payment-guard.js";
 import { PayoutRejected } from "../payout/payout-errors.js";
 import { refreshPayrollRunStatus } from "../payroll/run-status.js";
 import { salaryParts } from "../payroll/split.js";
 import { onRecurringBillSettled } from "../recurring/next-bill.js";
+import { enqueuePaidBill } from "../zoho/enqueue.js";
 import { assertBillPayable, billAmountOf } from "./payable.js";
 import { nairobiDate } from "./status.js";
 
@@ -33,8 +35,8 @@ import { nairobiDate } from "./status.js";
  *   (still unpaid and payable, the same amount, the payee's details as
  *   they were when the payment was prepared) and moves to `paying` with
  *   the payout. A refusal rolls the whole approval back.
- * - **Paid:** the bill is `paid`, and a recurring bill's next one is
- *   created in the same transaction (T36).
+ * - **Paid:** the bill is `paid`, and in the same transaction it's queued
+ *   for Zoho Books (T44) and a recurring bill's next one is created (T36).
  * - **Failed:** the bill is `payout_failed`; the admin retries it.
  * - **Needs review:** the bill stays `paying` until a person resolves it.
  *
@@ -446,7 +448,15 @@ function followPayout(
         },
       });
       if (next === "paid" && moved.payrollRunId === null) {
+        yield* enqueuePaidBill(tx, moved.organizationId, moved.id);
         yield* onRecurringBillSettled(tx, moved, new Date());
+      }
+      if (next === "paid" && moved.payrollRunId !== null) {
+        yield* notify(tx, {
+          kind: "salary_paid",
+          organizationId: moved.organizationId,
+          billId: moved.id,
+        });
       }
       if (run) yield* refreshPayrollRunStatus(tx, run, SYSTEM);
     }),

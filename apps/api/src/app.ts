@@ -17,6 +17,7 @@ import {
   createSignUpRoutes,
 } from "./routes/organizations.js";
 import { createPaycrestWebhookRoutes } from "./routes/paycrest-webhook.js";
+import { createReportDownloadRoutes } from "./routes/reports.js";
 
 export type App = Hono<{ Variables: AuthVariables }>;
 
@@ -32,6 +33,7 @@ export function createApp({ runtime }: { readonly runtime: AppRuntime }): App {
   });
 
   app.route("/health", createHealthRoutes());
+  app.route("/downloads/reports", createReportDownloadRoutes(runtime));
   // Signed by the provider, not a user, so no login middleware.
   app.route("/webhooks", createAlchemyWebhookRoutes(runtime));
   app.route("/webhooks", createPaycrestWebhookRoutes(runtime));

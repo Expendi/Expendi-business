@@ -15,6 +15,8 @@ export interface EmailMessage {
   readonly subject: string;
   readonly text: string;
   readonly html: string;
+  /** Resend sends a message once per key, for 24 hours. */
+  readonly idempotencyKey?: string;
 }
 
 export interface EmailSenderShape {
@@ -48,6 +50,9 @@ export function makeResendEmailSender(
             headers: {
               Authorization: `Bearer ${Redacted.value(settings.apiKey)}`,
               "Content-Type": "application/json",
+              ...(message.idempotencyKey
+                ? { "Idempotency-Key": message.idempotencyKey }
+                : {}),
             },
             body: JSON.stringify({
               from: settings.from,
