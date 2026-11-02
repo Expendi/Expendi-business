@@ -157,6 +157,42 @@ async function readState() {
 }
 
 describe("spreadsheet import", () => {
+  it("previews Shanga TSV with source rows, skips headings and deduplicates repeated imports", async () => {
+    const header =
+      "Expense Category\tItem Description\tPurchased By\tDate Purchased\tCost\tVendor\tStatus\tMember Email";
+    const input: ImportRequest = {
+      kind: "history",
+      layout: "shanga",
+      fileName: "sanitized-shanga.tsv",
+      csv: `${header}\n\n${header}\nOffice\tPaper\tTest Admin\t${today}\t1,500.50\tTest Shop\tpaid\t${company.admin.email}`,
+      mapping: {
+        category: "Expense Category",
+        description: "Item Description",
+        date: "Date Purchased",
+        amount: "Cost",
+        name: "Vendor",
+        email: "Member Email",
+      },
+    };
+    const report = await preview(input);
+    expect(report.rows.map((r) => [r.row, r.status])).toEqual([
+      [3, "skipped"],
+      [4, "ready"],
+    ]);
+    expect((await readState()).expenses).toHaveLength(0);
+    expect((await commit(input)).imported).toBe(1);
+    expect((await preview(input)).ready).toBe(0);
+    const state = await readState();
+    expect(state.expenses).toHaveLength(1);
+    expect(state.expenses[0]?.amountKes).toBe(150050n);
+    expect(state.payouts).toHaveLength(0);
+    const mixed = await preview({
+      ...input,
+      csv: input.csv.replace("\tpaid\t", "\tunpaid\t"),
+    });
+    expect(mixed.errors).toBe(1);
+    expect(mixed.previewToken).toBeNull();
+  });
   it("imports all 25 public UKEF payments through mapped columns with explicit test-only GBP conversion", async () => {
     const bytes = readFileSync(
       new URL("../fixtures/imports/ukef-july-2026.csv", import.meta.url),

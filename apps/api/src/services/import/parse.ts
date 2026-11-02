@@ -1,7 +1,7 @@
 import type { ImportField, ImportRequest } from "@expendi-business/shared";
 import {
   IMPORT_FIELDS,
-  parseImportCsv,
+  parseImportSpreadsheet,
   payeeKindSchema,
   recurringScheduleSchema,
 } from "@expendi-business/shared";
@@ -31,19 +31,36 @@ export function importAmount(value: string, allowZero = false): bigint {
 }
 
 export function mappedRows(input: ImportRequest): Record<string, string>[] {
-  const { headers, rows } = parseImportCsv(input.csv);
+  const { headers, rows, rowNumbers, ignored } = parseImportSpreadsheet(
+    input.csv,
+    input.layout,
+  );
+  if (
+    input.layout === "shanga" &&
+    !["history", "claim", "bill"].includes(input.kind)
+  )
+    throw new Error(
+      "Use Paid history, Unpaid claims or bills for Shanga expense sheets. Salary and recurring schedules need a separate prepared file.",
+    );
   const mapping = Object.entries(input.mapping);
   if (!mapping.length || mapping.some(([, h]) => !headers.includes(h)))
     throw new Error("Map the CSV columns before previewing.");
   if (new Set(mapping.map(([, h]) => h)).size !== mapping.length)
     throw new Error("Map each column to only one field.");
-  return rows.map((row) => ({
+  const mapped: Record<string, string>[] = rows.map((row, i) => ({
     ...Object.fromEntries(
       mapping.map(([field, header]) => [
         field,
         row[headers.indexOf(header)] ?? "",
       ]),
     ),
+    $row: String(rowNumbers[i]),
+    ...(input.layout === "shanga"
+      ? {
+          $status: row[headers.indexOf("Status")] ?? "",
+          status: row[headers.indexOf("Status")] ?? "",
+        }
+      : {}),
     // Retain unmapped source IDs, so otherwise-identical legitimate payments
     // remain distinct. Column order and filename do not affect identity.
     $source: JSON.stringify(
@@ -52,6 +69,24 @@ export function mappedRows(input: ImportRequest): Record<string, string>[] {
         .sort(([a = ""], [b = ""]) => a.localeCompare(b)),
     ),
   }));
+  return [
+    ...mapped,
+    ...ignored.map((r) => ({ $row: String(r.row), $skip: r.message })),
+  ].sort((a, b) => Number(a.$row) - Number(b.$row));
+}
+
+export function validateImportStatus(
+  input: ImportRequest,
+  row: Record<string, string>,
+) {
+  const value = input.layout === "shanga" ? row.$status : row.status;
+  if (input.layout !== "shanga" && value === undefined) return;
+  if (!["history", "claim", "bill"].includes(input.kind)) return;
+  const expected = input.kind === "history" ? "paid" : "unpaid";
+  if (value?.trim().toLowerCase() !== expected)
+    throw new Error(
+      `Status must be ${expected} for this record type. Confirm payment status and split paid and unpaid records into separate files.`,
+    );
 }
 
 export function required(

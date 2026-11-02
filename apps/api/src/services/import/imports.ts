@@ -45,6 +45,7 @@ import {
   payeeKind,
   required,
   schedule,
+  validateImportStatus,
 } from "./parse.js";
 
 type Action =
@@ -388,12 +389,19 @@ function plan(
   );
   return raw.map((values, i): PlannedRow => {
     const report: ImportReport["rows"][number] = {
-      row: i + 2,
+      row: Number(values.$row) || i + 2,
       values: cleanValues(values),
       status: "ready",
       message: "Ready to import.",
     };
+    if (values.$skip)
+      return {
+        action: null,
+        hash: "",
+        report: { ...report, status: "skipped", message: values.$skip },
+      };
     try {
+      validateImportStatus(input, values);
       const action = actionFor(input, values, ctx, organizationId, today);
       // Date-derived bill status is not source identity and changes overnight.
       const identity =

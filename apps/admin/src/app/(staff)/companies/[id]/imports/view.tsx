@@ -12,7 +12,8 @@ import type {
 import {
   IMPORT_KINDS,
   IMPORT_MAX_BYTES,
-  parseImportCsv,
+  parseImportSpreadsheet,
+  suggestImportMapping,
 } from "@expendi-business/shared";
 
 import {
@@ -41,8 +42,17 @@ const fields: Record<ImportRequest["kind"], ImportField[]> = {
     "scheduleDay",
     "payVia",
   ],
-  bill: ["payee", "category", "heading", "amount", "date", "description"],
+  bill: [
+    "payee",
+    "category",
+    "heading",
+    "amount",
+    "date",
+    "description",
+    "status",
+  ],
   claim: [
+    "status",
     "name",
     "email",
     "category",
@@ -53,6 +63,7 @@ const fields: Record<ImportRequest["kind"], ImportField[]> = {
     "mpesaCode",
   ],
   history: [
+    "status",
     "name",
     "email",
     "category",
@@ -80,7 +91,17 @@ const labels: Record<ImportField, string> = {
   payVia: "Pay via (default: expendi)",
   issued: "Total float issued in KES",
   left: "Float balance left in KES",
+  status: "Payment status (paid / unpaid)",
 };
+
+function suggestedMapping(headers: string[], kind: ImportRequest["kind"]) {
+  const suggestions = suggestImportMapping(headers, kind);
+  return Object.fromEntries(
+    fields[kind].flatMap((field) =>
+      suggestions[field] ? [[field, suggestions[field]]] : [],
+    ),
+  );
+}
 
 export function ImportView({ companyId }: { companyId: string }) {
   const { api, staff } = useStaffAuth();
@@ -90,10 +111,13 @@ export function ImportView({ companyId }: { companyId: string }) {
     queryFn: () => api.ops.company(companyId),
   });
   const [kind, setKind] = useState<ImportRequest["kind"]>("payee");
+  const [layout, setLayout] = useState<"standard" | "shanga">("standard");
   const [file, setFile] = useState<{
     name: string;
     csv: string;
     headers: string[];
+    ignored: number;
+    rows: number;
   } | null>(null);
   const [mapping, setMapping] = useState<ImportRequest["mapping"]>({});
   const [preview, setPreview] = useState<{
@@ -119,7 +143,11 @@ export function ImportView({ companyId }: { companyId: string }) {
     setBusy(true);
     try {
       if (selected.size > IMPORT_MAX_BYTES)
-        throw new Error("Use a CSV smaller than 512 KB.");
+        throw new Error("Use a CSV or TSV smaller than 512 KB.");
+      if (!/\.(csv|tsv)$/i.test(selected.name))
+        throw new Error(
+          "Export one Excel sheet as UTF-8 CSV or TSV, then upload it here.",
+        );
       let csv: string;
       try {
         csv = new TextDecoder("utf-8", { fatal: true }).decode(
@@ -127,16 +155,18 @@ export function ImportView({ companyId }: { companyId: string }) {
         );
       } catch {
         throw new Error(
-          "Export this file as CSV UTF-8 in Excel, then try again.",
+          "Export this file as UTF-8 CSV or TSV, then try again.",
         );
       }
-      const { headers } = parseImportCsv(csv);
-      setFile({ name: selected.name, csv, headers });
-      setMapping(
-        Object.fromEntries(
-          fields[kind].filter((f) => headers.includes(f)).map((f) => [f, f]),
-        ),
-      );
+      const { headers, ignored, rows } = parseImportSpreadsheet(csv, layout);
+      setFile({
+        name: selected.name,
+        csv,
+        headers,
+        ignored: ignored.length,
+        rows: rows.length,
+      });
+      setMapping(suggestedMapping(headers, kind));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't read this file.");
     } finally {
@@ -152,6 +182,7 @@ export function ImportView({ companyId }: { companyId: string }) {
       csv: file.csv,
       fileName: file.name,
       mapping,
+      layout,
     };
     try {
       setPreview({
@@ -201,10 +232,10 @@ export function ImportView({ companyId }: { companyId: string }) {
         </Link>
         <h1 className="mt-2 text-xl font-semibold">Import spreadsheet</h1>
         <p className="mt-2 max-w-2xl text-sm text-stone-600">
-          Upload one UTF-8 CSV per record type, up to 500 rows. Invite members
-          and create categories first, then import payees before salaries and
-          bills. Dates use DD/MM/YYYY or YYYY-MM-DD; amounts use KES, such as
-          1,500.00.
+          Upload one UTF-8 CSV or TSV per record type, up to 500 non-empty rows.
+          Invite members and create categories first, then import payees before
+          salaries and bills. Dates use DD/MM/YYYY or YYYY-MM-DD; amounts use
+          KES, such as 1,500.00.
         </p>
         <p className="mt-2 max-w-2xl text-sm text-stone-600">
           Payment details remain unset until a company admin adds and confirms
@@ -215,6 +246,49 @@ export function ImportView({ companyId }: { companyId: string }) {
       <fieldset disabled={busy} className="space-y-4">
         <legend className="font-semibold">1. Choose records and file</legend>
         <label className="block max-w-sm text-sm">
+          Spreadsheet layout
+          <select
+            className={inputClass}
+            value={layout}
+            onChange={(e) => {
+              const next = e.target.value === "shanga" ? "shanga" : "standard";
+              setLayout(next);
+              setFile(null);
+              setMapping({});
+              if (next === "shanga") setKind("history");
+              resetPreview();
+            }}
+          >
+            <option value="standard">Standard spreadsheet</option>
+            <option value="shanga">Shanga expense sheets</option>
+          </select>
+        </label>
+        {layout === "shanga" ? (
+          <div className="max-w-2xl space-y-2 text-sm text-stone-600">
+            <p>
+              Repeated headings and summary-only cells outside named columns are
+              skipped. Money In is income and cannot be imported here.
+            </p>
+            <p>
+              Split paid and unpaid records first. The source Status column must
+              say paid for history, or unpaid for bills and claims. Confirm that
+              unpaid purchases are supplier bills or employee reimbursements.
+            </p>
+            <p>
+              Add a Member Email column for claims/history; Purchased By names
+              cannot identify memberships. For bills, add the actual Due Date.
+              Where Cost and Total both exist, choose the final KES transaction
+              amount explicitly.
+            </p>
+            <p>
+              Receipt flags and Drive links do not upload receipts. Personnel
+              expenses are not salary schedules, and past subscription payments
+              are not recurring instructions. Q2 2026 history falls outside the
+              current three-month import window.
+            </p>
+          </div>
+        ) : null}
+        <label className="block max-w-sm text-sm">
           Record type
           <select
             className={inputClass}
@@ -223,12 +297,17 @@ export function ImportView({ companyId }: { companyId: string }) {
               const selected = IMPORT_KINDS.find((k) => k === e.target.value);
               if (selected) {
                 setKind(selected);
-                setMapping({});
+                setMapping(
+                  file ? suggestedMapping(file.headers, selected) : {},
+                );
                 resetPreview();
               }
             }}
           >
-            {IMPORT_KINDS.map((k) => (
+            {IMPORT_KINDS.filter(
+              (k) =>
+                layout !== "shanga" || ["history", "bill", "claim"].includes(k),
+            ).map((k) => (
               <option key={k} value={k}>
                 {k === "history"
                   ? "Paid history"
@@ -242,10 +321,11 @@ export function ImportView({ companyId }: { companyId: string }) {
           </select>
         </label>
         <label className="block text-sm">
-          CSV file
+          CSV or TSV file
           <input
             type="file"
-            accept=".csv,text/csv"
+            key={layout}
+            accept=".csv,.tsv,text/csv,text/tab-separated-values"
             className={`${inputClass} max-w-md`}
             onChange={(e) => {
               void loadFile(e.target.files?.[0]);
@@ -254,6 +334,10 @@ export function ImportView({ companyId }: { companyId: string }) {
         </label>
         {file ? (
           <div>
+            <p className="mb-4 text-sm">
+              {file.rows} data rows · {file.ignored} template/summary rows
+              skipped. Check the suggested mappings before previewing.
+            </p>
             <h2 className="mb-4 font-semibold">2. Map columns</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               {fields[kind].map((field) => (
@@ -261,6 +345,7 @@ export function ImportView({ companyId }: { companyId: string }) {
                   {labels[field]}
                   <select
                     className={inputClass}
+                    disabled={layout === "shanga" && field === "status"}
                     value={mapping[field] ?? ""}
                     onChange={(e) => {
                       const value = e.target.value;
