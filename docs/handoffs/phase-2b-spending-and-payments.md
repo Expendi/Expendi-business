@@ -185,7 +185,7 @@ None new. This phase reuses Paycrest, Privy, Resend, Expo push and R2.
 - **Status:**
   - 2026-11-02: started early, in parallel with Phase 2 code (Dennis's decision; see the Phase 2 Handoff notes, "QA deferred"). The Phase 2B gate of Checkpoint B (Till, Paybill, bank, USDC address, payroll cap) hasn't run yet.
   - T34: the API and tests are done (uncommitted); the app screens are in progress.
-  - T35, T36, T38 and T41: code done (2026-11-02); app screens included. T37, T39 and T40 are next.
+  - T34–T41 code done (2026-11-02), app screens included. T42 and T43 remain. The Phase 2B live gate (Checkpoint B) and QA haven't run yet.
 - **Built:**
   - **T34 payees API:**
     - **Table:** `payees` (migrations 0024/0025), with a check constraint per method and RLS FORCE. The routes are admin only.
@@ -224,6 +224,22 @@ None new. This phase reuses Paycrest, Privy, Resend, Expo push and R2.
       - Employees read only their own paid, paying or failed payroll bills (`GET …/me/salary-payments`).
       - **Phase 1 issue fixed:** payroll `payouts` rows are admin-only.
     - **Seam for T39:** `services/payroll/payable.ts`.
+  - **T37 paying bills:**
+    - **USD bills:** `bills` and `recurring_items` have `currency` (`kes`/`usd`, taken from the payee's method) and `amount_usdc`. A USD bill pays exactly that USDC; the engine values it in KES for the daily cap.
+    - **Pay / Pay all:** up to 20 bills per passkey. Payees changed within 24 hours are refused together until the admin gives a second confirmation.
+    - **Shared approval steps:** prepare, reuse or discard, cover check, preview. These moved to `services/payments/payment-approval.ts`, which claims use too.
+    - **Bill payout hook:** `bills/bill-payout-hooks.ts` runs the T36 next-bill hook on `paid`.
+  - **T39 paying payroll:**
+    - **Pay:** Approve & pay all with one passkey, each person their own payout, the run cap enforced by the engine.
+    - **Run status:** `draft → paying → paid / partly_failed`, with progress counts. A failed person is retried alone.
+    - **Split salaries:** a salary over KES 300,000 splits into several orders (`payouts.subject_part`), and a retry pays only the unpaid parts.
+    - **Margin:** changes need a passkey (purpose `change_payroll_margin`), re-cap draft runs and email every admin.
+  - **T40 petty cash floats:**
+    - **Tables:** `floats` and `float_movements` (migrations 0047/0048).
+    - **Issuing:** issues and top-ups are float payouts (pending → paid/failed) to the holder's confirmed number, with a passkey.
+    - **Balance:** computed from paid movements minus spending, returns and write-offs; never stored.
+    - **Overspend:** splits into the float spending plus a submitted claim for exactly the extra (`expenses.overspend_claim_id`).
+    - **Close:** needs a zero balance, or a write-off reason.
   - **Bills to USDC payees are entered in USD (Dennis, 2026-11-02),** and paid exactly that USDC, as USDC payees already work (T33). The overview, cap and export use the KES equivalent at the payment-day rate. T35 built KES-only bills, so this change lands with T37.
   - **`bills` and `recurring_items` (spec §10 updated):**
     - **`bills` columns:** `variable`, `paid_on`, `paid_outside_note`, `cancelled_by`, `cancelled_at`.
@@ -237,5 +253,15 @@ None new. This phase reuses Paycrest, Privy, Resend, Expo push and R2.
     - Employee `mpesa_phone` payees never store the phone.
 - **Environment variables added:**
 - **Known issues and TODOs:**
+  - **Overspend claims (T40) have gaps in `claims.ts`:**
+    - editing one with an SMS receipt fails, because the SMS amount is compared to the extra
+    - amount edits aren't blocked
+    - the claim view doesn't expose `floatId`
+    - a recompute may flag the paired float row as a near-duplicate
+  - **A non-payroll bill above Paycrest's per-order maximum (~3,000 USDC) isn't split.** Paycrest answers "rate unavailable" (503).
+  - **For T42 (overview) and T44 (Zoho):**
+    - Petty cash = float spending + claims with a `float_id`; don't count float payouts as spending as well.
+    - A bill paid outside is both a bill and a company spending row (`expenses.bill_id`); count it once.
+    - USD bills: use `amount_kes` on the payout once paid, the company-spending row once paid outside, and the live rate while unpaid.
 - **QA results (date, who ran it, devices used):**
 - **Next session starts with:**

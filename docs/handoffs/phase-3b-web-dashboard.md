@@ -28,7 +28,7 @@ Added to the MVP by Dennis on 2026-11-02 (spec §6.14). It runs in parallel with
 - **This repo:**
   - `apps/admin`: the Next.js structure, Privy login, API client and tooling to copy
   - `apps/mobile/src/features/approval/`: how the app runs a passkey approval (the same API calls on the web)
-  - `apps/mobile/well-known/`: the passkey association files the site must serve
+  - `apps/web/public/.well-known/`: the passkey association files the site must serve
   - `apps/api/src/middleware/admin-app-cors.ts`: the CORS pattern for `/internal`, to mirror for customer routes
   - `apps/api/src/__tests__/routes/internal-routes.test.ts`: the route-listing test to copy for "accountants can't act"
 
@@ -147,10 +147,35 @@ T45 → T46 → T47 → T49 → T48 → T50 → T51. T45 and T46 can start at on
 
 ## Handoff notes (fill in before ending each session)
 
-- **Status:**
+- **Status (2026-11-02):** T45 and T46 code done (uncommitted at the time of writing). T47–T51 are next, each after its API (T42 for T50, T22 for T51).
 - **Built:**
+  - **T45:**
+    - **The app:** `apps/web` (Next.js 16, port 3002), copied from `apps/admin`.
+    - **Sign-in:** an email code or a passkey, with a passkey offer after an email sign-in.
+    - **After sign-in:**
+      - several companies → a company picker
+      - an employee → "Use the Expendi Business app"
+      - no name yet → "Your full name" (`PATCH /me`)
+      - otherwise → the dashboard shell, with placeholder pages naming their task
+    - **Accountants** see a "View only" badge; `useDashboard().canAct` is admins only.
+    - **Passkey files:** they now live only in `apps/web/public/.well-known/`, served as `application/json`.
+    - **API:** CORS for `DASHBOARD_ORIGINS` on `/me/*` and `/organizations/*` only.
+    - **Vercel:** `apps/web/vercel.json` builds through turbo.
+  - **T46:**
+    - **Accountants are now `users`** (migration 0049 backfills them; 0050 drops `memberships.email`/`full_name` and makes `user_id` NOT NULL).
+    - **Invites:** an accountant invite is `invited` until first sign-in, and sends a dashboard email.
+    - **No writes:** the tenant middleware refuses every non-GET request from an accountant on every company route.
+    - **Reads:** `requireAdminOrReader()` opens every admin read to accountants.
+    - **RLS (0051):** accountants can read bills, recurring items, payroll runs, payroll payouts and floats.
+    - **Test:** a route-listing test proves every action refuses accountants, and every read matches the admin's.
 - **Changes from spec or plan, and why:**
 - **Environment variables added:**
+  - **API:** `DASHBOARD_ORIGINS` (optional, comma-separated).
+  - **Web:** `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_PRIVY_APP_ID`, `NEXT_PUBLIC_PRIVY_CLIENT_ID` (optional).
+  - **Vercel project:** root `apps/web`, Node 22, domain `business.expendi.app`.
 - **Known issues and TODOs:**
+  - **Mobile copy:** `apps/mobile/src/features/company/roles.ts` still says accountants have "No app login". Update it to point them at the dashboard.
+  - **Export recipients:** T22 should send the export to accountants whose membership isn't removed, not only active ones (an invited accountant may not have signed in yet).
+  - **Deploying migration 0050:** the old release reads the dropped columns, so expect a few seconds of errors while the new release replaces it.
 - **QA results (date, who ran it, browsers used):**
 - **Next session starts with:**

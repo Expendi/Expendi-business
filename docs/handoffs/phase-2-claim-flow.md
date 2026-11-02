@@ -175,7 +175,13 @@ T11 → T12 → T13 → T32 → T14 → T15, T16, T17 (any order) → T18 → T1
       - **After every payout status change** (sync, fund, onchain, staff resolve), a claim follows to `paid` or `payout_failed`.
     - **Columns:** `expenses.self_approved` and `expenses.payout_id` (migration 0043).
     - **App:** the approvals queue and pay screen.
-  - **Not started:** T20.
+  - **T20 and the name fix, code done (2026-11-02):**
+    - **Name:** `PATCH /me { fullName }`. The app asks "What's your name?" at first sign-in, which closes the T19 creator-name gap.
+    - **Push notifications:** `push_tokens`, plus a `notification_outbox` written in the event's own transaction. Jobs send it: `push-notifications` (lock 72_020, every 5 s) and `push-receipts` (lock 72_021).
+    - **Events:** claim submitted (to admins), rejected and paid (to the employee), payout failed (to both).
+    - **Recipients** are worked out at send time from active memberships, so removed members get nothing and accountants aren't counted as admins.
+    - **Hook for later events:** `notify(tx, event)` in `services/notification/notify.ts`.
+  - **All Phase 2 code is done.** Every Phase 2 task waits only for device QA.
   - **Open (T19):** a company creator has no `full_name`, so Approve & pay refuses their own claims. Fix in progress: `PATCH /me { fullName }`, and a name prompt at first sign-in.
   - **How it was built:** in parallel with the Phase 2 gate of Checkpoint B, by subagents, as Dennis decided. See the Phase 1 handoff for the gate results.
   - **QA deferred (Dennis, 2026-11-02):** device QA for Phase 2 (Checkpoint C) and the Phase 2B gate of Checkpoint B are postponed. This is an exception to the README rule that a phase's QA passes before the next phase starts. Code continues in parallel:
@@ -198,7 +204,7 @@ T11 → T12 → T13 → T32 → T14 → T15, T16, T17 (any order) → T18 → T1
     - EAS project `@chizaalabs/expendi-business` (`3c092318-4971-433e-b238-6b4586e09bac`), with the owner pinned in `app.config.ts`
     - channels `development` / `preview` / `production`, `runtimeVersion` fingerprint
     - `EXPO_PUBLIC_*` values are set in the EAS `development` and `preview` environments
-  - **Passkey domain files:** `apps/mobile/well-known/`.
+  - **Passkey domain files:** `apps/web/public/.well-known/`.
     - The AASA file has Team ID `46XB9S9YV6`.
     - `assetlinks.json` still needs the Android SHA-256 from the first EAS build.
     - Neither is hosted yet.
@@ -295,6 +301,10 @@ T11 → T12 → T13 → T32 → T14 → T15, T16, T17 (any order) → T18 → T1
   - **Adding/removing allowlisted addresses and withdrawing don't email the other admins.** Spec §7.8 does this for payees; it would be a cheap way to notice misuse.
   - **Approval-passkey enrolment depends on Privy's `latest_verified_at`.** Confirm on a device that Privy updates it on sign-in; if it doesn't, enrolment fails closed ("sign in again", which is currently a full sign-out).
   - **R2 presigned uploads haven't run against a real bucket.**
+  - **Push needs device setup before QA:**
+    - a new dev build (`expo-notifications`, `expo-camera`)
+    - Android: a Firebase project, `google-services.json` as the EAS file variable `GOOGLE_SERVICES_JSON`, and the FCM V1 key via `eas credentials`
+    - iOS: an APNs key via `eas credentials`
   - **T16:** a receipt read that finishes after the claim was submitted isn't copied to the claim.
   - **T18:** a near-duplicate warning is put on the newer claim only.
   - **T19 must call `requireConfirmedPayoutPhone`** inside its Approve & pay transaction and pay only to the number it returns. Until then, T32's "Approve & pay is refused" criterion is open.
@@ -303,7 +313,7 @@ T11 → T12 → T13 → T32 → T14 → T15, T16, T17 (any order) → T18 → T1
     - **Needed before T21,** whose wallet history must show refunds.
   - **Needed before Checkpoint C:**
     - **SPF/DKIM** for the Resend sending domain.
-    - **Host the passkey files** (`apps/mobile/well-known/`) at `https://business.expendi.app/.well-known/` (HTTPS, `application/json`, no redirect).
+    - **Host the passkey files** (`apps/web/public/.well-known/`) at `https://business.expendi.app/.well-known/` (HTTPS, `application/json`, no redirect).
     - **Android SHA-256 in `assetlinks.json`,** from the first EAS build.
   - **The `payout-number` mobile screen (T32)** isn't built.
   - **No icon or splash image yet.** On iOS the forms' keyboard avoidance ignores the header height.

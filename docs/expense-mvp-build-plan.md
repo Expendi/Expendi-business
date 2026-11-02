@@ -817,7 +817,7 @@ Added to the MVP on 2026-11-02 (spec §6.14). A Next.js app at `business.expendi
 - **Navigation:** depends on the role; accountants see no action buttons.
 - **API side:** CORS on customer routes only for `DASHBOARD_ORIGINS`, and `WEBAUTHN_ORIGINS` gains `https://business.expendi.app`.
 - **Hosting:** Vercel at `business.expendi.app`.
-- **Passkey files:** serve `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` as `application/json`, with no redirect. Keep one source of truth for them (today `apps/mobile/well-known/`).
+- **Passkey files:** serve `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` as `application/json`, with no redirect. Keep one source of truth for them (today `apps/web/public/.well-known/`).
 
 **Acceptance criteria:**
 

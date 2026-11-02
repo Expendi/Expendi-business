@@ -12,6 +12,8 @@ The expense MVP is built across several sessions. Each phase has a handoff docum
 | 3B    | [Web dashboard](phase-3b-web-dashboard.md)                              | Phase 3B · Web dashboard              |
 | 4     | [Pilot launch](phase-4-pilot-launch.md)                                 | Phase 4 · Pilot launch                |
 
+**Starting a new session?** Read [next-session.md](next-session.md) first: every QA checklist still owed, the setup steps, the remaining tasks and the open issues, in one place.
+
 **Sources of truth:**
 
 - [Spec](../expense-mvp-spec.md): what we're building and why. Section references like "§7" point here.
