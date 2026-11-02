@@ -19,6 +19,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: "expendi-business",
   version: "0.1.0",
   orientation: "portrait",
+  icon: "./assets/icon.png",
   userInterfaceStyle: "light",
   runtimeVersion: { policy: "fingerprint" },
   updates: {
@@ -34,6 +35,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: APP_ID,
+    adaptiveIcon: {
+      foregroundImage: "./assets/icon-foreground.png",
+      backgroundColor: "#FFFFFF",
+    },
     edgeToEdgeEnabled: true,
     // Push on Android goes through Firebase Cloud Messaging. EAS builds get
     // the file from the GOOGLE_SERVICES_JSON file variable.
@@ -50,7 +55,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-updates",
     "expo-secure-store",
     "expo-web-browser",
-    ["expo-splash-screen", { backgroundColor: "#FFFFFF" }],
+    [
+      "expo-splash-screen",
+      {
+        backgroundColor: "#FFFFFF",
+        image: "./assets/icon-foreground.png",
+        imageWidth: 200,
+      },
+    ],
     [
       "expo-image-picker",
       {
