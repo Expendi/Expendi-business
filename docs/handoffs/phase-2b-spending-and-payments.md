@@ -183,9 +183,42 @@ None new. This phase reuses Paycrest, Privy, Resend, Expo push and R2.
 ## Handoff notes (fill in before ending each session)
 
 - **Status:**
+  - 2026-11-02: started early, in parallel with Phase 2 code (Dennis's decision; see the Phase 2 Handoff notes, "QA deferred"). The Phase 2B gate of Checkpoint B (Till, Paybill, bank, USDC address, payroll cap) hasn't run yet.
+  - T34: the API and tests are done (uncommitted); the app screens are in progress.
+  - T35 and T36: code done (uncommitted at the time of writing); app screens included.
 - **Built:**
+  - **T34 payees API:**
+    - **Table:** `payees` (migrations 0024/0025), with a check constraint per method and RLS FORCE. The routes are admin only.
+    - **Employee payees** link to a same-company membership. On `mpesa_phone`, the phone is never stored: it's resolved at payment time to the confirmed `users.phone`.
+    - **USDC payees** must be on the T33 allowlist; addresses must pass EIP-55.
+    - **Detail changes:** creating a payable payee or changing its details goes through a passkey challenge (purpose `change_payee`) bound to the exact change. It's audited with masked values, emails every admin and sets `details_changed_at`.
+    - **Guards for T37/T39** (`services/payees/payment-guard.ts`): call `resolvePayeeRecipient(tx, payeeId, { secondConfirmation })` inside the payout-prepare transaction. It enforces the 24-hour rule on the database clock and returns the recipient snapshot.
+    - **Extra route:** `GET …/payees/banks` (Paycrest's KES banks, for the picker).
+  - **T35 bills:**
+    - **Tables:** `bills` (migrations 0033/0034). Admin only in the routes AND in row-level security (`app_current_role() = 'admin'`, like `payroll_runs`).
+    - **Status job:** `station/bill-status.ts`, lock 72_035, every 15 minutes. It moves only forward, through the definer function `advance_bill_statuses(today)`. Status ticks aren't audited.
+    - **Invoices:** images or PDFs through `POST …/bills/upload-url` (claims stay image-only, also enforced by a DB check). The app attaches images only; PDFs need `expo-document-picker`.
+    - **Variable bills:** a `variable` flag, with a NULL amount until it's entered.
+    - **Seam for T37:** `services/bills/payable.ts` `assertBillPayable` refuses `not_unpaid`, `paid_outside_payee`, `paid_outside_recurring`, `no_amount` and `no_reference`.
+  - **T36 recurring payments:**
+    - **Tables:** `recurring_items` (migrations 0038/0039). One outstanding bill per item, enforced by a partial unique index over `upcoming`/`due`/`overdue`/`payout_failed`/`paying`.
+    - **Job:** `station/recurring-bills.ts`, lock 72_036.
+    - **Next bill:** `createNextRecurringBill` makes it. Settling a bill (paid outside, cancelled) creates the next one in the same transaction.
+    - **T37 must call `onRecurringBillSettled(tx, bill, now)` when a bill becomes `paid`.**
+    - Salary items are left to T38: the unique index would block a payroll bill while the previous one is `payout_failed`.
 - **Live payment references (bills, payroll, floats):**
 - **Changes from spec or plan, and why:**
+  - **Bills to USDC payees are entered in USD (Dennis, 2026-11-02),** and paid exactly that USDC, as USDC payees already work (T33). The overview, cap and export use the KES equivalent at the payment-day rate. T35 built KES-only bills, so this change lands with T37.
+  - **`bills` and `recurring_items` (spec §10 updated):**
+    - **`bills` columns:** `variable`, `paid_on`, `paid_outside_note`, `cancelled_by`, `cancelled_at`.
+    - **`receipt_files`:** `bill_role` (`invoice`/`proof`) and the `pdf` kind.
+    - **`recurring_items.next_due_on`:** the bill after the current one; NULL means ended.
+    - **`recurring_items.schedule_day`:** the ISO weekday for weekly schedules.
+    - **Fixed after creation:** payee, schedule, `starts_on` and `pay_via` can't be changed.
+  - **`payees` (spec §10 updated):**
+    - `method` is nullable (no payment details yet).
+    - USDC payees store no `account_name`; the payee's name is used.
+    - Employee `mpesa_phone` payees never store the phone.
 - **Environment variables added:**
 - **Known issues and TODOs:**
 - **QA results (date, who ran it, devices used):**

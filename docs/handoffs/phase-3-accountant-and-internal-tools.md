@@ -188,12 +188,50 @@ T23 → T27 → T24 → T22 → T25 → T30 → T31 → T44 → T26
 ## Handoff notes (fill in before ending each session)
 
 - **Status:**
+  - 2026-11-02: started early, in parallel with Phase 2 code (Dennis's decision; see the Phase 2 Handoff notes, "QA deferred").
+  - T23 is in progress; T27, T24 and T30 follow it.
+  - T22, T25, T26, T31 and T44 wait for T19 and Phase 2B code.
 - **Built:**
+  - **T23 (2026-11-02, uncommitted):**
+    - **`staff_users`** (migrations 0020/0021). The app role has no grant on the table; staff login resolves only through `active_staff_by_email()` (SECURITY DEFINER), so the API can't list, add or re-enable staff.
+    - **`/internal/*`:**
+      - staff login on every request (Privy token → email → an active staff row)
+      - `requireStaffRole("ops_admin")` for actions
+      - `POST /internal/session` audits `staff.signed_in`
+      - CORS only for `ADMIN_APP_ORIGINS`
+    - **A route-listing test** fails if any internal route could create, approve, fund or retry a payout or withdrawal.
+    - **Staff and customer access are independent,** tested with one login that is both.
+    - **`apps/admin`:** Next.js 16 with Privy email login, copied from the consumer `apps/admin`.
+    - **`scripts/add-staff.ts`:** run it with `SECRETS_MANAGER=env DATABASE_URL_MIGRATE=<owner url>` (with `doppler`, Doppler's values would overwrite the URL you pass).
+  - **T27, audit log viewer:** `GET /internal/audit` (company, actor, action prefix, entity, Nairobi date range; keyset paging) through `staff_search_audit_log()`. The app role still has no SELECT on `audit_log`.
+  - **T24, ops console:**
+    - **Company reads:** one company's view runs in that company's scope inside a `READ ONLY` transaction. Lists that span companies use SECURITY DEFINER functions.
+    - **Two-step confirmations:** `staff_confirmations` (migration 0036) stores single-use, 5-minute tokens, hashed and bound to the purpose, target, parameters and staff member.
+    - **Resolving a `needs_review` payout:**
+      - **`paid`** needs Paycrest `validated`/`settled` (an on-chain deposit only proves Paycrest received the USDC). For an on-chain payout it needs the exact transfer.
+      - **`failed`** needs no transfer, funding at least 30 minutes ago, and the order expired or cancelled.
+      - A missing debit is recorded exactly once.
+    - **Pause:** platform-wide through `set_platform_payouts_paused()`; per company through the company's own scope. Both are audited.
+    - **Money guard:** the route-listing test now also checks the import graph: nothing under `/internal` can reach the approve, fund, prepare, retry or send code.
+  - **T30, Zoho connection:**
+    - **Tables:** `accounting_connections` + `accounting_syncs` (migrations 0028/0029).
+    - **Token storage:** refresh tokens sealed with AES-256-GCM, `v1:<keyId>:<iv>:<tag>:<ct>`, the connection ID bound as additional data, and canonical base64url enforced.
+    - **Connect link:** single-use, lasts 7 days, stored hashed. The OAuth `state` is HMAC-signed.
+    - **Zoho's servers:** the `accounts-server` named in the callback and the `api_domain` are both checked against Zoho's hosts.
+    - **Scopes:** `ZohoBooks.settings.READ`, `ZohoBooks.accountants.READ`, `ZohoBooks.expenses.CREATE` and `ZohoBooks.expenses.READ`.
+    - **A dead refresh token** shows up as `invalid_code` (as well as `invalid_grant` or 401) and sets `needs_reconnect`.
 - **Staff accounts created:**
+  - Staff list (Dennis, 2026-11-02): `hello@cradlelabs.io` as `ops_admin`. It is added with `scripts/add-staff.ts` once T23 is deployed.
+  - The same email is also the customer admin of the dev test company "Expendi Test Co", so staff and customer access must stay independent (tested in T23).
 - **Spreadsheet column mapping for the pilot:**
 - **Zoho test organization, and the pilot's category-to-account mapping:**
 - **Changes from spec or plan, and why:**
 - **Environment variables added:**
+  - **API:** `ADMIN_APP_ORIGINS`, optional and comma-separated.
+  - **Admin app:** `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_PRIVY_APP_ID`, `NEXT_PUBLIC_PRIVY_CLIENT_ID` (optional).
+  - **API, Zoho, all optional (without them, connect answers 503):** `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REDIRECT_URI`, `ACCOUNTING_TOKEN_KEY` (`openssl rand -base64 32`; never change it once tokens are stored).
+  - **Zoho console:** a server-based client, redirect `<api>/integrations/zoho/callback`, Multi-DC on with "same credentials for all data centres".
+  - **Privy dashboard:** add the admin app's origins (e.g. `http://localhost:3001` and the deployed URL) as allowed domains.
 - **Known issues and TODOs:**
 - **QA results (date, who ran it):**
 - **Next session starts with:**

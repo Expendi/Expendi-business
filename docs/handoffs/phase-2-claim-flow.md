@@ -158,8 +158,21 @@ T11 → T12 → T13 → T32 → T14 → T15, T16, T17 (any order) → T18 → T1
     - T11 (EXP-279), T12 (EXP-282) and T13 (EXP-286): the app and the API.
     - T32 (EXP-303): the API only. The `payout-number` screen isn't built yet.
     - All four stay In Progress in Linear until their device checks pass.
-  - **Not started:** T14–T21.
+  - **Code done, verified by tests, uncommitted (2026-11-02, second session block):**
+    - T14 (claims with a photo, API + app)
+    - T15 (parser only; the "paste SMS" wiring is in progress)
+    - T16 (extraction core and eval script; the endpoint is in progress)
+    - T21 (wallet history, withdrawals, approval passkeys in the app)
+    - Refund linking (Phase 1 known issue)
+  - **Code done too:** the T15 wiring, the T16 endpoint, T17 and T18.
+  - **Not started:** T19, T20.
   - **How it was built:** in parallel with the Phase 2 gate of Checkpoint B, by subagents, as Dennis decided. See the Phase 1 handoff for the gate results.
+  - **QA deferred (Dennis, 2026-11-02):** device QA for Phase 2 (Checkpoint C) and the Phase 2B gate of Checkpoint B are postponed. This is an exception to the README rule that a phase's QA passes before the next phase starts. Code continues in parallel:
+    - the Phase 2 tasks T14, T15 (parser), T16 (extraction core) and T21
+    - the refund-linking fix
+    - Phase 2B's T34 (API)
+    - Phase 3's unblocked tasks: T23, then T27, T24 and T30
+    - The other Phase 3 tasks (T22, T25, T26, T31, T44) wait for T19 and Phase 2B code. Both QA passes still have to run before go-live.
 - **Built:**
   - **T11 app (`apps/mobile`):**
     - Expo SDK 54 with expo-router, NativeWind and React Query. Versions are pinned to what the consumer's lockfile actually runs:
@@ -213,7 +226,40 @@ T11 → T12 → T13 → T32 → T14 → T15, T16, T17 (any order) → T18 → T1
     - A `paying` order that Paycrest still reports as pending after 2 hours also goes to review.
     - The tests run serially (`payout-sync.serial.test.ts`), because reconcile sweeps every company.
   - **Tests:** 466 main + 26 serial in the API, and 18 money-formatting tests in the app. Typecheck, lint, format and the API build all pass.
-- **Claude model chosen and eval accuracy:** not yet (T16).
+- **More built (2026-11-02):**
+  - **T14:**
+    - **Tables:** `expenses` (all §10 columns; status `submitted`/`rejected`/`paying`/`paid`/`payout_failed`/`paid_outside`/`recorded`) and `receipt_files` (plus `uploaded_by`). Migrations 0022/0023 have RLS FORCE and no DELETE grant.
+    - **R2 uploads** through presigned PUT URLs (`services/storage/sigv4.ts`, checked against AWS's published example) under `org/<id>/receipts/`. The file is HEAD-checked before a claim can attach it.
+    - **Duplicate image** (same sha256 in the company) → 409.
+    - **Visibility:** employees see only their own claims; admins see all. Editing is only for the owner while `submitted`/`rejected`, and editing a rejected claim resubmits it.
+    - **App:** the claims list, new (camera or library → shrink to 1600 px JPEG 0.7 → sha256 → upload → form → review → submit), detail and edit.
+  - **T15:** `parseMpesaSms` in `packages/shared`, 90 synthetic fixtures. Real SMS samples from Dennis are still needed.
+  - **T16:**
+    - `services/extraction/` with the Anthropic SDK and structured outputs. Every field is validated with zod; on failure it returns `unreadable` with the raw reply kept.
+    - `scripts/eval-receipts.ts`. The default model is `claude-opus-5-5` at low effort, until the eval compares it with Sonnet 5.5 and Haiku 5.5.
+  - **T21:**
+    - **Withdrawals** are payouts with subject `withdrawal`, through the existing onchain engine and every guard. The debit's ledger type is `withdrawal` (migration 0027).
+    - **Daily cap:** withdrawals are exempt from it. Spec §7.4 scopes the cap to claims, floats and bills, and moving the company's own money to its passkey-allowlisted address shouldn't be trapped by it. The per-transaction cap still applies.
+    - **Approval-passkey enrolment** is `/me/approval-passkey`, admin only. It needs a recent login: both the token's `iat` and Privy's `latest_verified_at` within 10 minutes. Every admin is emailed.
+    - **Race fixed:** two outstanding enrolment challenges could create two passkeys.
+    - **Wallet history:** `GET …/wallet/history`.
+    - **App:** `src/features/approval/` (reusable for T19), and the history, allowed-addresses and withdraw screens.
+  - **Refund linking:** see the Phase 1 handoff's Known issues, "Refunds come from Paycrest's Gateway contract (fixed)".
+  - **T15 wiring:**
+    - A pasted SMS is stored inline (`receipt_files.sms_text`, kind `sms_text`, migration 0032), not in R2. An SMS-only claim is allowed.
+    - The API re-parses the SMS and refuses a code or amount that contradicts it.
+  - **T16 endpoint:** `POST …/receipts/:id/extract`, for the uploader only.
+    - The result is cached on `receipt_files.extraction` (migration 0035) and copied to `expenses.extraction` on submit.
+    - Any error is reported as "couldn't read, enter by hand".
+    - App: fields read from the receipt are marked "check it", and low-confidence ones are highlighted.
+  - **T17:**
+    - QR parser in `packages/shared/src/etims-qr.ts` (trusts only `kra.go.ke` hosts).
+    - **eTIMS QRs carry the supplier PIN, branch and a signature, not the invoice number.** Only older TIMS (ETR) QRs carry the number, so for eTIMS receipts the number comes from the photo read or is typed. Spec §6.6 is updated.
+    - App: a company KRA PIN card. `expo-camera` was added, a new native module, so the dev client must be rebuilt.
+  - **T18:** `services/expenses/rules.ts`, generic over every kind of expense.
+    - Exact duplicates get a 409 naming the earlier expense (including imported ones).
+    - `expenses.warnings` holds `near_duplicate` (same member, same amount, ±1 day) and `older_than_60_days`. Only admins see them.
+- **Claude model chosen and eval accuracy:** not yet (T16). It needs `ANTHROPIC_API_KEY` in Doppler and about 50 redacted, labelled receipts.
 - **Telnyx Verify profile used:** Dennis's choice is the consumer's Telnyx account with a new Verify profile for Expendi Business. The keys aren't in Doppler yet. Without them the routes return 503 and the API still starts.
 - **Changes from spec or plan, and why:**
   - **Spec §10 updated:**
@@ -230,7 +276,16 @@ T11 → T12 → T13 → T32 → T14 → T15, T16, T17 (any order) → T18 → T1
   - **App:** `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_PRIVY_APP_ID`, `EXPO_PUBLIC_PRIVY_CLIENT_ID`
     - locally in the git-ignored `apps/mobile/.env`
     - for builds in the EAS environments
+  - **More API variables, all optional:**
+    - receipt uploads: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
+    - receipt reading: `ANTHROPIC_API_KEY`, `RECEIPT_MODEL`
+  - **For device QA:** `WEBAUTHN_ORIGINS` must include `android:apk-key-hash:<base64url SHA-256 of the signing cert>`. Get the fingerprint from `eas credentials`, then run `tr -d ':' | xxd -r -p | base64 | tr '+/' '-_' | tr -d '='`.
 - **Known issues and TODOs:**
+  - **Adding/removing allowlisted addresses and withdrawing don't email the other admins.** Spec §7.8 does this for payees; it would be a cheap way to notice misuse.
+  - **Approval-passkey enrolment depends on Privy's `latest_verified_at`.** Confirm on a device that Privy updates it on sign-in; if it doesn't, enrolment fails closed ("sign in again", which is currently a full sign-out).
+  - **R2 presigned uploads haven't run against a real bucket.**
+  - **T16:** a receipt read that finishes after the claim was submitted isn't copied to the claim.
+  - **T18:** a near-duplicate warning is put on the newer claim only.
   - **T19 must call `requireConfirmedPayoutPhone`** inside its Approve & pay transaction and pay only to the number it returns. Until then, T32's "Approve & pay is refused" criterion is open.
   - **Refunds land as `deposit` rows.** Paycrest refunds come from its Gateway contract (`0x30f6…dd0f`), confirmed twice at Checkpoint B.
     - **Fix:** save the order's on-chain `gateway_id` (it's in Paycrest's `transactionLogs`) on the payout during sync, and classify a Gateway transfer as that payout's `refund` from the Gateway's refund event in the same receipt.
@@ -241,6 +296,10 @@ T11 → T12 → T13 → T32 → T14 → T15, T16, T17 (any order) → T18 → T1
     - **Android SHA-256 in `assetlinks.json`,** from the first EAS build.
   - **The `payout-number` mobile screen (T32)** isn't built.
   - **No icon or splash image yet.** On iOS the forms' keyboard avoidance ignores the header height.
+  - **Railway's `preDeployCommand` didn't run migrations** on the 2026-11-02 deploy of `91679ae` (deployment `ee971920`).
+    - **What happened:** the new code went live with 15 migrations applied, and the deploy and build logs have no `[migrate]` output.
+    - **Fix applied:** Claude applied 0015–0019 by hand through the SSH tunnel (`tsx src/db/migrate-cli.ts` with `DATABASE_URL_MIGRATE` pointed at `localhost:55432`). Afterwards, 20 migrations are recorded and both new tables have RLS ENABLE + FORCE.
+    - **Before relying on it, especially for production:** check the service's pre-deploy setting in the Railway dashboard. Every deploy until then: apply the migrations by hand first.
   - **Railway installs the whole workspace,** mobile included. It's safe, since pnpm only runs esbuild's install script, but slower. Consider an API-only install filter.
 - **QA results (date, who ran it, devices used):**
   - 2026-11-02, Claude: automated checks pass (see Tests above). No device runs yet.
