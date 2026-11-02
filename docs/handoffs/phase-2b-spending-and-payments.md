@@ -185,7 +185,7 @@ None new. This phase reuses Paycrest, Privy, Resend, Expo push and R2.
 - **Status:**
   - 2026-11-02: started early, in parallel with Phase 2 code (Dennis's decision; see the Phase 2 Handoff notes, "QA deferred"). The Phase 2B gate of Checkpoint B (Till, Paybill, bank, USDC address, payroll cap) hasn't run yet.
   - T34: the API and tests are done (uncommitted); the app screens are in progress.
-  - T35 and T36: code done (uncommitted at the time of writing); app screens included.
+  - T35, T36, T38 and T41: code done (2026-11-02); app screens included. T37, T39 and T40 are next.
 - **Built:**
   - **T34 payees API:**
     - **Table:** `payees` (migrations 0024/0025), with a check constraint per method and RLS FORCE. The routes are admin only.
@@ -208,6 +208,22 @@ None new. This phase reuses Paycrest, Privy, Resend, Expo push and R2.
     - Salary items are left to T38: the unique index would block a payroll bill while the previous one is `payout_failed`.
 - **Live payment references (bills, payroll, floats):**
 - **Changes from spec or plan, and why:**
+  - **T41 company spending:**
+    - **Tables:** `paid_from_accounts` (migrations 0040–0042). `expenses.paid_from_account` text became `paid_from_account_id`, a composite FK.
+    - **No-receipt reason:** `expenses.no_receipt_reason` (8–300 characters). "No receipt" is computed, not stored.
+    - **Bills paid outside:** marking a bill paid outside records exactly one company spending row (`expenses.bill_id`, unique) in the same transaction.
+    - **Watch for double counting:** a bill paid outside is both a `paid_outside` bill and a company spending row. T42 (overview) and T44 (Zoho) must skip one; `expenses.bill_id IS NOT NULL` marks it.
+  - **T38 salaries and payroll:**
+    - **Salaries** are monthly, fixed-amount `salaries` recurring items paid through Expendi, one per payee.
+    - **Draft job:** `payroll-drafts`, lock 72_038. It drafts at most 5 Nairobi days before pay day, once per `(organization, pay_date)`.
+    - **Cap:** each run's cap is its drafted salaries × (100 + margin)%.
+    - **Pay changes** need the admin's passkey (purpose `change_salary`) and email every admin.
+    - **Draft adjustments** (amount, leave out, one-off) need reasons and are audited.
+    - **Privacy (migration 0045):**
+      - Payroll bills, runs and salary items are admin-only in RLS.
+      - Employees read only their own paid, paying or failed payroll bills (`GET …/me/salary-payments`).
+      - **Phase 1 issue fixed:** payroll `payouts` rows are admin-only.
+    - **Seam for T39:** `services/payroll/payable.ts`.
   - **Bills to USDC payees are entered in USD (Dennis, 2026-11-02),** and paid exactly that USDC, as USDC payees already work (T33). The overview, cap and export use the KES equivalent at the payment-day rate. T35 built KES-only bills, so this change lands with T37.
   - **`bills` and `recurring_items` (spec §10 updated):**
     - **`bills` columns:** `variable`, `paid_on`, `paid_outside_note`, `cancelled_by`, `cancelled_at`.

@@ -165,7 +165,18 @@ T11 → T12 → T13 → T32 → T14 → T15, T16, T17 (any order) → T18 → T1
     - T21 (wallet history, withdrawals, approval passkeys in the app)
     - Refund linking (Phase 1 known issue)
   - **Code done too:** the T15 wiring, the T16 endpoint, T17 and T18.
-  - **Not started:** T19, T20.
+  - **T19 code done (2026-11-02):**
+    - **Routes:**
+      - `POST …/claims/approval` (1–20 claims): requires a confirmed payout phone and a full name; returns the cost preview and passkey options
+      - `…/approval/:challengeId/confirm`
+      - `…/:claimId/retry` and `…/:claimId/reject` (reason 5–500 characters)
+    - **One subject hook** (`services/payout/subjects.ts`):
+      - **At approval,** under the approval's locks, the claim is re-checked (still `submitted`, same amount, same confirmed number) and set to `paying`. A refusal rolls back the whole approval.
+      - **After every payout status change** (sync, fund, onchain, staff resolve), a claim follows to `paid` or `payout_failed`.
+    - **Columns:** `expenses.self_approved` and `expenses.payout_id` (migration 0043).
+    - **App:** the approvals queue and pay screen.
+  - **Not started:** T20.
+  - **Open (T19):** a company creator has no `full_name`, so Approve & pay refuses their own claims. Fix in progress: `PATCH /me { fullName }`, and a name prompt at first sign-in.
   - **How it was built:** in parallel with the Phase 2 gate of Checkpoint B, by subagents, as Dennis decided. See the Phase 1 handoff for the gate results.
   - **QA deferred (Dennis, 2026-11-02):** device QA for Phase 2 (Checkpoint C) and the Phase 2B gate of Checkpoint B are postponed. This is an exception to the README rule that a phase's QA passes before the next phase starts. Code continues in parallel:
     - the Phase 2 tasks T14, T15 (parser), T16 (extraction core) and T21
@@ -296,10 +307,10 @@ T11 → T12 → T13 → T32 → T14 → T15, T16, T17 (any order) → T18 → T1
     - **Android SHA-256 in `assetlinks.json`,** from the first EAS build.
   - **The `payout-number` mobile screen (T32)** isn't built.
   - **No icon or splash image yet.** On iOS the forms' keyboard avoidance ignores the header height.
-  - **Railway's `preDeployCommand` didn't run migrations** on the 2026-11-02 deploy of `91679ae` (deployment `ee971920`).
-    - **What happened:** the new code went live with 15 migrations applied, and the deploy and build logs have no `[migrate]` output.
-    - **Fix applied:** Claude applied 0015–0019 by hand through the SSH tunnel (`tsx src/db/migrate-cli.ts` with `DATABASE_URL_MIGRATE` pointed at `localhost:55432`). Afterwards, 20 migrations are recorded and both new tables have RLS ENABLE + FORCE.
-    - **Before relying on it, especially for production:** check the service's pre-deploy setting in the Railway dashboard. Every deploy until then: apply the migrations by hand first.
+  - **Railway pre-deploy migrations (fixed 2026-11-02):**
+    - Railway reads `railway.json`'s build and start commands, but never ran its `preDeployCommand`. The 2026-11-02 deploys went live without migrations, and Claude applied 0015–0039 by hand.
+    - **Fix:** Dennis set the pre-deploy step in the dashboard (`api` → Settings → Deploy) to `pnpm --filter @expendi-business/api migrate`. Deployment `55fa1870` logs `[migrate] migrations applied` before the server starts.
+    - **Before 2026-12-01:** Railway's Config as Code (`railway.json`) is deprecated and stops working that day. Move to Infrastructure as Code (`railway config migrate`), or put the build/start commands in the dashboard and delete `railway.json`.
   - **Railway installs the whole workspace,** mobile included. It's safe, since pnpm only runs esbuild's install script, but slower. Consider an API-only install filter.
 - **QA results (date, who ran it, devices used):**
   - 2026-11-02, Claude: automated checks pass (see Tests above). No device runs yet.

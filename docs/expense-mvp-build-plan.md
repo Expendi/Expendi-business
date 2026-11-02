@@ -8,7 +8,7 @@
 
 ## Overview
 
-Build the MVP as one monorepo: `apps/api`, `apps/mobile`, `apps/admin` and `packages/shared`. The MVP is staff claims plus all company spending: petty cash, bills, subscriptions, salaries and company spending, all paid through Expendi.
+Build the MVP as one monorepo: `apps/api`, `apps/mobile`, `apps/web` (the company web dashboard, added 2026-11-02), `apps/admin` and `packages/shared`. The MVP is staff claims plus all company spending: petty cash, bills, subscriptions, salaries and company spending, all paid through Expendi.
 
 The order is set by risk:
 
@@ -804,6 +804,147 @@ Add these mapping fields to the Task 30 screens. Float issues and top-ups never 
 
 ---
 
+## Phase 3B: Web dashboard
+
+Added to the MVP on 2026-11-02 (spec §6.14). A Next.js app at `business.expendi.app` for company admins and accountants. It reuses the API the app uses; the API work here is mostly accountant access, a few read endpoints and browser CORS. It runs in parallel with Phases 2B and 3. Each screen task waits for the API task it sits on.
+
+### Task 45: Web dashboard scaffold, sign-in and hosting
+
+**Description:** Create `apps/web` in Next.js, following `apps/admin`'s structure and tooling.
+
+- **Sign-in:** Privy email code, then a passkey in the browser, with the same accounts as the app. A person in several companies picks one. An employee is told to use the app.
+- **API client:** typed from `packages/shared`.
+- **Navigation:** depends on the role; accountants see no action buttons.
+- **API side:** CORS on customer routes only for `DASHBOARD_ORIGINS`, and `WEBAUTHN_ORIGINS` gains `https://business.expendi.app`.
+- **Hosting:** Vercel at `business.expendi.app`.
+- **Passkey files:** serve `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` as `application/json`, with no redirect. Keep one source of truth for them (today `apps/mobile/well-known/`).
+
+**Acceptance criteria:**
+
+- [ ] An admin and an accountant sign in; an employee is told to use the app
+- [ ] The passkey association files are served with the right content type and validate with Apple's and Google's checkers
+- [ ] Browser requests from any other origin are refused by the API
+
+**Dependencies:** Tasks 11, 23
+**Files likely touched:** `apps/web/`, `apps/api/src/middleware/`, `apps/api/src/config.ts`
+**Scope:** M
+
+### Task 46: Accountant access
+
+**Description:** Accountants become view-only dashboard users (spec §4, §6.14).
+
+- **Invites:** an accountant invite creates or links a `users` row by email, like other invites. The membership activates on first sign-in. Existing email-only accountant memberships are linked by email.
+- **Read access:** the `accountant` role can read every company read route, salaries and payroll included (Dennis, 2026-11-02).
+- **No writes:** every action route refuses accountants, enforced in the API with a route-listing test like T23's internal-route test.
+- **Several companies:** an accountant on several companies switches between them.
+
+**Acceptance criteria:**
+
+- [ ] An accountant sees everything in their company, read-only, including salaries
+- [ ] Every action route refuses an accountant (tested by listing the routes)
+- [ ] An accountant on two companies sees each separately; a removed accountant loses access immediately
+
+**Dependencies:** Tasks 13, 45
+**Files likely touched:** `apps/api/src/db/schema/memberships.ts`, `apps/api/src/middleware/tenant.ts`, `apps/api/src/services/membership/`, tests
+**Scope:** M
+
+### Task 47: Expenses and approvals on the web
+
+**Description:**
+
+- **All expenses:** claims, petty cash and company spending, filterable by employee, kind, category, month and eTIMS status (new read endpoint), with the receipts beside the details.
+- **Approval queue:** the receipt beside each claim, warnings shown, and select several claims → one passkey confirmation (Task 19's batch API, up to 20).
+- **Claim actions:** reject with a reason, retry a failed payout.
+- **Passkey on a phone:** the browser offers "use a phone or tablet", so the admin can confirm with the phone.
+
+**Acceptance criteria:**
+
+- [ ] An admin approves and pays several claims with one passkey from a desktop browser, and each pays exactly once
+- [ ] The expense filters work across claims, petty cash and company spending
+- [ ] Accountants see the same lists, with no actions
+
+**Dependencies:** Tasks 19, 45 (and 40 and 41 for those kinds)
+**Files likely touched:** `apps/web/src/app/(company)/expenses/`, `apps/web/src/app/(company)/approvals/`, `apps/api/src/routes/expenses.ts`
+**Scope:** M
+
+### Task 48: Bills, recurring payments, payees and payroll on the web
+
+**Description:** Everything the app can do for these, on the web:
+
+- **Payees:** detail changes with a passkey.
+- **Bills:** **Pay** and **Pay all** (Task 37).
+- **Payroll runs:** drafts and adjustments (Task 38) and **Approve & pay all** (Task 39).
+- **Invoices:** desktop upload of invoice PDFs, which the app can't pick yet.
+
+**Acceptance criteria:**
+
+- [ ] An admin pays several due bills with one passkey from the browser
+- [ ] An admin adjusts and pays a payroll run from the browser
+- [ ] Accountants see bills, payees and payroll runs read-only, salaries included
+
+**Dependencies:** Tasks 34–39, 45
+**Files likely touched:** `apps/web/src/app/(company)/{bills,recurring,payees,payroll}/`
+**Scope:** M
+
+### Task 49: Wallet, team, settings and activity on the web
+
+**Description:**
+
+- **Wallet:** balance in USDC and KES, deposit address ("send USDC on Base only"), history, and withdrawals and allowed addresses with a passkey.
+- **Team:** invite, change roles, remove, including accountants.
+- **Settings:**
+  - company details
+  - the category list: add, rename, archive and mark eTIMS-exempt. These are new audited API routes; categories were seeded but never editable.
+  - the admin's approval passkey: set it up in the browser under the existing rules
+- **Activity:** the company's own audit log, read-only, for admins and accountants. A company-scoped read; the staff search function stays staff-only.
+
+**Acceptance criteria:**
+
+- [ ] An admin withdraws to an allowlisted address with a passkey from the browser
+- [ ] Category changes are audited, and an archived category can't be picked for new spending
+- [ ] Admins and accountants see only their own company's activity
+
+**Dependencies:** Tasks 12, 13, 21, 45, 46
+**Files likely touched:** `apps/web/src/app/(company)/{wallet,team,settings,activity}/`, `apps/api/src/routes/categories.ts`, `apps/api/src/routes/activity.ts`
+**Scope:** M
+
+### Task 50: Spending overview on the web
+
+**Description:** The spending overview (§6.24) on a big screen, from Task 42's API.
+
+**Acceptance criteria:**
+
+- [ ] The overview's figures match the app's for the same company and month
+
+**Dependencies:** Tasks 42, 45
+**Files likely touched:** `apps/web/src/app/(company)/overview/`
+**Scope:** S
+
+### Task 51: Accountant downloads and the eTIMS report
+
+**Description:**
+
+- **Downloads:** the monthly export and receipts zip (Task 22) for any month.
+- **eTIMS report:** for a month, each expense with its date, merchant, amount, eTIMS status, invoice number and supplier PIN, as CSV with a byte-order mark, like the export.
+- **Who:** both admins and accountants.
+
+**Acceptance criteria:**
+
+- [ ] An accountant downloads the export, the receipts zip and the eTIMS report for a chosen month
+- [ ] The eTIMS report matches the month's expenses
+
+**Dependencies:** Tasks 22, 46
+**Files likely touched:** `apps/api/src/services/export/`, `apps/api/src/routes/reports.ts`, `apps/web/src/app/(company)/reports/`
+**Scope:** S
+
+### Checkpoint D2: Web dashboard
+
+- [ ] Go-live checklist item 17 in §13 passes
+- [ ] The isolation helper covers every new route, and the accountant route-listing test passes
+- [ ] Review with a human
+
+---
+
 ## Phase 4: Pilot launch
 
 ### Task 28: Getting the app to staff
@@ -850,6 +991,7 @@ Add these mapping fields to the Task 30 screens. Float issues and top-ups never 
 | Mobile         | 11 can start once Task 4 is done; 15 (the parser) any time; 32 follows 13                  |
 | Internal tools | 23 → 27 can start once Task 3 is done; 24–26 wait on Task 9                                |
 | Zoho Books     | 30 can start once Tasks 12 and 23 are done; 31 waits on Task 19                            |
+| Web dashboard  | 45 → 46 any time; 47–51 each after the API task they sit on (19, 37–39, 21, 42, 22)        |
 
 These must run in sequence: database migrations, and anything that depends on the payout engine (Tasks 8–10 before 19).
 

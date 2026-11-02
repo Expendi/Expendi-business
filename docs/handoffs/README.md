@@ -9,18 +9,20 @@ The expense MVP is built across several sessions. Each phase has a handoff docum
 | 2     | [Claim flow](phase-2-claim-flow.md)                                     | Phase 2 · Claim flow                  |
 | 2B    | [Spending & payments](phase-2b-spending-and-payments.md)                | Phase 2B · Spending & payments        |
 | 3     | [Accountant & internal tools](phase-3-accountant-and-internal-tools.md) | Phase 3 · Accountant & internal tools |
+| 3B    | [Web dashboard](phase-3b-web-dashboard.md)                              | Phase 3B · Web dashboard              |
 | 4     | [Pilot launch](phase-4-pilot-launch.md)                                 | Phase 4 · Pilot launch                |
 
 **Sources of truth:**
 
 - [Spec](../expense-mvp-spec.md): what we're building and why. Section references like "§7" point here.
-- [Build plan](../expense-mvp-build-plan.md): all 44 tasks with their acceptance criteria.
+- [Build plan](../expense-mvp-build-plan.md): all 51 tasks with their acceptance criteria.
 - Linear project **Expendi Business**: issue status. Each phase handoff lists its exact issue IDs.
   - T1–T29: EXP-272 to EXP-300
   - T30 and T31 (Zoho Books): EXP-301 and EXP-302
   - T32: EXP-303
   - T33: EXP-304
   - T34–T44 (added when the scope widened to all company spending): EXP-305 to EXP-315, not in task order
+  - T45–T51 (web dashboard, added to the MVP on 2026-11-02): EXP-316 to EXP-322
 
 ---
 
