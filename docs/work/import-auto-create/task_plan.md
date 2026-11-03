@@ -26,3 +26,4 @@ Implementation, tests, browser smoke and builds passed. Preparing an isolated re
 
 - All seven API/web/admin build/typecheck tasks passed; shared tests passed (187).
 - Browser smoke initially used an exact-text selector for a result cell that now includes the created category. Updated the selector and added an assertion for the history provenance text.
+- Ops deployment exposed an existing build/typegen race: parallel tasks collided on `.next/types/routes.d.ts` (ENOENT). The Vercel log directly identifies concurrent writers, so a broader bug-search loop is unnecessary; serialize build then typecheck and verify the actual deployment pipeline.
