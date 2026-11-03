@@ -1,0 +1,364 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens mirrored from qonto.com/en (Tailwind v4.3.3 build, computed
+ * styles captured at 1440/768/390). `--spacing: 1px` matches Qonto's scale so
+ * `p-24` is 24px, `gap-16` is 16px, `leading-28` is 28px.
+ */
+@theme {
+  --spacing: 1px;
+
+  --font-sans: var(--font-qonto-sans), "QontoSans", sans-serif;
+
+  --color-primary-black: #050505;
+  --color-primary-white: #ffffff;
+  --color-grey-25: #f9f9f9;
+  --color-grey-50: #f5f5f5;
+  --color-grey-100: #e8e8e8;
+  --color-grey-200: #e0e0e0;
+  --color-grey-300: #cccccc;
+  --color-grey-400: #b8b8b8;
+  --color-grey-500: #8f8f8f;
+  --color-grey-600: #616161;
+  --color-grey-700: #3d3d3d;
+  --color-grey-800: #262626;
+  --color-grey-850: #2c2c2c;
+  --color-grey-900: #1a1a1a;
+  --color-trustpilot: #00b67a;
+  --color-chatbot-online: #45b184;
+  --color-chatbot-badge: #f95656;
+
+  --text-12: 12px;
+  --text-14: 14px;
+  --text-16: 16px;
+  --text-18: 18px;
+  --text-20: 20px;
+  --text-22: 22px;
+  --text-24: 24px;
+  --text-28: 28px;
+  --text-32: 32px;
+  --text-40: 40px;
+  --text-44: 44px;
+  --text-56: 56px;
+  --text-72: 72px;
+
+  --ease-qonto: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-qonto-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-qonto-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-arrow: cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-primary-white);
+    color: var(--color-primary-black);
+    font-family: var(--font-sans);
+    font-size: 18px;
+    line-height: 24px;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-variant-numeric: lining-nums proportional-nums;
+  }
+
+  h1 {
+    font-size: 44px;
+    font-weight: 700;
+    line-height: 52px;
+  }
+
+  h2 {
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 40px;
+  }
+
+  h3 {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 32px;
+  }
+
+  @media (width >= 48rem) {
+    h1 {
+      font-size: 72px;
+      line-height: 80px;
+    }
+
+    h2 {
+      font-size: 56px;
+      line-height: 64px;
+    }
+
+    h3 {
+      font-size: 28px;
+      line-height: 36px;
+    }
+  }
+}
+
+/* Qonto type scale: mobile value first, ≥768px value in the media block. */
+@utility h2-small {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 36px;
+  font-variant-numeric: lining-nums proportional-nums;
+  @media (width >= 48rem) {
+    font-size: 40px;
+    line-height: 48px;
+  }
+}
+
+@utility h3-small {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  font-variant-numeric: lining-nums proportional-nums;
+  @media (width >= 48rem) {
+    font-size: 24px;
+    line-height: 32px;
+  }
+}
+
+@utility body-regular {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 26px;
+  @media (width >= 48rem) {
+    font-size: 18px;
+    line-height: 28px;
+  }
+}
+
+@utility body-bold {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 26px;
+  @media (width >= 48rem) {
+    font-size: 18px;
+    line-height: 28px;
+  }
+}
+
+@utility body-small-regular {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  @media (width >= 48rem) {
+    font-size: 16px;
+    line-height: 26px;
+  }
+}
+
+@utility body-small-bold {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 22px;
+  @media (width >= 48rem) {
+    font-size: 16px;
+    line-height: 26px;
+  }
+}
+
+@utility caption {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  @media (width >= 48rem) {
+    line-height: 22px;
+  }
+}
+
+@utility caption-small {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+@utility caption-slim {
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 24px;
+}
+
+@utility lead {
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 28px;
+  @media (width >= 48rem) {
+    font-size: 22px;
+    line-height: 32px;
+  }
+}
+
+/* Page container: `section .website-revamp` on qonto.com. */
+@utility container-qonto {
+  max-width: 1600px;
+  margin-inline: auto;
+  padding-inline: 16px;
+  @media (width >= 48rem) {
+    padding-inline: 32px;
+  }
+  @media (width >= 64rem) {
+    padding-inline: 48px;
+  }
+}
+
+/* Scrims and photo treatments, verbatim from Qonto's stylesheet. */
+@utility scrim-dark-photo-overlay-gradient {
+  background:
+    linear-gradient(180deg, rgb(5 5 5 / 0) 78.6%, rgb(5 5 5) 100%),
+    linear-gradient(0deg, rgb(5 5 5 / 0.15) 0%, rgb(5 5 5 / 0.15) 100%);
+}
+
+@utility scrim-dark-top-to-bottom {
+  background: linear-gradient(
+    rgb(5 5 5 / 0.67) 0%,
+    rgb(5 5 5 / 0.67) 10%,
+    rgb(5 5 5 / 0) 50%
+  );
+}
+
+@utility scrim-dark-left-to-right {
+  background: linear-gradient(
+    90deg,
+    rgb(5 5 5 / 0.67) 0%,
+    rgb(5 5 5 / 0.67) 20%,
+    rgb(5 5 5 / 0) 60%
+  );
+}
+
+@utility photo-blur-top-to-bottom {
+  filter: blur(6px);
+  transform: translateZ(0);
+  mask-image: linear-gradient(#000 0%, transparent 45%);
+}
+
+@utility photo-blur-left-to-right {
+  filter: blur(6px);
+  transform: translateZ(0);
+  mask-image: linear-gradient(90deg, #000 0%, transparent 45%);
+}
+
+@utility surface-container-gradient-light {
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    var(--color-grey-100) 0%,
+    var(--color-white) 100%
+  );
+}
+
+@utility surface-container-gradient-dark {
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    var(--color-grey-700) 0%,
+    var(--color-grey-850) 50%,
+    var(--color-grey-900) 100%
+  );
+}
+
+@utility surface-container-gradient-subtle {
+  background: radial-gradient(
+    66.82% 50% at 50% 50%,
+    var(--color-grey-200) 0%,
+    var(--color-grey-50) 100%
+  );
+}
+
+/*
+ * Buttons. Light surfaces get the default treatment; any ancestor with
+ * `.darkmode` flips them, exactly like Qonto's `.darkmode .btn-*` rules.
+ * Qonto's hover swaps are instant (computed `transition: all 0s`).
+ */
+@layer components {
+  .btn {
+    display: inline-block;
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 12px 16px;
+    text-align: center;
+    white-space: nowrap;
+    font-size: 16px;
+    line-height: 26px;
+  }
+
+  @media (width >= 48rem) {
+    .btn {
+      font-size: 18px;
+      line-height: 28px;
+    }
+  }
+
+  .btn-primary {
+    background-color: var(--color-primary-black);
+    color: var(--color-primary-white);
+  }
+
+  .btn-primary:hover {
+    background-color: rgb(29 29 27 / 0.92);
+  }
+
+  .btn-primary:active {
+    background-color: #373737;
+  }
+
+  .darkmode .btn-primary {
+    background-color: var(--color-primary-white);
+    color: var(--color-primary-black);
+  }
+
+  .darkmode .btn-primary:hover {
+    background-color: rgb(255 255 255 / 0.92);
+  }
+
+  .btn-secondary {
+    border: 1px solid var(--color-primary-black);
+    background-color: transparent;
+    color: var(--color-primary-black);
+    padding-block: 11px;
+  }
+
+  .btn-secondary:hover {
+    background-color: rgb(29 29 27 / 0.08);
+  }
+
+  .btn-secondary:active {
+    background-color: rgb(29 29 27 / 0.12);
+  }
+
+  .darkmode .btn-secondary {
+    border-color: var(--color-primary-white);
+    color: var(--color-primary-white);
+  }
+
+  .darkmode .btn-secondary:hover {
+    background-color: rgb(245 245 245 / 0.08);
+  }
+
+  .footer-link-underline {
+    background-image: linear-gradient(
+      to right,
+      currentColor 0%,
+      currentColor 100%
+    );
+    background-repeat: no-repeat;
+    background-position: right 100%;
+    background-size: 0 1px;
+    padding-bottom: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
