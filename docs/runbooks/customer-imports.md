@@ -43,6 +43,12 @@ Only company admins access upload, preview, commit and import history. Accountan
 
 ## Deployed — 2026-11-02
 
+### Supplier/category creation update — 2026-11-03
+
+Feature `4e92491` is live: Railway `809a0f70-7b38-4630-8fa6-3563b389e5ad` succeeded and customer web `dpl_74JEVc9p7Dk5XiNtiUsMac8jUDB1` is Ready. Ops follow-up `3b87e3d` fixes an existing build/typegen race by running them sequentially; `dpl_4cykwM9BgfUG8Bej7cifMjstHjLQ` is Ready. The customer import page defaults to reviewing and creating missing names on confirmation. Verification: 43 API import/parser/accountant tests, 162 web tests, 187 shared tests, clean release builds/typechecks and browser smoke. Full evidence: `docs/work/import-auto-create/delivery.md`.
+
+### Original self-service release
+
 - Release `b508d61b8af491be33e4e09cef1420adac884c52` pushed to `Expendi/Expendi-business` and `DennohKim/expendi-admin`. A clean detached worktree passed all seven build/typecheck tasks using the committed lockfile.
 - Railway dev API: `1629e2dd-1924-459b-a242-b1f832ad416b` **SUCCESS**. Logs confirm `[migrate] migrations applied` and healthy startup. A read-only database query confirmed migration journal row 67 (`1793643203411`), both actor columns and all four member import policies.
 - Customer web: `dpl_2ccyb3EyYkCXJBp2f636DYNk2BR1` **Ready**, published from the clean release worktree to <https://business.expendi.app>. Paid expenses: <https://business.expendi.app/imports?kind=history>; unpaid bills: <https://business.expendi.app/imports?kind=bill>.

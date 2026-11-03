@@ -17,4 +17,10 @@ Implemented customer-import creation of missing suppliers and categories.
 - Changed API/web lint passed.
 - Chromium mocked-HTTP smoke passed: creation summaries, opt-out errors, preview invalidation, confirmation gating, history provenance, accountant restriction, bill mappings and 390px reflow. Mobile screenshot inspected.
 
-Release/deployment pending. No live financial records imported for this change.
+## Release
+
+- Feature commit `4e92491` pushed to both repositories. Its clean-worktree build/typecheck passed using the committed lockfile.
+- Customer web deployment `dpl_74JEVc9p7Dk5XiNtiUsMac8jUDB1` is Ready at <https://business.expendi.app>. Public import pages return 200 and served JS contains the new creation option and preview section.
+- Ops deployment initially hit the existing concurrent Next build/typegen race. Follow-up `3b87e3d` serializes build then typecheck; deployment `dpl_4cykwM9BgfUG8Bej7cifMjstHjLQ` is Ready, with logs confirming both stages succeeded. The custom Ops domain points to this deployment.
+- Railway API feature deployment `809a0f70-7b38-4630-8fa6-3563b389e5ad` (`4e92491`) is SUCCESS. Startup logs confirm migrations completed and the server started; receipt reading remains disabled. No new schema migration was needed.
+- Post-deployment health returned 200/OK; unauthenticated import preview returned 401 with the expected customer CORS header. No live financial records imported for this change.
