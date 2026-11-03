@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import "tailwindcss" source("..");
 
 /*
  * Design tokens mirrored from qonto.com/en (Tailwind v4.3.3 build, computed

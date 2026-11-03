@@ -1,0 +1,37 @@
+section#section-2.surface-section-background-inverse.darkmode.text-dark-primary.wr-items-section [0,900 1440x384] {bg=rgb(5, 5, 5); of=clip visible}
+  div.px-16.py-40.website-revamp.md:px-32.lg:px-48.md:py-64 [0,900 1440x384] {font=18px/24px w400; color=rgb(255, 255, 255); p=80px 48px; maxw=1600px}
+    div.flex.gap-x-48.mb-40.md:mb-40.lg:mb-56.justify-between [48,980 1344x0] {d=flex; fd=row jc=space-between ai=normal; gap=normal 48px; m=0px 0px 56px}
+    div.hidden.lg:flex.lg:flex-col.lg:gap-y-48 [48,1036 1344x168] {d=flex; fd=column jc=normal ai=normal; gap=48px normal}
+      div.grid.grid-cols-12.lg:gap-x-24.lg:items-stretch.lg:grid-rows-[auto_auto_auto] [48,1036 1344x168] {d=grid; gtc=90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px gtr=72px 40px 56px; gap=normal 24px}
+        div.col-span-full.lg:row-span-3.lg:grid.lg:grid-rows-subgrid.lg:pr-24.lg:col-span-4 [48,1036 432x168] {d=grid; gtc=408px gtr=subgrid [] [] [] []; p=0px 24px 0px 0px}
+          div.flex.flex-col.h-full.lg:contents [0,800 0x0] {d=contents}
+            div.mb-12.md:mb-16.flex.justify-between [48,1036 408x56] {d=flex; fd=row jc=space-between ai=normal; m=0px 0px 16px}
+              div.flex.gap-x-8 [48,1036 56x56] {d=flex; fd=row jc=normal ai=normal; gap=normal 8px}
+                div.w-fit [48,1036 56x56]
+                  picture [48,1036 56x56]
+                    img.rounded-lg.h-40.md:h-48.lg:h-56.w-auto [48,1036 56x56] IMG=https://qonto.com/blog/images/asset/35272/image/lg_avif-7e084dfeeb3562b4cce7caed16dd826a.avif alt="WEB Badge Flag France WbRvmp" nat=320x320 {r=8px; of=clip; maxw=100%; ar=auto 384 / 384}
+            div.flex.flex-col.flex-1.gap-y-8.lg:grow.lg:contents [0,800 0x0] {d=contents}
+              h3.h3-small.content-primary-a.lg:mb-8 [48,1108 408x32] "Made in France" {font=24px/32px w600; m=0px 0px 8px; fvn=lining-nums proportional-nums}
+              div.body-regular.lg:grow.content-secondary [48,1148 408x56] {font=18px/28px w400; color=rgb(204, 204, 204)}
+                p [48,1148 408x56] "Qonto is a French company headquartered in Paris."
+        div.col-span-full.lg:row-span-3.lg:grid.lg:grid-rows-subgrid.lg:pr-24.lg:col-span-4 [504,1036 432x168] {d=grid; gtc=408px gtr=subgrid [] [] [] []; p=0px 24px 0px 0px}
+          div.flex.flex-col.h-full.lg:contents [0,800 0x0] {d=contents}
+            div.mb-12.md:mb-16.flex.justify-between [504,1036 408x56] {d=flex; fd=row jc=space-between ai=normal; m=0px 0px 16px}
+              div.flex.gap-x-8 [504,1036 56x56] {d=flex; fd=row jc=normal ai=normal; gap=normal 8px}
+                div.flex.justify-center.items-center.w-40.h-40.rounded-lg [504,1036 56x56] {bg=rgb(26, 26, 26); d=flex; fd=row jc=center ai=center; r=8px}
+                  img.h-24.w-24.md:h-28.md:w-28.lg:h-32.lg:w-32 [516,1048 32x32] IMG=https://qonto.com/blog/images/asset/3564/image/8776002af0a108fa96ca53b2a7c7c34a.svg alt="WEB Iconography Black Qonto" nat=32x32 {of=clip; maxw=100%; ar=auto 32 / 32}
+            div.flex.flex-col.flex-1.gap-y-8.lg:grow.lg:contents [0,800 0x0] {d=contents}
+              h3.h3-small.content-primary-a.lg:mb-8 [504,1108 408x32] "750,000+ clients" {font=24px/32px w600; m=0px 0px 8px; fvn=lining-nums proportional-nums}
+              div.body-regular.lg:grow.content-secondary [504,1148 408x56] {font=18px/28px w400; color=rgb(204, 204, 204)}
+                p [504,1148 408x28] "use Qonto daily to run their business."
+        div.col-span-full.lg:row-span-3.lg:grid.lg:grid-rows-subgrid.lg:pr-24.lg:col-span-4 [960,1036 432x168] {d=grid; gtc=408px gtr=subgrid [] [] [] []; p=0px 24px 0px 0px}
+          div.flex.flex-col.h-full.lg:contents [0,800 0x0] {d=contents}
+            div.mb-12.md:mb-16.flex.justify-between [960,1036 408x56] {d=flex; fd=row jc=space-between ai=normal; m=0px 0px 16px}
+              div.flex.gap-x-8 [960,1036 120x56] {d=flex; fd=row jc=normal ai=normal; gap=normal 8px}
+                div.w-fit [960,1036 120x56]
+                  picture [960,1036 120x56]
+                    img.rounded-lg.h-40.md:h-48.lg:h-56.w-auto [960,1036 120x56] IMG=https://qonto.com/blog/images/asset/33384/image/lg_avif-c03d34e447214fa803d885672347bdf3.avif alt="Customer Support 24 7 DarkMode" nat=686x320 {r=8px; of=clip; maxw=100%; ar=auto 823 / 384}
+            div.flex.flex-col.flex-1.gap-y-8.lg:grow.lg:contents [0,800 0x0] {d=contents}
+              h3.h3-small.content-primary-a.lg:mb-8 [960,1108 408x32] "24/7 human support" {font=24px/32px w600; m=0px 0px 8px; fvn=lining-nums proportional-nums}
+              div.body-regular.lg:grow.content-secondary [960,1148 408x56] {font=18px/28px w400; color=rgb(204, 204, 204)}
+                p [960,1148 408x28] "We're available via chat, email, and phone."

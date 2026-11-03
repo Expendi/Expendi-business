@@ -1,0 +1,27 @@
+section#section-1.relative.col-span-6.w-full.min-h-svh.lg:min-h-screen.md:col-span-9 [0,0 1440x900] {bg=rgb(5, 5, 5); pos=relative; minh=900px}
+  picture.hidden.lg:block.w-full.lg:h-screen.h-svh.object-cover [0,0 1440x900] {pos=absolute top:0px right:0px bottom:0px left:0px; z=10; fit=cover 50% 50%}
+    img.h-full.w-full.object-cover [0,0 1440x900] IMG=https://qonto.com/blog/images/asset/33449/image/lg_avif-a6948b2af844547d039c49ecc13c3565.avif alt="WEB Various HeroFullWidth Homepage Desktop Static WbRvmp" nat=1440x809 {of=clip; fit=cover 50% 50%; maxw=100%; ar=auto 1920 / 1080}
+  video#hero-video.object-cover.absolute.inset-0.z-20.w-full.h-svh [0,0 1440x900] VIDEO=https://qonto.com/blog/images/web%20en%20various%2016x9%20%23%20homepage%20desktop.mp4 poster= {pos=absolute top:0px right:0px bottom:0px left:0px; z=20; of=clip; fit=cover 50% 50%; maxw=100%}
+  div.absolute.inset-0.z-30.pointer-events-none.lg:h-screen.h-svh [0,0 1440x900] {font=18px/24px w400; color=rgb(255, 255, 255); bgimg=linear-gradient(rgba(5, 5, 5, 0) 78.6%, rgb(5, 5, 5) 100%), linear-gradient(0deg, rgba(5, 5, 5, 0.15) 0%, rgba(5, 5, 5, 0.15) 100%) size=auto, auto pos=0% 0%, 0% 0%; pos=absolute top:0px right:0px bottom:0px left:0px; z=30}
+  div.grid.relative.z-40.grid-cols-6.col-span-12.gap-x-24 [0,0 1440x900] {font=18px/24px w400; color=rgb(255, 255, 255); d=grid; gtc=90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px gtr=420px; gap=48px 24px; p=128px 48px 48px; pos=relative; z=40; maxw=1600px; minh=100%; maxh=1264px}
+    div.flex.flex-col.col-span-6.pb-48.md:col-span-9.lg:col-span-12 [48,432 1344x420] {d=flex; fd=column jc=flex-end ai=normal}
+      div.flex.flex-col.gap-y-16.lg:gap-y-24.lg:w-870 [48,432 870x320] {d=flex; fd=column jc=normal ai=normal; gap=24px normal}
+        ul.h-32.cycle-ratings.w-fit [48,432 131x32] {pos=relative}
+          li [48,432 131x36] {font=14px/36px w400; d=list-item}
+            a.inline-flex.items-center.whitespace-nowrap [48,432 131x36] href=https://trustpilot.com/review/qonto.com {d=inline-flex; fd=row jc=normal ai=center; ws=nowrap; cur=pointer}
+              span.mr-4.font-bold [48,432 21x36] "4.7" {font=14px/36px w700; m=0px 4px 0px 0px; ws=nowrap; cur=pointer}
+              span [73,432 25x36] "of 5" {ws=nowrap; cur=pointer}
+              img.ml-8 [106,439 73x22] IMG=https://qonto.com/blog/assets/trustpilot-logo-with-text-dark-b22f8901d908ca3b6637db9fa438c9c8f3f8182a709d00499269c123cf4a7528.svg alt="Trustpilot badge" nat=73x22 {m=0px 0px 0px 8px; of=clip; maxw=100%; ws=nowrap; cur=pointer}
+        h1 [48,488 870x240] {font=72px/80px w700; fvn=lining-nums proportional-nums}
+          span.block [48,488 870x80] "Business account." {fvn=lining-nums proportional-nums}
+          span.block [48,568 870x80] "Finance management." {fvn=lining-nums proportional-nums}
+          span.block [48,648 870x80] "Company creation." {fvn=lining-nums proportional-nums}
+        p.body-regular [48,752 870x0] {font=18px/28px w400}
+      div.flex.gap-x-16.mt-32.lg:mt-48 [48,800 1344x52] {d=flex; fd=row jc=normal ai=normal; gap=normal 16px; m=48px 0px 0px}
+        div.flex.flex-wrap.gap-16.darkmode [48,800 376x52] {d=flex; fd=row jc=normal ai=normal wrap; gap=16px 16px}
+          a [48,800 175x52] href=https://welcome.qonto.com/signup/select-country {cur=pointer}
+            div.block.text-center.whitespace-nowrap.btn.btn-primary.text-16 [48,800 175x52] {font=18px/28px w400; color=rgb(5, 5, 5); bg=rgb(255, 255, 255); d=inline-block; p=12px 16px; r=8px; ws=nowrap; ta=center; cur=pointer}
+              span [64,815 143x21] "Open an account" {ws=nowrap; ta=center; cur=pointer}
+          a [239,800 185x52] href=https://qonto.com/en/pricing {cur=pointer}
+            div.block.text-center.btn.btn-secondary.text-16.leading-26 [239,800 185x52] {font=18px/28px w400; d=inline-block; p=11px 16px; r=8px; bT=1px solid rgb(255, 255, 255); bR=1px solid rgb(255, 255, 255); bB=1px solid rgb(255, 255, 255); bL=1px solid rgb(255, 255, 255); ta=center; cur=pointer}
+              span [256,815 151x21] "Find the right plan" {ta=center; cur=pointer}

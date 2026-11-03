@@ -1,0 +1,212 @@
+footer.website-revamp [0,8049 1440x1287]
+  div.relative.px-16.py-40.md:px-32.lg:px-48.surface-section-background-inverse [0,8049 1440x788] {font=18px/24px w400; color=rgb(255, 255, 255); bg=rgb(5, 5, 5); p=80px 48px; pos=relative; z=1}
+    div.grid.grid-cols-12.gap-x-8.md:gap-x-24.max-w-[1504px].mx-auto [48,8129 1344x628] {d=grid; gtc=90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px gtr=628px; gap=normal 24px; maxw=1504px}
+      div.flex.flex-col.col-span-12.lg:col-span-3 [48,8129 318x628] {d=flex; fd=column jc=normal ai=normal}
+        div.p-24.rounded-2xl.md:rounded-3xl.bg-grey-900.group.lg:w-2/3 [48,8129 212x140] {bg=rgb(26, 26, 26); p=24px; r=24px}
+          a.flex.justify-between.items-start.w-full.gap-4.darkmode [72,8153 164x32] "Pricing" href=https://qonto.com/en/pricing {d=flex; fd=row jc=space-between ai=flex-start; gap=4px 4px; cur=pointer}
+            div.btn-rounded.btn-rounded-dark [204,8153 32x32] {bg=rgb(61, 61, 61); d=flex; fd=row jc=center ai=center; r=3.35544e+07px; tr=0.3s cubic-bezier(0.4, 0, 0.2, 1); of=hidden; cur=pointer}
+              div.btn-rounded-arrow-wrapper.invert-svg [211,8160 18x18] {pos=relative; cur=pointer}
+                div.btn-rounded-arrow-container [211,8160 18x18] {pos=relative; cur=pointer}
+                  div.arrow-primary.lg:group-hover:animate-arrow-exit-250 [211,8160 18x18] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, 0, 0); cur=pointer}
+                    svg#Layer_1.rotate-135.rotate-135 [207,8156 25x25] SVG(0 0 18 18) {filter=brightness(0) invert(1); of=hidden; cur=pointer}
+                  div.arrow-secondary.lg:group-hover:animate-arrow-enter-250 [193,8178 18x18] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, -18, 18); cur=pointer}
+                    svg#Layer_1.rotate-135.rotate-135 [189,8174 25x25] SVG(0 0 18 18) {filter=brightness(0) invert(1); of=hidden; cur=pointer}
+          div.pt-16.caption.text-dark-secondary [72,8185 164x60] {font=14px/22px w400; color=rgb(204, 204, 204); p=16px 0px 0px}
+            p [72,8201 164x44] "Find the best plan for your business needs."
+        div.flex.flex-col.gap-32.justify-between.my-32.md:flex-row [48,8293 318x144] {d=flex; fd=column jc=space-between ai=normal; gap=32px 32px; m=24px 0px}
+          div.flex.gap-16.justify-center.lg:px-16.lg:flex-col.lg:gap-24 [48,8293 318x144] {d=flex; fd=column jc=center ai=normal; gap=24px 24px; p=0px 16px}
+            div.lg:flex.lg:items-center.lg:gap-8 [64,8293 286x32] {d=flex; fd=row jc=normal ai=center; gap=8px 8px}
+              div.flex.gap-4.justify-center.items-center.lg:justify-start.lg:gap-8 [64,8293 64x32] {d=flex; fd=row jc=flex-start ai=center; gap=8px 8px}
+                h3.h3-small [64,8293 36x32] "4.7" {font=24px/32px w600; fvn=lining-nums proportional-nums}
+                svg.w-20.h-20.w-20.h-20 [108,8299 20x20] SVG(0 0 20 20) {of=hidden}
+              div.flex.gap-4.items-center [136,8297 102x24] {d=flex; fd=row jc=normal ai=center; gap=4px 4px}
+                svg.w-16.h-16.w-16.h-16 [136,8301 16x16] SVG(0 0 16 16) {of=hidden}
+                div.caption-slim.text-nowrap [156,8297 82x24] "on App Store" {font=14px/24px w300; ws=nowrap}
+            div.lg:flex.lg:items-center.lg:gap-8 [64,8349 286x32] {d=flex; fd=row jc=normal ai=center; gap=8px 8px}
+              div.flex.gap-4.justify-center.items-center.lg:justify-start.lg:gap-8 [64,8349 64x32] {d=flex; fd=row jc=flex-start ai=center; gap=8px 8px}
+                h3.h3-small [64,8349 36x32] "4.7" {font=24px/32px w600; fvn=lining-nums proportional-nums}
+                svg.w-20.h-20.w-20.h-20 [108,8355 20x20] SVG(0 0 20 20) {of=hidden}
+              div.flex.gap-4.items-center [136,8353 103x24] {d=flex; fd=row jc=normal ai=center; gap=4px 4px}
+                svg.w-16.h-16.w-16.h-16 [136,8357 16x16] SVG(0 0 20 20) {of=hidden}
+                div.caption-slim.text-nowrap [156,8353 83x24] "on Play Store" {font=14px/24px w300; ws=nowrap}
+            div.lg:flex.lg:items-center.lg:gap-8 [64,8405 286x32] {d=flex; fd=row jc=normal ai=center; gap=8px 8px}
+              div.flex.gap-4.justify-center.items-center.lg:justify-start.lg:gap-8 [64,8405 64x32] {d=flex; fd=row jc=flex-start ai=center; gap=8px 8px}
+                h3.h3-small [64,8405 36x32] "4.7" {font=24px/32px w600; fvn=lining-nums proportional-nums}
+                svg.w-20.h-20.w-20.h-20 [108,8411 20x20] SVG(0 0 20 20) {of=hidden}
+              div.flex.gap-4.items-center [136,8409 100x24] {d=flex; fd=row jc=normal ai=center; gap=4px 4px}
+                svg.w-16.h-16.w-16.h-16 [136,8413 16x16] SVG(0 0 20 20) {of=hidden}
+                div.caption-slim.text-nowrap [156,8409 80x24] "on Trustpilot" {font=14px/24px w300; ws=nowrap}
+      div.col-span-12.gap-x-24.lg:col-span-9.columns-2.md:columns-3.lg:columns-3 [390,8129 1002x628]
+        div.mb-32.break-inside-avoid.lg:mb-24 [390,8129 318x154] {m=0px 0px 24px}
+          div.pb-16.body-small-bold.lg:pb-8.text-dark-primary [390,8129 318x34] {font=16px/26px w700; p=0px 0px 8px}
+            p [390,8129 318x26] "BUSINESS ACCOUNT"
+          div.pb-8.caption.text-dark-secondary [390,8163 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8166 191x18] "Open Business Bank Account" href=https://qonto.com/en/open-an-account {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [390,8193 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8196 217x18] "Business Account for Freelancers" href=https://qonto.com/en/open-an-account/freelancers {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [390,8223 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8226 148x18] "Account Remuneration" href=https://qonto.com/en/open-an-account/remunerated-professional-account {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [390,8253 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8256 198x18] "Bank Account for Associations" href=https://qonto.com/en/open-an-account/association {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+        div.mb-32.break-inside-avoid.lg:mb-24 [390,8307 318x154] {m=0px 0px 24px}
+          div.pb-16.body-small-bold.lg:pb-8.text-dark-primary [390,8307 318x34] {font=16px/26px w700; p=0px 0px 8px}
+            p [390,8307 318x26] "BUSINESS CARDS"
+          div.pb-8.caption.text-dark-secondary [390,8341 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8344 61x18] "One Card" href=https://qonto.com/en/payment-methods/card/card-one {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [390,8371 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8374 78x18] "Virtual Card" href=https://qonto.com/en/payment-methods/card/virtual-card {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [390,8401 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8404 62x18] "Plus Card" href=https://qonto.com/en/payment-methods/card/card-plus {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [390,8431 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8434 82x18] "See all cards" href=https://qonto.com/en/payment-methods/card {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+        div.mb-32.break-inside-avoid.lg:mb-24 [390,8485 318x94] {m=0px 0px 24px}
+          div.pb-16.body-small-bold.lg:pb-8.text-dark-primary [390,8485 318x34] {font=16px/26px w700; p=0px 0px 8px}
+            p [390,8485 318x26] "COMPANY CREATION"
+          div.pb-8.caption.text-dark-secondary [390,8519 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8522 119x18] "Create a Company" href=https://qonto.com/en/creation {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [390,8549 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8552 99x18] "Capital Deposit" href=https://qonto.com/en/capital-deposit {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+        div.mb-32.break-inside-avoid.lg:mb-24 [390,8603 318x154] {m=0px 0px 24px}
+          div.pb-16.body-small-bold.lg:pb-8.text-dark-primary [390,8603 318x34] {font=16px/26px w700; p=0px 0px 8px}
+            p [390,8603 318x26] "GET PAID"
+          div.pb-8.caption.text-dark-secondary [390,8637 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8640 86x18] "POS Terminal" href=https://qonto.com/en/payment-methods/pos {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [390,8667 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8670 94x18] "Payment Links" href=https://qonto.com/en/payment-methods/payment-links {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [390,8697 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8700 120x18] "Tap-to-Pay iPhone" href=https://qonto.com/en/payment-methods/tap-to-pay-iphone {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [390,8727 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [390,8730 126x18] "Tap-to-Pay Android" href=https://qonto.com/en/payment-methods/tap-to-pay-android {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+        div.mb-32.break-inside-avoid.lg:mb-24 [732,8129 318x124] {m=0px 0px 24px}
+          div.pb-16.body-small-bold.lg:pb-8.text-dark-primary [732,8129 318x34] {font=16px/26px w700; p=0px 0px 8px}
+            p [732,8129 318x26] "FINANCING"
+          div.pb-8.caption.text-dark-secondary [732,8163 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8166 125x18] "Business Financing" href=https://qonto.com/en/financing {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [732,8193 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8196 61x18] "Pay Later" href=https://qonto.com/en/financing/pay-later {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [732,8223 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8226 63x18] "Overdraft" href=https://qonto.com/en/financing/overdraft {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+        div.mb-32.break-inside-avoid.lg:mb-24 [732,8277 318x214] {m=0px 0px 24px}
+          div.pb-16.body-small-bold.lg:pb-8.text-dark-primary [732,8277 318x34] {font=16px/26px w700; p=0px 0px 8px}
+            p [732,8277 318x26] "FINANCIAL TOOLS"
+          div.pb-8.caption.text-dark-secondary [732,8311 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8314 207x18] "Expense Management Software" href=https://qonto.com/en/team {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [732,8341 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8344 157x18] "Pre-accounting Solution" href=https://qonto.com/en/accounting {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [732,8371 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8374 87x18] "Invoicing Tool" href=https://qonto.com/en/invoicing {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [732,8401 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8404 155x18] "Cash-flow Management" href=https://qonto.com/en/cash-management {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [732,8431 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8434 78x18] "Integrations" href=https://qonto.com/en/integrations {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [732,8461 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8464 135x18] "Quotes Management" href=https://qonto.com/en/invoicing/quotes {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+        div.mb-32.break-inside-avoid.lg:mb-24 [732,8515 318x214] {m=0px 0px 24px}
+          div.pb-16.body-small-bold.lg:pb-8.text-dark-primary [732,8515 318x34] {font=16px/26px w700; p=0px 0px 8px}
+            p [732,8515 318x26] "RESOURCES"
+          div.pb-8.caption.text-dark-secondary [732,8549 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8552 84x18] "Product Tour" href=https://qonto.com/en/product-tour {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [732,8579 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8582 140x18] "Banking Comparators" href=https://qonto.com/en/comparators {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [732,8609 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8612 118x18] "Financial Glossary" href=https://qonto.com/en/glossary {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [732,8639 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8642 153x18] "SWIFT/BIC Code Finder" href=https://qonto.com/en/swift-codes {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [732,8669 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8672 95x18] "Qonto Insights" href=https://qonto.com/en/insights {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [732,8699 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [732,8702 110x18] "See all resources" href=https://qonto.com/en/resources {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+        div.mb-32.break-inside-avoid.lg:mb-24 [1074,8129 318x304] {m=0px 0px 24px}
+          div.pb-16.body-small-bold.lg:pb-8.text-dark-primary [1074,8129 318x34] {font=16px/26px w700; p=0px 0px 8px}
+            p [1074,8129 318x26] "COMPANY"
+          div.pb-8.caption.text-dark-secondary [1074,8163 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [1074,8166 63x18] "Our Story" href=https://qonto.com/en/about {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [1074,8193 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [1074,8196 36x18] "Press" href=https://qonto.com/en/press {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [1074,8223 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [1074,8226 98x18] "Our Customers" href=https://qonto.com/en/trust {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [1074,8253 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [1074,8256 162x18] "Sustainability & Inclusion" href=https://qonto.com/en/impact {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [1074,8283 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [1074,8286 51x18] "Careers" href=https://qonto.com/en/careers {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [1074,8313 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [1074,8316 29x18] "Blog" href=https://qonto.com/en/blog {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [1074,8343 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [1074,8346 97x18] "FAQ & Support" href=https://support-fr.qonto.com/hc/en-us?_gl=1*1c8hd4*_gcl_gb*R0NMLjE3NzE0MDYxMDAuQ2xrS0NBaUFuY3ZNQmhBWEVra0F3cTlwSEV0MjVnMDloZG84NnFSa2MtbTBDMUZ1bzYyOHUyaVVlTnZQcjNBSV9zdzVWR0JkRDNuT2tBT19FOURzSVhTV19STHl2Qk92QnhTUnpHZWgxUU9iSmZLVFlDZ0lHZ0s1dlEuZDg3QUNQdkJtZjRCRU1LbjlvMEQuLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLg..*_gcl_au*MTU3NzQyNzgzLjE3NjQxNzA2NjYuNjEyMTk2NjgxLjE3NjQyNDM5MzEuMTc2NDI0MzkzMA.. {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [1074,8373 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [1074,8376 123x18] "Recommend Qonto" href=https://qonto.com/en/referral {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [1074,8403 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [1074,8406 94x18] "Ethics Charter" href=https://qonto.com/en/ethics-charter {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+        div.mb-32.break-inside-avoid.lg:mb-24 [1074,8457 318x94] {m=0px 0px 24px}
+          div.pb-16.body-small-bold.lg:pb-8.text-dark-primary [1074,8457 318x34] {font=16px/26px w700; p=0px 0px 8px}
+            p [1074,8457 318x26] "FOR DEVELOPERS"
+          div.pb-8.caption.text-dark-secondary [1074,8491 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [1074,8494 88x18] "Qonto Embed" href=https://qonto.com/en/qonto-embed {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          div.pb-8.caption.text-dark-secondary [1074,8521 318x30] {font=14px/22px w400; color=rgb(204, 204, 204); p=0px 0px 8px}
+            a.border-bottom-animation.footer-nav-links [1074,8524 65x18] "Qonto API" href=https://docs.qonto.com/introduction/welcome {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; tr=background-size 0.2s ease-in-out; cur=pointer}
+  div.relative.z-10.px-16.pt-40.md:pt-64.lg:pt-40 [0,8837 1440x499] {font=18px/24px w400; color=rgb(5, 5, 5); p=40px 48px 0px; pos=relative; z=10}
+    div.flex.flex-col.gap-y-40.justify-between.pb-40.lg:py-40 [48,8877 1344x180] {d=flex; fd=row jc=space-between ai=flex-end; gap=32px normal; p=40px 0px}
+      div.flex.justify-center.md:justify-start [48,8917 343x100] {d=flex; fd=row jc=flex-start ai=normal}
+        svg [48,8917 343x100] SVG(0 0 85 24) {of=hidden}
+      div.flex.flex-col.gap-y-32.justify-between.lg:justify-start.md:flex-row [844,8923 548x94] {d=flex; fd=row jc=flex-start ai=normal; gap=32px 16px}
+        div.flex.gap-8.justify-center.items-end [844,8923 256x94] {d=flex; fd=row jc=center ai=flex-end; gap=8px 8px}
+          picture [844,8953 64x64]
+            img.h-64.w-auto.fill-grey-700 [844,8953 64x64] IMG=https://qonto.com/blog/images/asset/33290/image/lg_avif-d008e4ea7aecabc72cb9577373e981ba.avif alt="Badge Asset" nat=320x320 {of=clip; maxw=100%; ar=auto 384 / 384}
+          picture [916,8953 64x64]
+            img.h-64.w-auto.fill-grey-700 [916,8953 64x64] IMG=https://qonto.com/blog/images/asset/33292/image/lg_avif-b0dee7060c8b1522ab67eae1ec314e5c.avif alt="Badge Asset" nat=320x320 {of=clip; maxw=100%; ar=auto 384 / 384}
+          picture [988,8953 112x64]
+            img.h-64.w-auto.fill-grey-700 [988,8953 112x64] IMG=https://qonto.com/blog/images/asset/33288/image/lg_avif-f926bd03a74909be270313496d23db9d.avif alt="Badge Asset" nat=560x320 {of=clip; maxw=100%; ar=auto 672 / 384}
+        div.flex.flex-col.gap-y-32.md:gap-y-16.lg:gap-y-24 [1116,8923 276x94] {d=flex; fd=column jc=normal ai=normal; gap=24px normal}
+          div.flex.justify-center.md:justify-end [1116,8923 276x30] {d=flex; fd=row jc=flex-end ai=normal}
+            div.px-6 [1182,8923 42x30] {p=0px 6px}
+              a [1188,8923 30x30] href=https://www.facebook.com/getqonto {cur=pointer}
+                img.h-30.w-auto [1188,8923 30x30] IMG=https://qonto.com/blog/images/asset/33603/image/28fdb1711ea2f916e3bec2e6d618444c.svg alt="Facebook" nat=96x96 {of=clip; maxw=100%; cur=pointer; ar=auto 30 / 30}
+            div.px-6 [1224,8923 42x30] {p=0px 6px}
+              a [1230,8923 30x30] href=https://www.facebook.com/getqonto {cur=pointer}
+                img.h-30.w-auto [1230,8923 30x30] IMG=https://qonto.com/blog/images/asset/33596/image/7bdc8481de0e4f2d4de7573b366e881b.svg alt="X" nat=96x96 {of=clip; maxw=100%; cur=pointer; ar=auto 30 / 30}
+            div.px-6 [1266,8923 42x30] {p=0px 6px}
+              a [1272,8923 30x30] href=https://www.linkedin.com/company/qonto {cur=pointer}
+                img.h-30.w-auto [1272,8923 30x30] IMG=https://qonto.com/blog/images/asset/33598/image/ad73479e4a1febdc452fdc6b38103c57.svg alt="LinkedIn" nat=96x96 {of=clip; maxw=100%; cur=pointer; ar=auto 30 / 30}
+            div.px-6 [1308,8923 42x30] {p=0px 6px}
+              a [1314,8923 30x30] href=https://www.instagram.com/qonto {cur=pointer}
+                img.h-30.w-auto [1314,8923 30x30] IMG=https://qonto.com/blog/images/asset/33599/image/a15c6e786f3f8023ccad013037a91b99.svg alt="Instagram" nat=96x96 {of=clip; maxw=100%; cur=pointer; ar=auto 30 / 30}
+            div.px-6 [1350,8923 42x30] {p=0px 6px}
+              a [1356,8923 30x30] href=https://medium.com/qonto-way {cur=pointer}
+                img.h-30.w-auto [1356,8923 30x30] IMG=https://qonto.com/blog/images/asset/33600/image/7e2829066f618f1ba81bb0b432749c52.svg alt="Medium" nat=96x96 {of=clip; maxw=100%; cur=pointer; ar=auto 30 / 30}
+          div.flex.gap-16.justify-center.md:justify-end [1116,8977 276x40] {d=flex; fd=row jc=flex-end ai=normal; gap=16px 16px}
+            a [1116,8977 127x40] href=https://apps.apple.com/fr/app/qonto-business-finance-app/id1214811644?l=en-GB {cur=pointer}
+              picture [1116,8977 127x40] {cur=pointer}
+                img.h-40.w-auto [1116,8977 127x40] IMG=https://qonto.com/blog/images/asset/33597/image/lg_avif-1170c4840810afa5b777384e755d3474.avif alt="App Store" nat=1013x320 {of=clip; maxw=100%; cur=pointer}
+            a [1258,8977 134x40] href=https://play.google.com/store/apps/details?id=eu.qonto.qonto&hl=en {cur=pointer}
+              picture [1258,8977 134x40] {cur=pointer}
+                img.h-40.w-auto [1258,8977 134x40] IMG=https://qonto.com/blog/images/asset/33601/image/lg_avif-46383406703b81e6888524178d65a7ec.avif alt="Play Store" nat=1070x320 {of=clip; maxw=100%; cur=pointer}
+    hr.w-full.border-t.border-grey-300 [48,9057 1344x1] {bT=1px solid rgb(204, 204, 204); of=hidden}
+    div.flex.justify-between.items-center [48,9058 1344x72] {d=flex; fd=row jc=space-between ai=center}
+      div.inline-block.mt-24.lg:mt-32.md:mb-16.caption-small.leading-32 [48,9093 503x18] {font=12px/18px w400; m=32px 0px 16px}
+        a.border-bottom-animation.footer-nav-links.py-6.mr-16.md:py-0 [48,9095 47x16] href=https://qonto.com/en/cookies {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; m=0px 16px 0px 0px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          span [48,9095 44x14] "Cookies" {cur=pointer}
+        a.border-bottom-animation.footer-nav-links.py-6.mr-16.md:py-0 [111,9095 99x16] href=https://legal.qonto.com/en?_gl=1*zziar0*_gcl_au*MjEyNjQ3NDgxNi4xNzY5MDczNTU5 {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; m=0px 16px 0px 0px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          span [111,9095 96x14] "Legal Documents" {cur=pointer}
+        a.border-bottom-animation.footer-nav-links.py-6.mr-16.md:py-0 [226,9095 79x16] href=https://legal.qonto.com/en?_gl=1*zziar0*_gcl_au*MjEyNjQ3NDgxNi4xNzY5MDczNTU5#template-6uiwuhdde {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; m=0px 16px 0px 0px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          span [226,9095 76x14] "Privacy Policy" {cur=pointer}
+        a.border-bottom-animation.footer-nav-links.py-6.mr-16.md:py-0 [321,9095 49x16] href=https://qonto.com/en/security {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; m=0px 16px 0px 0px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          span [321,9095 47x14] "Security" {cur=pointer}
+        a.border-bottom-animation.footer-nav-links.py-6.mr-16.md:py-0 [386,9095 65x16] href=https://legal.qonto.com/?_gl=1*912vrq*_gcl_au*MjEyNjQ3NDgxNi4xNzY5MDczNTU5#artificial-intelligence-at-qonto {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; m=0px 16px 0px 0px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          span [386,9095 62x14] "AI at Qonto" {cur=pointer}
+        a.border-bottom-animation.footer-nav-links.py-6.mr-16.md:py-0 [467,9095 68x16] href=https://status.qonto.com/?_gl=1*912vrq*_gcl_au*MjEyNjQ3NDgxNi4xNzY5MDczNTU5 {bgimg=linear-gradient(to right, rgb(5, 5, 5) 0%, rgb(5, 5, 5) 100%) size=0px 1px pos=100% 100%; p=0px 0px 2px; m=0px 16px 0px 0px; tr=background-size 0.2s ease-in-out; cur=pointer}
+          span [467,9095 68x14] "Status Page" {cur=pointer}
+      div.hidden.pt-8.md:block [1280,9058 112x72] {p=8px 0px 0px}
+        div.flex.items-center.cursor-pointer.website-revamp.lang-switch-container.group [1280,9066 112x64] {d=flex; fd=row jc=normal ai=center; p=24px 0px 16px 40px; pos=relative; cur=pointer}
+          button.button-switcher.flex.gap-8.items-center.justify-center.mx-auto [1320,9090 72x24] {d=flex; fd=row jc=center ai=center; gap=8px 8px; pos=relative; ta=center; cur=grab}
+            svg.lazy.rounded-full.mr-4.lazy.rounded-full.mr-4 [1320,9094 16x16] SVG(0 0 16 16) {m=0px 4px 0px 0px; r=3.35544e+07px; of=hidden; ta=center; cur=grab}
+            span.uppercase.font-light [1348,9090 23x24] "en" {font=18px/24px w300; tt=uppercase; ta=center; cur=grab}
+            span [1379,9099 13x6] {ta=center; cur=grab}
+              svg.langPicker.ml-4.md:block.dropdown-chevron-icon.lg:invert [1383,9099 9x6] SVG(0 0 9 6) {m=0px 0px 0px 4px; filter=invert(1); of=hidden; ta=center; cur=grab}
+    div.caption-small.pb-40.md:pb-64.lg:pb-80 [48,9130 1344x206] {font=12px/18px w400; p=0px 0px 80px}
+      p [48,9130 1344x18] "Qonto SA is a Société Anonyme under French law, registered at the Paris Trade Register (n° 819 489 626) having its headquarters at 6 Impasse Bonne Nouvelle, 75010 Paris, France."
+      p [48,9148 1344x18]
+        br [48,9150 0x14]
+      p [48,9166 1344x18] "Qonto SA is a licensed payment institution authorized by the French Autorité de Contrôle Prudentiel et de Résolution (ACPR), under the registration number 16958 granted on 21/06/2018."
+      p [48,9184 1344x18]
+        br [48,9186 0x14]
+      p [48,9202 1344x54] "The entirety of the funds collected from our customers is safeguarded in compliance with the relevant legislation. A part of these funds is either held by our partner banks, Crédit Mutuel Arkéa, Société Générale, Natixis"

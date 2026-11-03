@@ -1,0 +1,37 @@
+section#section-2.surface-section-background-inverse.darkmode.text-dark-primary.wr-items-section [0,892 390x599] {bg=rgb(5, 5, 5); of=clip visible}
+  div.px-16.py-40.website-revamp.md:px-32.lg:px-48.md:py-64 [0,892 390x599] {font=16px/24px w400; color=rgb(255, 255, 255); p=40px 16px; maxw=1600px}
+    div.flex.gap-x-48.mb-40.md:mb-40.lg:mb-56.justify-between [16,932 358x0] {d=flex; fd=row jc=space-between ai=normal; gap=normal 48px; m=0px 0px 40px}
+    div.grid.grid-cols-6.md:grid-cols-9.lg:grid-cols-12.md:gap-x-16.lg:gap-x-24 [16,972 358x432] {d=grid; gtc=59.6562px 59.6562px 59.6562px 59.6562px 59.6562px 59.6562px gtr=140px 114px 114px; gap=32px normal}
+      div.col-span-full.lg:row-span-3.lg:grid.lg:grid-rows-subgrid.lg:pr-24.lg:col-span-4 [16,972 358x140]
+        div.flex.flex-col.h-full.lg:contents [16,972 358x140] {d=flex; fd=column jc=normal ai=normal}
+          div.mb-12.md:mb-16.flex.justify-between [16,972 358x40] {d=flex; fd=row jc=space-between ai=normal; m=0px 0px 12px}
+            div.flex.gap-x-8 [16,972 40x40] {d=flex; fd=row jc=normal ai=normal; gap=normal 8px}
+              div.w-fit [16,972 40x40]
+                picture [16,972 40x40]
+                  img.rounded-lg.h-40.md:h-48.lg:h-56.w-auto [16,972 40x40] IMG=https://qonto.com/blog/images/asset/35272/image/sm_avif-6b98fc4da139df3fa1c6b3b18718e4d4.avif alt="WEB Badge Flag France WbRvmp" nat=162x162 {r=8px; of=clip; maxw=100%; ar=auto 384 / 384}
+          div.flex.flex-col.flex-1.gap-y-8.lg:grow.lg:contents [16,1024 358x88] {d=flex; fd=column jc=normal ai=normal; gap=8px normal}
+            h3.h3-small.content-primary-a.lg:mb-8 [16,1024 358x28] "Made in France" {font=20px/28px w600; fvn=lining-nums proportional-nums}
+            div.body-regular.lg:grow.content-secondary [16,1060 358x52] {font=16px/26px w400; color=rgb(204, 204, 204)}
+              p [16,1060 358x52] "Qonto is a French company headquartered in Paris."
+      div.col-span-full.lg:row-span-3.lg:grid.lg:grid-rows-subgrid.lg:pr-24.lg:col-span-4 [16,1144 358x114]
+        div.flex.flex-col.h-full.lg:contents [16,1144 358x114] {d=flex; fd=column jc=normal ai=normal}
+          div.mb-12.md:mb-16.flex.justify-between [16,1144 358x40] {d=flex; fd=row jc=space-between ai=normal; m=0px 0px 12px}
+            div.flex.gap-x-8 [16,1144 40x40] {d=flex; fd=row jc=normal ai=normal; gap=normal 8px}
+              div.flex.justify-center.items-center.w-40.h-40.rounded-lg [16,1144 40x40] {bg=rgb(26, 26, 26); d=flex; fd=row jc=center ai=center; r=8px}
+                img.h-24.w-24.md:h-28.md:w-28.lg:h-32.lg:w-32 [24,1152 24x24] IMG=https://qonto.com/blog/images/asset/3564/image/8776002af0a108fa96ca53b2a7c7c34a.svg alt="WEB Iconography Black Qonto" nat=32x32 {of=clip; maxw=100%; ar=auto 32 / 32}
+          div.flex.flex-col.flex-1.gap-y-8.lg:grow.lg:contents [16,1196 358x62] {d=flex; fd=column jc=normal ai=normal; gap=8px normal}
+            h3.h3-small.content-primary-a.lg:mb-8 [16,1196 358x28] "750,000+ clients" {font=20px/28px w600; fvn=lining-nums proportional-nums}
+            div.body-regular.lg:grow.content-secondary [16,1232 358x26] {font=16px/26px w400; color=rgb(204, 204, 204)}
+              p [16,1232 358x26] "use Qonto daily to run their business."
+      div.col-span-full.lg:row-span-3.lg:grid.lg:grid-rows-subgrid.lg:pr-24.lg:col-span-4 [16,1290 358x114]
+        div.flex.flex-col.h-full.lg:contents [16,1290 358x114] {d=flex; fd=column jc=normal ai=normal}
+          div.mb-12.md:mb-16.flex.justify-between [16,1290 358x40] {d=flex; fd=row jc=space-between ai=normal; m=0px 0px 12px}
+            div.flex.gap-x-8 [16,1290 86x40] {d=flex; fd=row jc=normal ai=normal; gap=normal 8px}
+              div.w-fit [16,1290 86x40]
+                picture [16,1290 86x40]
+                  img.rounded-lg.h-40.md:h-48.lg:h-56.w-auto [16,1290 86x40] IMG=https://qonto.com/blog/images/asset/33384/image/sm_avif-e04f050b155a3c8d4399098dc54a8f07.avif alt="Customer Support 24 7 DarkMode" nat=348x162 {r=8px; of=clip; maxw=100%; ar=auto 823 / 384}
+          div.flex.flex-col.flex-1.gap-y-8.lg:grow.lg:contents [16,1342 358x62] {d=flex; fd=column jc=normal ai=normal; gap=8px normal}
+            h3.h3-small.content-primary-a.lg:mb-8 [16,1342 358x28] "24/7 human support" {font=20px/28px w600; fvn=lining-nums proportional-nums}
+            div.body-regular.lg:grow.content-secondary [16,1378 358x26] {font=16px/26px w400; color=rgb(204, 204, 204)}
+              p [16,1378 358x26] "We're available via chat, email, and phone."
+    div.block.pt-40.inline-block.lg:hidden.hidden.lg:hidden [16,1404 0x40] {d=inline-block; p=40px 0px 0px}

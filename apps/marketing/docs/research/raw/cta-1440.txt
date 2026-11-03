@@ -1,0 +1,18 @@
+section#section-11.overflow-hidden.relative.surface-section-background-base [0,7385 1440x664] {bg=rgb(255, 255, 255); pos=relative; of=hidden}
+  div.absolute.top-0.left-0.w-full.h-full.bg-center [0,7385 1440x664] {font=18px/24px w400; color=rgb(5, 5, 5); bgimg=image-set(url("https://qonto.com/blog/images/asset/35029/image/xl_avif-499a6b72a8f2545cd876dbe53fb7a06f.avif") 1dppx type("image/avif"), url("https://qonto.com/blog/images/asset/35029/image/xl_original-022c9a6a114150b7f32fd9c1c2fe9117.jpg") 1dppx type("image/jpeg")) size=cover pos=50% 50%; pos=absolute top:0px right:0px bottom:0px left:0px}
+  div.absolute.top-0.left-0.w-full.h-full.bg-center [0,7385 1440x664] {font=18px/24px w400; color=rgb(5, 5, 5); bgimg=image-set(url("https://qonto.com/blog/images/asset/35029/image/xl_avif-499a6b72a8f2545cd876dbe53fb7a06f.avif") 1dppx type("image/avif"), url("https://qonto.com/blog/images/asset/35029/image/xl_original-022c9a6a114150b7f32fd9c1c2fe9117.jpg") 1dppx type("image/jpeg")) size=cover pos=50% 50%; pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, 0, 0); filter=blur(6px)}
+  div.absolute.top-0.left-0.w-full.h-full.pointer-events-none [0,7385 1440x664] {font=18px/24px w400; color=rgb(5, 5, 5); bgimg=linear-gradient(90deg, rgba(5, 5, 5, 0.67) 0%, rgba(5, 5, 5, 0.67) 20%, rgba(5, 5, 5, 0) 60%) size=auto pos=0% 0%; pos=absolute top:0px right:0px bottom:0px left:0px}
+  div.grid.grid-cols-6.gap-x-8.px-16.py-48.mx-auto [0,7385 1440x664] {font=18px/24px w400; color=rgb(5, 5, 5); d=grid; gtc=90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px gtr=504px; gap=normal 24px; p=80px 48px; maxw=1600px}
+    div.flex.flex-col.col-span-6.items-center.px-24.pt-32 [48,7465 1344x504] {d=grid; gtc=90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px gtr=128px 44px 100px; gap=normal 24px; p=64px 0px; r=24px; minh=504px}
+      h2.relative.z-10.col-span-6.lg:pl-64.text-dark-primary [48,7581 660x128] "Complicated?" {font=56px/64px w600; color=rgb(255, 255, 255); p=0px 0px 0px 64px; pos=relative; z=10; fvn=lining-nums proportional-nums}
+        p [112,7645 596x64] "Not with Qonto." {fvn=lining-nums proportional-nums}
+      div.relative.z-10.col-span-5.col-start-1.mt-12.lg:pl-64 [48,7725 546x28] {font=18px/28px w400; color=rgb(255, 255, 255); p=0px 0px 0px 64px; m=16px 0px 0px; pos=relative; z=10}
+        p [112,7725 482x28] "Open your business account in just 10 minutes."
+      div.flex.relative.z-10.flex-col.col-span-5.col-start-1 [48,7801 546x52] {d=flex; fd=row jc=normal ai=center; gap=16px 16px; p=0px 0px 0px 64px; m=48px 0px 0px; pos=relative; z=10}
+        div.flex.flex-wrap.gap-16.justify-center.lg:justify-start.darkmode [112,7801 376x52] {color=rgb(255, 255, 255); d=flex; fd=row jc=flex-start ai=normal wrap; gap=16px 16px}
+          a [112,7801 175x52] href=https://welcome.qonto.com/signup/select-country {cur=pointer}
+            div.block.text-center.whitespace-nowrap.btn.btn-primary.text-16 [112,7801 175x52] {font=18px/28px w400; color=rgb(5, 5, 5); bg=rgb(255, 255, 255); d=inline-block; p=12px 16px; r=8px; ws=nowrap; ta=center; cur=pointer}
+              span [128,7816 143x21] "Open an account" {ws=nowrap; ta=center; cur=pointer}
+          a [303,7801 185x52] href=https://qonto.com/en/pricing {cur=pointer}
+            div.block.text-center.btn.btn-secondary.text-16.leading-26 [303,7801 185x52] {font=18px/28px w400; d=inline-block; p=11px 16px; r=8px; bT=1px solid rgb(255, 255, 255); bR=1px solid rgb(255, 255, 255); bB=1px solid rgb(255, 255, 255); bL=1px solid rgb(255, 255, 255); ta=center; cur=pointer}
+              span [320,7816 151x21] "Find the right plan" {ta=center; cur=pointer}

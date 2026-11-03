@@ -1,0 +1,151 @@
+REVEAL-CANDIDATES (below fold, not at rest) 4 [{"t":"IMG","txt":"","op":"1","tf":"matrix(1, 0, 0, 1, 0, 0)","tr":"none","vis":"visible","cls":"w-full h-full object-cover object-top photo-blur-left-to-right"},{"t":"IMG","txt":"","op":"1","tf":"matrix(1, 0, 0, 1, 0, 0)","tr":"none","vis":"visible","cls":"w-full h-full object-cover object-top photo-blur-left-to-right"},{"t":"IMG","txt":"","op":"1","tf":"matrix(1, 0, 0, 1, 0, 0)","tr":"none","vis":"visible","cls":"w-full h-full object-cover object-top photo-blur-left-to-right"},{"t":"IMG","txt":"","op":"1","tf":"matrix(1, 0, 0, 1, 0, 0)","tr":"none","vis":"visible","cls":"w-full h-full object-cover object-top photo-blur-left-to-right"}]
+NON-REST ELEMENTS BEFORE SCROLL 29 [{"t":"DIV","cls":"flex items-stretch cursor-pointer","op":"0.4","tf":"none","top":2788},{"t":"DIV","cls":"flex items-stretch cursor-pointer","op":"0.4","tf":"none","top":2948},{"t":"DIV","cls":"absolute inset-0 transition-opacity duration-500 opacity-0","op":"0","tf":"none","top":2484},{"t":"DIV","cls":"absolute inset-0 transition-opacity duration-500 opacity-0","op":"0","tf":"none","top":2484},{"t":"DIV","cls":"btn-rounded","op":"0","tf":"none","top":3520},{"t":"DIV","cls":"arrow-secondary lg:group-hover:animate-arrow-enter-250","op":"1","tf":"matrix(1, 0, 0, 1, -18, 18)","top":3545},{"t":"DIV","cls":"btn-rounded","op":"0","tf":"none","top":3520},{"t":"DIV","cls":"arrow-secondary lg:group-hover:animate-arrow-enter-250","op":"1","tf":"matrix(1, 0, 0, 1, -18, 18)","top":3545},{"t":"DIV","cls":"btn-rounded","op":"0","tf":"none","top":3520},{"t":"DIV","cls":"arrow-secondary lg:group-hover:animate-arrow-enter-250","op":"1","tf":"matrix(1, 0, 0, 1, -18, 18)","top":3545},{"t":"DIV","cls":"btn-rounded","op":"0","tf":"none","top":0},{"t":"DIV","cls":"btn-rounded","op":"0","tf":"none","top":0},{"t":"DIV","cls":"btn-rounded","op":"0","tf":"none","top":0},{"t":"DIV","cls":"swiper-wrapper","op":"1","tf":"matrix(1, 0, 0, 1, 48, 0)","top":6071},{"t":"DIV","cls":"swiper-slide wr-showreel-slide swiper-slide-next","op":"0.5","tf":"matrix(1, 0, 0, 1, 0, 0)","top":6071},{"t":"DIV","cls":"wr-showreel-overlay absolute inset-0 z-10","op":"0","tf":"matrix(1, 0, 0, 1, 0, 8)","top":6079},{"t":"DIV","cls":"swiper-slide wr-showreel-slide","op":"0.5","tf":"matrix(1, 0, 0, 1, 0, 0)","top":6071},{"t":"DIV","cls":"wr-showreel-overlay absolute inset-0 z-10","op":"0","tf":"matrix(1, 0, 0, 1, 0, 8)","top":6079},{"t":"DIV","cls":"swiper-slide wr-showreel-slide","op":"0.5","tf":"matrix(1, 0, 0, 1, 0, 0)","top":6071},{"t":"DIV","cls":"wr-showreel-overlay absolute inset-0 z-10","op":"0","tf":"matrix(1, 0, 0, 1, 0, 8)","top":6079},{"t":"BUTTON","cls":"flex items-center swiper-nav-prev swiper-button-disabled","op":"0.45","tf":"none","top":6811},{"t":"DIV","cls":"arrow-secondary","op":"1","tf":"matrix(1, 0, 0, 1, 40, 0)","top":6823},{"t":"DIV","cls":"arrow-secondary","op":"1","tf":"matrix(1, 0, 0, 1, -40, 0)","top":6823},{"t":"DIV","cls":"arrow-secondary","op":"1","tf":"matrix(1, 0, 0, 1, -18, 18)","top":7231},{"t":"DIV","cls":"arrow-secondary lg:group-hover:animate-arrow-enter-250","op":"1","tf":"matrix(1, 0, 0, 1, -18, 18)","top":8178},{"t":"path","cls":"[object SVGAnimatedString]","op":"0.1","tf":"none","top":8367},{"t":"path","cls":"[object SVGAnimatedString]","op":"0.07","tf":"none","top":8371},{"t":"path","cls":"[object SVGAnimatedString]","op":"0.07","tf":"none","top":8365},{"t":"path","cls":"[object SVGAnimatedString]","op":"0.3","tf":"none","top":8359}]
+CYCLE-RATINGS {"html":"4.7 of 5","lis":[{"op":"1","tf":"none","disp":"list-item","pos":"static","top":"auto","tr":"all","anim":"none 0s 0s 1"}]} 
+LAST {"html":"4.7 of 5","lis":[{"op":"1","tf":"none","disp":"list-item","pos":"static","top":"auto","tr":"all","anim":"none 0s 0s 1"}]} 
+TEXTS 4.7 of 5 | 4.7 of 5 | 4.7 of 5 | 4.7 of 5 | 4.7 of 5 | 4.7 of 5 | 4.7 of 5 | 4.7 of 5 | 4.7 of 5 | 4.7 of 5 | 4.7 of 5 | 4.7 of 5
+AI-TABS over 12s (500ms) 
+op=1 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=0.84375px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=9.28125px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=17.7188px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=26.1719px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=34.8906px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=43.3438px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=51.7812px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=60.2188px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=68.9531px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=77.3906px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=85.8438px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=94.2812px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=103.016px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=111.453px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=119.891px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=128.344px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=137.062px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=1 bar=145.516px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 1,0,0
+op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=1 bar=0.328125px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 0.866019,0.133981,0
+op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=1 bar=10.4688px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 0,1,0
+op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=1 bar=20.9375px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 0,1,0
+op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=1 bar=31.0625px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 0,1,0
+op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=1 bar=41.5312px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) || op=0.4 bar=0px/none/w-full h-0 rounded-full origin-top bg-content-primary/rgb(5, 5, 5) pane=rgba(0, 0, 0, 0) ## 0,1,0
+AI after click 3 (300ms) 0.4 rgba(0, 0, 0, 0) | 0.4 rgba(0, 0, 0, 0) | 1 rgba(0, 0, 0, 0)
+AI after click 3 (1800ms) 0.4 | 0.4 | 1 ## 0,0,1
+TESTIMONIALS autoplay sample 
+32567 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+33570 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+34579 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+35584 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+36587 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+37590 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+38596 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+39599 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+40603 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+41606 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+42610 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+43613 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+44616 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+45618 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+46621 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+47624 tf=matrix(1, 0, 0, 1, -3676, 0) dur=0ms active=3 txt=“I'd recommend Qonto to any en
+TESTIMONIALS after next click 
+tf=matrix(1, 0, 0, 1, -3676, 0) dur=500ms tfn=ease
+tf=matrix(1, 0, 0, 1, -3327.99, 0) dur=500ms tfn=ease
+tf=matrix(1, 0, 0, 1, -2819.25, 0) dur=500ms tfn=ease
+tf=matrix(1, 0, 0, 1, -2586.55, 0) dur=500ms tfn=ease
+tf=matrix(1, 0, 0, 1, -2500.92, 0) dur=500ms tfn=ease
+tf=matrix(1, 0, 0, 1, -2498, 0) dur=0ms tfn=ease
+tf=matrix(1, 0, 0, 1, -2498, 0) dur=0ms tfn=ease
+tf=matrix(1, 0, 0, 1, -2498, 0) dur=0ms tfn=ease
+TESTIMONIAL SLIDES [{"cls":"swiper-slide wr-showreel-slide","x":-2498,"w":1249,"op":"0.5","tf":"matrix(1, 0, 0, 1, 0, 0)","mr":"24px","txt":"“Qonto adapts as our team grows. No more time-cons"},{"cls":"swiper-slide wr-showreel-slide swiper-slide-prev","x":-1225,"w":1249,"op":"0.5","tf":"matrix(1, 0, 0, 1, 0, 0)","mr":"24px","txt":"“I needed to move fast when launching my business."},{"cls":"swiper-slide wr-showreel-slide swiper-slide-active","x":48,"w":1249,"op":"1","tf":"matrix(1, 0, 0, 1, 0, 0)","mr":"24px","txt":"“I'd recommend Qonto to everyone. In my view, it's"},{"cls":"swiper-slide wr-showreel-slide swiper-slide-next","x":1321,"w":1249,"op":"0.5","tf":"matrix(1, 0, 0, 1, 0, 0)","mr":"24px","txt":"“I'd recommend Qonto to any entrepreneur looking f"}]
+INTEGRATIONS lottie class=w-full h-full transition-all duration-500 opacity-100 data-controller=lottie convertor data-convertor-target=lottie data-lottie-target=looping src=https://qonto.com/blog/images/asset/34192/image/b110bbd06e094f78e7bf80d2dbfb7f79.json data-lottie-min-frame-value=0 data-lottie-max-frame-value=70 background=transparent aria-hidden=true loop= parent=absolute flex items-center justify-center h-496 md:h-624 lg:h-760 w-496 md:w-624 lg:w-760 left-1/2 top-0 -translate-x-1/2 lg:left-0 lg:top-1/2 lg:translate-x-0 lg:-translate-y-1/2
+PAY lottie background=transparent class=h-full flex object-cover items-center w-full transition-all duration-500 opacity-100 data-controller=wr-lottie data-wr-lottie-override-sizing-value= data-wr-lottie-target=fadeIn src=https://qonto.com/blog/images/asset/38018/image/31f1a5b8cdbb98d7535ec58d4df8d4ec.json data-wr-lottie-min-frame-value= data-wr-lottie-max-frame-value= aria-hidden=true
+MOBILE ASIDE+HEADER [
+ {
+  "y": 0,
+  "cls": "fixed right-0 bottom-0 left-0 px-16 transition-all ease-in-out z-1000 md:hidden duration-[600ms] opacity-0 translate-y-full pointer-events-none bg-primary-black/70 darkmode",
+  "op": "0",
+  "tf": "none",
+  "navBg": "oklab(0.114918 0.00000522286 0.00000230223 / 0.7)",
+  "navCls": "transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black",
+  "hdrTf": "none"
+ },
+ {
+  "y": 300,
+  "cls": "fixed right-0 bottom-0 left-0 px-16 transition-all ease-in-out z-1000 md:hidden duration-[600ms] bg-primary-black/70 darkmode opacity-100 translate-y-0",
+  "op": "1",
+  "tf": "none",
+  "navBg": "oklab(0.114918 0.00000522286 0.00000230223 / 0.7)",
+  "navCls": "transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black",
+  "hdrTf": "matrix(1, 0, 0, 1, 0, -844)"
+ },
+ {
+  "y": 700,
+  "cls": "fixed right-0 bottom-0 left-0 px-16 transition-all ease-in-out z-1000 md:hidden duration-[600ms] opacity-100 translate-y-0 bg-primary-black/70 darkmode",
+  "op": "1",
+  "tf": "none",
+  "navBg": "oklab(0.114918 0.00000522286 0.00000230223 / 0.7)",
+  "navCls": "transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black",
+  "hdrTf": "matrix(1, 0, 0, 1, 0, -844)"
+ },
+ {
+  "y": 900,
+  "cls": "fixed right-0 bottom-0 left-0 px-16 transition-all ease-in-out z-1000 md:hidden duration-[600ms] opacity-100 translate-y-0 bg-primary-black/70 darkmode",
+  "op": "1",
+  "tf": "none",
+  "navBg": "oklab(0.114918 0.00000522286 0.00000230223 / 0.7)",
+  "navCls": "transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black",
+  "hdrTf": "matrix(1, 0, 0, 1, 0, -844)"
+ },
+ {
+  "y": 1500,
+  "cls": "fixed right-0 bottom-0 left-0 px-16 transition-all ease-in-out z-1000 md:hidden duration-[600ms] opacity-100 translate-y-0 bg-primary-black/70 darkmode",
+  "op": "1",
+  "tf": "none",
+  "navBg": "oklab(0.114918 0.00000522286 0.00000230223 / 0.7)",
+  "navCls": "transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black",
+  "hdrTf": "matrix(1, 0, 0, 1, 0, -844)"
+ },
+ {
+  "y": 4000,
+  "cls": "fixed right-0 bottom-0 left-0 px-16 transition-all ease-in-out z-1000 md:hidden duration-[600ms] opacity-100 translate-y-0 bg-white/70",
+  "op": "1",
+  "tf": "none",
+  "navBg": "oklab(0.999994 0.0000455677 0.0000200868 / 0.7)",
+  "navCls": "transition-all duration-300 body-small-slim scrim-blur scrim-default",
+  "hdrTf": "matrix(1, 0, 0, 1, 0, -844)"
+ },
+ {
+  "y": 8000,
+  "cls": "fixed right-0 bottom-0 left-0 px-16 transition-all ease-in-out z-1000 md:hidden duration-[600ms] opacity-100 translate-y-0 bg-white/70",
+  "op": "1",
+  "tf": "none",
+  "navBg": "oklab(0.114918 0.00000522286 0.00000230223 / 0.7)",
+  "navCls": "transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black",
+  "hdrTf": "matrix(1, 0, 0, 1, 0, -844)"
+ },
+ {
+  "y": 10202,
+  "cls": "fixed right-0 bottom-0 left-0 px-16 transition-all ease-in-out z-1000 md:hidden duration-[600ms] bg-white/70 opacity-0 translate-y-full pointer-events-none",
+  "op": "0",
+  "tf": "none",
+  "navBg": "oklab(0.114918 0.00000522286 0.00000230223 / 0.7)",
+  "navCls": "transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black",
+  "hdrTf": "matrix(1, 0, 0, 1, 0, -844)"
+ }
+]
+BURGER count 1 transition-opacity duration-300 :: Back to navigation :: vis=false
+flex items-center justify-between text-left w-full py-14 lg:hidden ::  :: vis=true
+hidden nav-desktop-item px-0 text-left lg:py-0 lg:border-0 ::  :: vis=false
+flex items-center justify-between text-left w-full py-14 lg:hidden ::  :: vis=true
+hidden nav-desktop-item px-0 text-left lg:py-0 lg:border-0 ::  :: vis=false
+flex items-center justify-between text-left w-full py-14 lg:hidden ::  :: vis=true
+hidden nav-desktop-item px-0 text-left lg:py-0 lg:border-0 ::  :: vis=false
+flex items-center justify-between text-left w-full py-14 lg:hidden ::  :: vis=true
+hidden nav-desktop-item px-0 text-left lg:py-0 lg:border-0 ::  :: vis=false
+flex items-center justify-between text-left w-full py-14 lg:hidden ::  :: vis=true
+hidden nav-desktop-item px-0 text-left lg:py-0 lg:border-0 ::  :: vis=false
+flex items-center justify-between text-left w-full py-14 lg:hidden ::  :: vis=true
+hidden nav-desktop-item px-0 text-left lg:py-0 lg:border-0 ::  :: vis=false
+button-switcher flex gap-8 lg:px-10 items-center justify-center mt-8 lg:mt-0 lg:relative :: Change language :: vis=true
+button-switcher flex gap-8 lg:px-10 items-center justify-center mt-8 lg:mt-0 lg:relative :: Change language :: vis=false
+hamburger lg:top-0 lg:hidden :: Expand main menu :: vis=true

@@ -1,0 +1,28 @@
+div.absolute.z-10001.chatbot-full-container [0,9336 0x0] {font=18px/24px w400; color=rgb(5, 5, 5); pos=absolute top:9335.67px right:1440px bottom:-8435.67px left:0px; z=10001}
+  div.hidden.fixed.bottom-40.px-16.py-12.bg-white [0,8242 0x0] {bg=rgb(255, 255, 255); d=none; p=12px 16px; r=6px; shadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 1px 0px 10px 2px; pos=fixed right:100px bottom:40px; tr=0.3s cubic-bezier(0.4, 0, 0.2, 1); maxw=300px}
+    div.flex.gap-8.items-center [0,8242 0x0] {d=flex; fd=row jc=normal ai=center; gap=8px 8px}
+      div.text-grey-900.text-16.font-medium [0,8242 0x0] "👋 Hello! Need help?" {font=16px/24px w500; color=rgb(26, 26, 26)}
+    div.absolute.-bottom-2.-right-8.w-0.h-0.-translate-y-full [0,8242 0x0] {bT=8px solid rgba(0, 0, 0, 0); bB=8px solid rgba(0, 0, 0, 0); bL=8px solid rgb(255, 255, 255); pos=absolute right:-8px bottom:-2px}
+    button.flex.absolute.top-0.-left-24.justify-center.items-center [0,8242 0x0] {bg=rgb(97, 97, 97); d=flex; fd=row jc=center ai=center; r=3.35544e+07px; bT=1px solid rgb(255, 255, 255); bR=1px solid rgb(255, 255, 255); bB=1px solid rgb(255, 255, 255); bL=1px solid rgb(255, 255, 255); pos=absolute top:0px left:-24px; ta=center; cur=pointer}
+      svg [0,8242 0x0] SVG(0 0 16 16) {of=hidden; ta=center; cur=pointer}
+  button.flex.fixed.right-16.bottom-36.justify-center.items-center [1368,9050 56x56] {bg=rgb(26, 26, 26); d=flex; fd=row jc=center ai=center; r=3.35544e+07px; shadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 1px 0px 10px 2px; pos=fixed top:808px right:16px bottom:36px left:1368px; tr=0.3s cubic-bezier(0.4, 0, 0.2, 1); ta=center; cur=pointer}
+    picture [1368,9050 56x56] {ta=center; cur=pointer}
+      img.rounded-full.border-2.border-primary-white [1368,9050 56x56] IMG=https://qonto.com/blog/assets/chatbot/qonto_chatbot-56b8c3650e8bb3982228c66ffcb0f9c7fff70352c8a74017efd59b5eb0401ad7.png alt="Qonto chatbot" nat=200x200 {r=3.35544e+07px; bT=2px solid rgb(255, 255, 255); bR=2px solid rgb(255, 255, 255); bB=2px solid rgb(255, 255, 255); bL=2px solid rgb(255, 255, 255); of=clip; maxw=100%; ta=center; cur=pointer; ar=auto 56 / 56}
+  button.flex.hidden.fixed.right-16.bottom-36.justify-center [0,8242 0x0] {bg=rgb(26, 26, 26); d=none; r=3.35544e+07px; shadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.16) 0px 7px 6px 1px; pos=fixed right:16px bottom:36px; tr=0.3s cubic-bezier(0.4, 0, 0.2, 1); ta=center; cur=pointer}
+    div.absolute.top-16.left-16.cursor-pointer [0,8242 0x0] {pos=absolute top:16px left:16px; ta=center; cur=pointer}
+      svg [0,8242 0x0] SVG(0 0 16 16) {of=hidden; ta=center; cur=pointer}
+  div.flex.hidden.fixed.right-16.justify-center.items-center [0,8242 0x0] "1" {font=12px/24px w700; color=rgb(255, 255, 255); bg=rgb(249, 86, 86); d=none; r=3.35544e+07px; pos=fixed right:16px bottom:76px; tr=0.3s cubic-bezier(0.4, 0, 0.2, 1)}
+  div.hidden.fixed.right-0.w-full.h-full.rounded-md [0,8242 0x0] {bg=rgb(255, 255, 255); d=none; r=6px; shadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 1px 0px 10px 2px; pos=fixed right:16px bottom:108px; z=10000; op=0; tr=0.3s cubic-bezier(0.73, -0.63, 0.39, 2.69); minh=142px; maxh=500px}
+    div.flex.absolute.top-0.right-0.left-0.justify-between [0,8242 0x0] {color=rgb(255, 255, 255); bg=rgb(26, 26, 26); d=flex; fd=row jc=space-between ai=center; p=8px 15px; r=6px 6px 0px 0px; pos=absolute top:0px right:0px left:0px; z=1}
+      div.flex.items-center [0,8242 0x0] {d=flex; fd=row jc=normal ai=center}
+        div.relative [0,8242 0x0] {pos=relative}
+          picture [0,8242 0x0]
+            img.rounded-full.border-2.border-primary-white [0,8242 0x0] IMG=https://qonto.com/blog/assets/chatbot/qonto_chatbot-56b8c3650e8bb3982228c66ffcb0f9c7fff70352c8a74017efd59b5eb0401ad7.png alt="Qonto chatbot" nat=200x200 {r=3.35544e+07px; bT=2px solid rgb(255, 255, 255); bR=2px solid rgb(255, 255, 255); bB=2px solid rgb(255, 255, 255); bL=2px solid rgb(255, 255, 255); of=clip; maxw=100%; ar=auto 32 / 32}
+          div.absolute.right-0.bottom-0.bg-green-400.rounded-full.border-2 [0,8242 0x0] {bg=rgb(69, 177, 132); r=3.35544e+07px; bT=2px solid rgb(255, 255, 255); bR=2px solid rgb(255, 255, 255); bB=2px solid rgb(255, 255, 255); bL=2px solid rgb(255, 255, 255); pos=absolute right:0px bottom:0px}
+        div.ml-14.font-semibold.text-14 [0,8242 0x0] "Qonto" {font=14px/24px w600; m=0px 0px 0px 14px}
+      a.size-32.flex.items-center.justify-start [0,8242 0x0] href=/en/chatbot {d=flex; fd=row jc=flex-start ai=center; cur=pointer}
+        svg [0,8242 0x0] SVG(0 0 24 24) {of=hidden; cur=pointer}
+    div.overflow-y-auto.absolute.top-0.right-0.left-0.z-0 [0,8242 0x0] {font=12px/24px w400; p=56px 16px 14px; pos=absolute top:0px right:0px left:0px; z=0; of=auto}
+      turbo-frame#chatbot-frame [0,8242 0x0]
+        div.flex.justify-center.items-center.h-full [0,8242 0x0] {d=flex; fd=row jc=center ai=center}
+          lottie-player.mx-auto.w-46.h-46 [0,8242 0x0] LOTTIE=https://qonto.com/blog/assets/decision_tree/qonto-flower-animate-fa551b597ea9b6b9e91805c2360da0ef1a81ea703fc410f9546adb796f51c14f.json attrs=autoplay=,background=transparent,data-controller=lottie,data-lottie-start-at-the-beginning-value=,height=48,loop=,width=48,data-lottie-min-frame-value=0,data-lottie-max-frame-value=70,aria-hidden=true {m=0px auto}

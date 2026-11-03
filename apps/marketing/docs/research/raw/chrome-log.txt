@@ -1,0 +1,21 @@
+COOKIE HOVER Accept: rgba(0, 0, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0) 1 none tr=none -> rgba(0, 0, 0, 0) rgb(0, 0, 0) rgb(0, 0, 0) 1 none
+COOKIE HOVER Find out more: rgba(0, 0, 0, 0) rgb(68, 68, 68) rgb(29, 29, 27) 1 none tr=none -> rgba(0, 0, 0, 0) rgb(68, 68, 68) rgb(29, 29, 27) 0.7 none
+COOKIE HOVER Continue without agreeing: rgba(0, 0, 0, 0) rgb(99, 99, 96) rgb(99, 99, 96) 1 underline tr=none -> rgba(0, 0, 0, 0) rgb(99, 99, 96) rgb(99, 99, 96) 0.7 underline
+BURGER CANDIDATES BUTTON.hamburger lg:top-0 lg:hidden {"x":343,"y":0,"width":27,"height":64,"top":0,"right":370,"bottom":64,"left":343}
+VISIBLE CLICKABLES 9
+  BUTTON flex items-center justify-between text-left w-full py-14 lg:hidden act=click->mobile-navigation#openModal {"x":410,"y":96,"width":350,"height":60,"top":96,"right":760,"bottom":156,"left":410}
+  BUTTON flex items-center justify-between text-left w-full py-14 lg:hidden act=click->mobile-navigation#openModal {"x":410,"y":156,"width":350,"height":60,"top":156,"right":760,"bottom":216,"left":410}
+  BUTTON flex items-center justify-between text-left w-full py-14 lg:hidden act=click->mobile-navigation#openModal {"x":410,"y":216,"width":350,"height":60,"top":216,"right":760,"bottom":276,"left":410}
+  BUTTON flex items-center justify-between text-left w-full py-14 lg:hidden act=click->mobile-navigation#openModal {"x":410,"y":276,"width":350,"height":60,"top":276,"right":760,"bottom":336,"left":410}
+  BUTTON flex items-center justify-between text-left w-full py-14 lg:hidden act=click->mobile-navigation#openModal {"x":410,"y":336,"width":350,"height":60,"top":336,"right":760,"bottom":396,"left":410}
+  BUTTON flex items-center justify-between text-left w-full py-14 lg:hidden act=click->mobile-navigation#openModal {"x":410,"y":396,"width":350,"height":60,"top":396,"right":760,"bottom":456,"left":410}
+  DIV flex items-center cursor-pointer website-revamp lang-switch-container group xl:mr-0 lg:relative lg:h-80 act=click@window->reveal#clickOutside keydown.esc->reveal#hide {"x":410,"y":456,"width":350,"height":34,"top":456,"right":760,"bottom":490,"left":410}
+  BUTTON button-switcher flex gap-8 lg:px-10 items-center justify-center mt-8 lg:mt-0 lg:relative act=click->reveal#toggle {"x":410,"y":464,"width":62.125,"height":26,"top":464,"right":472.125,"bottom":490,"left":410}
+  BUTTON hamburger lg:top-0 lg:hidden act=click->navigation-revamp#toggle {"x":343,"y":0,"width":27,"height":64,"top":0,"right":370,"bottom":64,"left":343}
+THEME y=2290 dark
+THEME y=2310 dark
+THEME y=2324 light
+THEME y=2340 light
+THEME y=2364 light
+THEME y=2384 light
+THEME y=2404 light

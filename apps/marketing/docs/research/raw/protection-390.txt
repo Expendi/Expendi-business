@@ -1,0 +1,31 @@
+div.col-span-12 [0,7330 390x740] {font=16px/24px w400; color=rgb(5, 5, 5)}
+  section#section-1.surface-section-background-inverse.darkmode [0,7330 390x740] {bg=rgb(5, 5, 5)}
+    div.grid.grid-cols-6.gap-x-8.px-16.py-48.mx-auto [0,7330 390x740] {color=rgb(255, 255, 255); d=grid; gtc=45px 45px 45px 45px 45px 45px 0px 0px 0px 0px 0px 0px gtr=114px 530px; gap=normal 8px; p=48px 16px; maxw=1600px}
+      div.flex.flex-col.col-span-12.justify-center.lg:col-span-5 [16,7378 358x114] {d=flex; fd=column jc=center ai=normal}
+        div.h2-small.mb-16.md:mb-12.lg:mb-24 [16,7378 358x72] "First-class protection for your business." {font=28px/36px w600; m=0px 0px 16px; fvn=lining-nums proportional-nums}
+        a.pointer-events-auto.btn-tertiary.inline-flex.items-center.text-16.leading-26 [16,7466 358x26] href=https://qonto.com/en/trust {font=16px/26px w400; d=flex; fd=row jc=normal ai=center; cur=pointer}
+          span.relative [16,7466 83x26] "Learn more" {pos=relative; cur=pointer}
+          div.invert-svg.ml-4 [103,7470 18x18] {m=0px 0px 0px 4px; cur=pointer}
+            div.btn-tertiary-arrow-wrapper [103,7470 18x18] {pos=relative; of=hidden; cur=pointer}
+              div.btn-tertiary-arrow-container [103,7470 18x18] {pos=relative; cur=pointer}
+                div.arrow-primary [103,7470 18x18] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, 0, 0); cur=pointer}
+                  svg#Layer_1.rotate-135.rotate-135 [99,7466 25x25] SVG(0 0 18 18) {filter=brightness(0) invert(1); of=hidden; cur=pointer}
+                div.arrow-secondary [85,7488 18x18] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, -18, 18); cur=pointer}
+                  svg#Layer_1.rotate-135.rotate-135 [81,7484 25x25] SVG(0 0 18 18) {filter=brightness(0) invert(1); of=hidden; cur=pointer}
+      div.col-span-12.lg:col-span-7.rounded-2xl.md:rounded-3xl.bg-dark.px-16 [16,7516 358x506] {bg=rgb(26, 26, 26); bgimg=linear-gradient(rgb(26, 26, 26), rgb(26, 26, 26)), conic-gradient(from 125.808deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.8) 8%, rgba(255, 255, 255, 0) 18%, rgba(255, 255, 255, 0) 100%) size=auto, auto pos=0% 0%, 0% 0%; p=24px 16px; m=24px 0px 0px; r=16px; bT=1px solid rgba(0, 0, 0, 0); bR=1px solid rgba(0, 0, 0, 0); bB=1px solid rgba(0, 0, 0, 0); bL=1px solid rgba(0, 0, 0, 0); shadow=rgba(255, 255, 255, 0.08) 0px 0px 20px 0px; tf=matrix(1, 0, 0, 1, 0, 0); tr=box-shadow 0.3s; anim=rotate-gradient 3s linear infinite}
+        div.flex.flex-col.md:flex-row.justify-center.lg:justify-end.gap-x-56 [33,7565 324x432] {d=flex; fd=column jc=center ai=normal; gap=32px 56px; m=24px 0px 0px}
+          div.flex.flex-col.justify-center.align-center.items-center.text-center [33,7565 324x114] {d=flex; fd=column jc=center ai=center; ta=center}
+            picture [163,7565 64x64] {ta=center}
+              img.h-64.md:h-80.w-auto.flex-shrink-0.object-contain.invert [163,7565 64x64] IMG=https://qonto.com/blog/images/asset/34547/image/sm_avif-0d7cb3783ba4ea8d93488fe10760b50c.avif alt="Cybersecurity Generic" nat=162x162 {filter=invert(1); of=clip; fit=contain 50% 50%; maxw=100%; ta=center; ar=auto 384 / 384}
+            div.body-slim.mt-24 [71,7653 248x26] {font=16px/26px w400; m=24px 0px 0px; ta=center}
+              p [71,7653 248x26] "Legally protected customer funds" {ta=center}
+          div.flex.flex-col.justify-center.align-center.items-center.text-center [33,7711 324x114] {d=flex; fd=column jc=center ai=center; ta=center}
+            picture [163,7711 64x64] {ta=center}
+              img.h-64.md:h-80.w-auto.flex-shrink-0.object-contain.invert [163,7711 64x64] IMG=https://qonto.com/blog/images/asset/33291/image/sm_avif-6d1d5d3745f600c6eeec7693dcfa8eef.avif alt="Founds Regulatory ACPR" nat=162x162 {filter=invert(1); of=clip; fit=contain 50% 50%; maxw=100%; ta=center; ar=auto 384 / 384}
+            div.body-slim.mt-24 [85,7799 220x26] {font=16px/26px w400; m=24px 0px 0px; ta=center}
+              p [85,7799 220x26] "Regulated financial institution" {ta=center}
+          div.flex.flex-col.justify-center.align-center.items-center.text-center [33,7857 324x140] {d=flex; fd=column jc=center ai=center; ta=center}
+            picture [139,7857 112x64] {ta=center}
+              img.h-64.md:h-80.w-auto.flex-shrink-0.object-contain.invert [139,7857 112x64] IMG=https://qonto.com/blog/images/asset/34548/image/sm_avif-7123f1d1489931b0feaa8b8a61ccef51.avif alt="Cybersecurity RGPD ISO27001" nat=284x162 {filter=invert(1); of=clip; fit=contain 50% 50%; maxw=100%; ta=center; ar=auto 672 / 384}
+            div.body-slim.mt-24 [33,7945 324x52] {font=16px/26px w400; m=24px 0px 0px; ta=center}
+              p [33,7945 324x52] "Top standards in IT security & data protection" {ta=center}

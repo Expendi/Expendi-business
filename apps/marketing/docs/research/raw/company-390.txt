@@ -1,0 +1,39 @@
+section#section-7.surface-section-background-base.text-light-primary.wr-items-section [0,5654 390x774] {bg=rgb(255, 255, 255); of=clip visible}
+  div.px-16.py-40.website-revamp.md:px-32.lg:px-48.md:py-64 [0,5654 390x774] {font=16px/24px w400; color=rgb(5, 5, 5); p=40px 16px; maxw=1600px}
+    div.flex.gap-x-48.mb-40.md:mb-40.lg:mb-56.justify-between [16,5694 358x80] {d=flex; fd=row jc=space-between ai=normal; gap=normal 48px; m=0px 0px 40px}
+      h2.content-primary-a [16,5694 358x80] "Create your company with Qonto" {font=32px/40px w600; fvn=lining-nums proportional-nums}
+    div.grid.grid-cols-6.md:grid-cols-9.lg:grid-cols-12.md:gap-x-16.lg:gap-x-24 [16,5814 358x484] {d=grid; gtc=59.6562px 59.6562px 59.6562px 59.6562px 59.6562px 59.6562px gtr=140px 140px 140px; gap=32px normal}
+      div.col-span-full.lg:row-span-3.lg:grid.lg:grid-rows-subgrid.lg:pr-24.lg:col-span-4 [16,5814 358x140]
+        div.flex.flex-col.h-full.lg:contents [16,5814 358x140] {d=flex; fd=column jc=normal ai=normal}
+          div.mb-12.md:mb-16.flex.justify-between [16,5814 358x40] {d=flex; fd=row jc=space-between ai=normal; m=0px 0px 12px}
+            div.flex.gap-x-8 [16,5814 40x40] {d=flex; fd=row jc=normal ai=normal; gap=normal 8px}
+              div.flex.justify-center.items-center.w-40.h-40.rounded-lg [16,5814 40x40] {bg=rgb(245, 245, 245); d=flex; fd=row jc=center ai=center; r=8px}
+                img.h-24.w-24.md:h-28.md:w-28.lg:h-32.lg:w-32 [24,5822 24x24] IMG=https://qonto.com/blog/images/asset/24698/image/654efe69a52515964ba8e9fb836b7300.svg alt="WEB Iconography Black Fast" nat=32x32 {of=clip; maxw=100%; ar=auto 32 / 32}
+          div.flex.flex-col.flex-1.gap-y-8.lg:grow.lg:contents [16,5866 358x88] {d=flex; fd=column jc=normal ai=normal; gap=8px normal}
+            h3.h3-small.content-primary-a.lg:mb-8 [16,5866 358x28] "Simple and fast" {font=20px/28px w600; fvn=lining-nums proportional-nums}
+            div.body-regular.lg:grow.content-secondary [16,5902 358x52] {font=16px/26px w400; color=rgb(61, 61, 61)}
+              p [16,5902 358x52] "Ditch the paperwork. We'll have you up and running in 24 hours."
+      div.col-span-full.lg:row-span-3.lg:grid.lg:grid-rows-subgrid.lg:pr-24.lg:col-span-4 [16,5986 358x140]
+        div.flex.flex-col.h-full.lg:contents [16,5986 358x140] {d=flex; fd=column jc=normal ai=normal}
+          div.mb-12.md:mb-16.flex.justify-between [16,5986 358x40] {d=flex; fd=row jc=space-between ai=normal; m=0px 0px 12px}
+            div.flex.gap-x-8 [16,5986 40x40] {d=flex; fd=row jc=normal ai=normal; gap=normal 8px}
+              div.flex.justify-center.items-center.w-40.h-40.rounded-lg [16,5986 40x40] {bg=rgb(245, 245, 245); d=flex; fd=row jc=center ai=center; r=8px}
+                img.h-24.w-24.md:h-28.md:w-28.lg:h-32.lg:w-32 [24,5994 24x24] IMG=https://qonto.com/blog/images/asset/34341/image/412ace6a1a0a19d72fd6c9eb37de1597.svg alt="WEB Iconography Black Target" nat=32x32 {of=clip; maxw=100%; ar=auto 32 / 32}
+          div.flex.flex-col.flex-1.gap-y-8.lg:grow.lg:contents [16,6038 358x88] {d=flex; fd=column jc=normal ai=normal; gap=8px normal}
+            h3.h3-small.content-primary-a.lg:mb-8 [16,6038 358x28] "The right fit for your business" {font=20px/28px w600; fvn=lining-nums proportional-nums}
+            div.body-regular.lg:grow.content-secondary [16,6074 358x52] {font=16px/26px w400; color=rgb(61, 61, 61)}
+              p [16,6074 358x52] "Qonto works for all business structures: SAS, SASU, SARL, EURL, SCI, and micro-enterprises."
+      div.col-span-full.lg:row-span-3.lg:grid.lg:grid-rows-subgrid.lg:pr-24.lg:col-span-4 [16,6158 358x140]
+        div.flex.flex-col.h-full.lg:contents [16,6158 358x140] {d=flex; fd=column jc=normal ai=normal}
+          div.mb-12.md:mb-16.flex.justify-between [16,6158 358x40] {d=flex; fd=row jc=space-between ai=normal; m=0px 0px 12px}
+            div.flex.gap-x-8 [16,6158 40x40] {d=flex; fd=row jc=normal ai=normal; gap=normal 8px}
+              div.flex.justify-center.items-center.w-40.h-40.rounded-lg [16,6158 40x40] {bg=rgb(245, 245, 245); d=flex; fd=row jc=center ai=center; r=8px}
+                img.h-24.w-24.md:h-28.md:w-28.lg:h-32.lg:w-32 [24,6166 24x24] IMG=https://qonto.com/blog/images/asset/26586/image/1970edbe2d4cc89df6a8748d46541e48.svg alt="WEB Iconography Black Customer Service" nat=32x32 {of=clip; maxw=100%; ar=auto 32 / 32}
+          div.flex.flex-col.flex-1.gap-y-8.lg:grow.lg:contents [16,6210 358x88] {d=flex; fd=column jc=normal ai=normal; gap=8px normal}
+            h3.h3-small.content-primary-a.lg:mb-8 [16,6210 358x28] "We're with you all the way" {font=20px/28px w600; fvn=lining-nums proportional-nums}
+            div.body-regular.lg:grow.content-secondary [16,6246 358x52] {font=16px/26px w400; color=rgb(61, 61, 61)}
+              p [16,6246 358x52] "From start to KBIS, we're with you - and available every day to help."
+    div.block.pt-40.inline-block.lg:hidden.hidden.lg:hidden [16,6298 191x90] {d=inline-block; p=40px 0px 0px}
+      a [16,6338 191x50] href=https://qonto.com/en/creation {cur=pointer}
+        div.block.text-center.btn.btn-secondary.text-16.leading-26 [16,6338 191x50] {font=16px/26px w400; p=11px 16px; r=8px; bT=1px solid rgb(5, 5, 5); bR=1px solid rgb(5, 5, 5); bB=1px solid rgb(5, 5, 5); bL=1px solid rgb(5, 5, 5); ta=center; cur=pointer}
+          span [33,6353 157x19] "Create your company" {ta=center; cur=pointer}

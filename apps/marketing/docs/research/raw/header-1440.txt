@@ -1,0 +1,48 @@
+header#nav-revamp.fixed.w-full.website-revamp.z-100000.top-0.lg:h-80 [0,0 1440x80] {pos=fixed top:0px right:0px bottom:820px left:0px; z=100000; tr=none}
+  nav#navigation.transition-all.duration-300.body-small-slim.scrim-blur.scrim-emphasis.black [0,0 1440x80] {bg=oklab(0.114918 0.00000522286 0.00000230223 / 0.7); tr=background-color 0.5s ease-out; bdf=blur(6px)}
+    div.flex.flex-wrap.justify-between.items-center.px-20.lg:px-48 [0,0 1440x80] {font=16px/26px w400; color=rgb(255, 255, 255); d=flex; fd=row jc=space-between ai=center wrap; p=0px 48px}
+      div.grow.lg:relative.lg:flex-1.lg:flex.lg:items-center.lg:h-80 [48,0 1021x80] {d=flex; fd=row jc=normal ai=center; pos=relative}
+        div.lg:pb-8.lg:mr-32 [48,23 82x34] {p=0px 0px 8px; m=0px 32px 0px 0px}
+          a [48,23 82x24] href=/en {d=inline-block; tf=matrix(1, 0, 0, 1, 0, 0); cur=pointer}
+            svg.logo.logo [48,23 82x24] SVG(0 0 82 24) {filter=brightness(0) invert(1); of=hidden; cur=pointer}
+        div#nav-menu.flex.overflow-scroll.absolute.top-0.left-0.flex-col [162,0 658x80] {d=flex; fd=row jc=space-between ai=center; pos=relative; z=0; tr=0.2s cubic-bezier(0.4, 0, 0.2, 1)}
+          div [162,0 658x80]
+            div#navigation-items [162,0 658x80]
+              ul.flex.flex-col.lg:flex-row.lg:gap-24.nav-menu [162,0 658x80] {d=flex; fd=row jc=normal ai=normal; gap=24px 24px}
+                li.relative.list-none.lg:h-80.lg:flex.lg:items-center.menu-title [162,0 132x80] {d=flex; fd=row jc=normal ai=center; pos=relative}
+                  div.hidden.absolute.top-0.w-full.h-full.cursor-pointer [162,0 132x80] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=pointer}
+                  button.hidden.nav-desktop-item.px-0.text-left.lg:py-0.lg:border-0 [162,27 132x26] {cur=pointer}
+                    span.body-small-slim.nav-menu-text.!leading-20 [162,30 132x19] "Business account" {font=16px/20px w400; cur=pointer}
+                li.relative.list-none.lg:h-80.lg:flex.lg:items-center.menu-title [318,0 134x80] {d=flex; fd=row jc=normal ai=center; pos=relative}
+                  div.hidden.absolute.top-0.w-full.h-full.cursor-pointer [318,0 134x80] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=pointer}
+                  button.hidden.nav-desktop-item.px-0.text-left.lg:py-0.lg:border-0 [318,27 134x26] {cur=pointer}
+                    span.body-small-slim.nav-menu-text.!leading-20 [318,30 134x19] "Company creation" {font=16px/20px w400; cur=pointer}
+                li.relative.list-none.lg:h-80.lg:flex.lg:items-center.menu-title [476,0 106x80] {d=flex; fd=row jc=normal ai=center; pos=relative}
+                  div.hidden.absolute.top-0.w-full.h-full.cursor-pointer [476,0 106x80] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=pointer}
+                  button.hidden.nav-desktop-item.px-0.text-left.lg:py-0.lg:border-0 [476,27 106x26] {cur=pointer}
+                    span.body-small-slim.nav-menu-text.!leading-20 [476,30 106x19] "Financial tools" {font=16px/20px w400; cur=pointer}
+                li.relative.list-none.lg:h-80.lg:flex.lg:items-center.menu-title [606,0 46x80] {d=flex; fd=row jc=normal ai=center; pos=relative}
+                  div.hidden.absolute.top-0.w-full.h-full.cursor-pointer [606,0 46x80] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=pointer}
+                  button.hidden.nav-desktop-item.px-0.text-left.lg:py-0.lg:border-0 [606,27 46x26] {cur=pointer}
+                    span.body-small-slim.nav-menu-text.!leading-20 [606,30 46x19] "Credit" {font=16px/20px w400; cur=pointer}
+                li.relative.list-none.lg:h-80.lg:flex.lg:items-center.menu-title [676,0 52x80] {d=flex; fd=row jc=normal ai=center; pos=relative}
+                  div.hidden.absolute.top-0.w-full.h-full.cursor-pointer [676,0 52x80] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=pointer}
+                  button.hidden.nav-desktop-item.px-0.text-left.lg:py-0.lg:border-0 [676,27 51x26] {cur=pointer}
+                    span.body-small-slim.nav-menu-text.!leading-20 [676,30 51x19] "Pricing" {font=16px/20px w400; cur=pointer}
+                li.relative.list-none.lg:h-80.lg:flex.lg:items-center.menu-title [752,0 68x80] {d=flex; fd=row jc=normal ai=center; pos=relative}
+                  div.hidden.absolute.top-0.w-full.h-full.cursor-pointer [752,0 68x80] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=pointer}
+                  button.hidden.nav-desktop-item.px-0.text-left.lg:py-0.lg:border-0 [752,27 67x26] {cur=pointer}
+                    span.body-small-slim.nav-menu-text.!leading-20 [752,30 67x19] "About us" {font=16px/20px w400; cur=pointer}
+      div.flex.items-center.h-full.lg:gap-x-16 [1069,0 323x80] {d=flex; fd=row jc=normal ai=center; gap=normal 16px}
+        div.hidden.items-center.h-full.lg:flex [1069,0 82x80] {d=flex; fd=row jc=normal ai=center}
+          div.flex.items-center.cursor-pointer.website-revamp.lang-switch-container.group [1069,0 82x80] {d=flex; fd=row jc=normal ai=center; pos=relative; cur=pointer}
+            button.button-switcher.flex.gap-8.lg:px-10.items-center.justify-center [1069,27 82x26] {d=flex; fd=row jc=center ai=center; gap=8px 8px; p=0px 10px; pos=relative; ta=center; cur=grab}
+              span [1079,32 16x16] {ta=center; cur=grab}
+                svg.lazy.rounded-full.lazy.rounded-full [1079,32 16x16] SVG(0 0 16 16) {r=3.35544e+07px; of=hidden; ta=center; cur=grab}
+              span.uppercase.body-regular.md:body-small-regular [1103,27 21x26] "en" {tt=uppercase; ta=center; cur=grab}
+              span [1133,37 9x6] {ta=center; cur=grab}
+                svg.langPicker.md:block.dropdown-chevron-icon.lg:invert [1133,37 9x6] SVG(0 0 9 6) {filter=invert(1); of=hidden; ta=center; cur=grab}
+        div.flex.items-center.lg:gap-x-16 [1168,16 224x48] {d=flex; fd=row jc=normal ai=center; gap=normal 16px}
+          a.body-regular.md:body-small-regular.hidden.py-4.flex.items-center [1168,23 50x34] "Sign in" href=https://app.qonto.com/detectapp.html?appUrl=/ {p=4px 0px; cur=pointer}
+          a.btn.btn-primary.rounded-lg.text-12.md:text-16.mr-24 [1233,16 159x48] "Open an account" href=https://welcome.qonto.com/signup/select-country {font=16px/24px w400; color=rgb(5, 5, 5); bg=rgb(255, 255, 255); p=12px 16px; r=8px; cur=pointer}
+  div.fixed.left-0.top-80.w-full.h-screen.rounded-none [0,80 1440x900] {font=18px/24px w400; color=rgb(255, 255, 255); bg=rgb(5, 5, 5); d=flex; fd=row jc=center ai=center; pos=fixed top:80px right:0px bottom:-80px left:0px; z=-10; op=0}

@@ -1,0 +1,84 @@
+section#section-5.wr-cards-section.surface-section-background-base [0,3304 1440x847] {bg=rgb(255, 255, 255); of=clip visible}
+  div.py-48.website-revamp.md:py-64.lg:py-80 [0,3304 1440x847] {font=18px/24px w400; color=rgb(5, 5, 5); p=80px 48px; maxw=1600px}
+    div.flex.flex-col.gap-24.justify-between.w-full.lg:flex-row [48,3384 1344x64] {d=flex; fd=row jc=space-between ai=flex-end; gap=8px 8px; m=0px 0px 56px}
+      h2.text-light-primary [48,3384 819x64] "Compliant invoicing, zero effort" {font=56px/64px w600; fvn=lining-nums proportional-nums}
+      div.flex.lg:mb-8.hidden.lg:flex [1209,3388 183x52] {d=flex; fd=row jc=normal ai=normal; m=0px 0px 8px}
+        div.flex.flex-wrap.gap-16 [1209,3388 183x52] {d=flex; fd=row jc=normal ai=normal wrap; gap=16px 16px}
+          a [1209,3388 183x52] href=https://qonto.com/en/invoicing {cur=pointer}
+            div.block.text-center.btn.btn-secondary.text-16.leading-26 [1209,3388 183x52] {font=18px/28px w400; d=inline-block; p=11px 16px; r=8px; bT=1px solid rgb(5, 5, 5); bR=1px solid rgb(5, 5, 5); bB=1px solid rgb(5, 5, 5); bL=1px solid rgb(5, 5, 5); ta=center; cur=pointer}
+              span [1226,3403 149x21] "Discover invoicing" {ta=center; cur=pointer}
+    div.pt-38.lg:pt-0.flex.flex-col.gap-24.hidden [48,3504 1344x567] {d=flex; fd=column jc=normal ai=normal; gap=24px 24px}
+      div.grid.grid-cols-12.gap-32.items-stretch [48,3504 1344x567] {d=grid; gtc=82.6562px 82.6562px 82.6562px 82.6562px 82.6562px 82.6562px 82.6562px 82.6562px 82.6562px 82.6562px 82.6562px 82.6562px gtr=566.672px; gap=32px 32px}
+        div.relative.w-full.card-content.md:rounded-3xl.will-change-transform.group [48,3504 427x567] {d=flex; fd=column jc=normal ai=normal; r=24px; pos=relative; tr=translate 0.25s ease-out}
+          div.w-full [48,3504 427x427]
+            div.relative.w-full [48,3504 427x427] {pos=relative}
+              div.flex.overflow-hidden.relative.flex-none.justify-center.items-center [48,3504 427x427] {bgimg=radial-gradient(66.82% 50%, rgb(224, 224, 224) 0%, rgb(245, 245, 245) 100%) size=auto pos=0% 0%; d=flex; fd=row jc=center ai=center; r=24px; pos=relative; of=hidden; ar=1 / 1}
+                picture.flex.justify-center [48,3504 427x427] {d=flex; fd=row jc=center ai=normal}
+                  img.rounded-2xl.md:rounded-3xl.overflow-hidden.pointer-events-none.h-full.w-full [48,3504 427x427] IMG=https://qonto.com/blog/images/asset/35243/image/lg_avif-aa048c21d9daafe95e7415fd1f1b7487.avif alt="WEB  UI  Hero TopicHighlight Bento Headline Cards E Invoicing Compliant WbRvmp" nat=1440x1440 {r=24px; of=hidden; fit=cover 50% 50%; maxw=100%; ar=auto 2160 / 2160}
+              div.absolute.right-16.top-16.z-20 [427,3520 32x32] {pos=absolute top:16px right:16px bottom:378.656px left:378.656px; z=20}
+                div.cta-rounded-wrapper.w-min.h-min.block.static [427,3520 32x32]
+                  div.btn-rounded [427,3520 32x32] {bg=rgb(232, 232, 232); d=flex; fd=row jc=center ai=center; r=3.35544e+07px; op=0; tr=opacity 0.1s linear; of=hidden}
+                    div.btn-rounded-arrow-wrapper [434,3527 18x18] {pos=relative}
+                      div.btn-rounded-arrow-container [434,3527 18x18] {pos=relative}
+                        div.arrow-primary.lg:group-hover:animate-arrow-exit-250 [434,3527 18x18] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, 0, 0)}
+                          svg#Layer_1.rotate-135.rotate-135 [430,3523 25x25] SVG(0 0 18 18) {of=hidden}
+                        div.arrow-secondary.lg:group-hover:animate-arrow-enter-250 [416,3545 18x18] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, -18, 18)}
+                          svg#Layer_1.rotate-135.rotate-135 [412,3541 25x25] SVG(0 0 18 18) {of=hidden}
+          div.mt-16.relative.z-20 [48,3947 427x96] {m=16px 0px 0px; pos=relative; z=20}
+            div.flex.relative.flex-col.w-full.rounded-2xl.md:rounded-3xl [48,3947 427x96] {d=flex; fd=column jc=normal ai=normal; r=24px; pos=relative}
+              div.flex.flex-col.justify-between [48,3947 427x96] {d=flex; fd=column jc=space-between ai=normal}
+                div.flex.relative.flex-col.gap-12.justify-start.items-start [48,3947 427x96] {d=flex; fd=column jc=flex-start ai=flex-start; gap=16px 16px; p=0px 12px 0px 0px; pos=relative; z=11}
+                  div.flex.flex-col.gap-8.w-full [48,3947 415x96] {d=flex; fd=column jc=normal ai=normal; gap=8px 8px}
+                    div.flex.relative.z-10.gap-8.items-start.w-full [48,3947 415x32] {d=flex; fd=row jc=normal ai=flex-start; gap=8px 8px; pos=relative; z=10}
+                      h3.font-semibold.break-words.wr-card-title.h3-small.text-light-primary [48,3947 276x32] "Get ready for e-invoicing" {font=24px/32px w600; fvn=lining-nums proportional-nums}
+                    div.break-words.wr-card-text.body-regular.content-secondary [48,3987 415x56] {font=18px/28px w400; color=rgb(61, 61, 61)}
+                      p [48,3987 415x56] "As a Certified Approved Platform, Qonto includes fully compliant e-invoicing in all plans."
+          a.card-link.absolute.inset-0.z-30.cursor-pointer.rounded-2xl [48,3504 427x567] href=https://qonto.com/en/invoicing/ {r=24px; pos=absolute top:0px right:0px bottom:0px left:0px; z=30; cur=pointer}
+        div.relative.w-full.card-content.md:rounded-3xl.will-change-transform.group [507,3504 427x567] {d=flex; fd=column jc=normal ai=normal; r=24px; pos=relative; tr=translate 0.25s ease-out}
+          div.w-full [507,3504 427x427]
+            div.relative.w-full [507,3504 427x427] {pos=relative}
+              div.flex.overflow-hidden.relative.flex-none.justify-center.items-center [507,3504 427x427] {bgimg=radial-gradient(66.82% 50%, rgb(224, 224, 224) 0%, rgb(245, 245, 245) 100%) size=auto pos=0% 0%; d=flex; fd=row jc=center ai=center; r=24px; pos=relative; of=hidden; ar=1 / 1}
+                lottie-player.rounded-2xl.md:rounded-3xl.overflow-hidden.pointer-events-none.h-full.w-full [507,3504 427x427] LOTTIE=https://qonto.com/blog/images/asset/40503/image/a30e396d2066659bbd7f7a673ec80d0c.json attrs=background=transparent,data-controller=wr-lottie,data-wr-lottie-target=onHoverCut,play=false,play_once=true,data-wr-lottie-min-frame-value=,data-wr-lottie-max-frame-value=,aria-hidden=true {r=24px; of=hidden; fit=cover 50% 50%}
+              div.absolute.right-16.top-16.z-20 [885,3520 32x32] {pos=absolute top:16px right:16px bottom:378.672px left:378.672px; z=20}
+                div.cta-rounded-wrapper.w-min.h-min.block.static [885,3520 32x32]
+                  div.btn-rounded [885,3520 32x32] {bg=rgb(232, 232, 232); d=flex; fd=row jc=center ai=center; r=3.35544e+07px; op=0; tr=opacity 0.1s linear; of=hidden}
+                    div.btn-rounded-arrow-wrapper [892,3527 18x18] {pos=relative}
+                      div.btn-rounded-arrow-container [892,3527 18x18] {pos=relative}
+                        div.arrow-primary.lg:group-hover:animate-arrow-exit-250 [892,3527 18x18] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, 0, 0)}
+                          svg#Layer_1.rotate-135.rotate-135 [889,3523 25x25] SVG(0 0 18 18) {of=hidden}
+                        div.arrow-secondary.lg:group-hover:animate-arrow-enter-250 [874,3545 18x18] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, -18, 18)}
+                          svg#Layer_1.rotate-135.rotate-135 [871,3541 25x25] SVG(0 0 18 18) {of=hidden}
+          div.mt-16.relative.z-20 [507,3947 427x124] {m=16px 0px 0px; pos=relative; z=20}
+            div.flex.relative.flex-col.w-full.rounded-2xl.md:rounded-3xl [507,3947 427x124] {d=flex; fd=column jc=normal ai=normal; r=24px; pos=relative}
+              div.flex.flex-col.justify-between [507,3947 427x124] {d=flex; fd=column jc=space-between ai=normal}
+                div.flex.relative.flex-col.gap-12.justify-start.items-start [507,3947 427x124] {d=flex; fd=column jc=flex-start ai=flex-start; gap=16px 16px; p=0px 12px 0px 0px; pos=relative; z=11}
+                  div.flex.flex-col.gap-8.w-full [507,3947 415x124] {d=flex; fd=column jc=normal ai=normal; gap=8px 8px}
+                    div.flex.relative.z-10.gap-8.items-start.w-full [507,3947 415x32] {d=flex; fd=row jc=normal ai=flex-start; gap=8px 8px; pos=relative; z=10}
+                      h3.font-semibold.break-words.wr-card-title.h3-small.text-light-primary [507,3947 364x32] "Quotes & invoices, faster with AI" {font=24px/32px w600; fvn=lining-nums proportional-nums}
+                    div.break-words.wr-card-text.body-regular.content-secondary [507,3987 415x84] {font=18px/28px w400; color=rgb(61, 61, 61)}
+                      p [507,3987 415x84] "Qonto AI drafts invoices & quotes, you review them. Track status and get paid faster with payment links."
+          a.card-link.absolute.inset-0.z-30.cursor-pointer.rounded-2xl [507,3504 427x567] href=https://qonto.com/en/invoicing/ {r=24px; pos=absolute top:0px right:0px bottom:0px left:0px; z=30; cur=pointer}
+        div.relative.w-full.card-content.md:rounded-3xl.will-change-transform.group [965,3504 427x567] {d=flex; fd=column jc=normal ai=normal; r=24px; pos=relative; tr=translate 0.25s ease-out}
+          div.w-full [965,3504 427x427]
+            div.relative.w-full [965,3504 427x427] {pos=relative}
+              div.flex.overflow-hidden.relative.flex-none.justify-center.items-center [965,3504 427x427] {bgimg=radial-gradient(66.82% 50%, rgb(224, 224, 224) 0%, rgb(245, 245, 245) 100%) size=auto pos=0% 0%; d=flex; fd=row jc=center ai=center; r=24px; pos=relative; of=hidden; ar=1 / 1}
+                lottie-player.rounded-2xl.md:rounded-3xl.overflow-hidden.pointer-events-none.h-full.w-full [965,3504 427x427] LOTTIE=https://qonto.com/blog/images/asset/40850/image/2f3f2bb1e35987914af80dd11b48c4bb.json attrs=background=transparent,data-controller=wr-lottie,data-wr-lottie-target=onHoverCut,play=false,play_once=true,data-wr-lottie-min-frame-value=,data-wr-lottie-max-frame-value=,aria-hidden=true {r=24px; of=hidden; fit=cover 50% 50%}
+              div.absolute.right-16.top-16.z-20 [1344,3520 32x32] {pos=absolute top:16px right:16px bottom:378.656px left:378.656px; z=20}
+                div.cta-rounded-wrapper.w-min.h-min.block.static [1344,3520 32x32]
+                  div.btn-rounded [1344,3520 32x32] {bg=rgb(232, 232, 232); d=flex; fd=row jc=center ai=center; r=3.35544e+07px; op=0; tr=opacity 0.1s linear; of=hidden}
+                    div.btn-rounded-arrow-wrapper [1351,3527 18x18] {pos=relative}
+                      div.btn-rounded-arrow-container [1351,3527 18x18] {pos=relative}
+                        div.arrow-primary.lg:group-hover:animate-arrow-exit-250 [1351,3527 18x18] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, 0, 0)}
+                          svg#Layer_1.rotate-135.rotate-135 [1347,3523 25x25] SVG(0 0 18 18) {of=hidden}
+                        div.arrow-secondary.lg:group-hover:animate-arrow-enter-250 [1333,3545 18x18] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, -18, 18)}
+                          svg#Layer_1.rotate-135.rotate-135 [1329,3541 25x25] SVG(0 0 18 18) {of=hidden}
+          div.mt-16.relative.z-20 [965,3947 427x124] {m=16px 0px 0px; pos=relative; z=20}
+            div.flex.relative.flex-col.w-full.rounded-2xl.md:rounded-3xl [965,3947 427x124] {d=flex; fd=column jc=normal ai=normal; r=24px; pos=relative}
+              div.flex.flex-col.justify-between [965,3947 427x124] {d=flex; fd=column jc=space-between ai=normal}
+                div.flex.relative.flex-col.gap-12.justify-start.items-start [965,3947 427x124] {d=flex; fd=column jc=flex-start ai=flex-start; gap=16px 16px; p=0px 12px 0px 0px; pos=relative; z=11}
+                  div.flex.flex-col.gap-8.w-full [965,3947 415x124] {d=flex; fd=column jc=normal ai=normal; gap=8px 8px}
+                    div.flex.relative.z-10.gap-8.items-start.w-full [965,3947 415x32] {d=flex; fd=row jc=normal ai=flex-start; gap=8px 8px; pos=relative; z=10}
+                      h3.font-semibold.break-words.wr-card-title.h3-small.text-light-primary [965,3947 387x32] "Supplier invoices, minus the admin" {font=24px/32px w600; fvn=lining-nums proportional-nums}
+                    div.break-words.wr-card-text.body-regular.content-secondary [965,3987 415x84] {font=18px/28px w400; color=rgb(61, 61, 61)}
+                      p [965,3987 415x84] "AI imports supplier invoices and flags what to check. You review & pay in a click. Reconciliation is automated."
+          a.card-link.absolute.inset-0.z-30.cursor-pointer.rounded-2xl [965,3504 427x567] href=https://qonto.com/en/invoicing/supplier-invoices {r=24px; pos=absolute top:0px right:0px bottom:0px left:0px; z=30; cur=pointer}

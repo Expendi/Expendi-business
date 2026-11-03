@@ -1,0 +1,10 @@
+section#section-8.py-40.full-width-media-default.md:py-80.surface-section-background-base [0,5263 1440x608] {bg=rgb(255, 255, 255); p=24px 0px 80px}
+  div.website-revamp [0,5287 1440x504] {font=18px/24px w400; color=rgb(5, 5, 5); p=0px 48px; maxw=1600px}
+    div.grid.grid-cols-12.gap-x-8.md:gap-x-24 [48,5287 1344x0] {d=grid; gtc=90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px gtr=0px; gap=normal 24px}
+      div.col-span-12.md:col-span-5 [48,5287 546x0]
+      div.col-span-12.md:col-span-6.md:col-start-7 [732,5287 660x0]
+    div [48,5287 1344x504]
+      div.relative [48,5287 1344x504] {pos=relative}
+        div.hidden.relative.md:block.overflow-hidden.w-full.rounded-2xl [48,5287 1344x504] {r=24px; pos=relative; of=hidden; maxh=504px; ar=8 / 3}
+          picture.block.w-full.h-full [48,5287 1344x504]
+            img.object-cover.object-center.w-full.relative.rounded-2xl.lg:rounded-3xl [48,5287 1344x504] IMG=https://qonto.com/blog/images/asset/33897/image/lg_avif-4416f0f91da7f86f2496ca28b60607ab.avif alt="Company Creation Upload Document Homepage" nat=1440x809 {r=24px; pos=relative; of=clip; fit=cover 50% 50%; maxw=100%; ar=auto 3840 / 2160}

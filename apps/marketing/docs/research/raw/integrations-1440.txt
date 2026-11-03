@@ -1,0 +1,12 @@
+section#section-6.overflow-hidden.relative.surface-section-background-base [0,4151 1440x664] {bg=rgb(255, 255, 255); pos=relative; of=hidden}
+  div.absolute.top-0.left-0.w-full.h-full.bg-center [0,4151 1440x664] {font=18px/24px w400; color=rgb(5, 5, 5); bgimg=radial-gradient(66.82% 50%, rgb(224, 224, 224) 0%, rgb(245, 245, 245) 100%) size=auto pos=0% 0%; pos=absolute top:0px right:0px bottom:0px left:0px}
+  div.grid.grid-cols-6.px-16.py-48.mx-auto.website-revamp [0,4151 1440x664] {font=18px/24px w400; color=rgb(5, 5, 5); d=grid; gtc=90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px gtr=504px; gap=normal 24px; p=80px 48px; maxw=1600px}
+    div.flex.flex-col.col-span-6.items-center.px-24.pt-32 [48,4231 1344x504] {d=grid; gtc=90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px gtr=376px; gap=normal 24px; minh=504px}
+      div.grid.z-10.grid-cols-6.col-span-6.lg:pl-64.lg:py-64 [48,4295 660x376] {d=grid; gtc=99.3281px 99.3281px 99.3281px 99.3281px 99.3281px 99.3438px gtr=128px 72px 48px; p=64px 0px 64px 64px; z=10}
+        h2.col-span-6.text-light-primary [112,4359 596x128] "Keep all your tools connected" {font=56px/64px w600; fvn=lining-nums proportional-nums}
+        div.col-span-6.col-start-1.mt-12.body-slim.md:mt-16.lg:col-span-5 [112,4503 497x56] {font=18px/28px w400; m=16px 0px 0px}
+          p [112,4503 497x56] "Connect over 2,000 external tools & accounts directly to Qonto - let all your data sync automatically."
+        div.flex.flex-col.col-span-6.col-start-1.gap-12.mt-32 [112,4607 497x0] {d=flex; fd=column jc=normal ai=normal; gap=16px 16px; m=48px 0px 0px}
+      div.flex.relative.z-10.w-full.h-full.lg:col-span-6 [732,4295 660x376] {d=flex; fd=row jc=flex-end ai=normal; p=0px 64px 0px 0px; pos=relative; z=10}
+        div.absolute.flex.items-center.justify-center.h-496.md:h-624 [732,4103 760x760] {d=flex; fd=row jc=center ai=center; pos=absolute top:188px right:-100px bottom:-572px left:0px}
+          lottie-player.w-full.h-full.transition-all.duration-500.opacity-100 [732,4103 760x760] LOTTIE=https://qonto.com/blog/images/asset/34192/image/b110bbd06e094f78e7bf80d2dbfb7f79.json attrs=data-controller=lottie convertor,data-convertor-target=lottie,data-lottie-target=looping,data-lottie-min-frame-value=0,data-lottie-max-frame-value=70,background=transparent,aria-hidden=true,loop= {tr=0.5s cubic-bezier(0.4, 0, 0.2, 1)}

@@ -1,0 +1,53 @@
+section#section-4.surface-section-background-base [0,3123 390x1053] {bg=rgb(255, 255, 255)}
+  div.website-revamp [0,3123 390x1053] {font=16px/24px w400; color=rgb(5, 5, 5); p=0px 16px; maxw=1600px}
+    div.lg:hidden [16,3123 358x1053]
+      div.px-16.py-40.mx-auto.md:px-32 [16,3123 358x1053] {p=40px 16px}
+        h2.h2-small.mb-24 [32,3163 326x108] "Qonto AI." {font=28px/36px w600; m=0px 0px 24px; fvn=lining-nums proportional-nums}
+          p [32,3199 326x72] "Your choice, your control." {fvn=lining-nums proportional-nums}
+        div [32,3295 326x487]
+          button.accordion-title.w-full.text-left.py-16.peer.open [32,3295 326x128] {d=inline-block; p=16px 0px; cur=pointer}
+            div.flex.flex-col.flex-1 [32,3311 326x96] {d=flex; fd=column jc=normal ai=normal; cur=pointer}
+              div.flex.justify-between.items-center [32,3311 326x28] {d=flex; fd=row jc=space-between ai=center; cur=pointer}
+                h3.h3-small [32,3311 195x28] "Agents, inside Qonto" {font=20px/28px w600; cur=pointer; fvn=lining-nums proportional-nums}
+                span.ml-16.shrink-0 [342,3317 16x16] {m=0px 0px 0px 16px; cur=pointer}
+                  svg.accordion-arrow.no-invert.rotate-180.duration-500.ease-out [342,3317 16x16] SVG(0 0 16 10) {tr=0.5s cubic-bezier(0, 0, 0.2, 1); of=hidden; cur=pointer}
+              div.body-regular.mt-16 [32,3355 326x52] {font=16px/26px w400; m=16px 0px 0px; cur=pointer}
+                p [32,3355 326x52] "Ask Agents directly inside Qonto, right within the workflows you already use." {cur=pointer}
+          div#wr-tha-step-0.accordion-menu.peer-[.open]:!overflow-visible [32,3439 326x343] {tr=0.3s ease-out; maxh=343px}
+            div.-mx-16.my-16.flex.justify-center [16,3439 358x343] {d=flex; fd=row jc=center ai=normal; m=16px -16px}
+              div.overflow-hidden.relative.rounded-2xl.size-[343px] [24,3439 343x343] {r=16px; pos=relative; of=hidden}
+                img.absolute.inset-0.w-full.h-full.object-cover.pointer-events-none [24,3439 343x343] IMG=https://qonto.com/blog/assets/wr_topic_highlight_advanced/ai_gradient_background-3a3a8028a913dfd6273b80f6d0be5a9605c66603e99a14ef78a175dc4702ed90.png alt="" nat=2960x2960 {pos=absolute top:0px right:0px bottom:0px left:0px; of=clip; fit=cover 50% 50%; maxw=100%}
+                lottie-player.relative.w-full.h-full [24,3439 343x343] LOTTIE=https://qonto.com/blog/images/asset/40500/image/811bee643efecf4c6d05e9d644cb3881.json attrs=autoplay=,background=transparent,loop= {pos=relative}
+        div [32,3798 326x128]
+          button.accordion-title.w-full.text-left.py-16.peer [32,3798 326x128] {d=inline-block; p=16px 0px; cur=pointer}
+            div.flex.flex-col.flex-1 [32,3814 326x96] {d=flex; fd=column jc=normal ai=normal; cur=pointer}
+              div.flex.justify-between.items-center [32,3814 326x28] {d=flex; fd=row jc=space-between ai=center; cur=pointer}
+                h3.h3-small [32,3814 193x28] "MCP, in your AI tools" {font=20px/28px w600; cur=pointer; fvn=lining-nums proportional-nums}
+                span.ml-16.shrink-0 [342,3820 16x16] {m=0px 0px 0px 16px; cur=pointer}
+                  svg.accordion-arrow.no-invert.accordion-arrow.no-invert [342,3820 16x16] SVG(0 0 16 10) {of=hidden; cur=pointer}
+              div.body-regular.mt-16 [32,3858 326x52] {font=16px/26px w400; m=16px 0px 0px; cur=pointer}
+                p [32,3858 326x52] "Connect Qonto MCP to the AI tools you already work with every day." {cur=pointer}
+          div#wr-tha-step-1.accordion-menu.peer-[.open]:!overflow-visible [32,3926 326x0] {tr=0.3s ease-out; of=hidden; maxh=0px}
+            div.-mx-16.my-16.flex.justify-center [16,3942 358x343] {d=flex; fd=row jc=center ai=normal; m=16px -16px}
+              div.overflow-hidden.relative.rounded-2xl.size-[343px] [24,3942 343x343] {r=16px; pos=relative; of=hidden}
+                img.absolute.inset-0.w-full.h-full.object-cover.pointer-events-none [24,3942 343x343] IMG=https://qonto.com/blog/assets/wr_topic_highlight_advanced/ai_gradient_background-3a3a8028a913dfd6273b80f6d0be5a9605c66603e99a14ef78a175dc4702ed90.png alt="" nat=2960x2960 {pos=absolute top:0px right:0px bottom:0px left:0px; of=clip; fit=cover 50% 50%; maxw=100%}
+                lottie-player.relative.w-full.h-full [24,3942 343x343] LOTTIE=https://qonto.com/blog/images/asset/40501/image/5f3bca743313dd4770c0f595ad7b0c1b.json attrs=autoplay=,background=transparent,loop= {pos=relative}
+        div [32,3926 326x128]
+          button.accordion-title.w-full.text-left.py-16.peer [32,3926 326x128] {d=inline-block; p=16px 0px; cur=pointer}
+            div.flex.flex-col.flex-1 [32,3942 326x96] {d=flex; fd=column jc=normal ai=normal; cur=pointer}
+              div.flex.justify-between.items-center [32,3942 326x28] {d=flex; fd=row jc=space-between ai=center; cur=pointer}
+                h3.h3-small [32,3942 238x28] "Visibility & accountability" {font=20px/28px w600; cur=pointer; fvn=lining-nums proportional-nums}
+                span.ml-16.shrink-0 [342,3948 16x16] {m=0px 0px 0px 16px; cur=pointer}
+                  svg.accordion-arrow.no-invert.accordion-arrow.no-invert [342,3948 16x16] SVG(0 0 16 10) {of=hidden; cur=pointer}
+              div.body-regular.mt-16 [32,3986 326x52] {font=16px/26px w400; m=16px 0px 0px; cur=pointer}
+                p [32,3986 326x52] "AI drafts the work, you review & approve. All actions logged and traceable." {cur=pointer}
+          div#wr-tha-step-2.accordion-menu.peer-[.open]:!overflow-visible [32,4054 326x0] {tr=0.3s ease-out; of=hidden; maxh=0px}
+            div.-mx-16.my-16.flex.justify-center [16,4070 358x343] {d=flex; fd=row jc=center ai=normal; m=16px -16px}
+              div.overflow-hidden.relative.rounded-2xl.size-[343px] [24,4070 343x343] {r=16px; pos=relative; of=hidden}
+                img.absolute.inset-0.w-full.h-full.object-cover.pointer-events-none [24,4070 343x343] IMG=https://qonto.com/blog/assets/wr_topic_highlight_advanced/ai_gradient_background-3a3a8028a913dfd6273b80f6d0be5a9605c66603e99a14ef78a175dc4702ed90.png alt="" nat=2960x2960 {pos=absolute top:0px right:0px bottom:0px left:0px; of=clip; fit=cover 50% 50%; maxw=100%}
+                lottie-player.relative.w-full.h-full [24,4070 343x343] LOTTIE=https://qonto.com/blog/images/asset/40502/image/d13e448a375bd2f3f46a06ae2a0a8372.json attrs=autoplay=,background=transparent,loop= {pos=relative}
+        div.mt-32 [32,4086 326x50] {m=32px 0px 0px}
+          div.block [32,4086 326x50]
+            a [32,4086 326x50] href=https://qonto.com/en/ai {cur=pointer}
+              div.block.text-center.whitespace-nowrap.btn.btn-secondary.text-16 [32,4086 166x50] {font=16px/26px w400; p=11px 16px; r=8px; bT=1px solid rgb(5, 5, 5); bR=1px solid rgb(5, 5, 5); bB=1px solid rgb(5, 5, 5); bL=1px solid rgb(5, 5, 5); ws=nowrap; ta=center; cur=pointer}
+                span [49,4101 132x19] "Discover Qonto AI" {ws=nowrap; ta=center; cur=pointer}

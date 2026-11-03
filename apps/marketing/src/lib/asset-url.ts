@@ -49,5 +49,5 @@ export function lottieUrl(id: AssetId): string {
 
 export const VIDEO = {
   heroDesktop: "/qonto/video/web-en-various-16x9-homepage-desktop.mp4",
-  heroMobile: "/qonto/video/web-en-various-homepage-mobile.mp4",
+  heroMobile: "/qonto/video/down-net-http20260612-55-7yckw-lg-original.mp4",
 } as const;

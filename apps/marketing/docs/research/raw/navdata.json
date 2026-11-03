@@ -1,0 +1,1068 @@
+{
+ "menus": [
+  {
+   "title": "Business account",
+   "href": null,
+   "columns": [
+    [
+     {
+      "category": "Account & cards",
+      "items": [
+       {
+        "label": "Online business account",
+        "href": "/en/open-an-account",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Debit & deferred debit cards",
+        "href": "/en/payment-methods/card",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Account remuneration",
+        "href": "/en/open-an-account/remunerated-professional-account",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Account aggregation",
+        "href": "/en/integrations/banks",
+        "hasIcon": true,
+        "badge": null
+       }
+      ]
+     },
+     {
+      "category": "Tools",
+      "items": [
+       {
+        "label": "Bookkeeping",
+        "href": "/en/accounting",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "E-invoicing",
+        "href": "/en/invoicing",
+        "hasIcon": true,
+        "badge": null
+       }
+      ]
+     }
+    ],
+    [
+     {
+      "category": "Incoming payments",
+      "items": [
+       {
+        "label": "Accept payments",
+        "href": "/en/get-paid",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Get paid online",
+        "href": "/en/get-paid/online",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Get paid in-person",
+        "href": "/en/get-paid/in-person",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Payment terminals",
+        "href": "/en/payment-methods/pos",
+        "hasIcon": true,
+        "badge": null
+       }
+      ]
+     },
+     {
+      "category": "Outgoing payments",
+      "items": [
+       {
+        "label": "Transfers and direct debits",
+        "href": "/en/payment-methods#transfers",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "International transfers",
+        "href": "/en/payment-methods/international-transfer",
+        "hasIcon": true,
+        "badge": null
+       }
+      ]
+     }
+    ],
+    [
+     {
+      "category": "Resources",
+      "items": [
+       {
+        "label": "Our tools & guides",
+        "href": "/en/resources",
+        "hasIcon": false,
+        "badge": null
+       },
+       {
+        "label": "Business account comparators",
+        "href": "/en/comparators",
+        "hasIcon": false,
+        "badge": null
+       },
+       {
+        "label": "Blog",
+        "href": "/en/blog/freelancers",
+        "hasIcon": false,
+        "badge": null
+       },
+       {
+        "label": "Discover Qonto AI",
+        "href": "/en/ai-agent-hub",
+        "hasIcon": false,
+        "badge": null
+       }
+      ]
+     }
+    ]
+   ],
+   "highlight": {
+    "href": "/en/invoicing",
+    "img": "https://qonto.com/blog/images/asset/35257/image/lg_avif-d98cd235e572d0a923a8cf86a25ec206.avif",
+    "video": null,
+    "title": "E-invoicing",
+    "desc": "Qonto-certified platform to send and receive invoices."
+   }
+  },
+  {
+   "title": "Company creation",
+   "href": null,
+   "columns": [
+    [
+     {
+      "category": "Online business setup",
+      "items": [
+       {
+        "label": "Company creation",
+        "href": "/en/creation",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Deposit share capital",
+        "href": "/en/capital-deposit",
+        "hasIcon": true,
+        "badge": null
+       }
+      ]
+     }
+    ],
+    [
+     {
+      "category": "Resources",
+      "items": [
+       {
+        "label": "Our toolbox",
+        "href": "/en/resources",
+        "hasIcon": false,
+        "badge": null
+       },
+       {
+        "label": "Chartered Accountants directory",
+        "href": "https://qonto.com/fr/accountants-partners",
+        "hasIcon": false,
+        "badge": null
+       },
+       {
+        "label": "Blog",
+        "href": "/en/blog/creators",
+        "hasIcon": false,
+        "badge": null
+       }
+      ]
+     }
+    ]
+   ],
+   "highlight": {
+    "href": "/en/blog/creators/tools-tips/mistakes-starting-your-business",
+    "img": "https://qonto.com/blog/images/asset/33275/image/lg_avif-e3cbe765ccf1730799261bd08bb3ced4.avif",
+    "video": null,
+    "title": "Business creation guide",
+    "desc": "All the key steps to get you started."
+   }
+  },
+  {
+   "title": "Financial tools",
+   "href": null,
+   "columns": [
+    [
+     {
+      "category": "Solutions",
+      "items": [
+       {
+        "label": "Explore all features",
+        "href": "/en/finance-management",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Team expense management",
+        "href": "/en/team",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Payment cards",
+        "href": "/en/payment-methods/card",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "E-invoicing",
+        "href": "/en/invoicing",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Accounting & bookkeeping",
+        "href": "/en/accounting",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Integrations",
+        "href": "/en/integrations",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Cash flow management",
+        "href": "/en/cash-management",
+        "hasIcon": true,
+        "badge": null
+       }
+      ]
+     }
+    ],
+    [
+     {
+      "category": "Resources",
+      "items": [
+       {
+        "label": "Entrepreneur insight 2026",
+        "href": "/en/resources/entrepreneur-survey",
+        "hasIcon": false,
+        "badge": null
+       },
+       {
+        "label": "Corporate expense policy template",
+        "href": "/en/resources/template/expense-policy",
+        "hasIcon": false,
+        "badge": null
+       },
+       {
+        "label": "Cash flow management checklist",
+        "href": "https://qonto.com/docs/pdf/cash%20flow%20management%20checklist.pdf",
+        "hasIcon": false,
+        "badge": null
+       },
+       {
+        "label": "Discover Qonto AI",
+        "href": "/en/ai-agent-hub",
+        "hasIcon": false,
+        "badge": null
+       }
+      ]
+     }
+    ]
+   ],
+   "highlight": {
+    "href": "/en/product-tour",
+    "img": "https://qonto.com/blog/images/asset/35031/image/lg_avif-2b8650c7e1bf50ecbdf90dbc85e505f7.avif",
+    "video": null,
+    "title": "Explore our platform",
+    "desc": "Discover how our financial tools work"
+   }
+  },
+  {
+   "title": "Credit",
+   "href": null,
+   "columns": [
+    [
+     {
+      "category": "Solutions",
+      "items": [
+       {
+        "label": "All our credit offers",
+        "href": "/en/financing",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Deferred debit card",
+        "href": "/en/payment-methods/card/credit-card",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Overdraft",
+        "href": "/en/financing/overdraft",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Pay later",
+        "href": "/en/financing/pay-later",
+        "hasIcon": true,
+        "badge": null
+       }
+      ]
+     }
+    ],
+    [
+     {
+      "category": "Resources",
+      "items": [
+       {
+        "label": "ROI calculator",
+        "href": "/en/tools/roi-calculator",
+        "hasIcon": false,
+        "badge": null
+       },
+       {
+        "label": "Our tools & guides",
+        "href": "/en/resources",
+        "hasIcon": false,
+        "badge": null
+       },
+       {
+        "label": "Blog",
+        "href": "/en/blog/sme/growth",
+        "hasIcon": false,
+        "badge": null
+       }
+      ]
+     }
+    ]
+   ],
+   "highlight": {
+    "href": "/en/cash-management",
+    "img": "https://qonto.com/blog/images/asset/35042/image/lg_avif-81a8878dbbf858a26d714f51b8f6757e.avif",
+    "video": null,
+    "title": "Managing business cash flow",
+    "desc": "Why it matters and how to invest it."
+   }
+  },
+  {
+   "title": "Pricing",
+   "href": null,
+   "columns": [
+    [
+     {
+      "category": "Business account pricing",
+      "items": [
+       {
+        "label": "Self-employed",
+        "href": "/en/pricing?select-toggle=solo&periodicity=yearly&website_addon_period=yearly",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Micro-businesses",
+        "href": "/en/pricing?select-toggle=team&periodicity=yearly&website_addon_period=yearly",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "SMEs",
+        "href": "/en/pricing?select-toggle=team&periodicity=yearly&website_addon_period=yearly",
+        "hasIcon": true,
+        "badge": null
+       }
+      ]
+     }
+    ],
+    [
+     {
+      "category": "Company creation pricing",
+      "items": [
+       {
+        "label": "Create a business",
+        "href": "/en/pricing/creation",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "Capital deposit",
+        "href": "/en/capital-deposit",
+        "hasIcon": true,
+        "badge": null
+       }
+      ]
+     }
+    ]
+   ],
+   "highlight": null
+  },
+  {
+   "title": "About us",
+   "href": null,
+   "columns": [
+    [
+     {
+      "category": "About Qonto",
+      "items": [
+       {
+        "label": "Customer case studies",
+        "href": "/en/customers",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "About us",
+        "href": "/en/about",
+        "hasIcon": true,
+        "badge": null
+       }
+      ]
+     },
+     {
+      "category": "Qonto AI",
+      "items": [
+       {
+        "label": "Agents",
+        "href": "https://qonto.com/en/ai",
+        "hasIcon": true,
+        "badge": null
+       },
+       {
+        "label": "MCP",
+        "href": "https://qonto.com/en/ai/mcp",
+        "hasIcon": true,
+        "badge": null
+       }
+      ]
+     }
+    ]
+   ],
+   "highlight": {
+    "href": "https://qonto.com/en/ai",
+    "img": "https://qonto.com/blog/images/asset/36901/image/lg_avif-0cf350be73c1cfd9414f8649890038dc.avif",
+    "video": null,
+    "title": "Discover Qonto AI",
+    "desc": "Your Qonto account comes with built-in AI agents."
+   }
+  }
+ ],
+ "lang": [
+  {
+   "tag": "LI",
+   "text": "Europe",
+   "href": null
+  },
+  {
+   "tag": "LI",
+   "text": "France",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "France",
+   "href": "/fr"
+  },
+  {
+   "tag": "LI",
+   "text": "Deutschland",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "Deutschland",
+   "href": "/de"
+  },
+  {
+   "tag": "LI",
+   "text": "España",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "España",
+   "href": "/es"
+  },
+  {
+   "tag": "LI",
+   "text": "Italia",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "Italia",
+   "href": "/it"
+  },
+  {
+   "tag": "LI",
+   "text": "Österreich",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "Österreich",
+   "href": "/de-at"
+  },
+  {
+   "tag": "LI",
+   "text": "België",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "België",
+   "href": "/fr-be"
+  },
+  {
+   "tag": "LI",
+   "text": "Portugal",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "Portugal",
+   "href": "/pt"
+  },
+  {
+   "tag": "LI",
+   "text": "Nederland",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "Nederland",
+   "href": "/nl"
+  },
+  {
+   "tag": "LI",
+   "text": "Europe",
+   "href": null
+  },
+  {
+   "tag": "LI",
+   "text": "France",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "France",
+   "href": "/fr"
+  },
+  {
+   "tag": "LI",
+   "text": "Deutschland",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "Deutschland",
+   "href": "/de"
+  },
+  {
+   "tag": "LI",
+   "text": "España",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "España",
+   "href": "/es"
+  },
+  {
+   "tag": "LI",
+   "text": "Italia",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "Italia",
+   "href": "/it"
+  },
+  {
+   "tag": "LI",
+   "text": "Österreich",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "Österreich",
+   "href": "/de-at"
+  },
+  {
+   "tag": "LI",
+   "text": "België",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "België",
+   "href": "/fr-be"
+  },
+  {
+   "tag": "LI",
+   "text": "Portugal",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "Portugal",
+   "href": "/pt"
+  },
+  {
+   "tag": "LI",
+   "text": "Nederland",
+   "href": null
+  },
+  {
+   "tag": "A",
+   "text": "Nederland",
+   "href": "/nl"
+  }
+ ],
+ "langBox": "\n\nen\n\n\n\n\n\nSelect your country\n\n\nExplore our country-specific features in your preferred language.\n\n\n\n\n\n\n\nEurope\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nFrance\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nDeutschland\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nEspaña\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nItalia\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nÖsterreich\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nBelgië\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPortugal\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nNederland\n\n\n\n\n\n",
+ "footer": {
+  "columns": [
+   {
+    "title": "BUSINESS ACCOUNT",
+    "links": [
+     {
+      "label": "Open Business Bank Account",
+      "href": "https://qonto.com/en/open-an-account"
+     },
+     {
+      "label": "Business Account for Freelancers",
+      "href": "https://qonto.com/en/open-an-account/freelancers"
+     },
+     {
+      "label": "Account Remuneration",
+      "href": "https://qonto.com/en/open-an-account/remunerated-professional-account"
+     },
+     {
+      "label": "Bank Account for Associations",
+      "href": "https://qonto.com/en/open-an-account/association"
+     }
+    ]
+   },
+   {
+    "title": "BUSINESS CARDS",
+    "links": [
+     {
+      "label": "One Card",
+      "href": "https://qonto.com/en/payment-methods/card/card-one"
+     },
+     {
+      "label": "Virtual Card",
+      "href": "https://qonto.com/en/payment-methods/card/virtual-card"
+     },
+     {
+      "label": "Plus Card",
+      "href": "https://qonto.com/en/payment-methods/card/card-plus"
+     },
+     {
+      "label": "See all cards",
+      "href": "https://qonto.com/en/payment-methods/card"
+     }
+    ]
+   },
+   {
+    "title": "COMPANY CREATION",
+    "links": [
+     {
+      "label": "Create a Company",
+      "href": "https://qonto.com/en/creation"
+     },
+     {
+      "label": "Capital Deposit",
+      "href": "https://qonto.com/en/capital-deposit"
+     }
+    ]
+   },
+   {
+    "title": "GET PAID",
+    "links": [
+     {
+      "label": "POS Terminal",
+      "href": "https://qonto.com/en/payment-methods/pos"
+     },
+     {
+      "label": "Payment Links",
+      "href": "https://qonto.com/en/payment-methods/payment-links"
+     },
+     {
+      "label": "Tap-to-Pay iPhone",
+      "href": "https://qonto.com/en/payment-methods/tap-to-pay-iphone"
+     },
+     {
+      "label": "Tap-to-Pay Android",
+      "href": "https://qonto.com/en/payment-methods/tap-to-pay-android"
+     }
+    ]
+   },
+   {
+    "title": "FINANCING",
+    "links": [
+     {
+      "label": "Business Financing",
+      "href": "https://qonto.com/en/financing"
+     },
+     {
+      "label": "Pay Later",
+      "href": "https://qonto.com/en/financing/pay-later"
+     },
+     {
+      "label": "Overdraft",
+      "href": "https://qonto.com/en/financing/overdraft"
+     }
+    ]
+   },
+   {
+    "title": "FINANCIAL TOOLS",
+    "links": [
+     {
+      "label": "Expense Management Software",
+      "href": "https://qonto.com/en/team"
+     },
+     {
+      "label": "Pre-accounting Solution",
+      "href": "https://qonto.com/en/accounting"
+     },
+     {
+      "label": "Invoicing Tool",
+      "href": "https://qonto.com/en/invoicing"
+     },
+     {
+      "label": "Cash-flow Management",
+      "href": "https://qonto.com/en/cash-management"
+     },
+     {
+      "label": "Integrations",
+      "href": "https://qonto.com/en/integrations"
+     },
+     {
+      "label": "Quotes Management",
+      "href": "https://qonto.com/en/invoicing/quotes"
+     }
+    ]
+   },
+   {
+    "title": "RESOURCES",
+    "links": [
+     {
+      "label": "Product Tour",
+      "href": "https://qonto.com/en/product-tour"
+     },
+     {
+      "label": "Banking Comparators",
+      "href": "https://qonto.com/en/comparators"
+     },
+     {
+      "label": "Financial Glossary",
+      "href": "https://qonto.com/en/glossary"
+     },
+     {
+      "label": "SWIFT/BIC Code Finder",
+      "href": "https://qonto.com/en/swift-codes"
+     },
+     {
+      "label": "Qonto Insights",
+      "href": "https://qonto.com/en/insights"
+     },
+     {
+      "label": "See all resources",
+      "href": "https://qonto.com/en/resources"
+     }
+    ]
+   },
+   {
+    "title": "COMPANY",
+    "links": [
+     {
+      "label": "Our Story",
+      "href": "https://qonto.com/en/about"
+     },
+     {
+      "label": "Press",
+      "href": "https://qonto.com/en/press"
+     },
+     {
+      "label": "Our Customers",
+      "href": "https://qonto.com/en/trust"
+     },
+     {
+      "label": "Sustainability & Inclusion",
+      "href": "https://qonto.com/en/impact"
+     },
+     {
+      "label": "Careers",
+      "href": "https://qonto.com/en/careers"
+     },
+     {
+      "label": "Blog",
+      "href": "https://qonto.com/en/blog"
+     },
+     {
+      "label": "FAQ & Support",
+      "href": "https://support-fr.qonto.com/hc/en-us?_gl=1*1c8hd4*_gcl_gb*R0NMLjE3NzE0MDYxMDAuQ2xrS0NBaUFuY3ZNQmhBWEVra0F3cTlwSEV0MjVnMDloZG84NnFSa2MtbTBDMUZ1bzYyOHUyaVVlTnZQcjNBSV9zdzVWR0JkRDNuT2tBT19FOURzSVhTV19STHl2Qk92QnhTUnpHZWgxUU9iSmZLVFlDZ0lHZ0s1dlEuZDg3QUNQdkJtZjRCRU1LbjlvMEQuLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLg..*_gcl_au*MTU3NzQyNzgzLjE3NjQxNzA2NjYuNjEyMTk2NjgxLjE3NjQyNDM5MzEuMTc2NDI0MzkzMA.."
+     },
+     {
+      "label": "Recommend Qonto",
+      "href": "https://qonto.com/en/referral"
+     },
+     {
+      "label": "Ethics Charter",
+      "href": "https://qonto.com/en/ethics-charter"
+     }
+    ]
+   },
+   {
+    "title": "FOR DEVELOPERS",
+    "links": [
+     {
+      "label": "Qonto Embed",
+      "href": "https://qonto.com/en/qonto-embed"
+     },
+     {
+      "label": "Qonto API",
+      "href": "https://docs.qonto.com/introduction/welcome"
+     }
+    ]
+   }
+  ],
+  "bottomLinks": [
+   {
+    "label": "Pricing",
+    "href": "https://qonto.com/en/pricing",
+    "img": null,
+    "aria": "Pricing"
+   },
+   {
+    "label": "",
+    "href": "https://www.facebook.com/getqonto",
+    "img": "https://qonto.com/blog/images/asset/33603/image/28fdb1711ea2f916e3bec2e6d618444c.svg",
+    "aria": "Badge Asset"
+   },
+   {
+    "label": "",
+    "href": "https://www.facebook.com/getqonto",
+    "img": "https://qonto.com/blog/images/asset/33596/image/7bdc8481de0e4f2d4de7573b366e881b.svg",
+    "aria": "Badge Asset"
+   },
+   {
+    "label": "",
+    "href": "https://www.linkedin.com/company/qonto",
+    "img": "https://qonto.com/blog/images/asset/33598/image/ad73479e4a1febdc452fdc6b38103c57.svg",
+    "aria": "Badge Asset"
+   },
+   {
+    "label": "",
+    "href": "https://www.instagram.com/qonto",
+    "img": "https://qonto.com/blog/images/asset/33599/image/a15c6e786f3f8023ccad013037a91b99.svg",
+    "aria": "Badge Asset"
+   },
+   {
+    "label": "",
+    "href": "https://medium.com/qonto-way",
+    "img": "https://qonto.com/blog/images/asset/33600/image/7e2829066f618f1ba81bb0b432749c52.svg",
+    "aria": "Badge Asset"
+   },
+   {
+    "label": "",
+    "href": "https://apps.apple.com/fr/app/qonto-business-finance-app/id1214811644?l=en-GB",
+    "img": "https://qonto.com/blog/images/asset/33597/image/881e0baa2430a366b2216103c1ef40ad.png",
+    "aria": "Badge Asset"
+   },
+   {
+    "label": "",
+    "href": "https://play.google.com/store/apps/details?id=eu.qonto.qonto&hl=en",
+    "img": "https://qonto.com/blog/images/asset/33601/image/fd1668e8200007e3a485794925c1b340.png",
+    "aria": "Badge Asset"
+   },
+   {
+    "label": "France",
+    "href": "/fr",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "Deutschland",
+    "href": "/de",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "España",
+    "href": "/es",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "Italia",
+    "href": "/it",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "Österreich",
+    "href": "/de-at",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "België",
+    "href": "/fr-be",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "Portugal",
+    "href": "/pt",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "Nederland",
+    "href": "/nl",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "France",
+    "href": "/fr",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "Deutschland",
+    "href": "/de",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "España",
+    "href": "/es",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "Italia",
+    "href": "/it",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "Österreich",
+    "href": "/de-at",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "België",
+    "href": "/fr-be",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "Portugal",
+    "href": "/pt",
+    "img": null,
+    "aria": null
+   },
+   {
+    "label": "Nederland",
+    "href": "/nl",
+    "img": null,
+    "aria": null
+   }
+  ],
+  "legal": [
+   "Qonto SA is a Société Anonyme under French law, registered at the Paris Trade Register (n° 819 489 626) having its headquarters at 6 Impasse Bonne Nouvelle, 75010 Paris, France.",
+   "Qonto SA is a licensed payment institution authorized by the French Autorité de Contrôle Prudentiel et de Résolution (ACPR), under the registration number 16958 granted on 21/06/2018.",
+   "The entirety of the funds collected from our customers is safeguarded in compliance with the relevant legislation. A part of these funds is either held by our partner banks, Crédit Mutuel Arkéa, Société Générale, Natixis or Rothschild Martin Maurel, or invested in qualified money market funds, with the corresponding fund units held by Société Générale. In the case of bankruptcy of one of these partner banks, the deposits are covered up to €100,000 per institution and per client by the Fonds de Garantie des Dépôts et de Résolution (FGDR). The remaining part of the funds is fully covered by two stand-alone guarantees, one granted by Crédit Agricole CIB, a subsidiary of Crédit Agricole S.A., the other by BNP Paribas."
+  ],
+  "imgs": [
+   {
+    "src": "https://qonto.com/blog/images/asset/33290/image/5ac59accd5ef0dd6156d906fab952b4c.png",
+    "alt": "Badge Asset",
+    "w": 64,
+    "h": 64,
+    "cls": "h-64 w-auto fill-grey-700"
+   },
+   {
+    "src": "https://qonto.com/blog/images/asset/33292/image/5f4bd5a0a0ba9f6e3321814d8a94cecb.png",
+    "alt": "Badge Asset",
+    "w": 64,
+    "h": 64,
+    "cls": "h-64 w-auto fill-grey-700"
+   },
+   {
+    "src": "https://qonto.com/blog/images/asset/33288/image/586dc961d9808f847f7eb4b9e3555b7f.png",
+    "alt": "Badge Asset",
+    "w": 112,
+    "h": 64,
+    "cls": "h-64 w-auto fill-grey-700"
+   },
+   {
+    "src": "https://qonto.com/blog/images/asset/33603/image/28fdb1711ea2f916e3bec2e6d618444c.svg",
+    "alt": "Facebook",
+    "w": 30,
+    "h": 30,
+    "cls": "h-30 w-auto"
+   },
+   {
+    "src": "https://qonto.com/blog/images/asset/33596/image/7bdc8481de0e4f2d4de7573b366e881b.svg",
+    "alt": "X",
+    "w": 30,
+    "h": 30,
+    "cls": "h-30 w-auto"
+   },
+   {
+    "src": "https://qonto.com/blog/images/asset/33598/image/ad73479e4a1febdc452fdc6b38103c57.svg",
+    "alt": "LinkedIn",
+    "w": 30,
+    "h": 30,
+    "cls": "h-30 w-auto"
+   },
+   {
+    "src": "https://qonto.com/blog/images/asset/33599/image/a15c6e786f3f8023ccad013037a91b99.svg",
+    "alt": "Instagram",
+    "w": 30,
+    "h": 30,
+    "cls": "h-30 w-auto"
+   },
+   {
+    "src": "https://qonto.com/blog/images/asset/33600/image/7e2829066f618f1ba81bb0b432749c52.svg",
+    "alt": "Medium",
+    "w": 30,
+    "h": 30,
+    "cls": "h-30 w-auto"
+   },
+   {
+    "src": "https://qonto.com/blog/images/asset/33597/image/881e0baa2430a366b2216103c1ef40ad.png",
+    "alt": "App Store",
+    "w": 0,
+    "h": 40,
+    "cls": "h-40 w-auto"
+   },
+   {
+    "src": "https://qonto.com/blog/images/asset/33601/image/fd1668e8200007e3a485794925c1b340.png",
+    "alt": "Play Store",
+    "w": 0,
+    "h": 40,
+    "cls": "h-40 w-auto"
+   }
+  ]
+ }
+}

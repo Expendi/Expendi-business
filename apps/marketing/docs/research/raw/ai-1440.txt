@@ -1,0 +1,48 @@
+section#section-4.surface-section-background-base [0,2404 1440x900] {bg=rgb(255, 255, 255)}
+  div.website-revamp [0,2404 1440x900] {font=18px/24px w400; color=rgb(5, 5, 5); p=0px 48px; maxw=1600px}
+    div.hidden.lg:block [48,2404 1344x900]
+      div.grid.gap-x-8.px-32.py-48.mx-auto.lg:grid-cols-12 [48,2404 1344x900] {d=grid; gtc=82px 82px 82px 82px 82px 82px 82px 82px 82px 82px 82px 82px gtr=740px; gap=normal 24px; p=80px 48px}
+        div.flex.flex-col.gap-48.lg:col-span-5 [96,2484 506x740] {d=flex; fd=column jc=normal ai=normal; gap=48px 48px}
+          h2.h2-small.content-primary-a [96,2484 506x96] "Qonto AI." {font=40px/48px w600; fvn=lining-nums proportional-nums}
+            p [96,2532 506x48] "Your choice, your control." {fvn=lining-nums proportional-nums}
+          div.flex.flex-col.gap-8 [96,2628 506x472] {d=flex; fd=column jc=normal ai=normal; gap=8px 8px}
+            div.flex.items-stretch.cursor-pointer [96,2628 506x152] {d=flex; fd=row jc=normal ai=stretch; tr=opacity 0.5s; cur=pointer}
+              div.flex.mr-0.w-2.shrink-0 [96,2628 2x152] {d=flex; fd=row jc=normal ai=normal; cur=pointer}
+                div.overflow-hidden.w-full.rounded-full.bg-content-tertiary [96,2628 2x152] {bg=rgb(184, 184, 184); r=3.35544e+07px; of=hidden; cur=pointer}
+                  div.w-full.h-0.rounded-full.origin-top.bg-content-primary [96,2628 2x59] {bg=rgb(5, 5, 5); r=3.35544e+07px; tr=none; cur=pointer}
+              div.flex-1.px-40.py-32.rounded-r-xl.transition-colors.duration-300 [98,2628 504x152] {p=32px 40px; r=0px 12px 12px 0px; tr=color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), outline-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), text-decoration-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), fill 0.3s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-from 0.3s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-via 0.3s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-to 0.3s cubic-bezier(0.4, 0, 0.2, 1); cur=pointer}
+                h3.h3-small.mb-8 [138,2660 424x32] "Agents, inside Qonto" {font=24px/32px w600; m=0px 0px 8px; cur=pointer; fvn=lining-nums proportional-nums}
+                p.body-regular [138,2700 424x0] {font=18px/28px w400; cur=pointer}
+                p [138,2700 424x48] "Ask Agents directly inside Qonto, right within the workflows you already use." {cur=pointer}
+                p [138,2748 424x0] {cur=pointer}
+            div.flex.items-stretch.cursor-pointer [96,2788 506x152] {d=flex; fd=row jc=normal ai=stretch; op=0.4; tr=opacity 0.5s; cur=pointer}
+              div.flex.mr-0.w-2.shrink-0 [96,2788 2x152] {d=flex; fd=row jc=normal ai=normal; cur=pointer}
+                div.overflow-hidden.w-full.rounded-full.bg-content-tertiary [96,2788 2x152] {bg=rgb(184, 184, 184); r=3.35544e+07px; of=hidden; cur=pointer}
+                  div.w-full.h-0.rounded-full.origin-top.bg-content-primary [96,2788 2x0] {bg=rgb(5, 5, 5); r=3.35544e+07px; tr=none; cur=pointer}
+              div.flex-1.px-40.py-32.rounded-r-xl.transition-colors.duration-300 [98,2788 504x152] {p=32px 40px; r=0px 12px 12px 0px; tr=color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), outline-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), text-decoration-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), fill 0.3s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-from 0.3s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-via 0.3s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-to 0.3s cubic-bezier(0.4, 0, 0.2, 1); cur=pointer}
+                h3.h3-small.mb-8 [138,2820 424x32] "MCP, in your AI tools" {font=24px/32px w600; m=0px 0px 8px; cur=pointer; fvn=lining-nums proportional-nums}
+                p.body-regular [138,2860 424x0] {font=18px/28px w400; cur=pointer}
+                p [138,2860 424x48] "Connect Qonto MCP to the AI tools you already work with every day." {cur=pointer}
+                p [138,2908 424x0] {cur=pointer}
+            div.flex.items-stretch.cursor-pointer [96,2948 506x152] {d=flex; fd=row jc=normal ai=stretch; op=0.4; tr=opacity 0.5s; cur=pointer}
+              div.flex.mr-0.w-2.shrink-0 [96,2948 2x152] {d=flex; fd=row jc=normal ai=normal; cur=pointer}
+                div.overflow-hidden.w-full.rounded-full.bg-content-tertiary [96,2948 2x152] {bg=rgb(184, 184, 184); r=3.35544e+07px; of=hidden; cur=pointer}
+                  div.w-full.h-0.rounded-full.origin-top.bg-content-primary [96,2948 2x0] {bg=rgb(5, 5, 5); r=3.35544e+07px; tr=none; cur=pointer}
+              div.flex-1.px-40.py-32.rounded-r-xl.transition-colors.duration-300 [98,2948 504x152] {p=32px 40px; r=0px 12px 12px 0px; tr=color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), outline-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), text-decoration-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), fill 0.3s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-from 0.3s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-via 0.3s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-to 0.3s cubic-bezier(0.4, 0, 0.2, 1); cur=pointer}
+                h3.h3-small.mb-8 [138,2980 424x32] "Visibility & accountability" {font=24px/32px w600; m=0px 0px 8px; cur=pointer; fvn=lining-nums proportional-nums}
+                p.body-regular [138,3020 424x0] {font=18px/28px w400; cur=pointer}
+                p [138,3020 424x48] "AI drafts the work, you review & approve. All actions logged and traceable." {cur=pointer}
+                p [138,3068 424x0] {cur=pointer}
+          div.block [96,3148 506x52]
+            a [96,3163 183x21] href=https://qonto.com/en/ai {cur=pointer}
+              div.block.text-center.whitespace-nowrap.btn.btn-secondary.text-16 [96,3148 183x52] {font=18px/28px w400; d=inline-block; p=11px 16px; r=8px; bT=1px solid rgb(5, 5, 5); bR=1px solid rgb(5, 5, 5); bB=1px solid rgb(5, 5, 5); bL=1px solid rgb(5, 5, 5); ws=nowrap; ta=center; cur=pointer}
+                span [113,3163 149x21] "Discover Qonto AI" {ws=nowrap; ta=center; cur=pointer}
+        div.hidden.justify-center.items-center.lg:col-span-6.lg:col-start-7.lg:flex [732,2484 612x740] {d=flex; fd=row jc=center ai=center}
+          div.overflow-hidden.relative.rounded-3xl.size-740.shrink-0 [668,2484 740x740] {r=24px; pos=relative; of=hidden}
+            img.absolute.inset-0.w-full.h-full.object-cover.pointer-events-none [668,2484 740x740] IMG=https://qonto.com/blog/assets/wr_topic_highlight_advanced/ai_gradient_background-3a3a8028a913dfd6273b80f6d0be5a9605c66603e99a14ef78a175dc4702ed90.png alt="" nat=2960x2960 {pos=absolute top:0px right:0px bottom:0px left:0px; of=clip; fit=cover 50% 50%; maxw=100%}
+            div.absolute.inset-0.transition-opacity.duration-500.opacity-100 [668,2484 740x740] {pos=absolute top:0px right:0px bottom:0px left:0px; tr=opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1)}
+              lottie-player.relative.w-full.h-full [668,2484 740x740] LOTTIE=https://qonto.com/blog/images/asset/40500/image/811bee643efecf4c6d05e9d644cb3881.json attrs=background=transparent {pos=relative}
+            div.absolute.inset-0.transition-opacity.duration-500.opacity-0 [668,2484 740x740] {pos=absolute top:0px right:0px bottom:0px left:0px; op=0; tr=opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1)}
+              lottie-player.relative.w-full.h-full [668,2484 740x740] LOTTIE=https://qonto.com/blog/images/asset/40501/image/5f3bca743313dd4770c0f595ad7b0c1b.json attrs=background=transparent {pos=relative}
+            div.absolute.inset-0.transition-opacity.duration-500.opacity-0 [668,2484 740x740] {pos=absolute top:0px right:0px bottom:0px left:0px; op=0; tr=opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1)}
+              lottie-player.relative.w-full.h-full [668,2484 740x740] LOTTIE=https://qonto.com/blog/images/asset/40502/image/d13e448a375bd2f3f46a06ae2a0a8372.json attrs=background=transparent {pos=relative}

@@ -1,0 +1,50 @@
+section#section-3.col-span-6.w-full.md:col-span-9.lg:col-span-12.surface-section-background-inverse.darkmode [0,1491 390x1632] {bg=rgb(5, 5, 5)}
+  div.grid.grid-cols-6.col-span-12.px-16.py-48.mx-auto [0,1491 390x1632] {font=16px/24px w400; color=rgb(255, 255, 255); d=grid; gtc=59.6562px 59.6562px 59.6562px 59.6562px 59.6562px 59.6562px gtr=1536px; p=48px 16px; maxw=1600px}
+    div.grid.grid-cols-1.col-span-6.gap-y-24.grid-auto-rows-min.md:gap-y-32 [16,1539 358x1536] {d=grid; gtc=358px 0px gtr=80px 1358px 50px; gap=24px normal}
+      div.row-start-1.row-end-2.lg:self-center [16,1539 358x80]
+        h2 [16,1539 358x80] "Business account," {font=32px/40px w600; fvn=lining-nums proportional-nums}
+          span.content-tertiary [16,1540 328x77] "AI-powered." {color=rgb(143, 143, 143); fvn=lining-nums proportional-nums}
+      div.col-span-2 [16,1643 358x1358]
+        div.grid.grid-cols-6.gap-8.md:gap-16.lg:gap-24.md:grid-cols-12 [16,1643 358x1358] {d=grid; gtc=53px 53px 53px 53px 53px 53px gtr=130px 471px 262px 471px; gap=8px 8px}
+          div.flex.gap-24.justify-between.items-center.p-16.rounded-2xl [16,1643 358x130] {d=flex; fd=row jc=space-between ai=center; gap=24px 24px; p=16px; r=16px; bT=1px solid rgb(97, 97, 97); bR=1px solid rgb(97, 97, 97); bB=1px solid rgb(97, 97, 97); bL=1px solid rgb(97, 97, 97); minh=128px; maxh=288px}
+            div.flex.flex-col.gap-16.max-w-510 [33,1660 324x96] {d=flex; fd=column jc=normal ai=normal; gap=16px 16px; maxw=510px}
+              h3.h3-small [33,1660 324x28] "Account remuneration" {font=20px/28px w600; fvn=lining-nums proportional-nums}
+              p.block.body-slim.text-left [33,1704 324x52] "Earn up to 5%* on your Qonto account balance." {font=16px/26px w400}
+          div.col-span-3.md:col-span-6.max-lg:order-4.lg:row-span-2.lg:row-start-1.lg:col-span-8 [16,2260 175x262]
+            div.flex.relative.flex-col-reverse.gap-16.justify-end.p-16 [16,2260 175x262] {bg=rgb(26, 26, 26); d=flex; fd=column-reverse jc=flex-end ai=normal; gap=16px 16px; p=16px; r=16px; pos=relative}
+              div.flex.flex-col.gap-16.max-w-510 [32,2332 143x148] {d=flex; fd=column jc=normal ai=normal; gap=16px 16px; maxw=510px}
+                h3.h3-small [32,2332 143x28] "Pay" {font=20px/28px w600; fvn=lining-nums proportional-nums}
+                p.block.body-slim.text-left.lg:max-w-437 [32,2376 143x104] "SEPA & global transfers, virtual cards, & Apple Pay/Google Pay." {font=16px/26px w400}
+              div.flex.overflow-hidden.flex-col.justify-center.items-start.h-40 [32,2276 143x40] {d=flex; fd=column jc=center ai=flex-start; of=hidden}
+                div.flex.justify-center.items-center.p-8.w-40.h-40 [32,2276 40x40] {bg=rgb(61, 61, 61); d=flex; fd=row jc=center ai=center; p=8px; r=4px}
+                  img.h-24.w-24.brightness-0.invert.h-full.flex [40,2284 24x24] IMG=https://qonto.com/blog/images/asset/26498/image/d74377ef939cdd9ccbdc58a7911179ea.svg alt="WEB Iconography BlackTransfer" nat=32x32 {d=flex; fd=row jc=normal ai=normal; filter=brightness(0) invert(1); of=clip; maxw=100%; ar=auto 32 / 32}
+          div.col-span-6.md:col-span-12.max-lg:order-5.lg:row-span-2.lg:row-start-1.lg:col-span-8 [16,2530 358x471]
+            div.flex.overflow-hidden.relative.flex-col.justify-between.p-16 [16,2530 358x471] {d=flex; fd=column jc=space-between ai=normal; p=16px; r=16px; pos=relative; of=hidden}
+              div.absolute.top-0.left-0.w-full.h-full.bg-center [16,2530 358x471] {bgimg=image-set(url("https://qonto.com/blog/images/asset/35054/image/md_avif-80840819991dbe73088d0d868f8674b3.avif") 1dppx type("image/avif"), url("https://qonto.com/blog/images/asset/35054/image/md_original-3833791a0a747aa5ec884485c2ab09d2.jpg") 1dppx type("image/jpeg")) size=cover pos=50% 50%; pos=absolute top:0px right:0px bottom:0px left:0px}
+              div.absolute.top-0.left-0.w-full.h-full.bg-center [16,2530 358x471] {bgimg=image-set(url("https://qonto.com/blog/images/asset/35054/image/md_avif-80840819991dbe73088d0d868f8674b3.avif") 1dppx type("image/avif"), url("https://qonto.com/blog/images/asset/35054/image/md_original-3833791a0a747aa5ec884485c2ab09d2.jpg") 1dppx type("image/jpeg")) size=cover pos=50% 50%; pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, 0, 0); filter=blur(6px)}
+              div.absolute.top-0.left-0.w-full.h-full.pointer-events-none [16,2530 358x471] {bgimg=linear-gradient(rgba(5, 5, 5, 0.67) 0%, rgba(5, 5, 5, 0.67) 10%, rgba(5, 5, 5, 0) 50%) size=auto pos=0% 0%; pos=absolute top:0px right:0px bottom:0px left:0px}
+              div.flex.z-10.flex-col.gap-16.max-w-510 [32,2546 326x128] {d=flex; fd=column jc=normal ai=normal; gap=16px 16px; z=10; maxw=510px}
+                h3.h3-small [32,2546 326x28] "Get paid" {font=20px/28px w600; fvn=lining-nums proportional-nums}
+                p.block.body-slim.text-left.mb-32 [32,2590 326x52] "Invoices with embedded payment links, Tap to Pay & POS terminals." {font=16px/26px w400; m=0px 0px 32px}
+          div.col-span-3.md:col-span-6.max-lg:order-4.lg:col-span-8.lg:col-start-1.lg:row-span-3 [199,2260 175x262]
+            div.flex.relative.flex-col-reverse.gap-16.justify-end.p-16 [199,2260 175x262] {bg=rgb(26, 26, 26); d=flex; fd=column-reverse jc=flex-end ai=normal; gap=16px 16px; p=16px; r=16px; pos=relative}
+              div.flex.flex-col.gap-16.max-w-510 [215,2332 143x174] {d=flex; fd=column jc=normal ai=normal; gap=16px 16px; maxw=510px}
+                h3.h3-small [215,2332 143x28] "Credit suite" {font=20px/28px w600; fvn=lining-nums proportional-nums}
+                p.block.body-slim.text-left.lg:max-w-437 [215,2376 143x130] "A range of working capital solutions, integrated into your business account." {font=16px/26px w400}
+              div.flex.overflow-hidden.flex-col.justify-center.items-start.h-40 [215,2276 143x40] {d=flex; fd=column jc=center ai=flex-start; of=hidden}
+                div.flex.justify-center.items-center.p-8.w-40.h-40 [215,2276 40x40] {bg=rgb(61, 61, 61); d=flex; fd=row jc=center ai=center; p=8px; r=4px}
+                  img.h-24.w-24.brightness-0.invert.h-full.flex [223,2284 24x24] IMG=https://qonto.com/blog/images/asset/33263/image/fb899e53914f3845a8c9f7a0ea6793c2.svg alt="WEB Iconography Black Calendar WbRvmp" nat=32x32 {d=flex; fd=row jc=normal ai=normal; filter=brightness(0) invert(1); of=clip; maxw=100%; ar=auto 32 / 32}
+          div.col-span-6.md:col-span-12.max-lg:order-2.lg:row-span-2.lg:row-start-3.lg:col-span-16 [16,1781 358x471]
+            div.flex.overflow-hidden.relative.flex-col.justify-between.p-16 [16,1781 358x471] {d=flex; fd=column jc=space-between ai=normal; p=16px; r=16px; pos=relative; of=hidden}
+              div.absolute.top-0.left-0.w-full.h-full.bg-center [16,1781 358x471] {bgimg=image-set(url("https://qonto.com/blog/images/asset/33297/image/md_avif-670f0d025465712f3e85afe9a1aea4ce.avif") 1dppx type("image/avif"), url("https://qonto.com/blog/images/asset/33297/image/md_original-a364a2e830909c9231dda9a23921ffce.jpg") 1dppx type("image/jpeg")) size=cover pos=50% 50%; pos=absolute top:0px right:0px bottom:0px left:0px}
+              div.absolute.top-0.left-0.w-full.h-full.bg-center [16,1781 358x471] {bgimg=image-set(url("https://qonto.com/blog/images/asset/33297/image/md_avif-670f0d025465712f3e85afe9a1aea4ce.avif") 1dppx type("image/avif"), url("https://qonto.com/blog/images/asset/33297/image/md_original-a364a2e830909c9231dda9a23921ffce.jpg") 1dppx type("image/jpeg")) size=cover pos=50% 50%; pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, 0, 0); filter=blur(6px)}
+              div.absolute.top-0.left-0.w-full.h-full.pointer-events-none [16,1781 358x471] {bgimg=linear-gradient(rgba(5, 5, 5, 0.67) 0%, rgba(5, 5, 5, 0.67) 10%, rgba(5, 5, 5, 0) 50%) size=auto pos=0% 0%; pos=absolute top:0px right:0px bottom:0px left:0px}
+              div.flex.z-10.flex-col.gap-16.max-w-510 [32,1797 326x128] {d=flex; fd=column jc=normal ai=normal; gap=16px 16px; z=10; maxw=510px}
+                h3.h3-small [32,1797 326x28] "Mastercard debit and credit cards" {font=20px/28px w600; fvn=lining-nums proportional-nums}
+                p.block.body-slim.text-left.mb-32 [32,1841 326x52] "Choose instant or deferred debit. Limits up to €200,000/month." {font=16px/26px w400; m=0px 0px 32px}
+      div.row-start-3.row-end-4.lg:row-start-1.lg:row-end-2.lg:self-end.lg:mb-6 [16,3025 358x50]
+        div.flex.flex-wrap.gap-16 [16,3025 358x50] {d=flex; fd=row jc=normal ai=normal wrap; gap=16px 16px}
+          a [16,3025 261x50] href=https://qonto.com/en/open-an-account {cur=pointer}
+            div.block.text-center.btn.btn-secondary.text-16.leading-26 [16,3025 261x50] {font=16px/26px w400; p=11px 16px; r=8px; bT=1px solid rgb(255, 255, 255); bR=1px solid rgb(255, 255, 255); bB=1px solid rgb(255, 255, 255); bL=1px solid rgb(255, 255, 255); ta=center; cur=pointer}
+              span [33,3037 227x26] {ta=center; cur=pointer}
+                p [33,3037 227x26] "Discover our business account" {ta=center; cur=pointer}

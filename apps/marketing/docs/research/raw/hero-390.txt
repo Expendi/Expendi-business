@@ -1,0 +1,27 @@
+section#section-1.relative.col-span-6.w-full.min-h-svh.lg:min-h-screen.md:col-span-9 [0,0 390x892] {bg=rgb(5, 5, 5); pos=relative; minh=844px}
+  picture.block.lg:hidden.w-full.lg:h-screen.h-svh.object-cover [0,0 390x844] {pos=absolute top:0px right:0px bottom:0px left:0px; z=10; fit=cover 50% 50%}
+    img.h-full.w-full.object-cover [0,0 390x844] IMG=https://qonto.com/blog/images/asset/33450/image/sm_avif-90db073d13b49a912698d8a66aa51585.avif alt="WEB Various HeroFullWidth Homepage Mobile Static WbRvmp" nat=305x542 {of=clip; fit=cover 50% 50%; maxw=100%; ar=auto 720 / 1280}
+  video#hero-video.object-cover.absolute.inset-0.z-20.w-full.h-svh [0,0 390x844] VIDEO=https://qonto.com/blog/images/down-net_http20260612-55-7yckw_lg_original.mp4 poster= {pos=absolute top:0px right:0px bottom:0px left:0px; z=20; of=clip; fit=cover 50% 50%; maxw=100%}
+  div.absolute.inset-0.z-30.pointer-events-none.lg:h-screen.h-svh [0,0 390x844] {font=16px/24px w400; color=rgb(255, 255, 255); bgimg=linear-gradient(rgba(5, 5, 5, 0) 78.6%, rgb(5, 5, 5) 100%), linear-gradient(0deg, rgba(5, 5, 5, 0.15) 0%, rgba(5, 5, 5, 0.15) 100%) size=auto, auto pos=0% 0%, 0% 0%; pos=absolute top:0px right:0px bottom:0px left:0px; z=30}
+  div.grid.relative.z-40.grid-cols-6.col-span-12.gap-x-24 [0,0 390x892] {font=16px/24px w400; color=rgb(255, 255, 255); d=grid; gtc=39.6562px 39.6562px 39.6562px 39.6562px 39.6562px 39.6562px gtr=756px; gap=24px 24px; p=88px 16px 48px; pos=relative; z=40; maxw=1600px; minh=100%}
+    div.flex.flex-col.col-span-6.pb-48.md:col-span-9.lg:col-span-12 [16,88 358x756] {d=flex; fd=column jc=flex-end ai=normal; p=0px 0px 48px}
+      div.flex.flex-col.gap-y-16.lg:gap-y-24.lg:w-870 [16,542 358x172] {d=flex; fd=column jc=normal ai=normal; gap=16px normal}
+        ul.h-32.cycle-ratings.w-fit [16,542 131x32] {pos=relative}
+          li [16,542 131x36] {font=14px/36px w400; d=list-item}
+            a.inline-flex.items-center.whitespace-nowrap [16,542 131x36] href=https://trustpilot.com/review/qonto.com {d=inline-flex; fd=row jc=normal ai=center; ws=nowrap; cur=pointer}
+              span.mr-4.font-bold [16,542 21x36] "4.7" {font=14px/36px w700; m=0px 4px 0px 0px; ws=nowrap; cur=pointer}
+              span [41,542 25x36] "of 5" {ws=nowrap; cur=pointer}
+              img.ml-8 [74,549 73x22] IMG=https://qonto.com/blog/assets/trustpilot-logo-with-text-dark-b22f8901d908ca3b6637db9fa438c9c8f3f8182a709d00499269c123cf4a7528.svg alt="Trustpilot badge" nat=73x22 {m=0px 0px 0px 8px; of=clip; maxw=100%; ws=nowrap; cur=pointer}
+        h1 [16,590 358x108] {font=28px/36px w700; fvn=lining-nums proportional-nums}
+          span.block [16,590 358x36] "Business account." {fvn=lining-nums proportional-nums}
+          span.block [16,626 358x36] "Finance management." {fvn=lining-nums proportional-nums}
+          span.block [16,662 358x36] "Company creation." {fvn=lining-nums proportional-nums}
+        p.body-regular [16,714 358x0] {font=16px/26px w400}
+      div.flex.gap-x-16.mt-32.lg:mt-48 [16,746 358x50] {d=flex; fd=row jc=normal ai=normal; gap=normal 16px; m=32px 0px 0px}
+        div.flex.flex-wrap.gap-16.darkmode [16,746 343x50] {d=flex; fd=row jc=normal ai=normal wrap; gap=16px 16px}
+          a [16,746 159x50] href=https://welcome.qonto.com/signup/select-country {cur=pointer}
+            div.block.text-center.whitespace-nowrap.btn.btn-primary.text-16 [16,746 159x50] {font=16px/26px w400; color=rgb(5, 5, 5); bg=rgb(255, 255, 255); p=12px 16px; r=8px; ws=nowrap; ta=center; cur=pointer}
+              span [32,761 127x19] "Open an account" {ws=nowrap; ta=center; cur=pointer}
+          a [191,746 169x50] href=https://qonto.com/en/pricing {cur=pointer}
+            div.block.text-center.btn.btn-secondary.text-16.leading-26 [191,746 169x50] {font=16px/26px w400; p=11px 16px; r=8px; bT=1px solid rgb(255, 255, 255); bR=1px solid rgb(255, 255, 255); bB=1px solid rgb(255, 255, 255); bL=1px solid rgb(255, 255, 255); ta=center; cur=pointer}
+              span [208,761 135x19] "Find the right plan" {ta=center; cur=pointer}

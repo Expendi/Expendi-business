@@ -1,0 +1,200 @@
+HEADER {"y":0,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":50,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":120,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":400,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":905,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":1500,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":2410,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-default","headerTf":"none","headerTop":0,"navBg":"oklab(0.999994 0.0000455677 0.0000200868 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"none","btnBg":"rgb(5, 5, 5)","btnColor":"rgb(255, 255, 255)","txtColor":"rgb(5, 5, 5)","signColor":"rgb(5, 5, 5)","shadow":"none","borderB":"0px solid rgb(5, 5, 5)"}
+HEADER {"y":2700,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-default","headerTf":"none","headerTop":0,"navBg":"oklab(0.999994 0.0000455677 0.0000200868 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"none","btnBg":"rgb(5, 5, 5)","btnColor":"rgb(255, 255, 255)","txtColor":"rgb(5, 5, 5)","signColor":"rgb(5, 5, 5)","shadow":"none","borderB":"0px solid rgb(5, 5, 5)"}
+HEADER {"y":3400,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-default","headerTf":"none","headerTop":0,"navBg":"oklab(0.999994 0.0000455677 0.0000200868 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"none","btnBg":"rgb(5, 5, 5)","btnColor":"rgb(255, 255, 255)","txtColor":"rgb(5, 5, 5)","signColor":"rgb(5, 5, 5)","shadow":"none","borderB":"0px solid rgb(5, 5, 5)"}
+HEADER {"y":4200,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-default","headerTf":"none","headerTop":0,"navBg":"oklab(0.999994 0.0000455677 0.0000200868 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"none","btnBg":"rgb(5, 5, 5)","btnColor":"rgb(255, 255, 255)","txtColor":"rgb(5, 5, 5)","signColor":"rgb(5, 5, 5)","shadow":"none","borderB":"0px solid rgb(5, 5, 5)"}
+HEADER {"y":5000,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-default","headerTf":"none","headerTop":0,"navBg":"oklab(0.999994 0.0000455677 0.0000200868 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"none","btnBg":"rgb(5, 5, 5)","btnColor":"rgb(255, 255, 255)","txtColor":"rgb(5, 5, 5)","signColor":"rgb(5, 5, 5)","shadow":"none","borderB":"0px solid rgb(5, 5, 5)"}
+HEADER {"y":5900,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":6500,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":7000,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":7400,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-default","headerTf":"none","headerTop":0,"navBg":"oklab(0.999994 0.0000455677 0.0000200868 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"none","btnBg":"rgb(5, 5, 5)","btnColor":"rgb(255, 255, 255)","txtColor":"rgb(5, 5, 5)","signColor":"rgb(5, 5, 5)","shadow":"none","borderB":"0px solid rgb(5, 5, 5)"}
+HEADER {"y":8100,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":8436,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":7000,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":3000,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-default","headerTf":"none","headerTop":0,"navBg":"oklab(0.999994 0.0000455677 0.0000200868 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"none","btnBg":"rgb(5, 5, 5)","btnColor":"rgb(255, 255, 255)","txtColor":"rgb(5, 5, 5)","signColor":"rgb(5, 5, 5)","shadow":"none","borderB":"0px solid rgb(5, 5, 5)"}
+HEADER {"y":500,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HEADER {"y":0,"headerCls":"fixed w-full website-revamp z-100000 top-0 lg:h-80 black","navCls":"transition-all duration-300 body-small-slim scrim-blur scrim-emphasis black","headerTf":"none","headerTop":0,"navBg":"oklab(0.114918 0.00000522286 0.00000230223 / 0.7)","navBdf":"blur(6px)","navTr":"background-color 0.5s ease-out","logoFilter":"brightness(0) invert(1)","btnBg":"rgb(255, 255, 255)","btnColor":"rgb(5, 5, 5)","txtColor":"rgb(255, 255, 255)","signColor":"rgb(255, 255, 255)","shadow":"none","borderB":"0px solid rgb(255, 255, 255)"}
+HOVER hero primary btn #section-1 .btn-primary 
+  div.block[0] backgroundColor: rgb(255, 255, 255) -> oklab(0.999994 0.0000455678 0.0000200868 / 0.92) 
+  transitions: div.block[0] transition=all | span.[1] transition=all
+HOVER hero secondary btn #section-1 .btn-secondary 
+  div.block[0] backgroundColor: rgba(0, 0, 0, 0) -> oklab(0.970145 0.0000441968 0.0000194311 / 0.08) 
+  transitions: div.block[0] transition=all | span.[1] transition=all
+HOVER nav item Business account header li.menu-title 
+  li.relative[0] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  li.relative[0] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  li.relative[0] transition: all -> color 0.2s
+  div.hidden[1] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  div.hidden[1] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  button.flex[2] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  button.flex[2] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  h3.grow[3] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  h3.grow[3] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  svg.[4] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  svg.[4] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  g.[5] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  g.[5] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  path.[6] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  path.[6] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  defs.[7] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  defs.[7] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  clippath.[8] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  clippath.[8] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  rect.[9] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  rect.[9] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  button.hidden[10] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  button.hidden[10] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  span.body-small-slim[11] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  span.body-small-slim[11] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  svg.max-h-10[12] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  svg.max-h-10[12] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  path.[13] color: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  path.[13] borderColor: rgb(255, 255, 255) -> rgb(5, 5, 5)
+  div.overflow-hidden[14] width: auto -> 1228px
+  div.overflow-hidden[14] height: auto -> 476px
+  div.overflow-hidden[14] display: none -> block
+  div.mt-20[15] width: auto -> 1228px
+  div.mt-20[15] height: auto -> 476px
+  div.flex[16] width: auto -> 1228px
+  div.flex[16] height: auto -> 476px
+  div.flex[17] width: auto -> 867px
+  div.flex[17] height: auto -> 412px
+  ul.specific-width[18] height: auto -> 412px
+  li.mt-32[19] width: auto -> 273px
+  li.mt-32[19] height: auto -> 22px
+  li.list-none[20] width: auto -> 273px
+  li.list-none[20] height: auto -> 54px
+  a.py-13[21] width: 100% -> 273px
+  a.py-13[21] height: auto -> 54px
+  div.inline[24] width: auto -> 181.484px
+  div.inline[24] height: auto -> 26px
+  div.flex[25] width: auto -> 181.484px
+  div.flex[25] height: auto -> 26px
+  span.[26] width: auto -> 181.484px
+  span.[26] height: auto -> 26px
+  li.list-none[27] width: auto -> 273px
+  li.list-none[27] height: auto -> 54px
+  a.py-13[28] width: 100% -> 273px
+  a.py-13[28] height: auto -> 54px
+  div.inline[32] width: auto -> 207.719px
+  div.inline[32] height: auto -> 26px
+  div.flex[33] width: auto -> 207.719px
+  div.flex[33] height: auto -> 26px
+  span.[34] width: auto -> 207.719px
+  span.[34] height: auto -> 26px
+  li.list-none[35] width: auto -> 273px
+  li.list-none[35] height: auto -> 54px
+  a.py-13[36] width: 100% -> 273px
+  a.py-13[36] height: auto -> 54px 
+  transitions: li.relative[0] transition=all | div.hidden[1] transition=all | button.flex[2] transition=all | h3.grow[3] transition=all | svg.[4] transition=all | g.[5] transition=all | path.[6] transition=all | defs.[7] transition=all
+HOVER Sign in header a:has-text("Sign in") 
+  a.body-regular[0] color: rgb(255, 255, 255) -> rgb(97, 97, 97)
+  a.body-regular[0] borderColor: rgb(255, 255, 255) -> rgb(97, 97, 97) 
+  transitions: a.body-regular[0] transition=all
+HOVER header Open account header a.btn-primary 
+  a.btn[0] backgroundColor: rgb(255, 255, 255) -> oklab(0.999994 0.0000455678 0.0000200868 / 0.92) 
+  transitions: a.btn[0] transition=all
+HOVER lang switch header .lang-switch-container 
+  svg.langPicker[21] transform: none -> matrix(-1, 0, 0, -1, 0, 0)
+  svg.langPicker[21] transition: all -> 0.4s ease-out
+  div.block[23] height: auto -> 326px
+  div.block[23] left: auto -> 0px
+  div.block[23] display: none -> block
+  p.mb-8[24] width: auto -> 292px
+  p.mb-8[24] height: auto -> 28px
+  div.mb-16[25] width: auto -> 292px
+  div.mb-16[25] height: auto -> 44px
+  div.flex[26] width: auto -> 292px
+  div.flex[26] height: auto -> 182px
+  ul.w-1/2[27] width: 50% -> 146px
+  ul.w-1/2[27] height: auto -> 182px
+  li.mb-8[28] width: auto -> 146px
+  li.mb-8[28] height: auto -> 30px
+  div.flex[29] width: fit-content -> 85.5625px
+  div.flex[29] height: auto -> 30px 
+  transitions: div.flex[0] transition=all | button.button-switcher[1] transition=all | span.[2] transition=all | svg.lazy[3] transition=all | path.[4] transition=all | g.[5] transition=all | path.[6] transition=all | path.[7] transition=all
+HOVER trustpilot rating link #section-1 .cycle-ratings a 
+  NO DIFF 
+  transitions: a.inline-flex[0] transition=all | span.mr-4[1] transition=all | span.[2] transition=all | img.ml-8[3] transition=all
+HOVER bento secondary btn #section-3 .btn-secondary 
+  div.block[0] backgroundColor: rgba(0, 0, 0, 0) -> oklab(0.970145 0.0000441968 0.0000194311 / 0.08) 
+  transitions: div.block[0] transition=all | span.[1] transition=all | p.[2] transition=all
+HOVER bento card pay #section-3 .card-content 
+  NO DIFF 
+  transitions: div.flex[0] transition=all | div.flex[1] transition=all | h3.h3-small[2] transition=all | p.block[3] transition=all | div.hidden[4] transition=all | lottie-player.h-full[5] transition=0.5s cubic-bezier(0.4, 0, 0.2, 1) | div.flex[6] transition=all | div.flex[7] transition=all
+HOVER bento card get paid #section-3 .lg\:col-start-17 > div 
+  NO DIFF 
+  transitions: div.flex[0] transition=all | div.absolute[1] transition=all | div.absolute[2] transition=all | div.absolute[3] transition=all | div.flex[4] transition=all | h3.h3-small[5] transition=all | p.block[6] transition=all
+HOVER ai step 2 #section-4 [data-wr-tha-target="step"] 
+  NO DIFF 
+  transitions: div.flex[0] transition=opacity 0.5s | div.flex[1] transition=all | div.overflow-hidden[2] transition=all | div.w-full[3] transition=none | div.flex-1[4] transition=color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), outline-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), text-decoration-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), fill 0.3s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-from 0.3s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-via 0.3s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-to 0.3s cubic-bezier(0.4, 0, 0.2, 1) | h3.h3-small[5] transition=all | p.body-regular[6] transition=all | p.[7] transition=all
+HOVER ai discover btn #section-4 .hidden.lg\:block .btn-secondary 
+  div.block[0] backgroundColor: rgba(0, 0, 0, 0) -> rgba(29, 29, 27, 0.08) 
+  transitions: div.block[0] transition=all | span.[1] transition=all
+HOVER invoicing btn #section-5 .btn-secondary 
+  div.block[0] backgroundColor: rgba(0, 0, 0, 0) -> rgba(29, 29, 27, 0.08) 
+  transitions: div.block[0] transition=all | span.[1] transition=all
+HOVER invoicing card 1 #section-5 .hidden.lg\:flex .wr-card-linkable 
+  div.relative[0] translate: none -> 0px -10px
+  div.btn-rounded[10] opacity: 0 -> 1
+  div.arrow-primary[13] transform: matrix(1, 0, 0, 1, 0, 0) -> matrix(1, 0, 0, 1, 18, -18)
+  div.arrow-primary[13] animationName: none -> arrow-exit
+  div.arrow-secondary[18] transform: matrix(1, 0, 0, 1, -18, 18) -> matrix(1, 0, 0, 1, 0, 0)
+  div.arrow-secondary[18] animationName: none -> arrow-enter 
+  transitions: div.relative[0] transition=translate 0.25s ease-out | div.w-full[1] transition=all | div.relative[2] transition=all | div.flex[3] transition=all | picture.flex[4] transition=all | source.[5] transition=all | source.[6] transition=all | img.rounded-2xl[7] transition=all
+HOVER invoicing card 2 #section-5 .hidden.lg\:flex .wr-card-linkable 
+  div.relative[0] translate: none -> 0px -10px
+  div.btn-rounded[7] opacity: 0 -> 1
+  div.arrow-primary[10] transform: matrix(1, 0, 0, 1, 0, 0) -> matrix(1, 0, 0, 1, 18, -18)
+  div.arrow-primary[10] animationName: none -> arrow-exit
+  div.arrow-secondary[15] transform: matrix(1, 0, 0, 1, -18, 18) -> matrix(1, 0, 0, 1, 0, 0)
+  div.arrow-secondary[15] animationName: none -> arrow-enter 
+  transitions: div.relative[0] transition=translate 0.25s ease-out | div.w-full[1] transition=all | div.relative[2] transition=all | div.flex[3] transition=all | lottie-player.rounded-2xl[4] transition=all | div.absolute[5] transition=all | div.cta-rounded-wrapper[6] transition=all | div.btn-rounded[7] transition=opacity 0.1s linear
+HOVER company btn #section-7 .btn-secondary 
+  div.block[0] backgroundColor: rgba(0, 0, 0, 0) -> rgba(29, 29, 27, 0.08) 
+  transitions: div.block[0] transition=all | span.[1] transition=all
+HOVER testimonial btn #section-9 .btn-secondary 
+  div.block[0] backgroundColor: rgba(0, 0, 0, 0) -> oklab(0.970145 0.0000441968 0.0000194311 / 0.08) 
+  transitions: div.block[0] transition=all | span.[1] transition=all
+HOVER testimonial slide #section-9 .swiper-slide-active .card-content 
+  NO DIFF 
+  transitions: div.card-content[0] transition=translate 0.25s ease-out | div.wr-showreel-media[1] transition=all | picture.absolute[2] transition=all | source.[3] transition=all | source.[4] transition=all | img.w-full[5] transition=all | div.absolute[6] transition=all | picture.absolute[7] transition=all
+HOVER testimonial next #section-9 .swiper-nav-next 
+  NO DIFF 
+  transitions: button.flex[0] transition=all | div.flex[1] transition=all | div.flex[2] transition=all | div.btn-tertiary-arrow-container[3] transition=all | div.arrow-primary[4] transition=all | svg.h-24[5] transition=all | path.[6] transition=all | div.arrow-secondary[7] transition=all
+HOVER testimonial prev #section-9 .swiper-nav-prev 
+  NO DIFF 
+  transitions: button.flex[0] transition=all | div.flex[1] transition=all | div.flex[2] transition=all | div.btn-tertiary-arrow-container[3] transition=all | div.arrow-primary[4] transition=all | svg.h-24[5] transition=all | path.[6] transition=all | div.arrow-secondary[7] transition=all
+HOVER protection learn more .btn-tertiary 
+  NO DIFF 
+  transitions: a.pointer-events-auto[0] transition=all | span.relative[1] transition=all | div.invert-svg[2] transition=all | div.btn-tertiary-arrow-wrapper[3] transition=all | div.btn-tertiary-arrow-container[4] transition=all | div.arrow-primary[5] transition=all | svg.rotate-135[6] transition=all | style.[7] transition=all
+HOVER cta primary #section-11 .btn-primary 
+  div.block[0] backgroundColor: rgb(255, 255, 255) -> oklab(0.999994 0.0000455678 0.0000200868 / 0.92) 
+  transitions: div.block[0] transition=all | span.[1] transition=all
+HOVER cta secondary #section-11 .btn-secondary 
+  div.block[0] backgroundColor: rgba(0, 0, 0, 0) -> oklab(0.970145 0.0000441968 0.0000194311 / 0.08) 
+  transitions: div.block[0] transition=all | span.[1] transition=all
+HOVER footer pricing card footer .group 
+  div.arrow-primary[5] transform: matrix(1, 0, 0, 1, 0, 0) -> matrix(1, 0, 0, 1, 18, -18)
+  div.arrow-primary[5] animationName: none -> arrow-exit
+  div.arrow-secondary[10] transform: matrix(1, 0, 0, 1, -18, 18) -> matrix(1, 0, 0, 1, 0, 0)
+  div.arrow-secondary[10] animationName: none -> arrow-enter 
+  transitions: div.p-24[0] transition=all | a.[1] transition=all | div.btn-rounded[2] transition=0.3s cubic-bezier(0.4, 0, 0.2, 1) | div.btn-rounded-arrow-wrapper[3] transition=all | div.btn-rounded-arrow-container[4] transition=all | div.arrow-primary[5] transition=all | svg.rotate-135[6] transition=all | style.[7] transition=all
+HOVER footer link footer a.footer-nav-links 
+  NO DIFF 
+  transitions: a.border-bottom-animation[0] transition=background-size 0.2s ease-in-out
+HOVER footer bottom link NOT FOUND footer a
+HOVER footer social footer a[href*="facebook"] 
+  NO DIFF 
+  transitions: a.[0] transition=all | img.h-30[1] transition=all
+MEGAMENU 0 {"op":"0.5","tr":"all","cls":"fixed left-0 top-80 w-full h-screen rounded-none opacity-0 pointer-events-none bg-primary-black overlay -z-10 animate-overlayFadeRevamp","nav":"rgb(255, 255, 255)","navCls":"transition-all duration-300 body-small-slim scrim-blur bg-primary-white"}
+MEGAMENU 1 {"op":"0.5","tr":"all","cls":"fixed left-0 top-80 w-full h-screen rounded-none opacity-0 pointer-events-none bg-primary-black overlay -z-10 animate-overlayFadeRevamp","nav":"rgb(255, 255, 255)","navCls":"transition-all duration-300 body-small-slim scrim-blur bg-primary-white"}
+MEGAMENU 2 {"op":"0.5","tr":"all","cls":"fixed left-0 top-80 w-full h-screen rounded-none opacity-0 pointer-events-none bg-primary-black overlay -z-10 animate-overlayFadeRevamp","nav":"rgb(255, 255, 255)","navCls":"transition-all duration-300 body-small-slim scrim-blur bg-primary-white"}
+MEGAMENU 3 {"op":"0.5","tr":"all","cls":"fixed left-0 top-80 w-full h-screen rounded-none opacity-0 pointer-events-none bg-primary-black overlay -z-10 animate-overlayFadeRevamp","nav":"rgb(255, 255, 255)","navCls":"transition-all duration-300 body-small-slim scrim-blur bg-primary-white"}
+MEGAMENU 4 {"op":"0.5","tr":"all","cls":"fixed left-0 top-80 w-full h-screen rounded-none opacity-0 pointer-events-none bg-primary-black overlay -z-10 animate-overlayFadeRevamp","nav":"rgb(255, 255, 255)","navCls":"transition-all duration-300 body-small-slim scrim-blur bg-primary-white"}
+MEGAMENU 5 {"op":"0.5","tr":"all","cls":"fixed left-0 top-80 w-full h-screen rounded-none opacity-0 pointer-events-none bg-primary-black overlay -z-10 animate-overlayFadeRevamp","nav":"rgb(255, 255, 255)","navCls":"transition-all duration-300 body-small-slim scrim-blur bg-primary-white"}

@@ -1,0 +1,53 @@
+li.relative.list-none.lg:h-80.lg:flex.lg:items-center.menu-title [752,0 68x80] {font=16px/26px w400; color=rgb(5, 5, 5); d=flex; fd=row jc=normal ai=center; pos=relative; tr=color 0.2s}
+  div.hidden.absolute.top-0.w-full.h-full.cursor-pointer [752,0 68x80] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=pointer}
+  button.hidden.nav-desktop-item.px-0.text-left.lg:py-0.lg:border-0 [752,27 67x26] {cur=pointer}
+    span.body-small-slim.nav-menu-text.!leading-20 [752,30 67x19] "About us" {font=16px/20px w400; cur=pointer}
+  div#navigation-item-5.overflow-hidden.submenu.lg:group-hover:block.nav-submenu-revamp.menu-list.hidden [720,96 634x452] {bg=rgb(255, 255, 255); r=32px; pos=absolute top:96px right:-534px bottom:-468px left:-32px; z=1000; of=hidden}
+    div.mt-20.mb-32.lg:flex.lg:mt-0.lg:mb-0 [720,96 634x452] {d=flex; fd=row jc=normal ai=normal}
+      div.flex.flex-col.md:justify-between.lg:justify-center.md:flex-row.lg:p-32 [720,96 634x452] {d=flex; fd=row jc=center ai=normal; gap=24px 24px; p=32px}
+        div.flex.flex-col.flex-1.lg:flex-row.lg:gap-24 [752,128 273x388] {d=flex; fd=row jc=normal ai=normal; gap=24px 24px}
+          ul.lg:w-273 [752,128 273x388]
+            li.mt-32.mb-6.list-none.nav-top-category.content-secondary.no-darkmode [752,128 273x22] "About Qonto" {font=14px/22px w400; color=rgb(61, 61, 61); d=list-item; m=0px 0px 6px}
+            li.list-none.transition-all.duration-200.submenu-item [752,156 273x54] {d=list-item; tr=0.2s cubic-bezier(0.4, 0, 0.2, 1)}
+              a.py-13.lg:py-14.body-regular.md:body-small-regular.flex.items-center [752,156 273x54] href=/en/customers {d=flex; fd=row jc=normal ai=center; p=14px 0px; cur=pointer}
+                svg.inline.mr-10.flex-none.size-20.lg:size-22 [752,172 22x22] SVG(0 0 32 32) {m=0px 10px 0px 0px; of=hidden; cur=pointer}
+                div.inline.flex [784,170 169x26] {cur=pointer}
+                  div.flex.items-center [784,170 169x26] {d=flex; fd=row jc=normal ai=center; cur=pointer}
+                    span [784,170 169x26] "Customer case studies" {cur=pointer}
+            li.list-none.transition-all.duration-200.submenu-item [752,210 273x54] {d=list-item; tr=0.2s cubic-bezier(0.4, 0, 0.2, 1)}
+              a.py-13.lg:py-14.body-regular.md:body-small-regular.flex.items-center [752,210 273x54] href=/en/about {d=flex; fd=row jc=normal ai=center; p=14px 0px; cur=pointer}
+                svg.inline.mr-10.flex-none.size-20.lg:size-22 [752,226 22x22] SVG(0 0 32 32) {m=0px 10px 0px 0px; of=hidden; cur=pointer}
+                div.inline.flex [784,224 67x26] {cur=pointer}
+                  div.flex.items-center [784,224 67x26] {d=flex; fd=row jc=normal ai=center; cur=pointer}
+                    span [784,224 67x26] "About us" {cur=pointer}
+            li.mt-32.mb-6.list-none.nav-top-category.content-secondary.no-darkmode [752,296 273x22] {font=14px/22px w400; color=rgb(61, 61, 61); d=list-item; m=32px 0px 6px}
+              p [752,296 273x22] "Qonto AI"
+            li.list-none.transition-all.duration-200.submenu-item [752,324 273x54] {d=list-item; tr=0.2s cubic-bezier(0.4, 0, 0.2, 1)}
+              a.py-13.lg:py-14.body-regular.md:body-small-regular.flex.items-center [752,324 273x54] href=https://qonto.com/en/ai {d=flex; fd=row jc=normal ai=center; p=14px 0px; cur=pointer}
+                svg.inline.mr-10.flex-none.size-20.lg:size-22 [752,340 22x22] SVG(0 0 32 32) {m=0px 10px 0px 0px; of=hidden; cur=pointer}
+                div.inline.flex [784,338 53x26] {cur=pointer}
+                  div.flex.items-center [784,338 53x26] {d=flex; fd=row jc=normal ai=center; cur=pointer}
+                    span [784,338 53x26] "Agents" {cur=pointer}
+            li.list-none.transition-all.duration-200.submenu-item [752,378 273x54] {d=list-item; tr=0.2s cubic-bezier(0.4, 0, 0.2, 1)}
+              a.py-13.lg:py-14.body-regular.md:body-small-regular.flex.items-center [752,378 273x54] href=https://qonto.com/en/ai/mcp {d=flex; fd=row jc=normal ai=center; p=14px 0px; cur=pointer}
+                svg.inline.mr-10.flex-none.size-20.lg:size-22 [752,394 22x22] SVG(0 0 32 32) {m=0px 10px 0px 0px; of=hidden; cur=pointer}
+                div.inline.flex [784,392 36x26] {cur=pointer}
+                  div.flex.items-center [784,392 36x26] {d=flex; fd=row jc=normal ai=center; cur=pointer}
+                    span [784,392 36x26] "MCP" {cur=pointer}
+        div.flex.flex-col.flex-1.specific-width-highlight.lg:w-273.lg:mb-8 [1049,128 273x380] {d=flex; fd=column jc=normal ai=normal; m=0px 0px 8px}
+          a.group.lg:flex-1.lg:min-h-284.lg:max-h-335.mb-16.mt-32 [1049,128 273x284] href=https://qonto.com/en/ai {bgimg=radial-gradient(66.82% 50%, rgb(224, 224, 224) 0%, rgb(245, 245, 245) 100%) size=auto pos=0% 0%; m=0px 0px 16px; r=8px; pos=relative; minh=284px; maxh=335px; cur=pointer}
+            div.overflow-hidden.w-full.rounded-lg.md:h-310.lg:h-full.lg:min-w-260 [1049,128 273x284] {d=flex; fd=row jc=normal ai=flex-end; r=8px; of=hidden; cur=pointer}
+              picture.flex.w-full [1049,139 273x273] {d=flex; fd=row jc=normal ai=normal; cur=pointer}
+                img.object-contain.lg:object-cover.lg:aspect-auto.w-full.rounded-lg.aspect-[10/7] [1049,139 273x273] IMG=https://qonto.com/blog/images/asset/36901/image/lg_avif-0cf350be73c1cfd9414f8649890038dc.avif alt="Discover Qonto AI" nat=1440x1440 {r=8px; of=clip; fit=cover 50% 50%; maxw=100%; cur=pointer}
+            div.absolute.top-16.right-16 [1274,144 32x32] {pos=absolute top:16px right:16px bottom:236px left:225px; cur=pointer}
+              div.btn-rounded [1274,144 32x32] {bg=rgb(232, 232, 232); d=flex; fd=row jc=center ai=center; r=3.35544e+07px; tr=0.3s cubic-bezier(0.4, 0, 0.2, 1); of=hidden; cur=pointer}
+                div.btn-rounded-arrow-wrapper [1281,151 18x18] {pos=relative; cur=pointer}
+                  div.btn-rounded-arrow-container [1281,151 18x18] {pos=relative; cur=pointer}
+                    div.arrow-primary.lg:group-hover:animate-arrow-exit-250 [1281,151 18x18] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, 0, 0); cur=pointer}
+                      svg#Layer_1.rotate-135.rotate-135 [1277,147 25x25] SVG(0 0 18 18) {of=hidden; cur=pointer}
+                    div.arrow-secondary.lg:group-hover:animate-arrow-enter-250 [1263,169 18x18] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, -18, 18); cur=pointer}
+                      svg#Layer_1.rotate-135.rotate-135 [1259,165 25x25] SVG(0 0 18 18) {of=hidden; cur=pointer}
+          div.body-regular.md:body-bold [1049,428 273x28] {font=18px/28px w700}
+            strong [1049,431 154x21] "Discover Qonto AI"
+          div.body-regular.md:body-small-regular [1049,456 273x52]
+            p [1049,456 273x52] "Your Qonto account comes with built-in AI agents."

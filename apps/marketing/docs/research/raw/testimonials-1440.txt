@@ -1,0 +1,105 @@
+section#section-9.py-48.md:py-64.lg:py-80.wr-showreel.swiper-carousel.surface-section-background-inverse [0,5871 1440x1068] {bg=rgb(5, 5, 5); p=80px 0px; of=clip hidden}
+  div.grid.grid-cols-6.gap-x-8.md:grid-cols-9.lg:grid-cols-12.website-revamp [0,5951 1440x908] {font=18px/24px w400; color=rgb(255, 255, 255); d=grid; gtc=90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px 90px gtr=120px 708px 80px; gap=normal 24px; p=0px 48px; maxw=1600px}
+    div.col-span-full.mb-32.md:mb-40.lg:mb-56 [48,5951 1344x64] {m=0px 0px 56px}
+      div.flex.flex-col.gap-24.justify-between.w-full.lg:flex-row [48,5951 1344x64] {d=flex; fd=row jc=space-between ai=flex-end; gap=8px 8px}
+        h2 [48,5951 675x64] "Our customers say it best" {font=56px/64px w600; fvn=lining-nums proportional-nums}
+        div.flex.lg:mb-8.shrink-0 [1188,5955 204x52] {d=flex; fd=row jc=normal ai=normal; m=0px 0px 8px}
+          div.block [1188,5955 204x52]
+            a [1188,5970 204x21] href=https://qonto.com/fr/customers {cur=pointer}
+              div.block.text-center.btn.btn-secondary.text-16.leading-26 [1188,5955 204x52] {font=18px/28px w400; d=inline-block; p=11px 16px; r=8px; bT=1px solid rgb(255, 255, 255); bR=1px solid rgb(255, 255, 255); bB=1px solid rgb(255, 255, 255); bL=1px solid rgb(255, 255, 255); ta=center; cur=pointer}
+                span [1205,5970 170x21] "Lire les témoignages" {ta=center; cur=pointer}
+    div.col-span-full.min-w-0.wr-showreel-carousel-full-bleed [0,6071 1440x708] {m=0px 0px 0px -720px; pos=relative}
+      div.swiper.wr-showreel-swiper.w-full.max-w-full.swiper-backface-hidden.swiper-initialized [0,6071 1440x708] {pos=relative; z=1; maxw=1600px}
+        div.swiper-wrapper [-2498,6071 1440x708] {d=flex; fd=row jc=normal ai=normal; pos=relative; z=1; tf=matrix(1, 0, 0, 1, -2498, 0); tr=transform; cur=grab}
+          div.swiper-slide.wr-showreel-slide [-2498,6071 1249x708] {m=0px 24px 0px 0px; pos=relative; op=0.5; tf=matrix(1, 0, 0, 1, 0, 0); tr=opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1); maxw=1249px; cur=grab}
+            div.hidden.lg:block.h-full [-2498,6071 1249x708] {cur=grab}
+              div.card-content.group.relative.h-full.will-change-transform [-2498,6071 1249x708] {pos=relative; tr=translate 0.25s ease-out; cur=grab}
+                div.wr-showreel-media.relative.overflow-hidden.rounded-3xl [-2498,6071 1249x708] {r=24px; pos=relative; of=hidden; cur=grab}
+                  picture.absolute.inset-0 [-2498,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                    img.w-full.h-full.object-cover.object-top [-2498,6071 1249x708] IMG=https://qonto.com/blog/images/asset/34488/image/lg_avif-5b7dd8a538f14a49c50b4bfcbd0bdfd1.avif alt="" nat=1440x809 {of=clip; fit=cover 50% 0%; maxw=100%; cur=grab; ar=auto 3840 / 2160}
+                  div.absolute.inset-0.pointer-events-none [-2498,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                    picture.absolute.inset-0 [-2498,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                      img.w-full.h-full.object-cover.object-top.photo-blur-left-to-right [-2498,6071 1249x708] IMG=https://qonto.com/blog/images/asset/34488/image/lg_avif-5b7dd8a538f14a49c50b4bfcbd0bdfd1.avif alt="" nat=1440x809 {tf=matrix(1, 0, 0, 1, 0, 0); filter=blur(6px); of=clip; fit=cover 50% 0%; maxw=100%; cur=grab; ar=auto 3840 / 2160}
+                    div.absolute.inset-0.scrim-dark-photo-overlay-gradient-left-to-right [-2498,6071 1249x708] {bgimg=linear-gradient(90deg, rgba(5, 5, 5, 0.67) 0%, rgba(5, 5, 5, 0.67) 20%, rgba(5, 5, 5, 0) 60%) size=auto pos=0% 0%; pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                  div.wr-showreel-overlay.absolute.inset-0.z-10 [-2498,6079 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; z=10; op=0; tf=matrix(1, 0, 0, 1, 0, 8); tr=opacity 0.15s cubic-bezier(0.4, 0, 1, 1), transform 0.15s cubic-bezier(0.4, 0, 1, 1); cur=grab}
+                    div.absolute.top-24.left-24 [-2474,6103 122x40] {pos=absolute top:24px right:1103px bottom:644px left:24px; cur=grab}
+                      img.h-40.w-auto.object-contain.brightness-0.invert [-2474,6103 122x40] IMG=https://qonto.com/blog/images/asset/25709/image/fcd5f778043bd52ed3d8071935da97fb.svg alt="" nat=122x40 {filter=brightness(0) invert(1); of=clip; fit=contain 50% 50%; maxw=100%; cur=grab; ar=auto 122 / 40}
+                    div.absolute.inset-x-0.bottom-0.p-32.pb-80.text-primary-white [-2498,6535 1249x252] {p=32px 32px 80px; pos=absolute top:456px right:0px bottom:0px left:0px; cur=grab}
+                      div.w-[574px].max-w-full [-2466,6567 574x140] {maxw=100%; cur=grab}
+                        div.lead.mb-16 [-2466,6567 574x96] "Qonto adapts as our team grows. No more time-consuming, low-value processes. Employee expense management becomes simple." {font=22px/32px w400; m=0px 0px 16px; cur=grab}
+                          span [-2466,6570 10x25] "“" {cur=grab}
+                          span [-2161,6634 10x25] "”" {cur=grab}
+                        div.body-slim [-2466,6679 574x28] "Oksana Besnier, Financer Manager at Poiscaille" {font=18px/28px w400; cur=grab}
+          div.swiper-slide.wr-showreel-slide.swiper-slide-prev [-1225,6071 1249x708] {m=0px 24px 0px 0px; pos=relative; op=0.5; tf=matrix(1, 0, 0, 1, 0, 0); tr=opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1); maxw=1249px; cur=grab}
+            div.hidden.lg:block.h-full [-1225,6071 1249x708] {cur=grab}
+              div.card-content.group.relative.h-full.will-change-transform [-1225,6071 1249x708] {pos=relative; tr=translate 0.25s ease-out; cur=grab}
+                div.wr-showreel-media.relative.overflow-hidden.rounded-3xl [-1225,6071 1249x708] {r=24px; pos=relative; of=hidden; cur=grab}
+                  picture.absolute.inset-0 [-1225,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                    img.w-full.h-full.object-cover.object-top [-1225,6071 1249x708] IMG=https://qonto.com/blog/images/asset/34756/image/lg_avif-ea98e07956c479982cba290e952851eb.avif alt="" nat=1440x809 {of=clip; fit=cover 50% 0%; maxw=100%; cur=grab; ar=auto 3840 / 2160}
+                  div.absolute.inset-0.pointer-events-none [-1225,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                    picture.absolute.inset-0 [-1225,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                      img.w-full.h-full.object-cover.object-top.photo-blur-left-to-right [-1225,6071 1249x708] IMG=https://qonto.com/blog/images/asset/34756/image/lg_avif-ea98e07956c479982cba290e952851eb.avif alt="" nat=1440x809 {tf=matrix(1, 0, 0, 1, 0, 0); filter=blur(6px); of=clip; fit=cover 50% 0%; maxw=100%; cur=grab; ar=auto 3840 / 2160}
+                    div.absolute.inset-0.scrim-dark-photo-overlay-gradient-left-to-right [-1225,6071 1249x708] {bgimg=linear-gradient(90deg, rgba(5, 5, 5, 0.67) 0%, rgba(5, 5, 5, 0.67) 20%, rgba(5, 5, 5, 0) 60%) size=auto pos=0% 0%; pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                  div.wr-showreel-overlay.absolute.inset-0.z-10 [-1225,6079 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; z=10; op=0; tf=matrix(1, 0, 0, 1, 0, 8); tr=opacity 0.15s cubic-bezier(0.4, 0, 1, 1), transform 0.15s cubic-bezier(0.4, 0, 1, 1); cur=grab}
+                    div.absolute.top-24.left-24 [-1201,6103 180x40] {pos=absolute top:24px right:1045px bottom:644px left:24px; cur=grab}
+                      img.h-40.w-auto.object-contain.brightness-0.invert [-1201,6103 180x40] IMG=https://qonto.com/blog/images/asset/34546/image/99067b1bc5a4704e0d10b47a70680f8e.svg alt="" nat=180x40 {filter=brightness(0) invert(1); of=clip; fit=contain 50% 50%; maxw=100%; cur=grab; ar=auto 180 / 40}
+                    div.absolute.inset-x-0.bottom-0.p-32.pb-80.text-primary-white [-1225,6503 1249x284] {p=32px 32px 80px; pos=absolute top:424px right:0px bottom:0px left:0px; cur=grab}
+                      div.w-[574px].max-w-full [-1193,6535 574x172] {maxw=100%; cur=grab}
+                        div.lead.mb-16 [-1193,6535 574x128] "I needed to move fast when launching my business. Having a platform like Qonto - bringing all the essential services together in one place - was the best solution for me." {font=22px/32px w400; m=0px 0px 16px; cur=grab}
+                          span [-1193,6538 10x25] "“" {cur=grab}
+                          span [-1157,6634 10x25] "”" {cur=grab}
+                        div.body-slim [-1193,6679 574x28] "Pierre-Louis Vouteau, Founder of Ooak Data" {font=18px/28px w400; cur=grab}
+          div.swiper-slide.wr-showreel-slide.swiper-slide-active [48,6071 1249x708] {m=0px 24px 0px 0px; pos=relative; tf=matrix(1, 0, 0, 1, 0, 0); tr=opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1); maxw=1249px; cur=grab}
+            div.hidden.lg:block.h-full [48,6071 1249x708] {cur=grab}
+              div.card-content.group.relative.h-full.will-change-transform [48,6071 1249x708] {pos=relative; tr=translate 0.25s ease-out; cur=grab}
+                div.wr-showreel-media.relative.overflow-hidden.rounded-3xl [48,6071 1249x708] {r=24px; pos=relative; of=hidden; cur=grab}
+                  picture.absolute.inset-0 [48,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                    img.w-full.h-full.object-cover.object-top [48,6071 1249x708] IMG=https://qonto.com/blog/images/asset/34489/image/lg_avif-21acf1d97bbd4919e5ba3c5b7a90a2d3.avif alt="" nat=1440x809 {of=clip; fit=cover 50% 0%; maxw=100%; cur=grab; ar=auto 3840 / 2160}
+                  div.absolute.inset-0.pointer-events-none [48,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                    picture.absolute.inset-0 [48,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                      img.w-full.h-full.object-cover.object-top.photo-blur-left-to-right [48,6071 1249x708] IMG=https://qonto.com/blog/images/asset/34489/image/lg_avif-21acf1d97bbd4919e5ba3c5b7a90a2d3.avif alt="" nat=1440x809 {tf=matrix(1, 0, 0, 1, 0, 0); filter=blur(6px); of=clip; fit=cover 50% 0%; maxw=100%; cur=grab; ar=auto 3840 / 2160}
+                    div.absolute.inset-0.scrim-dark-photo-overlay-gradient-left-to-right [48,6071 1249x708] {bgimg=linear-gradient(90deg, rgba(5, 5, 5, 0.67) 0%, rgba(5, 5, 5, 0.67) 20%, rgba(5, 5, 5, 0) 60%) size=auto pos=0% 0%; pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                  div.wr-showreel-overlay.absolute.inset-0.z-10 [48,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; z=10; tf=matrix(1, 0, 0, 1, 0, 0); tr=opacity 0.35s cubic-bezier(0, 0, 0.2, 1) 0.15s, transform 0.35s cubic-bezier(0, 0, 0.2, 1) 0.15s; cur=grab}
+                    div.absolute.top-24.left-24 [72,6095 168x40] {pos=absolute top:24px right:1057px bottom:644px left:24px; cur=grab}
+                      img.h-40.w-auto.object-contain.brightness-0.invert [72,6095 168x40] IMG=https://qonto.com/blog/images/asset/34545/image/c65f14794f7baec76dda9a2b998fe5d7.svg alt="" nat=168x40 {filter=brightness(0) invert(1); of=clip; fit=contain 50% 50%; maxw=100%; cur=grab; ar=auto 168 / 40}
+                    div.absolute.inset-x-0.bottom-0.p-32.pb-80.text-primary-white [48,6527 1249x252] {p=32px 32px 80px; pos=absolute top:456px right:0px bottom:0px left:0px; cur=grab}
+                      div.w-[574px].max-w-full [80,6559 574x140] {maxw=100%; cur=grab}
+                        div.lead.mb-16 [80,6559 574x96] "I'd recommend Qonto to everyone. In my view, it's the ideal financial management solution for all businesses, regardless of their size or needs." {font=22px/32px w400; m=0px 0px 16px; cur=grab}
+                          span [80,6562 10x25] "“" {cur=grab}
+                          span [409,6626 10x25] "”" {cur=grab}
+                        div.body-slim [80,6671 574x28] "Pierre-Antoine Errard, Founder of Solarian" {font=18px/28px w400; cur=grab}
+          div.swiper-slide.wr-showreel-slide.swiper-slide-next [1321,6071 1249x708] {m=0px 24px 0px 0px; pos=relative; op=0.5; tf=matrix(1, 0, 0, 1, 0, 0); tr=opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1); maxw=1249px; cur=grab}
+            div.hidden.lg:block.h-full [1321,6071 1249x708] {cur=grab}
+              div.card-content.group.relative.h-full.will-change-transform [1321,6071 1249x708] {pos=relative; tr=translate 0.25s ease-out; cur=grab}
+                div.wr-showreel-media.relative.overflow-hidden.rounded-3xl [1321,6071 1249x708] {r=24px; pos=relative; of=hidden; cur=grab}
+                  picture.absolute.inset-0 [1321,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                    img.w-full.h-full.object-cover.object-top [1321,6071 1249x708] IMG=https://qonto.com/blog/images/asset/34566/image/lg_avif-7a65b67a705bf25caba200dc843776c5.avif alt="" nat=1440x809 {of=clip; fit=cover 50% 0%; maxw=100%; cur=grab; ar=auto 3840 / 2160}
+                  div.absolute.inset-0.pointer-events-none [1321,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                    picture.absolute.inset-0 [1321,6071 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                      img.w-full.h-full.object-cover.object-top.photo-blur-left-to-right [1321,6071 1249x708] IMG=https://qonto.com/blog/images/asset/34566/image/lg_avif-7a65b67a705bf25caba200dc843776c5.avif alt="" nat=1440x809 {tf=matrix(1, 0, 0, 1, 0, 0); filter=blur(6px); of=clip; fit=cover 50% 0%; maxw=100%; cur=grab; ar=auto 3840 / 2160}
+                    div.absolute.inset-0.scrim-dark-photo-overlay-gradient-left-to-right [1321,6071 1249x708] {bgimg=linear-gradient(90deg, rgba(5, 5, 5, 0.67) 0%, rgba(5, 5, 5, 0.67) 20%, rgba(5, 5, 5, 0) 60%) size=auto pos=0% 0%; pos=absolute top:0px right:0px bottom:0px left:0px; cur=grab}
+                  div.wr-showreel-overlay.absolute.inset-0.z-10 [1321,6079 1249x708] {pos=absolute top:0px right:0px bottom:0px left:0px; z=10; op=0; tf=matrix(1, 0, 0, 1, 0, 8); tr=opacity 0.15s cubic-bezier(0.4, 0, 1, 1), transform 0.15s cubic-bezier(0.4, 0, 1, 1); cur=grab}
+                    div.absolute.inset-x-0.bottom-0.p-32.pb-80.text-primary-white [1321,6503 1249x284] {p=32px 32px 80px; pos=absolute top:424px right:0px bottom:0px left:0px; cur=grab}
+                      div.w-[574px].max-w-full [1353,6535 574x172] {maxw=100%; cur=grab}
+                        div.lead.mb-16 [1353,6535 574x128] "I'd recommend Qonto to any entrepreneur looking for more than a bank - a true partner for their projects. I can finally spend time on my sites instead of on the phone with my bank." {font=22px/32px w400; m=0px 0px 16px; cur=grab}
+                          span [1353,6538 10x25] "“" {cur=grab}
+                          span [1492,6634 10x25] "”" {cur=grab}
+                        div.body-slim [1353,6679 574x28] "André Schmitte, Founder of AS Projets" {font=18px/28px w400; cur=grab}
+    div.relative.z-20.col-span-full.mt-32 [48,6811 1344x48] {m=32px 0px 0px; pos=relative; z=20}
+      div.swiper-navigation-arrows.flex.gap-16.justify-end.items-center.swiper-navigation-arrows--animated [48,6811 1344x48] {d=flex; fd=row jc=flex-end ai=center; gap=16px 16px}
+        button.flex.items-center.swiper-nav-prev [1280,6811 48x48] {d=flex; fd=row jc=normal ai=center; ta=center; cur=pointer}
+          div.flex.overflow-hidden.relative.justify-center.items-center.rounded-full [1280,6811 48x48] {bg=rgb(61, 61, 61); d=flex; fd=row jc=center ai=center; r=50%; pos=relative; of=hidden; ta=center; cur=pointer}
+            div.flex.justify-center.items-center.btn-tertiary-arrow-wrapper.swiper-nav-arrow-wrapper [1292,6823 24x24] {d=flex; fd=row jc=center ai=center; pos=relative; ta=center; cur=pointer}
+              div.btn-tertiary-arrow-container.swiper-nav-arrow-container [1292,6823 24x24] {pos=relative; ta=center; cur=pointer}
+                div.arrow-primary [1292,6823 24x24] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, 0, 0); ta=center; cur=pointer}
+                  svg.h-24.w-24.invert [1292,6823 24x24] SVG(0 0 24 24) {filter=invert(1); of=hidden; ta=center; cur=pointer}
+                div.arrow-secondary [1332,6823 24x24] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, 40, 0); ta=center; cur=pointer}
+                  svg.h-24.w-24.invert [1332,6823 24x24] SVG(0 0 24 24) {filter=invert(1); of=hidden; ta=center; cur=pointer}
+        button.flex.items-center.swiper-nav-next [1344,6811 48x48] {d=flex; fd=row jc=normal ai=center; ta=center; cur=pointer}
+          div.flex.overflow-hidden.relative.justify-center.items-center.rounded-full [1344,6811 48x48] {bg=rgb(61, 61, 61); d=flex; fd=row jc=center ai=center; r=50%; pos=relative; of=hidden; ta=center; cur=pointer}
+            div.flex.justify-center.items-center.btn-tertiary-arrow-wrapper.swiper-nav-arrow-wrapper [1356,6823 24x24] {d=flex; fd=row jc=center ai=center; pos=relative; ta=center; cur=pointer}
+              div.btn-tertiary-arrow-container.swiper-nav-arrow-container [1356,6823 24x24] {pos=relative; ta=center; cur=pointer}
+                div.arrow-primary [1356,6823 24x24] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, 0, 0); ta=center; cur=pointer}
+                  svg.h-24.w-24.invert [1356,6823 24x24] SVG(0 0 24 24) {filter=invert(1); of=hidden; ta=center; cur=pointer}
+                div.arrow-secondary [1316,6823 24x24] {pos=absolute top:0px right:0px bottom:0px left:0px; tf=matrix(1, 0, 0, 1, -40, 0); ta=center; cur=pointer}
+                  svg.h-24.w-24.invert [1316,6823 24x24] SVG(0 0 24 24) {filter=invert(1); of=hidden; ta=center; cur=pointer}

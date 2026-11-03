@@ -1,0 +1,12 @@
+section#section-6.overflow-hidden.relative.surface-section-background-base [0,4934 390x720] {bg=rgb(255, 255, 255); pos=relative; of=hidden}
+  div.absolute.top-0.left-0.w-full.h-full.bg-center [0,4934 390x720] {font=16px/24px w400; color=rgb(5, 5, 5); bgimg=radial-gradient(66.82% 50%, rgb(224, 224, 224) 0%, rgb(245, 245, 245) 100%) size=auto pos=0% 0%; pos=absolute top:0px right:0px bottom:0px left:0px}
+  div.grid.grid-cols-6.px-16.py-48.mx-auto.website-revamp [0,4934 390x720] {font=16px/24px w400; color=rgb(5, 5, 5); d=grid; gtc=59.6562px 59.6562px 59.6562px 59.6562px 59.6562px 59.6562px gtr=624px; p=48px 16px; maxw=1600px}
+    div.flex.flex-col.col-span-6.items-center.px-24.pt-32 [16,4982 358x624] {d=flex; fd=column jc=normal ai=center; p=32px 24px 0px; of=hidden; minh=624px; ta=center}
+      div.grid.z-10.grid-cols-6.col-span-6.lg:pl-64.lg:py-64 [40,5014 310x250] {d=grid; gtc=51.6562px 51.6562px 51.6562px 51.6562px 51.6562px 51.6562px gtr=80px 90px 80px; z=10; ta=center}
+        h2.col-span-6.text-light-primary [40,5014 310x80] "Keep all your tools connected" {font=32px/40px w600; ta=center; fvn=lining-nums proportional-nums}
+        div.col-span-6.col-start-1.mt-12.body-slim.md:mt-16.lg:col-span-5 [40,5106 310x78] {font=16px/26px w400; m=12px 0px 0px; ta=center}
+          p [40,5106 310x78] "Connect over 2,000 external tools & accounts directly to Qonto - let all your data sync automatically." {ta=center}
+        div.flex.flex-col.col-span-6.col-start-1.gap-12.mt-32 [40,5216 310x0] {d=flex; fd=column jc=normal ai=normal; gap=12px 12px; m=32px 0px 48px; ta=center}
+      div.flex.relative.z-10.w-full.h-full.lg:col-span-6 [40,5264 310x342] {d=flex; fd=row jc=normal ai=normal; pos=relative; z=10; ta=center}
+        div.absolute.flex.items-center.justify-center.h-496.md:h-624 [-53,5264 496x496] {d=flex; fd=row jc=center ai=center; pos=absolute top:0px right:-341px bottom:-154px left:155px; ta=center}
+          lottie-player.w-full.h-full.transition-all.duration-500.opacity-100 [-53,5264 496x496] LOTTIE=https://qonto.com/blog/images/asset/34192/image/b110bbd06e094f78e7bf80d2dbfb7f79.json attrs=data-controller=lottie convertor,data-convertor-target=lottie,data-lottie-target=looping,data-lottie-min-frame-value=0,data-lottie-max-frame-value=70,background=transparent,aria-hidden=true,loop= {tr=0.5s cubic-bezier(0.4, 0, 0.2, 1); ta=center}

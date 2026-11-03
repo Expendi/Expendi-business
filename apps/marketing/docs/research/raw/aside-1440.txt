@@ -1,0 +1,2 @@
+aside.fixed.right-0.bottom-0.left-0.px-16.transition-all [0,8242 0x0] {bg=oklab(0.114918 0.00000522286 0.00000230223 / 0.7); d=none; p=0px 16px; pos=fixed right:0px bottom:0px left:0px; z=1000; op=0; tr=0.6s cubic-bezier(0.4, 0, 0.2, 1); bdf=blur(5px)}
+  a.btn.btn-primary.block.text-center.text-16.leading-24 [0,8242 0x0] "Open an account" href=https://welcome.qonto.com/signup/select-country {font=16px/24px w400; color=rgb(5, 5, 5); bg=rgb(255, 255, 255); p=12px 16px; m=12px 0px; r=8px; ta=center; cur=pointer}

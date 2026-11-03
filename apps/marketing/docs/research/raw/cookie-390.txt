@@ -1,0 +1,20 @@
+BACKDROP didomi-popup-backdrop didomi-notice-popup didomi-popup__backdrop bg=rgba(29, 29, 27, 0.5) z=2147483641
+div#didomi-popup.didomi-popup-backdrop.didomi-notice-popup.didomi-popup__backdrop [0,0 390x844] {font=15px/24px w400; color=rgb(0, 0, 0); bg=rgba(29, 29, 27, 0.5); d=flex; fd=row jc=normal ai=flex-start; pos=fixed top:0px right:0px bottom:0px left:0px; z=2147483641; tr=none; of=auto; maxw=100%}
+  div.didomi-exterior-border.didomi-popup__exterior-border [0,166 390x512] {p=1px; m=166px 0px; r=5px; bT=1px solid rgba(0, 0, 0, 0); bR=1px solid rgba(0, 0, 0, 0); bB=1px solid rgba(0, 0, 0, 0); bL=1px solid rgba(0, 0, 0, 0); tr=none; maxw=100%}
+    div.didomi-popup-container.didomi-popup__dialog.didomi-popup-notice.didomi-popup-notice-info-type [2,168 390x508] {font=12px/19.2px w400; bg=rgb(255, 255, 255); d=flex; fd=column jc=normal ai=center; p=32px; r=8px; bT=1px solid rgba(0, 0, 0, 0); bR=1px solid rgba(0, 0, 0, 0); bB=1px solid rgba(0, 0, 0, 0); bL=1px solid rgba(0, 0, 0, 0); pos=relative; tr=none; maxw=390px}
+      div.didomi-popup-view [35,201 324x442] {tr=none; maxw=100%}
+        span.didomi-continue-without-agreeing [211,189 160x19] "Continue without agreeing" {color=rgb(99, 99, 96); m=0px 0px 8px; pos=absolute top:20px right:20px bottom:458.797px left:208.312px; z=1000; tr=none; td=underline; cur=pointer}
+          span [359,191 12x14] "→" {tr=none; cur=pointer}
+        div.didomi-popup-notice-logo-container [35,201 324x57] {tr=none; maxw=100%}
+          img.didomi-popup-notice-logo [35,201 200x57] IMG=https://qonto-assets.s3.eu-central-1.amazonaws.com/logos/logo_qonto_2022.jpg alt="Logo" nat=600x171 {m=0px 0px 30px; tr=none; of=clip; maxw=100%}
+        div.didomi-popup-notice-text-container [35,288 324x232] {tr=none; maxw=100%}
+          div.didomi-popup-notice-text [35,288 324x232] {font=14px/24px w300; m=16px 0px 0px; tr=none; maxw=600px}
+            p [35,288 324x232] "Like many websites, we use cookies. They allow us to follow your interactions on our site and this data helps us to personalize your experience while you're here. For example, we might use your data to display personaliz" {tr=none; ta=justify}
+              div.didomi-popup-title [35,288 324x24] "Your data. Your choice." {font=20px/24px w400; m=0px 0px 16px; tr=none; maxw=100%; ta=justify}
+              a [282,500 66x16] "right here" href=https://qonto.com/en/cookies {font=14px/24px w700; color=rgb(5, 5, 5); tr=none; ta=justify; td=underline; cur=pointer}
+        div#buttons.multiple.didomi-buttons.didomi-popup-notice-buttons [35,535 324x108] {d=flex; fd=column jc=space-between ai=normal; m=15px 0px 0px; tr=none; maxw=100%}
+          button#didomi-notice-learn-more-button.didomi-components-button.didomi-button.didomi-learn-more-button.didomi-button-standard.standard-button [35,545 324x48] {font=16px/30px w700 ls0.16px; color=rgb(68, 68, 68); p=8px 16px; m=10px 0px 0px; r=4px; bT=1px solid rgb(29, 29, 27); bR=1px solid rgb(29, 29, 27); bB=1px solid rgb(29, 29, 27); bL=1px solid rgb(29, 29, 27); tr=none; minh=40px; ta=center; cur=pointer}
+            span [143,559 107x19] "Find out more" {tr=none; ta=center; cur=pointer}
+          button#didomi-notice-agree-button.didomi-components-button.didomi-button.didomi-dismiss-button.didomi-components-button--color.didomi-button-highlight.highlight-button [35,603 324x40] {font=16px/22.4px w700 ls0.16px; color=rgb(255, 255, 255); bg=rgb(29, 29, 27); p=2px 25px; m=10px 0px 0px; r=4px; bT=1px solid rgba(29, 29, 27, 0.3); bR=1px solid rgba(29, 29, 27, 0.3); bB=1px solid rgba(29, 29, 27, 0.3); bL=1px solid rgba(29, 29, 27, 0.3); tr=none; minh=40px; ta=center; cur=pointer}
+            span [169,613 57x19] "Accept" {tr=none; ta=center; cur=pointer}
+        div [35,643 324x0] {tr=none; maxw=100%}
