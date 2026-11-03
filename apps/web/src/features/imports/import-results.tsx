@@ -51,6 +51,12 @@ export function ImportResults({
                 {completed && row.status === "ready"
                   ? "Imported successfully."
                   : row.message}
+                {row.newRecords?.map((record) => (
+                  <p key={`${record.kind}:${record.name}`} className="mt-1">
+                    {completed ? "Created" : "Create new"} {record.kind}:{" "}
+                    {record.name}
+                  </p>
+                ))}
               </td>
             </tr>
           ))}

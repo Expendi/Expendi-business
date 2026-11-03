@@ -55,6 +55,8 @@ No client records were imported during implementation. Anthropic receipt reading
 
 Customer paid-expense imports are recorded as company spending attributed to the importing admin, so they do not need Member Email. Ops historical claim imports retain their original member-email attribution. Use one workflow consistently for each dataset: changing record semantics between Ops and customer imports is not an update to an earlier import.
 
+The customer importer can now preview and create missing categories and bill suppliers on confirmation. Leave **Create missing suppliers and categories when I confirm** enabled and review the proposed names. Existing active names are reused; archived and ambiguous matches require correction. Ops preparation requirements above still apply. See `customer-imports.md` for details.
+
 ## Verification
 
 - Shared suite: 186 tests passed.

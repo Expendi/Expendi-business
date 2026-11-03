@@ -42,6 +42,8 @@ export const importRequestSchema = z.object({
 export type ImportRequest = z.infer<typeof importRequestSchema>;
 export const companyImportRequestSchema = importRequestSchema.extend({
   kind: z.enum(["history", "bill"]),
+  /** Explicit opt-in so older clients never create unreviewed master records. */
+  createMissing: z.boolean().optional(),
   mapping: z.partialRecord(
     z.enum([
       "name",
@@ -65,11 +67,17 @@ export const companyImportCommitSchema = companyImportRequestSchema.extend({
 export const importCommitSchema = importRequestSchema.extend({
   previewToken: z.string().min(1).max(300),
 });
+export const importNewRecordSchema = z.object({
+  kind: z.enum(["supplier", "category"]),
+  name: z.string(),
+});
+export type ImportNewRecord = z.infer<typeof importNewRecordSchema>;
 export const importRowReportSchema = z.object({
   row: z.number().int(),
   status: z.enum(["ready", "skipped", "error"]),
   message: z.string(),
   values: z.record(z.string(), z.string()),
+  newRecords: z.array(importNewRecordSchema).optional(),
 });
 export const importReportSchema = z.object({
   rows: z.array(importRowReportSchema),
@@ -77,6 +85,7 @@ export const importReportSchema = z.object({
   skipped: z.number().int(),
   errors: z.number().int(),
   totalKes: z.string().regex(/^\d+$/).optional(),
+  newRecords: z.array(importNewRecordSchema).optional(),
   previewToken: z.string().nullable(),
 });
 export type ImportReport = z.infer<typeof importReportSchema>;

@@ -26,6 +26,7 @@ import type { Transaction } from "../../db/scope.js";
 import type { Tenant } from "../../middleware/tenant.js";
 import type { AuditActor } from "../audit/audit-log.js";
 import type { StaffMember } from "../staff/staff-auth.js";
+import type { NewImportReference } from "./references.js";
 import {
   bills,
   categories,
@@ -54,6 +55,7 @@ import {
   schedule,
   validateImportStatus,
 } from "./parse.js";
+import { planImportReferences } from "./references.js";
 
 type Action =
   | { table: "payee"; data: NewPayee }
@@ -65,6 +67,7 @@ interface PlannedRow {
   report: ImportReport["rows"][number];
   hash: string;
   action: Action | null;
+  newRecords?: NewImportReference[];
 }
 const encode = (value: unknown): string =>
   JSON.stringify(value, (_key, v: unknown) =>
@@ -95,7 +98,11 @@ function validToken(token: string, digest: string): boolean {
   );
 }
 
-function loadContext(tx: Transaction, organizationId: string) {
+function loadContext(
+  tx: Transaction,
+  organizationId: string,
+  lockReferences = false,
+) {
   return Effect.gen(function* () {
     const [company] = yield* query(() =>
       tx
@@ -123,14 +130,19 @@ function loadContext(tx: Transaction, organizationId: string) {
           ),
         ),
     );
+    const categoryQuery = tx
+      .select()
+      .from(categories)
+      .where(eq(categories.organizationId, organizationId));
     const categoryRows = yield* query(() =>
-      tx
-        .select()
-        .from(categories)
-        .where(eq(categories.organizationId, organizationId)),
+      lockReferences ? categoryQuery.for("share") : categoryQuery,
     );
+    const payeeQuery = tx
+      .select()
+      .from(payees)
+      .where(eq(payees.organizationId, organizationId));
     const payeeRows = yield* query(() =>
-      tx.select().from(payees).where(eq(payees.organizationId, organizationId)),
+      lockReferences ? payeeQuery.for("share") : payeeQuery,
     );
     const existing = yield* query(() =>
       tx
@@ -186,6 +198,7 @@ function actionFor(
   organizationId: string,
   today: string,
   tenant?: Tenant,
+  references?: ReturnType<typeof planImportReferences>,
 ): Action {
   const person = () => {
     const email = required(row, "email").toLowerCase();
@@ -199,6 +212,7 @@ function actionFor(
     return found;
   };
   const category = () => {
+    if (references) return references.category(required(row, "category"));
     const name = required(row, "category").toLowerCase();
     const matches = ctx.categoryRows.filter(
       (c) => c.name.toLowerCase() === name && !c.archived,
@@ -210,6 +224,7 @@ function actionFor(
     return matches[0].id;
   };
   const payee = () => {
+    if (references) return references.payee(required(row, "payee"));
     const name = required(row, "payee").toLowerCase();
     const matches = ctx.payeeRows.filter(
       (p) => p.name.toLowerCase() === name && !p.archived,
@@ -394,7 +409,12 @@ function plan(
   ctx: Context,
   organizationId: string,
   tenant?: Tenant,
+  createMissing = false,
 ): PlannedRow[] {
+  const references =
+    tenant && createMissing
+      ? planImportReferences(organizationId, ctx.categoryRows, ctx.payeeRows)
+      : undefined;
   const today = nairobiToday();
   const seen = new Set(ctx.existing.map((r) => r.rowHash));
   const codes = new Set(ctx.codes.map((r) => r.mpesaCode));
@@ -430,6 +450,7 @@ function plan(
         organizationId,
         today,
         tenant,
+        references,
       );
       // Date-derived bill status is not source identity and changes overnight.
       const identity =
@@ -481,7 +502,16 @@ function plan(
           throw new Error("This payee already has an ongoing salary.");
         salaries.add(action.data.payeeId);
       }
-      return { action, hash: rowHash, report };
+      const newRecords = references?.forIds([
+        "categoryId" in action.data ? action.data.categoryId : undefined,
+        "payeeId" in action.data ? action.data.payeeId : undefined,
+      ]);
+      if (newRecords?.length)
+        report.newRecords = newRecords.map(({ kind, name }) => ({
+          kind,
+          name,
+        }));
+      return { action, hash: rowHash, report, newRecords };
     } catch (error) {
       return {
         action: null,
@@ -557,7 +587,7 @@ type ImportActor =
 function runImport(
   caller: ImportActor,
   organizationId: string,
-  input: ImportRequest,
+  input: ImportRequest & { createMissing?: boolean },
   previewToken?: string,
 ) {
   return Effect.gen(function* () {
@@ -599,6 +629,16 @@ function runImport(
               sql`SELECT pg_advisory_xact_lock(hashtextextended(${"import:" + organizationId}, 0))`,
             ),
           );
+          if (tenant && input.createMissing) {
+            // Parent lock also coordinates FK inserts from ordinary payee/category creation.
+            yield* query(() =>
+              tx
+                .select({ id: organizations.id })
+                .from(organizations)
+                .where(eq(organizations.id, organizationId))
+                .for("update"),
+            );
+          }
         }
         if (staff)
           yield* query(() =>
@@ -606,8 +646,24 @@ function runImport(
               sql`SELECT set_config('app.import_staff_id', ${staff.staffUserId}, true)`,
             ),
           );
-        const ctx = yield* loadContext(tx, organizationId);
-        const planned = plan(input, raw, ctx, organizationId, tenant);
+        const ctx = yield* loadContext(
+          tx,
+          organizationId,
+          Boolean(previewToken && tenant && input.createMissing),
+        );
+        const planned = plan(
+          input,
+          raw,
+          ctx,
+          organizationId,
+          tenant,
+          input.createMissing,
+        );
+        const newRecords = [
+          ...new Map(
+            planned.flatMap((r) => r.newRecords ?? []).map((r) => [r.id, r]),
+          ).values(),
+        ];
         const rows = planned.map((r) => r.report);
         const errors = rows.filter((r) => r.status === "error").length;
         const ready = rows.filter((r) => r.status === "ready").length;
@@ -621,6 +677,7 @@ function runImport(
           input.csv,
           Object.entries(input.mapping).sort(),
           planned.map((r) => r.hash),
+          ...(input.createMissing ? ["create-missing-v1"] : []),
         ]);
         if (!previewToken)
           return {
@@ -630,6 +687,7 @@ function runImport(
               ready,
               skipped,
               errors,
+              newRecords: newRecords.map(({ kind, name }) => ({ kind, name })),
               totalKes: planned
                 .reduce(
                   (sum, r) =>
@@ -653,6 +711,30 @@ function runImport(
             }),
           );
         const runId = randomUUID();
+        for (const record of newRecords) {
+          const values = { id: record.id, organizationId, name: record.name };
+          if (record.kind === "category")
+            yield* query(() => tx.insert(categories).values(values));
+          else
+            yield* query(() =>
+              tx.insert(payees).values({ ...values, kind: "supplier" }),
+            );
+          const entityType = record.kind === "category" ? "category" : "payee";
+          yield* audit.record(tx, {
+            actor,
+            organizationId,
+            action: `${entityType}.created`,
+            entity: { type: entityType, id: record.id },
+            after: {
+              name: record.name,
+              runId,
+              source: "import",
+              ...(record.kind === "supplier"
+                ? { kind: "supplier", details: null }
+                : { etimsNotRequired: false }),
+            },
+          });
+        }
         yield* query(() =>
           tx.insert(importRuns).values({
             id: runId,

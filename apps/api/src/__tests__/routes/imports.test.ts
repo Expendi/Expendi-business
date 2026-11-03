@@ -33,6 +33,7 @@ import {
   accountingConnections,
   accountingSyncs,
   bills,
+  categories,
   expenses,
   importRows,
   importRuns,
@@ -152,6 +153,7 @@ async function readState() {
         expenses: await tx.select().from(expenses),
         payouts: await tx.select().from(payouts),
         payees: await tx.select().from(payees),
+        categories: await tx.select().from(categories),
         recurring: await tx.select().from(recurringItems),
         bills: await tx.select().from(bills),
         audit: audit.rows,
@@ -512,6 +514,17 @@ describe("spreadsheet import", () => {
 });
 
 describe("company-admin imports", () => {
+  const newBill = () => ({
+    ...request("bill", {
+      payee: "New Supplier",
+      category: "New Category",
+      amount: "1500.50",
+      date: today,
+      status: "unpaid",
+      reference: "AUTO-1",
+    }),
+    createMissing: true,
+  });
   const input = () =>
     request("history", {
       name: "Company supplier",
@@ -555,6 +568,219 @@ describe("company-admin imports", () => {
       ((await res.json()) as { data: unknown }).data,
     );
   }
+  it("previews unique new suppliers/categories without writes and atomically creates them once across retries", async () => {
+    const body = newBill();
+    body.csv += `\n" new supplier "," new category ","200","${today}","unpaid","AUTO-2"`;
+    const before = await readState();
+    const report = await customerPreview(body);
+    expect(report.errors).toBe(0);
+    expect(report.ready).toBe(2);
+    expect(report.totalKes).toBe("170050");
+    expect(report.newRecords).toEqual([
+      { kind: "category", name: "New Category" },
+      { kind: "supplier", name: "New Supplier" },
+    ]);
+    expect(report.rows.every((r) => r.newRecords?.length === 2)).toBe(true);
+    expect(await readState()).toEqual(before);
+    const token = report.previewToken ?? "invalid";
+    const results = await Promise.all([
+      customerCall(body, token),
+      customerCall(body, token),
+    ]);
+    expect(results.map((r) => r.status)).toEqual([200, 200]);
+    const state = await readState();
+    expect(state.payees).toHaveLength(1);
+    expect(state.payees[0]).toMatchObject({
+      name: "New Supplier",
+      kind: "supplier",
+      method: null,
+      membershipId: null,
+      detailsChangedAt: null,
+    });
+    expect(
+      state.categories.filter((c) => c.name === "New Category"),
+    ).toHaveLength(1);
+    expect(state.bills).toHaveLength(2);
+    expect(new Set(state.bills.map((b) => b.payeeId)).size).toBe(1);
+    expect(state.payouts).toHaveLength(0);
+    expect((await customerPreview(body)).newRecords).toEqual([]);
+    expect((await customerCommit(body)).imported).toBe(0);
+    const entries = await owner.query(
+      "SELECT actor_type, actor_id, action, after FROM audit_log WHERE organization_id=$1 AND action IN ('payee.created','category.created')",
+      [company.organizationId],
+    );
+    expect(entries.rows).toHaveLength(2);
+    for (const entry of entries.rows)
+      expect(entry).toMatchObject({
+        actor_type: "user",
+        actor_id: company.admin.id,
+        after: { source: "import" },
+      });
+  });
+  it("creates only a category for paid expenses and preserves old-client opt-in boundaries", async () => {
+    const body = {
+      ...request("history", {
+        name: "Unknown Merchant",
+        category: "Imported Travel",
+        amount: "50",
+        date: "2026-06-15",
+      }),
+      createMissing: true,
+    };
+    expect(
+      (await customerPreview({ ...body, createMissing: false } as typeof body))
+        .errors,
+    ).toBe(1);
+    const report = await customerPreview(body);
+    expect(report.newRecords).toEqual([
+      { kind: "category", name: "Imported Travel" },
+    ]);
+    expect(
+      (
+        await customerCall(
+          { ...body, createMissing: false } as typeof body,
+          report.previewToken ?? "invalid",
+        )
+      ).status,
+    ).toBe(409);
+    expect((await customerCommit(body)).imported).toBe(1);
+    expect((await readState()).payees).toHaveLength(0);
+    const staffInput = { ...expenseInput(), createMissing: true };
+    staffInput.csv = staffInput.csv.replace('"Office"', '"Staff Missing"');
+    expect((await preview(staffInput)).errors).toBe(1);
+  });
+  it("matches existing names and blocks archived, ambiguous and overlong new names", async () => {
+    await commit(request("payee", { name: "Supplier" }));
+    const body = {
+      ...request("bill", {
+        payee: " SUPPLIER ",
+        category: " office ",
+        amount: "100",
+        date: today,
+      }),
+      createMissing: true,
+    };
+    expect((await customerPreview(body)).newRecords).toEqual([]);
+    await runInScope(
+      db,
+      { organizationId: company.organizationId, role: "admin" },
+      (tx) =>
+        tx.insert(payees).values({
+          organizationId: company.organizationId,
+          kind: "vendor",
+          name: "supplier",
+        }),
+    );
+    expect((await customerPreview(body)).rows[0]?.message).toContain(
+      "More than one active supplier",
+    );
+    await runInScope(
+      db,
+      { organizationId: company.organizationId, role: "admin" },
+      (tx) => tx.update(payees).set({ archived: true }),
+    );
+    expect((await customerPreview(body)).rows[0]?.message).toContain(
+      "archived supplier",
+    );
+    await runInScope(
+      db,
+      { organizationId: company.organizationId, role: "admin" },
+      (tx) => tx.update(categories).set({ archived: true }),
+    );
+    expect((await customerPreview(body)).rows[0]?.message).toContain(
+      "archived category",
+    );
+    const longCategory = newBill();
+    longCategory.csv = longCategory.csv.replace("New Category", "a".repeat(61));
+    expect((await customerPreview(longCategory)).rows[0]?.message).toContain(
+      "60 characters",
+    );
+    const longSupplier = newBill();
+    longSupplier.csv = longSupplier.csv.replace(
+      "New Supplier",
+      "a".repeat(121),
+    );
+    expect((await customerPreview(longSupplier)).rows[0]?.message).toContain(
+      "120 characters",
+    );
+  });
+  it("requires a fresh preview when a missing name is created elsewhere and remains tenant isolated", async () => {
+    const body = newBill();
+    const report = await customerPreview(body);
+    const other = await createCompany(db);
+    await addCategory(db, other, "New Category");
+    await runInScope(
+      db,
+      { organizationId: other.organizationId, role: "admin" },
+      (tx) =>
+        tx.insert(payees).values({
+          organizationId: other.organizationId,
+          kind: "supplier",
+          name: "New Supplier",
+        }),
+    );
+    expect((await customerPreview(body)).newRecords).toEqual(report.newRecords);
+    await addCategory(db, company, "New Category");
+    expect(
+      (await customerCall(body, report.previewToken ?? "invalid")).status,
+    ).toBe(409);
+    expect((await readState()).payees).toHaveLength(0);
+    expect((await customerCommit(body)).imported).toBe(1);
+    const state = await readState();
+    expect(
+      state.payees.every((p) => p.organizationId === company.organizationId),
+    ).toBe(true);
+    const createdPayee = state.payees[0];
+    if (!createdPayee) throw new Error("Expected new supplier");
+    await runInScope(
+      db,
+      { organizationId: company.organizationId, role: "admin" },
+      (tx) =>
+        tx
+          .update(payees)
+          .set({ name: "Renamed Supplier" })
+          .where(eq(payees.id, createdPayee.id)),
+    );
+    expect((await customerPreview(body)).rows[0]?.message).toContain(
+      "was renamed",
+    );
+  });
+  it("does not create references for invalid rows and rejects confirmation of an error preview", async () => {
+    const body = newBill();
+    body.csv += `\n"Invalid Supplier","Invalid Category","not-money","${today}","unpaid","BAD"`;
+    const before = await readState();
+    const report = await customerPreview(body);
+    expect(report.errors).toBe(1);
+    expect(report.previewToken).toBeNull();
+    expect(report.newRecords?.some((r) => r.name.startsWith("Invalid"))).toBe(
+      false,
+    );
+    expect((await customerCall(body, "forged")).status).toBe(409);
+    expect(await readState()).toEqual(before);
+  });
+  it("rolls back new references, bills and audits if the transaction fails after reference creation", async () => {
+    const body = newBill();
+    const report = await customerPreview(body);
+    const before = await readState();
+    await owner.query(`CREATE FUNCTION test_import_reference_rollback() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+      IF NEW.organization_id = '${company.organizationId}'::uuid AND NEW.action = 'bill.imported' THEN
+        RAISE EXCEPTION 'Test import rollback';
+      END IF; RETURN NEW; END $$;
+      CREATE TRIGGER test_import_reference_rollback BEFORE INSERT ON audit_log FOR EACH ROW EXECUTE FUNCTION test_import_reference_rollback();`);
+    try {
+      expect(
+        (await customerCall(body, report.previewToken ?? "invalid")).status,
+      ).toBe(500);
+      expect(await readState()).toEqual(before);
+    } finally {
+      await owner.query(
+        "DROP TRIGGER test_import_reference_rollback ON audit_log; DROP FUNCTION test_import_reference_rollback();",
+      );
+    }
+    expect(
+      (await customerCall(body, report.previewToken ?? "invalid")).status,
+    ).toBe(200);
+  });
   it("imports older paid expenses as company spending with member provenance, exact total and no payout", async () => {
     // Even pending Zoho connections would queue newly recorded spending.
     await runInScope(

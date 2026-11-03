@@ -21,7 +21,7 @@ export const importFields: Record<
   ],
   bill: [
     { field: "reference", label: "Invoice / payment reference" },
-    { field: "payee", label: "Existing payee", required: true },
+    { field: "payee", label: "Supplier / payee", required: true },
     { field: "amount", label: "Amount in KES", required: true },
     { field: "date", label: "Due date", required: true },
     { field: "category", label: "Category", required: true },

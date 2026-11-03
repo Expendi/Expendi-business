@@ -29,6 +29,7 @@ import {
   suggestCompanyMapping,
 } from "~/features/imports/import-draft";
 import { ImportHistory } from "~/features/imports/import-history";
+import { ImportNewRecords } from "~/features/imports/import-new-records";
 import { ImportResults } from "~/features/imports/import-results";
 import { describeApiError } from "~/lib/api";
 import { formatKesCents } from "~/lib/money";
@@ -84,6 +85,7 @@ function CompanyImports({
     report: ImportReport;
   } | null>(null);
   const [reviewed, setReviewed] = useState(false);
+  const [createMissing, setCreateMissing] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -138,6 +140,7 @@ function CompanyImports({
       fileName: file.name,
       csv: file.csv,
       mapping,
+      createMissing,
     };
     try {
       const report = await api.post(
@@ -263,21 +266,11 @@ function CompanyImports({
             Earlier financial periods are supported.
           </p>
           <p>
-            Create matching{" "}
-            <Link href="/settings" className={linkClass}>
-              categories
-            </Link>
-            {kind === "bill" ? (
-              <>
-                {" "}
-                and{" "}
-                <Link href="/payees" className={linkClass}>
-                  payees
-                </Link>
-              </>
-            ) : null}{" "}
-            first. Keep paid and unpaid records in separate files. Receipt links
-            do not upload receipts.
+            Existing categories{kind === "bill" ? " and payees" : ""} are
+            matched by name, ignoring capitalization and surrounding spaces. New
+            names appear in the preview for creation when you confirm. Keep paid
+            and unpaid records in separate files. Receipt links do not upload
+            receipts.
           </p>
           {layout === "shanga" ? (
             <p>
@@ -299,6 +292,25 @@ function CompanyImports({
             column when different transactions share the same details.
           </p>
         </div>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={createMissing}
+            onChange={(e) => {
+              setCreateMissing(e.target.checked);
+              resetPreview();
+            }}
+          />
+          {kind === "bill"
+            ? "Create missing suppliers and categories when I confirm"
+            : "Create missing categories when I confirm"}
+        </label>
+        {!createMissing ? (
+          <p className="text-sm text-stone-600">
+            Only existing active names will be accepted. Missing names will
+            appear as errors in the preview.
+          </p>
+        ) : null}
         <label className="block text-sm">
           CSV or TSV file
           <input
@@ -410,6 +422,7 @@ function CompanyImports({
             confirming.
           </p>
           <ImportResults rows={preview.report.rows} />
+          <ImportNewRecords records={preview.report.newRecords ?? []} />
           {preview.report.errors ? (
             <p className="text-sm">
               Fix the highlighted rows in your spreadsheet or correct the column
@@ -427,7 +440,11 @@ function CompanyImports({
                 />
                 I reviewed these{" "}
                 {kind === "history" ? "paid expenses" : "unpaid bills"} and the
-                total for {companyName}. Importing will not send money.
+                total for {companyName}
+                {preview.report.newRecords?.length
+                  ? ", including the new suppliers or categories listed above"
+                  : ""}
+                . Importing will not send money.
               </label>
               <button
                 type="button"

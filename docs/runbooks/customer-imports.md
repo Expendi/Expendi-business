@@ -6,8 +6,8 @@ Company admins open **Expenses → Import spreadsheet** for paid spending, or **
 
 1. Choose paid expenses or unpaid bills and download the example CSV if useful. Replace the example row with real data.
 2. Upload UTF-8 CSV/TSV, at most 512 KB and 500 non-empty rows. Export Excel workbooks one sheet at a time. Custom headings are supported through column mapping; the Shanga layout additionally handles its template rows.
-3. Check suggested column matches. Categories must already exist. Bills need an existing payee, their actual due date and KES amount. USDC-payee bills must be entered manually in USD. Bill references may be mapped (maximum 64 characters).
-4. Preview: review every row, exact KES total, duplicates and errors. Fix all errors before proceeding. Select the confirmation checkbox and import.
+3. Check suggested column matches. With **Create missing suppliers and categories when I confirm** enabled (the default), existing names are matched ignoring capitalization and surrounding spaces. The preview lists every missing category and, for bills, supplier that will be created. Paid expenses keep merchant names without creating payees. Turn the option off to require existing records. Bills need their actual due date and KES amount; USDC-payee bills must be entered manually in USD. Bill references may be mapped (maximum 64 characters).
+4. Preview: review every row, exact KES total, proposed new names, duplicates and errors. Correct misspellings in the source and upload again to match an existing record instead. Fix all errors before proceeding. Select the confirmation checkbox and import; new suppliers/categories and imported records are saved together.
 5. Open Expenses/Bills to see the records. **Import history** shows the uploader, filename, date, counts and per-row results; older runs can be loaded. After a timeout, check history and preview again before retrying.
 
 Only company admins access upload, preview, commit and import history. Accountants and employees cannot import, and cannot fetch another company's imports. Salary schedules, recurring instructions, unpaid claims, payees and opening floats remain available through Ops.
@@ -19,6 +19,8 @@ Only company admins access upload, preview, commit and import history. Accountan
 - Bills remain unpaid, with status derived from their due date. Payment is a separate existing flow, including normal payment authorization. Paid/unpaid columns, when mapped, must agree with the selected record type. Shanga always validates the original Status column.
 - Dates accept DD/MM/YYYY or YYYY-MM-DD. The old three-month import cutoff has been removed for both customer and Ops history; future spending is rejected.
 - Amounts are decimal KES converted with integer arithmetic; no exchange-rate conversion is performed.
+- New suppliers are `supplier` payees without payment details. New categories use the ordinary defaults, with no Zoho account mapping. Create-on-confirm is available for customer paid expenses and bills; Ops workflows retain their existing preparation requirements.
+- Repeated names create one record per company. Ambiguous active matches, archived-only matches and names of previously imported records that have since been renamed require correction and a fresh preview. New category names are limited to 60 characters and supplier names to 120.
 - Exact source-row repeats are skipped, including repeats submitted by another admin. Preserve unique source references. Changing source content creates new input, not an update. Similar manually entered transactions still require human reconciliation.
 - Ops historical claims retain their original semantics and member attribution. Use one workflow per dataset rather than importing the same history once as claims and again as company spending.
 
@@ -26,6 +28,7 @@ Only company admins access upload, preview, commit and import history. Accountan
 
 - Customer routes: `GET /organizations/:organizationId/imports`, `GET …/imports/:id`, `POST …/imports/preview`, `POST …/imports/commit`.
 - Existing tenant middleware plus an admin-only route guard; service-level role/kind checks and RLS enforce the same boundary.
+- `createMissing: true` explicitly opts customer requests into reference creation; omitted/false retains existing-only validation. Preview reports and stored row results include `newRecords`. Creation emits `payee.created` / `category.created` audits with the importing user and run ID, in the same transaction as the import. Stable company-scoped reference IDs preserve deduplication across first creation and retries; no schema migration is needed.
 - Migration `0066_low_matthew_murdock.sql` permits either staff or member provenance (exactly one), uses a composite membership/company foreign key, and adds tenant-admin read/insert policies. Existing staff runs remain valid. It does not modify expense, bill or wallet balances.
 - Imports reuse read-only previews, transactional audit and writes, per-company serialization and source deduplication. Preview signatures bind actor, company, filename, layout, input, mapping and resolved record identities; expiration is 30 minutes or API restart.
 - Original Shanga release: `c45ea94`, Railway deployment `0806fbd0-31d0-4fb7-9577-a8715bed6734` succeeded; Ops deployment `dpl_HwhLHSWpFXR89fZuQyu9ELBZDvUG` is Ready.

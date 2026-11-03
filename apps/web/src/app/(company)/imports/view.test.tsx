@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { DashboardProvider } from "~/contexts/dashboard-context";
+import { ImportNewRecords } from "~/features/imports/import-new-records";
 import { ImportResults } from "~/features/imports/import-results";
 import { ImportsView } from "./view";
 
@@ -33,6 +34,9 @@ describe("self-service importer", () => {
     expect(html).toContain("Acme");
     expect(html).toContain("Imports never send money");
     expect(html).toContain("Import history");
+    expect(html).toContain(
+      "Create missing suppliers and categories when I confirm",
+    );
     expect(html).not.toContain("Preview import");
   });
   it("does not expose upload or history controls to accountants", () => {
@@ -55,5 +59,33 @@ describe("self-service importer", () => {
     expect(html).toContain("Imported successfully");
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script>");
+  });
+  it("shows proposed master records as creations and retains them in completed results", () => {
+    const records = [
+      { kind: "supplier" as const, name: "<New Supplier>" },
+      { kind: "category" as const, name: "Travel" },
+    ];
+    const html = renderToStaticMarkup(<ImportNewRecords records={records} />);
+    expect(html).toContain("Create new supplier:");
+    expect(html).toContain("&lt;New Supplier&gt;");
+    expect(html).toContain("Create new category:");
+    expect(html).toContain("no payment details");
+    const completed = renderToStaticMarkup(
+      <ImportResults
+        completed
+        rows={[
+          {
+            row: 2,
+            status: "ready",
+            values: {},
+            message: "Ready",
+            newRecords: records,
+          },
+        ]}
+      />,
+    );
+    expect(completed).toContain("Created supplier:");
+    expect(completed).not.toContain("Create new");
+    expect(renderToStaticMarkup(<ImportNewRecords records={[]} />)).toBe("");
   });
 });
