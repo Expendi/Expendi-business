@@ -14,12 +14,23 @@ import type {
   ExpenseKind,
 } from "@expendi-business/shared";
 
+import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
+import { Button } from "~/components/ui/button";
 import {
-  cellClass,
-  headCellClass,
-  secondaryButton,
-  tableClass,
-} from "~/components/styles";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "~/components/ui/table";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatKesCents, formatNairobiTime } from "~/lib/format";
@@ -74,71 +85,82 @@ export function AccountingSyncsPanel({
   });
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-5">
-      <h2 className="text-base font-semibold">Syncs to Zoho</h2>
-      <p className="mt-1 text-sm text-stone-600">
-        Each paid claim, petty cash and company spending, paid bill and paid
-        payroll run becomes one Zoho expense. Syncs wait while the connection
-        needs reconnecting, then catch up.
-      </p>
-
-      <div className="mt-3 flex flex-wrap gap-2" role="tablist">
-        {TABS.map((tab) => (
-          <button
-            key={tab.status}
-            type="button"
-            role="tab"
-            aria-selected={tab.status === status}
-            className={`${secondaryButton} ${tab.status === status ? "bg-stone-100" : ""}`}
-            onClick={() => setStatus(tab.status)}
-          >
-            {tab.label}
-            {syncs.data ? ` (${syncs.data.counts[tab.status]})` : ""}
-          </button>
-        ))}
-      </div>
-
-      {syncs.isPending ? (
-        <p className="mt-3 text-sm text-stone-500">Loading…</p>
-      ) : syncs.isError ? (
-        <p role="alert" className="mt-3 text-sm text-error-700">
-          {describeApiError(syncs.error)}
-        </p>
-      ) : syncs.data.syncs.length === 0 ? (
-        <p className="mt-3 text-sm text-stone-500">Nothing here.</p>
-      ) : (
-        <div className="mt-3 overflow-x-auto">
-          <table className={tableClass}>
-            <thead className="border-b border-stone-200 text-stone-500">
-              <tr>
-                <th className={headCellClass}>Item</th>
-                <th className={headCellClass}>Amount</th>
-                <th className={headCellClass}>Tries</th>
-                <th className={headCellClass}>
-                  {status === "synced" ? "Zoho expense" : "Last error"}
-                </th>
-                <th className={headCellClass}>Updated</th>
-                {canAct && status === "failed" ? (
-                  <th className={headCellClass}>
-                    <span className="sr-only">Actions</span>
-                  </th>
-                ) : null}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {syncs.data.syncs.map((sync) => (
-                <SyncRow
-                  key={sync.id}
-                  companyId={companyId}
-                  sync={sync}
-                  canRetry={canAct && sync.status === "failed"}
-                />
-              ))}
-            </tbody>
-          </table>
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <h2>Syncs to Zoho</h2>
+        </CardTitle>
+        <CardDescription>
+          Each paid claim, petty cash and company spending, paid bill and paid
+          payroll run becomes one Zoho expense. Syncs wait while the connection
+          needs reconnecting, then catch up.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div
+          className="flex flex-wrap gap-2"
+          role="group"
+          aria-label="Sync status"
+        >
+          {TABS.map((tab) => (
+            <Button
+              key={tab.status}
+              type="button"
+              aria-pressed={tab.status === status}
+              variant={tab.status === status ? "secondary" : "ghost"}
+              onClick={() => setStatus(tab.status)}
+            >
+              {tab.label}
+              {syncs.data ? ` (${syncs.data.counts[tab.status]})` : ""}
+            </Button>
+          ))}
         </div>
-      )}
-    </div>
+
+        {syncs.isPending ? (
+          <PageLoading label="Loading accounting syncs…" />
+        ) : syncs.isError ? (
+          <PageError>{describeApiError(syncs.error)}</PageError>
+        ) : syncs.data.syncs.length === 0 ? (
+          <PageEmpty
+            title={`No ${status === "pending" ? "waiting" : status} syncs.`}
+          />
+        ) : (
+          <div
+            className="mt-4 overflow-hidden rounded-lg border border-border"
+            aria-busy={syncs.isPlaceholderData}
+          >
+            <Table aria-label="Accounting syncs">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Tries</TableHead>
+                  <TableHead>
+                    {status === "synced" ? "Zoho expense" : "Last error"}
+                  </TableHead>
+                  <TableHead>Updated</TableHead>
+                  {canAct && status === "failed" ? (
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  ) : null}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {syncs.data.syncs.map((sync) => (
+                  <SyncRow
+                    key={sync.id}
+                    companyId={companyId}
+                    sync={sync}
+                    canRetry={canAct && sync.status === "failed"}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -162,18 +184,18 @@ function SyncRow({
   });
 
   return (
-    <tr className="align-top">
-      <td className={cellClass}>
+    <TableRow>
+      <TableCell className="min-w-48 max-w-72 break-words whitespace-normal">
         <p className="font-medium">{subjectLabel(sync)}</p>
         <p className="text-xs text-stone-500">
           {sync.subject?.date ?? ""} {sync.subjectId}
         </p>
-      </td>
-      <td className={`${cellClass} whitespace-nowrap`}>
+      </TableCell>
+      <TableCell className="tabular-nums">
         {sync.subject ? formatKesCents(sync.subject.amountKesCents) : "—"}
-      </td>
-      <td className={cellClass}>{sync.attempts}</td>
-      <td className={cellClass}>
+      </TableCell>
+      <TableCell>{sync.attempts}</TableCell>
+      <TableCell className="min-w-48 max-w-80 break-words whitespace-normal">
         {sync.status === "synced" ? (
           <span>
             {sync.externalId}
@@ -182,27 +204,25 @@ function SyncRow({
         ) : (
           <span className="text-stone-700">{sync.lastError ?? "—"}</span>
         )}
-      </td>
-      <td className={`${cellClass} whitespace-nowrap`}>
-        {formatNairobiTime(sync.updatedAt)}
-      </td>
+      </TableCell>
+      <TableCell>{formatNairobiTime(sync.updatedAt)}</TableCell>
       {canRetry ? (
-        <td className={cellClass}>
-          <button
+        <TableCell>
+          <Button
             type="button"
-            className={secondaryButton}
+            variant="outline"
             disabled={retry.isPending || retry.isSuccess}
             onClick={() => retry.mutate()}
           >
             {retry.isSuccess ? "Queued" : "Retry"}
-          </button>
+          </Button>
           {retry.isError ? (
             <p role="alert" className="mt-1 text-xs text-error-700">
               {describeApiError(retry.error)}
             </p>
           ) : null}
-        </td>
+        </TableCell>
       ) : null}
-    </tr>
+    </TableRow>
   );
 }

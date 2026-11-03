@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { formatNairobiTime } from "~/lib/format";
+import { PageError } from "./page-state";
 import { dangerButton, secondaryButton } from "./styles";
 
 /**
@@ -34,14 +35,16 @@ export function SecondConfirmation({
     <div
       role="region"
       aria-label={title}
-      className="rounded-lg border border-amber-300 bg-amber-50 p-4"
+      className="rounded-xl border border-amber-300 bg-amber-50 p-4 sm:p-6"
     >
       <h3 className="text-sm font-semibold">{title}</h3>
       {children}
       <p className="mt-3 text-sm font-medium">Confirming will:</p>
       <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
         {consequences.map((consequence) => (
-          <li key={consequence}>{consequence}</li>
+          <li key={consequence} className="break-words">
+            {consequence}
+          </li>
         ))}
       </ul>
       <p className="mt-3 text-sm">
@@ -50,12 +53,8 @@ export function SecondConfirmation({
       <p className="mt-1 text-xs text-stone-600">
         This confirmation expires at {formatNairobiTime(expiresAt)}.
       </p>
-      {error ? (
-        <p role="alert" className="mt-3 text-sm text-error-700">
-          {error}
-        </p>
-      ) : null}
-      <div className="mt-4 flex gap-3">
+      {error ? <PageError>{error}</PageError> : null}
+      <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
           onClick={onConfirm}

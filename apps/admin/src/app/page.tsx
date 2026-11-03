@@ -3,7 +3,18 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { BrandMark } from "~/components/brand-mark";
 import { FullScreenMessage } from "~/components/full-screen-message";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { Button } from "~/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 
 export default function SignInPage() {
@@ -21,30 +32,35 @@ export default function SignInPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-6">
-      <div className="w-full max-w-sm rounded-lg border border-stone-200 bg-white p-8">
-        <h1 className="text-lg font-semibold">Expendi Business Ops</h1>
-        <p className="mt-2 text-sm text-stone-600">
-          For the Expendi team. Sign in with your work email.
-        </p>
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-4 py-12">
+      <div className="flex items-center gap-3 text-lg font-semibold tracking-tight">
+        <BrandMark />
+        Expendi Business
+      </div>
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>
+            <h1>Sign in to Operations</h1>
+          </CardTitle>
+          <CardDescription>
+            For the Expendi team. Sign in with your work email.
+          </CardDescription>
+        </CardHeader>
 
         {notice ? (
-          <p
-            role="alert"
-            className="mt-4 rounded-md bg-error-50 px-3 py-2 text-sm text-error-700"
-          >
-            {notice}
-          </p>
+          <CardContent>
+            <Alert variant="destructive">
+              <AlertDescription>{notice}</AlertDescription>
+            </Alert>
+          </CardContent>
         ) : null}
 
-        <button
-          type="button"
-          onClick={signIn}
-          className="mt-6 w-full rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-        >
-          Sign in with email
-        </button>
-      </div>
+        <CardFooter>
+          <Button type="button" onClick={signIn} className="w-full">
+            Sign in with email
+          </Button>
+        </CardFooter>
+      </Card>
     </main>
   );
 }

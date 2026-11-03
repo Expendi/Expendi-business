@@ -8,8 +8,10 @@ import { useState } from "react";
 import type { StaffPayoutQueueStatus } from "@expendi-business/shared";
 import { STAFF_PAYOUT_QUEUE_STATUSES } from "@expendi-business/shared";
 
+import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import { PayoutsTable } from "~/components/payouts-table";
 import { linkClass, secondaryButton } from "~/components/styles";
+import { buttonVariants } from "~/components/ui/button";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { toQueryString } from "~/lib/internal-api";
@@ -47,8 +49,8 @@ export function PayoutQueueView() {
 
   return (
     <section>
-      <h1 className="text-xl font-semibold">Payouts</h1>
-      <p className="mt-1 text-sm text-stone-600">
+      <h1 className="text-2xl font-semibold tracking-tight">Payouts</h1>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
         Claims, bills, floats, payroll runs and withdrawals that need review or
         have failed. Staff never send or retry a payout; the company&apos;s
         admin does.
@@ -68,17 +70,15 @@ export function PayoutQueueView() {
           </Link>
         </p>
       ) : null}
-      <nav aria-label="Status" className="mt-4 flex gap-2">
+      <nav aria-label="Status" className="mt-6 flex flex-wrap gap-2">
         {tabs.map((tab) => (
           <Link
             key={tab.label}
             href={`/payouts${toQueryString({ status: tab.status, companyId })}`}
             aria-current={tab.status === status ? "page" : undefined}
-            className={
-              tab.status === status
-                ? "rounded-md bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700"
-                : "rounded-md px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-100"
-            }
+            className={buttonVariants({
+              variant: tab.status === status ? "secondary" : "ghost",
+            })}
           >
             {tab.label}
           </Link>
@@ -110,24 +110,25 @@ function QueueResults({
   });
 
   if (result.isPending) {
-    return <p className="mt-6 text-sm text-stone-500">Loading…</p>;
+    return <PageLoading label="Loading payouts…" />;
   }
   if (result.isError) {
-    return (
-      <p role="alert" className="mt-6 text-sm text-error-700">
-        {describeApiError(result.error)}
-      </p>
-    );
+    return <PageError>{describeApiError(result.error)}</PageError>;
   }
   const { payouts, nextCursor } = result.data;
   return (
     <div className="mt-4">
       {payouts.length === 0 ? (
-        <p className="text-sm text-stone-500">Nothing needs attention.</p>
+        <PageEmpty title="Nothing needs attention.">
+          Payouts that need review or have failed will appear here.
+        </PageEmpty>
       ) : (
         <PayoutsTable payouts={payouts} showCompany />
       )}
-      <nav aria-label="Pages" className="mt-4 flex items-center gap-4 text-sm">
+      <nav
+        aria-label="Pages"
+        className="mt-4 flex flex-wrap items-center gap-3 text-sm"
+      >
         <button
           type="button"
           disabled={cursors.length === 1}

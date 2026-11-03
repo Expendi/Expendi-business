@@ -6,6 +6,9 @@ import { useEffect } from "react";
 
 import { FullScreenMessage } from "~/components/full-screen-message";
 import { Sidebar } from "~/components/sidebar";
+import { SiteHeader } from "~/components/site-header";
+import { Button } from "~/components/ui/button";
+import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 
 export default function StaffLayout({ children }: { children: ReactNode }) {
@@ -21,20 +24,16 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
       <FullScreenMessage>
         <p>{error}</p>
         <div className="mt-4 flex justify-center gap-4">
-          <button
-            type="button"
-            onClick={retry}
-            className="font-medium underline"
-          >
+          <Button type="button" onClick={retry} variant="outline">
             Try again
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => void signOut()}
-            className="font-medium underline"
+            variant="outline"
           >
             Sign out
-          </button>
+          </Button>
         </div>
       </FullScreenMessage>
     );
@@ -45,9 +44,17 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <SidebarProvider>
       <Sidebar staff={staff} onSignOut={() => void signOut()} />
-      <main className="flex-1 px-8 py-8">{children}</main>
-    </div>
+      <SidebarInset className="min-w-0">
+        <SiteHeader />
+        <main
+          id="main-content"
+          className="app-content @container/main mx-auto flex w-full min-w-0 max-w-[1440px] flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
+        >
+          {children}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

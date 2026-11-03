@@ -6,14 +6,17 @@ import Link from "next/link";
 
 import type { CompanyDetail } from "@expendi-business/shared";
 
+import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import { PauseFlow } from "~/components/pause-flow";
 import { PayoutsTable } from "~/components/payouts-table";
 import {
   cellClass,
   headCellClass,
-  linkClass,
+  secondaryButton,
   tableClass,
 } from "~/components/styles";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Table } from "~/components/ui/table";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatKesCents, formatNairobiTime, formatUsdc } from "~/lib/format";
@@ -29,14 +32,10 @@ export function CompanyView({ companyId }: { companyId: string }) {
   });
 
   if (result.isPending) {
-    return <p className="text-sm text-stone-500">Loading…</p>;
+    return <PageLoading label="Loading company…" />;
   }
   if (result.isError) {
-    return (
-      <p role="alert" className="text-sm text-error-700">
-        {describeApiError(result.error)}
-      </p>
-    );
+    return <PageError>{describeApiError(result.error)}</PageError>;
   }
   const company = result.data;
 
@@ -50,28 +49,39 @@ export function CompanyView({ companyId }: { companyId: string }) {
           Companies
         </Link>
       </p>
-      <h1 className="mt-1 text-xl font-semibold">{company.name}</h1>
+      <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+        {company.name}
+      </h1>
       <p className="mt-1 text-sm text-stone-600">
         KRA PIN {company.kraPin ?? "not given"} · signed up{" "}
         {formatNairobiTime(company.createdAt)} ·{" "}
         <span className="font-mono text-xs">{company.id}</span>
       </p>
-      <p className="mt-2 flex flex-wrap gap-4 text-sm">
+      <p className="mt-4 flex flex-wrap gap-2 text-sm">
         {canAct ? (
-          <Link href={`/companies/${company.id}/imports`} className={linkClass}>
+          <Link
+            href={`/companies/${company.id}/imports`}
+            className={secondaryButton}
+          >
             Import spreadsheet
           </Link>
         ) : null}
-        <Link href={`/payouts?companyId=${company.id}`} className={linkClass}>
+        <Link
+          href={`/payouts?companyId=${company.id}`}
+          className={secondaryButton}
+        >
           Payouts to review
         </Link>
         <Link
           href={`/audit-log?organizationId=${company.id}`}
-          className={linkClass}
+          className={secondaryButton}
         >
           Audit log
         </Link>
-        <Link href={`/companies/${company.id}/zoho`} className={linkClass}>
+        <Link
+          href={`/companies/${company.id}/zoho`}
+          className={secondaryButton}
+        >
           Zoho Books
         </Link>
       </p>
@@ -114,41 +124,52 @@ export function CompanyView({ companyId }: { companyId: string }) {
       ) : null}
 
       <h2 className="mt-8 text-base font-semibold">Members</h2>
-      <div className="mt-2 overflow-x-auto rounded-lg border border-stone-200 bg-white">
-        <table className={tableClass}>
-          <thead className="bg-stone-100 text-stone-600">
-            <tr>
-              <th scope="col" className={headCellClass}>
-                Name
-              </th>
-              <th scope="col" className={headCellClass}>
-                Email
-              </th>
-              <th scope="col" className={headCellClass}>
-                Role
-              </th>
-              <th scope="col" className={headCellClass}>
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {company.members.map((member) => (
-              <tr key={member.id} className="border-t border-stone-200">
-                <td className={cellClass}>{member.name ?? "—"}</td>
-                <td className={cellClass}>{member.email}</td>
-                <td className={cellClass}>{member.role}</td>
-                <td className={cellClass}>{member.status}</td>
+      {company.members.length === 0 ? (
+        <PageEmpty title="No members yet." />
+      ) : (
+        <div className="mt-3 overflow-hidden rounded-xl border border-border bg-card">
+          <Table className={tableClass} aria-label="Company members">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th scope="col" className={headCellClass}>
+                  Name
+                </th>
+                <th scope="col" className={headCellClass}>
+                  Email
+                </th>
+                <th scope="col" className={headCellClass}>
+                  Role
+                </th>
+                <th scope="col" className={headCellClass}>
+                  Status
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {company.members.map((member) => (
+                <tr
+                  key={member.id}
+                  className="border-t border-border hover:bg-muted/50"
+                >
+                  <td className={`${cellClass} min-w-40 max-w-64 break-words`}>
+                    {member.name ?? "—"}
+                  </td>
+                  <td className={`${cellClass} min-w-48 max-w-72 break-all`}>
+                    {member.email}
+                  </td>
+                  <td className={cellClass}>{member.role}</td>
+                  <td className={cellClass}>{member.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      )}
 
       <h2 className="mt-8 text-base font-semibold">Recent payouts</h2>
       <div className="mt-2">
         {company.recentPayouts.length === 0 ? (
-          <p className="text-sm text-stone-500">No payouts yet.</p>
+          <PageEmpty title="No payouts yet." />
         ) : (
           <PayoutsTable payouts={company.recentPayouts} showCompany={false} />
         )}
@@ -159,10 +180,14 @@ export function CompanyView({ companyId }: { companyId: string }) {
 
 function Stat({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-4">
-      <p className="text-xs text-stone-500">{label}</p>
-      <p className="mt-1 text-lg font-semibold">{children}</p>
-    </div>
+    <Card size="sm">
+      <CardHeader>
+        <p className="text-sm text-muted-foreground">{label}</p>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xl font-semibold tabular-nums">{children}</p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -174,35 +199,43 @@ function PauseSection({
   canAct: boolean;
 }) {
   return (
-    <div className="mt-6 rounded-lg border border-stone-200 bg-white p-4">
-      <h2 className="text-base font-semibold">Payouts</h2>
-      <p className="mt-1 text-sm">
-        {company.payoutsPaused
-          ? "Paused for this company."
-          : "Running for this company."}
-        {company.platformPayoutsPaused
-          ? " All companies' payouts are paused too (Controls)."
-          : null}
-      </p>
-      <div className="mt-3">
-        {canAct ? (
-          company.payoutsPaused ? (
-            <PauseFlow
-              action="unpause"
-              organizationId={company.id}
-              label={`Unpause ${company.name}'s payouts`}
-            />
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>
+          <h2>Payouts</h2>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="mt-1 text-sm">
+          {company.payoutsPaused
+            ? "Paused for this company."
+            : "Running for this company."}
+          {company.platformPayoutsPaused
+            ? " All companies' payouts are paused too (Controls)."
+            : null}
+        </p>
+        <div className="mt-3">
+          {canAct ? (
+            company.payoutsPaused ? (
+              <PauseFlow
+                action="unpause"
+                organizationId={company.id}
+                label={`Unpause ${company.name}'s payouts`}
+              />
+            ) : (
+              <PauseFlow
+                action="pause"
+                organizationId={company.id}
+                label={`Pause ${company.name}'s payouts`}
+              />
+            )
           ) : (
-            <PauseFlow
-              action="pause"
-              organizationId={company.id}
-              label={`Pause ${company.name}'s payouts`}
-            />
-          )
-        ) : (
-          <p className="text-sm text-stone-500">Pausing needs an ops admin.</p>
-        )}
-      </div>
-    </div>
+            <p className="text-sm text-stone-500">
+              Pausing needs an ops admin.
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

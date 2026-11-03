@@ -6,12 +6,21 @@ import Link from "next/link";
 
 import type { SystemHealth } from "@expendi-business/shared";
 
+import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import {
   cellClass,
   headCellClass,
   linkClass,
   tableClass,
 } from "~/components/styles";
+import { Badge } from "~/components/ui/badge";
+import {
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Card as Surface,
+} from "~/components/ui/card";
+import { Table } from "~/components/ui/table";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiTime } from "~/lib/format";
@@ -43,13 +52,11 @@ export function HealthView() {
 
   return (
     <section className="max-w-4xl">
-      <h1 className="text-xl font-semibold">System health</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">System health</h1>
       {result.isPending ? (
-        <p className="mt-6 text-sm text-stone-500">Loading…</p>
+        <PageLoading label="Loading system health…" />
       ) : result.isError ? (
-        <p role="alert" className="mt-6 text-sm text-error-700">
-          {describeApiError(result.error)}
-        </p>
+        <PageError>{describeApiError(result.error)}</PageError>
       ) : (
         <>
           <p className="mt-1 text-sm text-stone-600">
@@ -71,20 +78,25 @@ export function HealthView() {
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="mt-6 rounded-lg border border-stone-200 bg-white p-4">
-      <h2 className="text-base font-semibold">{title}</h2>
-      {children}
-    </div>
+    <Surface className="mt-6">
+      <CardHeader>
+        <CardTitle>
+          <h2>{title}</h2>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Surface>
   );
 }
 
 function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <span
-      className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${ok ? "bg-emerald-50 text-emerald-800" : "bg-error-50 text-error-700"}`}
+    <Badge
+      variant={ok ? "secondary" : "destructive"}
+      className={ok ? "bg-emerald-50 text-emerald-800" : undefined}
     >
       {label}
-    </span>
+    </Badge>
   );
 }
 
@@ -159,13 +171,11 @@ function Jobs({ health }: { health: SystemHealth }) {
   return (
     <Card title="Station jobs">
       {health.jobs.length === 0 ? (
-        <p className="mt-2 text-sm text-stone-500">
-          No job has recorded a run.
-        </p>
+        <PageEmpty title="No job has recorded a run." />
       ) : (
-        <div className="mt-2 overflow-x-auto rounded-lg border border-stone-200">
-          <table className={tableClass}>
-            <thead className="bg-stone-100 text-stone-600">
+        <div className="overflow-hidden rounded-lg border border-border">
+          <Table className={tableClass} aria-label="Station jobs">
+            <thead className="bg-muted/50 text-muted-foreground">
               <tr>
                 <th scope="col" className={headCellClass}>
                   Job
@@ -177,7 +187,10 @@ function Jobs({ health }: { health: SystemHealth }) {
             </thead>
             <tbody>
               {health.jobs.map((job) => (
-                <tr key={job.job} className="border-t border-stone-200">
+                <tr
+                  key={job.job}
+                  className="border-t border-border hover:bg-muted/50"
+                >
                   <td className={`${cellClass} font-mono text-xs`}>
                     {job.job}
                   </td>
@@ -190,7 +203,7 @@ function Jobs({ health }: { health: SystemHealth }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
       )}
     </Card>

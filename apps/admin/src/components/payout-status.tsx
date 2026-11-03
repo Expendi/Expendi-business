@@ -1,5 +1,7 @@
 import type { PayoutStatus } from "@expendi-business/shared";
 
+import { Badge } from "~/components/ui/badge";
+
 const STYLES: Partial<Record<PayoutStatus, string>> = {
   needs_review: "bg-amber-100 text-amber-900",
   failed: "bg-error-50 text-error-700",
@@ -8,10 +10,8 @@ const STYLES: Partial<Record<PayoutStatus, string>> = {
 
 export function PayoutStatusBadge({ status }: { status: PayoutStatus }) {
   return (
-    <span
-      className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${STYLES[status] ?? "bg-stone-100 text-stone-700"}`}
-    >
+    <Badge variant="secondary" className={STYLES[status]}>
       {status.replace("_", " ")}
-    </span>
+    </Badge>
   );
 }

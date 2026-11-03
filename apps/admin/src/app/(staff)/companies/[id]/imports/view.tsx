@@ -16,6 +16,7 @@ import {
   suggestImportMapping,
 } from "@expendi-business/shared";
 
+import { PageError, PageLoading } from "~/components/page-state";
 import {
   cellClass,
   headCellClass,
@@ -25,6 +26,8 @@ import {
   secondaryButton,
   tableClass,
 } from "~/components/styles";
+import { NativeSelect } from "~/components/ui/native-select";
+import { Table } from "~/components/ui/table";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { queryKeys } from "~/lib/query-keys";
@@ -223,16 +226,18 @@ export function ImportView({ companyId }: { companyId: string }) {
   }
   if (staff?.role !== "ops_admin")
     return <p>Only ops admins can import spreadsheets.</p>;
-  if (company.isPending) return <p>Loading company…</p>;
+  if (company.isPending) return <PageLoading label="Loading company…" />;
   if (company.isError)
-    return <p role="alert">{describeApiError(company.error)}</p>;
+    return <PageError>{describeApiError(company.error)}</PageError>;
   return (
     <section className="max-w-5xl space-y-6">
       <header>
         <Link href={`/companies/${companyId}`} className={linkClass}>
           {company.data.name}
         </Link>
-        <h1 className="mt-2 text-xl font-semibold">Import spreadsheet</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+          Import spreadsheet
+        </h1>
         <p className="mt-2 max-w-2xl text-sm text-stone-600">
           Upload one UTF-8 CSV or TSV per record type, up to 500 non-empty rows.
           Invite members and create categories first, then import payees before
@@ -246,12 +251,17 @@ export function ImportView({ companyId }: { companyId: string }) {
           history.
         </p>
       </header>
-      <fieldset disabled={busy} className="space-y-4">
-        <legend className="font-semibold">1. Choose records and file</legend>
+      <fieldset
+        disabled={busy}
+        className="space-y-4 rounded-xl border border-border bg-card p-4 sm:p-6"
+      >
+        <legend className="px-2 font-semibold">
+          1. Choose records and file
+        </legend>
         <label className="block max-w-sm text-sm">
           Spreadsheet layout
-          <select
-            className={inputClass}
+          <NativeSelect
+            className="mt-2 w-full"
             value={layout}
             onChange={(e) => {
               const next = e.target.value === "shanga" ? "shanga" : "standard";
@@ -264,7 +274,7 @@ export function ImportView({ companyId }: { companyId: string }) {
           >
             <option value="standard">Standard spreadsheet</option>
             <option value="shanga">Shanga expense sheets</option>
-          </select>
+          </NativeSelect>
         </label>
         {layout === "shanga" ? (
           <div className="max-w-2xl space-y-2 text-sm text-stone-600">
@@ -293,8 +303,8 @@ export function ImportView({ companyId }: { companyId: string }) {
         ) : null}
         <label className="block max-w-sm text-sm">
           Record type
-          <select
-            className={inputClass}
+          <NativeSelect
+            className="mt-2 w-full"
             value={kind}
             onChange={(e) => {
               const selected = IMPORT_KINDS.find((k) => k === e.target.value);
@@ -321,7 +331,7 @@ export function ImportView({ companyId }: { companyId: string }) {
                       : k}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <label className="block text-sm">
           CSV or TSV file
@@ -346,8 +356,8 @@ export function ImportView({ companyId }: { companyId: string }) {
               {fields[kind].map((field) => (
                 <label key={field} className="text-sm">
                   {labels[field]}
-                  <select
-                    className={inputClass}
+                  <NativeSelect
+                    className="mt-2 w-full"
                     disabled={layout === "shanga" && field === "status"}
                     value={mapping[field] ?? ""}
                     onChange={(e) => {
@@ -367,7 +377,7 @@ export function ImportView({ companyId }: { companyId: string }) {
                         {h}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </label>
               ))}
             </div>
@@ -383,11 +393,7 @@ export function ImportView({ companyId }: { companyId: string }) {
           </div>
         ) : null}
       </fieldset>
-      {error ? (
-        <p role="alert" className="text-sm text-error-700">
-          {error}
-        </p>
-      ) : null}
+      {error ? <PageError>{error}</PageError> : null}
       {done ? (
         <p role="status" className="text-sm">
           {done}
@@ -405,9 +411,14 @@ export function ImportView({ companyId }: { companyId: string }) {
             {preview.report.ready} ready · {preview.report.skipped} skipped ·{" "}
             {preview.report.errors} errors. This preview has saved nothing.
           </p>
-          <div className="max-h-96 overflow-auto rounded-lg border border-stone-200">
-            <table className={tableClass}>
-              <thead className="bg-stone-100">
+          <div
+            className="max-h-96 overflow-auto rounded-xl border border-border bg-card"
+            tabIndex={0}
+            role="region"
+            aria-label="Import preview rows"
+          >
+            <Table className={tableClass} aria-label="Import preview">
+              <thead className="bg-muted/50">
                 <tr>
                   {["Row", "Status", "Mapped values", "Result"].map((h) => (
                     <th key={h} scope="col" className={headCellClass}>
@@ -421,7 +432,9 @@ export function ImportView({ companyId }: { companyId: string }) {
                   <tr key={r.row} className="border-t border-stone-200">
                     <td className={cellClass}>{r.row}</td>
                     <td className={cellClass}>{r.status}</td>
-                    <td className={`${cellClass} break-words`}>
+                    <td
+                      className={`${cellClass} min-w-56 max-w-sm break-words`}
+                    >
                       {Object.entries(r.values).map(([k, v]) => (
                         <div key={k}>
                           <span className="text-stone-600">{k}: </span>
@@ -433,13 +446,14 @@ export function ImportView({ companyId }: { companyId: string }) {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
           {preview.report.previewToken && preview.report.ready > 0 ? (
             <div className="space-y-4">
-              <label className="flex items-start gap-2 text-sm">
+              <label className="flex min-h-11 items-start gap-3 text-sm">
                 <input
                   type="checkbox"
+                  className="mt-1 size-4 shrink-0 accent-primary"
                   checked={reviewed}
                   disabled={busy}
                   onChange={(e) => setReviewed(e.target.checked)}

@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import type { StaffPayoutDetail } from "@expendi-business/shared";
 
+import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import { PayoutStatusBadge } from "~/components/payout-status";
 import { subjectLabel } from "~/components/payouts-table";
 import {
@@ -14,6 +15,8 @@ import {
   secondaryButton,
   tableClass,
 } from "~/components/styles";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Table } from "~/components/ui/table";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatKesCents, formatNairobiTime, formatUsdc } from "~/lib/format";
@@ -33,14 +36,10 @@ export function PayoutView({ payoutId }: { payoutId: string }) {
   });
 
   if (result.isPending) {
-    return <p className="text-sm text-stone-500">Loading…</p>;
+    return <PageLoading label="Loading payout…" />;
   }
   if (result.isError) {
-    return (
-      <p role="alert" className="text-sm text-error-700">
-        {describeApiError(result.error)}
-      </p>
-    );
+    return <PageError>{describeApiError(result.error)}</PageError>;
   }
   const payout = result.data;
   const auditHref = `/audit-log?entityType=payout&entityId=${payout.id}`;
@@ -55,7 +54,7 @@ export function PayoutView({ payoutId }: { payoutId: string }) {
           Payouts
         </Link>
       </p>
-      <h1 className="mt-1 flex items-center gap-3 text-xl font-semibold">
+      <h1 className="mt-2 flex flex-wrap items-center gap-3 text-2xl font-semibold tracking-tight">
         {payout.method === "usdc" && payout.amountToTransferUsdc
           ? formatUsdc(payout.amountToTransferUsdc)
           : formatKesCents(payout.amountKesCents)}{" "}
@@ -83,55 +82,63 @@ export function PayoutView({ payoutId }: { payoutId: string }) {
 
       <PayoutActions payout={payout} canAct={canAct} />
 
-      <h2 className="mt-8 text-base font-semibold">Details</h2>
-      <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-2 rounded-lg border border-stone-200 bg-white p-4 text-sm sm:grid-cols-[14rem_1fr]">
-        {(
-          [
-            ["Payout ID", payout.id],
-            [
-              "Recipient",
-              `${payout.recipient.name}, ${payout.recipient.detail}`,
-            ],
-            ["Paycrest order", payout.providerOrderId ?? "—"],
-            [
-              "Paycrest status",
-              payout.providerStatus
-                ? `${payout.providerStatus} (checked ${time(payout.providerCheckedAt)})`
-                : "—",
-            ],
-            ["Gateway order", payout.gatewayOrderId ?? "—"],
-            ["Deposit address", payout.depositAddress ?? "—"],
-            ["Deposit valid until", time(payout.depositValidUntil)],
-            ["Company wallet", payout.walletAddress ?? "—"],
-            ["Amount to send", usdc(payout.amountToTransferUsdc)],
-            ["Most it may debit", usdc(payout.maxDebitUsdc)],
-            ["Rate", payout.rate ?? "—"],
-            ["Transaction hash", payout.txHash ?? "—"],
-            ["Privy transaction", payout.privyTransactionId ?? "—"],
-            ["M-Pesa or bank reference", payout.providerReference ?? "—"],
-            ["Created", time(payout.createdAt)],
-            ["Approved", time(payout.approvedAt)],
-            ["Funding started", time(payout.fundingStartedAt)],
-            ["Paid", time(payout.paidAt)],
-            ["Last change", time(payout.updatedAt)],
-          ] as const
-        ).map(([label, value]) => (
-          <div key={label} className="contents">
-            <dt className="text-stone-500">{label}</dt>
-            <dd className="break-all">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>
+            <h2>Details</h2>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-[14rem_minmax(0,1fr)]">
+            {(
+              [
+                ["Payout ID", payout.id],
+                [
+                  "Recipient",
+                  `${payout.recipient.name}, ${payout.recipient.detail}`,
+                ],
+                ["Paycrest order", payout.providerOrderId ?? "—"],
+                [
+                  "Paycrest status",
+                  payout.providerStatus
+                    ? `${payout.providerStatus} (checked ${time(payout.providerCheckedAt)})`
+                    : "—",
+                ],
+                ["Gateway order", payout.gatewayOrderId ?? "—"],
+                ["Deposit address", payout.depositAddress ?? "—"],
+                ["Deposit valid until", time(payout.depositValidUntil)],
+                ["Company wallet", payout.walletAddress ?? "—"],
+                ["Amount to send", usdc(payout.amountToTransferUsdc)],
+                ["Most it may debit", usdc(payout.maxDebitUsdc)],
+                ["Rate", payout.rate ?? "—"],
+                ["Transaction hash", payout.txHash ?? "—"],
+                ["Privy transaction", payout.privyTransactionId ?? "—"],
+                ["M-Pesa or bank reference", payout.providerReference ?? "—"],
+                ["Created", time(payout.createdAt)],
+                ["Approved", time(payout.approvedAt)],
+                ["Funding started", time(payout.fundingStartedAt)],
+                ["Paid", time(payout.paidAt)],
+                ["Last change", time(payout.updatedAt)],
+              ] as const
+            ).map(([label, value]) => (
+              <div key={label} className="contents">
+                <dt className="text-stone-500">{label}</dt>
+                <dd className="break-all">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </CardContent>
+      </Card>
 
       <h2 className="mt-8 text-base font-semibold">Ledger</h2>
       {payout.ledger.length === 0 ? (
-        <p className="mt-2 text-sm text-stone-500">
-          No ledger rows: nothing has been debited or refunded for it.
-        </p>
+        <PageEmpty title="No ledger entries.">
+          Nothing has been debited or refunded for this payout.
+        </PageEmpty>
       ) : (
-        <div className="mt-2 overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className={tableClass}>
-            <thead className="bg-stone-100 text-stone-600">
+        <div className="mt-3 overflow-hidden rounded-xl border border-border bg-card">
+          <Table className={tableClass} aria-label="Payout ledger">
+            <thead className="bg-muted/50 text-muted-foreground">
               <tr>
                 <th scope="col" className={headCellClass}>
                   When
@@ -149,32 +156,43 @@ export function PayoutView({ payoutId }: { payoutId: string }) {
             </thead>
             <tbody>
               {payout.ledger.map((row) => (
-                <tr key={row.id} className="border-t border-stone-200">
+                <tr
+                  key={row.id}
+                  className="border-t border-border hover:bg-muted/50"
+                >
                   <td className={cellClass}>{time(row.createdAt)}</td>
                   <td className={cellClass}>{row.type}</td>
-                  <td className={cellClass}>{formatUsdc(row.usdcAmount)}</td>
-                  <td className={`${cellClass} font-mono text-xs break-all`}>
+                  <td className={`${cellClass} tabular-nums whitespace-nowrap`}>
+                    {formatUsdc(row.usdcAmount)}
+                  </td>
+                  <td
+                    className={`${cellClass} min-w-48 max-w-80 font-mono text-xs break-all`}
+                  >
                     {row.txHash ?? "—"}
                   </td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
       )}
 
       <h2 className="mt-8 text-base font-semibold">Audit trail</h2>
-      <ol className="mt-2 space-y-1 text-sm">
-        {payout.auditTrail.map((entry) => (
-          <li key={entry.id}>
-            <span className="text-stone-500">
-              {formatNairobiTime(entry.occurredAt)}
-            </span>{" "}
-            <span className="font-mono text-xs">{entry.action}</span> by{" "}
-            {entry.actor.email ?? entry.actor.id}
-          </li>
-        ))}
-      </ol>
+      {payout.auditTrail.length === 0 ? (
+        <PageEmpty title="No audit entries yet." />
+      ) : (
+        <ol className="mt-3 divide-y divide-border rounded-xl border border-border bg-card px-4 text-sm sm:px-6">
+          {payout.auditTrail.map((entry) => (
+            <li key={entry.id} className="py-4 break-words">
+              <span className="text-stone-500">
+                {formatNairobiTime(entry.occurredAt)}
+              </span>{" "}
+              <span className="font-mono text-xs">{entry.action}</span> by{" "}
+              {entry.actor.email ?? entry.actor.id}
+            </li>
+          ))}
+        </ol>
+      )}
       <p className="mt-2 text-sm">
         <Link href={auditHref} className={linkClass}>
           Open in the audit log, with before and after

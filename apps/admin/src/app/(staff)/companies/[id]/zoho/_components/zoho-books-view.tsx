@@ -12,18 +12,21 @@ import type {
 } from "@expendi-business/shared";
 import { ZOHO_REQUIRED_CURRENCY } from "@expendi-business/shared";
 
+import { PageError, PageLoading } from "~/components/page-state";
+import {
+  dangerButton,
+  inputClass,
+  primaryButton,
+  secondaryButton,
+} from "~/components/styles";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { NativeSelect } from "~/components/ui/native-select";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiTime } from "~/lib/format";
 import { queryKeys } from "~/lib/query-keys";
 import { AccountingSyncsPanel } from "./accounting-syncs";
-
-const inputClass =
-  "mt-1 w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm focus:border-brand-600 focus:outline-none disabled:bg-stone-100";
-const primaryButton =
-  "rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50";
-const secondaryButton =
-  "rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50";
 
 /** The company's Zoho Books connection (spec §6.15, §6.17). */
 export function ZohoBooksView({ companyId }: { companyId: string }) {
@@ -44,7 +47,7 @@ export function ZohoBooksView({ companyId }: { companyId: string }) {
           Zoho Books
         </Link>
       </p>
-      <h1 className="mt-1 text-xl font-semibold">Zoho Books</h1>
+      <h1 className="mt-2 text-2xl font-semibold tracking-tight">Zoho Books</h1>
       <p className="mt-1 text-sm break-all text-stone-600">
         Company {companyId}
       </p>
@@ -55,11 +58,9 @@ export function ZohoBooksView({ companyId }: { companyId: string }) {
       )}
 
       {status.isPending ? (
-        <p className="mt-6 text-sm text-stone-500">Loading…</p>
+        <PageLoading label="Loading Zoho connection…" />
       ) : status.isError ? (
-        <p role="alert" className="mt-6 text-sm text-error-700">
-          {describeApiError(status.error)}
-        </p>
+        <PageError>{describeApiError(status.error)}</PageError>
       ) : (
         <ZohoBooksPanels
           companyId={companyId}
@@ -142,27 +143,27 @@ function mappingKey(connection: ZohoConnection): string {
 
 function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-5">
-      <h2 className="text-base font-semibold">{title}</h2>
-      <div className="mt-3 text-sm">{children}</div>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <h2>{title}</h2>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="min-w-0 break-words">{children}</CardContent>
+    </Card>
   );
 }
 
 function Notice({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-md border border-stone-200 bg-stone-100 px-3 py-2 text-sm text-stone-700">
-      {children}
-    </p>
+    <Alert>
+      <AlertDescription>{children}</AlertDescription>
+    </Alert>
   );
 }
 
 function ErrorText({ error }: { error: unknown }) {
-  return (
-    <p role="alert" className="mt-3 text-sm text-error-700">
-      {describeApiError(error)}
-    </p>
-  );
+  return <PageError>{describeApiError(error)}</PageError>;
 }
 
 function statusLabel(connection: ZohoConnection | null): string {
@@ -184,7 +185,7 @@ function statusLabel(connection: ZohoConnection | null): string {
 function StatusPanel({ connection }: { connection: ZohoConnection | null }) {
   return (
     <Panel title="Status">
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-[12rem_1fr]">
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-[12rem_minmax(0,1fr)] [&>dd]:break-words">
         <dt className="text-stone-500">Connection</dt>
         <dd className="font-medium">{statusLabel(connection)}</dd>
         {connection ? (
@@ -271,7 +272,7 @@ function ConnectLinkPanel({
               className={`${inputClass} font-mono`}
             />
           </label>
-          <div className="mt-2 flex items-center gap-3">
+          <div className="mt-3 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={() => void copy(link.url)}
@@ -360,9 +361,13 @@ function OrganizationPanel({
                 const isKes =
                   organization.currencyCode === ZOHO_REQUIRED_CURRENCY;
                 return (
-                  <label key={organization.id} className="flex gap-2">
+                  <label
+                    key={organization.id}
+                    className="flex min-h-11 items-start gap-3 rounded-lg border border-border p-3 has-checked:border-primary has-checked:bg-accent/40"
+                  >
                     <input
                       type="radio"
+                      className="mt-1 size-4 shrink-0 accent-primary"
                       name="organization"
                       value={organization.id}
                       checked={selected === organization.id}
@@ -529,34 +534,34 @@ function MappingPanel({
               Where the money came from, e.g. a bank account called
               &ldquo;Expendi Wallet&rdquo;.
             </span>
-            <select
+            <NativeSelect
               required
               value={paidThroughAccountId}
               onChange={(event) => setPaidThroughAccountId(event.target.value)}
-              className={inputClass}
+              className="mt-2 w-full"
             >
               <option value="" disabled>
                 Choose an account
               </option>
               {accountOptions(paidThroughAccounts)}
-            </select>
+            </NativeSelect>
           </label>
           <label className="block">
             Default expense account
             <span className="block text-stone-500">
               For categories without their own account.
             </span>
-            <select
+            <NativeSelect
               required
               value={defaultAccountId}
               onChange={(event) => setDefaultAccountId(event.target.value)}
-              className={inputClass}
+              className="mt-2 w-full"
             >
               <option value="" disabled>
                 Choose an account
               </option>
               {accountOptions(expenseAccounts)}
-            </select>
+            </NativeSelect>
           </label>
           <label className="block">
             Petty cash account
@@ -564,30 +569,30 @@ function MappingPanel({
               The Paid Through account for spending from petty cash floats, e.g.
               a cash account called &ldquo;Petty Cash&rdquo;.
             </span>
-            <select
+            <NativeSelect
               value={pettyCashAccountId}
               onChange={(event) => setPettyCashAccountId(event.target.value)}
-              className={inputClass}
+              className="mt-2 w-full"
             >
               <option value={NOT_CHOSEN}>
                 Not chosen: petty cash spending waits
               </option>
               {accountOptions(paidThroughAccounts)}
-            </select>
+            </NativeSelect>
           </label>
           <label className="block">
             Salaries account
             <span className="block text-stone-500">
               Each payroll run posts here as one expense for its total.
             </span>
-            <select
+            <NativeSelect
               value={salariesAccountId}
               onChange={(event) => setSalariesAccountId(event.target.value)}
-              className={inputClass}
+              className="mt-2 w-full"
             >
               <option value={NOT_CHOSEN}>Not chosen: payroll runs wait</option>
               {accountOptions(expenseAccounts)}
-            </select>
+            </NativeSelect>
           </label>
 
           <div>
@@ -602,7 +607,7 @@ function MappingPanel({
                   ({ categoryId, categoryName }) => (
                     <label key={categoryId} className="block">
                       {categoryName}
-                      <select
+                      <NativeSelect
                         value={categoryAccounts[categoryId] ?? USE_DEFAULT}
                         onChange={(event) =>
                           setCategoryAccounts((current) => ({
@@ -610,11 +615,11 @@ function MappingPanel({
                             [categoryId]: event.target.value,
                           }))
                         }
-                        className={inputClass}
+                        className="mt-2 w-full"
                       >
                         <option value={USE_DEFAULT}>Default account</option>
                         {accountOptions(expenseAccounts)}
-                      </select>
+                      </NativeSelect>
                     </label>
                   ),
                 )}
@@ -637,7 +642,7 @@ function MappingPanel({
                   ({ paidFromAccountId, name }) => (
                     <label key={paidFromAccountId} className="block">
                       {name}
-                      <select
+                      <NativeSelect
                         value={
                           paidFromAccounts[paidFromAccountId] ?? NOT_CHOSEN
                         }
@@ -647,13 +652,13 @@ function MappingPanel({
                             [paidFromAccountId]: event.target.value,
                           }))
                         }
-                        className={inputClass}
+                        className="mt-2 w-full"
                       >
                         <option value={NOT_CHOSEN}>
                           Not mapped: its spending waits
                         </option>
                         {accountOptions(paidThroughAccounts)}
-                      </select>
+                      </NativeSelect>
                     </label>
                   ),
                 )}
@@ -709,7 +714,7 @@ function DisconnectPanel({ companyId }: { companyId: string }) {
             type="button"
             disabled={disconnect.isPending}
             onClick={() => disconnect.mutate()}
-            className="rounded-md bg-error-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className={dangerButton}
           >
             Yes, disconnect
           </button>

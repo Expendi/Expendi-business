@@ -10,6 +10,7 @@ import { STAFF_REASON_MIN_LENGTH } from "@expendi-business/shared";
 import type { PauseAction } from "~/lib/internal-api";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
+import { PageError } from "./page-state";
 import { SecondConfirmation } from "./second-confirmation";
 import { inputClass, primaryButton, secondaryButton } from "./styles";
 
@@ -101,7 +102,7 @@ export function PauseFlow({
   return (
     <form
       onSubmit={onReview}
-      className="rounded-lg border border-stone-200 bg-white p-4"
+      className="rounded-xl border border-border bg-card p-4 sm:p-6"
     >
       <label className="block text-sm font-medium">
         Why? (at least {STAFF_REASON_MIN_LENGTH} characters, kept in the audit
@@ -116,11 +117,9 @@ export function PauseFlow({
         />
       </label>
       {prepare.isError ? (
-        <p role="alert" className="mt-2 text-sm text-error-700">
-          {describeApiError(prepare.error)}
-        </p>
+        <PageError>{describeApiError(prepare.error)}</PageError>
       ) : null}
-      <div className="mt-3 flex gap-3">
+      <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="submit"
           disabled={prepare.isPending}

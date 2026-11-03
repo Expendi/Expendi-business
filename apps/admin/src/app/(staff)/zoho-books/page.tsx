@@ -4,6 +4,17 @@ import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Button } from "~/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { Field, FieldError, FieldLabel } from "~/components/ui/field";
+import { Input } from "~/components/ui/input";
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
@@ -27,41 +38,49 @@ export default function ZohoBooksPage() {
 
   return (
     <section className="max-w-xl">
-      <h1 className="text-xl font-semibold">Zoho Books</h1>
-      <p className="mt-1 text-sm text-stone-600">
+      <h1 className="text-2xl font-semibold tracking-tight">Zoho Books</h1>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">
         Send a company&apos;s accountant a connect link, pick the Zoho
         organization and map categories to Zoho accounts.
       </p>
-      <form
-        onSubmit={onSubmit}
-        className="mt-6 rounded-lg border border-stone-200 bg-white p-4"
-      >
-        <label className="block text-sm">
-          Company ID
-          <input
-            value={companyId}
-            onChange={(event) => {
-              setCompanyId(event.target.value);
-              setInvalid(false);
-            }}
-            placeholder="e.g. 3f0c…"
-            aria-invalid={invalid}
-            className="mt-1 w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 font-mono text-sm focus:border-brand-600 focus:outline-none"
-          />
-        </label>
-        {invalid ? (
-          <p role="alert" className="mt-2 text-sm text-error-700">
-            Enter the company&apos;s ID, as shown on the company page or in the
-            audit log.
-          </p>
-        ) : null}
-        <button
-          type="submit"
-          className="mt-4 rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-        >
-          Open
-        </button>
-      </form>
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>
+            <h2>Open a company connection</h2>
+          </CardTitle>
+          <CardDescription>
+            Find the company ID on its company page or in the audit log.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit}>
+            <Field data-invalid={invalid}>
+              <FieldLabel htmlFor="zoho-company-id">Company ID</FieldLabel>
+              <Input
+                id="zoho-company-id"
+                value={companyId}
+                onChange={(event) => {
+                  setCompanyId(event.target.value);
+                  setInvalid(false);
+                }}
+                placeholder="e.g. 3f0c…"
+                aria-invalid={invalid}
+                aria-describedby={invalid ? "zoho-company-error" : undefined}
+                className="font-mono"
+              />
+              {invalid ? (
+                <FieldError id="zoho-company-error">
+                  Enter the company&apos;s ID, as shown on the company page or
+                  in the audit log.
+                </FieldError>
+              ) : null}
+            </Field>
+            <Button type="submit" className="mt-4">
+              Open connection
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </section>
   );
 }

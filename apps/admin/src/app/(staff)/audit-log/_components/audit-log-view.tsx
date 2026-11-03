@@ -11,6 +11,18 @@ import { AUDIT_ACTOR_TYPES } from "@expendi-business/shared";
 
 import type { AuditFilters } from "./audit-filters";
 import { JsonDiff } from "~/components/json-diff";
+import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { NativeSelect } from "~/components/ui/native-select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "~/components/ui/table";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiTime } from "~/lib/format";
@@ -22,9 +34,6 @@ import {
 } from "./audit-filters";
 
 const PAGE_SIZE = 50;
-
-const inputClass =
-  "mt-1 w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm focus:border-brand-600 focus:outline-none";
 
 export function AuditLogView() {
   const router = useRouter();
@@ -43,8 +52,8 @@ export function AuditLogView() {
 
   return (
     <section>
-      <h1 className="text-xl font-semibold">Audit log</h1>
-      <p className="mt-1 text-sm text-stone-600">
+      <h1 className="text-2xl font-semibold tracking-tight">Audit log</h1>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
         Every recorded change to money, access and settings, across all
         companies. Read-only. Times are Nairobi time.
       </p>
@@ -73,23 +82,23 @@ function AuditSearchForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="mt-6 grid grid-cols-1 gap-4 rounded-lg border border-stone-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4"
+      className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-2 sm:p-6 xl:grid-cols-4"
     >
       <label className="text-sm">
         Company ID
-        <input
+        <Input
           name="organizationId"
           defaultValue={filters.organizationId}
           placeholder="Any company"
-          className={inputClass}
+          className="mt-2"
         />
       </label>
       <label className="text-sm">
         Actor type
-        <select
+        <NativeSelect
           name="actorType"
           defaultValue={filters.actorType ?? ""}
-          className={inputClass}
+          className="mt-2 w-full"
         >
           <option value="">Any</option>
           {AUDIT_ACTOR_TYPES.map((type) => (
@@ -97,87 +106,77 @@ function AuditSearchForm({
               {type}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </label>
       <label className="text-sm">
         Actor ID
-        <input
+        <Input
           name="actorId"
           defaultValue={filters.actorId}
           placeholder="User, staff or system ID"
-          className={inputClass}
+          className="mt-2"
         />
       </label>
       <div className="text-sm">
         <label htmlFor="audit-action">Action</label>
-        <div className="mt-1 flex gap-2">
-          <select
+        <div className="mt-2 flex gap-2">
+          <NativeSelect
             name="actionMatch"
             aria-label="How to match the action"
             defaultValue={filters.actionPrefix ? "prefix" : "exact"}
-            className="rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm"
+            className="w-28 shrink-0"
           >
             <option value="exact">is</option>
             <option value="prefix">starts with</option>
-          </select>
-          <input
+          </NativeSelect>
+          <Input
             id="audit-action"
             name="action"
             defaultValue={filters.actionPrefix ?? filters.action}
             placeholder="e.g. payout."
-            className="w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm focus:border-brand-600 focus:outline-none"
           />
         </div>
       </div>
       <label className="text-sm">
         Entity type
-        <input
+        <Input
           name="entityType"
           defaultValue={filters.entityType}
           placeholder="e.g. payout"
-          className={inputClass}
+          className="mt-2"
         />
       </label>
       <label className="text-sm">
         Entity ID
-        <input
+        <Input
           name="entityId"
           defaultValue={filters.entityId}
-          className={inputClass}
+          className="mt-2"
         />
       </label>
       <label className="text-sm">
         From (Nairobi date)
-        <input
+        <Input
           type="date"
           name="from"
           defaultValue={filters.from}
-          className={inputClass}
+          className="mt-2"
         />
       </label>
       <label className="text-sm">
         To (Nairobi date)
-        <input
+        <Input
           type="date"
           name="to"
           defaultValue={filters.to}
-          className={inputClass}
+          className="mt-2"
         />
       </label>
-      <div className="flex gap-3 sm:col-span-2 lg:col-span-4">
-        <button
-          type="submit"
-          className="rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-        >
-          Search
-        </button>
-        <button
-          type="button"
-          onClick={onClear}
-          className="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
-        >
+      <div className="flex flex-wrap gap-3 sm:col-span-2 xl:col-span-4">
+        <Button type="submit">Search</Button>
+        <Button type="button" onClick={onClear} variant="outline">
           Clear
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -197,14 +196,10 @@ function AuditResults({ filters }: { filters: AuditFilters }) {
   });
 
   if (result.isPending) {
-    return <p className="mt-6 text-sm text-stone-500">Searching…</p>;
+    return <PageLoading label="Searching audit entries…" />;
   }
   if (result.isError) {
-    return (
-      <p role="alert" className="mt-6 text-sm text-error-700">
-        {describeApiError(result.error)}
-      </p>
-    );
+    return <PageError>{describeApiError(result.error)}</PageError>;
   }
 
   const { entries, nextCursor } = result.data;
@@ -214,7 +209,9 @@ function AuditResults({ filters }: { filters: AuditFilters }) {
   return (
     <div className="mt-6">
       {entries.length === 0 ? (
-        <p className="text-sm text-stone-500">No entries match.</p>
+        <PageEmpty title="No entries match.">
+          Try a different company, action or date range.
+        </PageEmpty>
       ) : (
         <AuditTable
           entries={entries}
@@ -225,21 +222,21 @@ function AuditResults({ filters }: { filters: AuditFilters }) {
 
       <nav
         aria-label="Pages"
-        className="mt-4 flex items-center gap-4 text-sm text-stone-600"
+        className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground"
       >
-        <button
+        <Button
           type="button"
           disabled={pageNumber === 1}
           onClick={() => {
             setSelectedId(null);
             setCursors((stack) => stack.slice(0, -1));
           }}
-          className="rounded-md border border-stone-300 px-3 py-1.5 font-medium disabled:opacity-40"
+          variant="outline"
         >
           Newer
-        </button>
+        </Button>
         <span>Page {pageNumber}</span>
-        <button
+        <Button
           type="button"
           disabled={!nextCursor || result.isPlaceholderData}
           onClick={() => {
@@ -247,10 +244,10 @@ function AuditResults({ filters }: { filters: AuditFilters }) {
             setSelectedId(null);
             setCursors((stack) => [...stack, nextCursor]);
           }}
-          className="rounded-md border border-stone-300 px-3 py-1.5 font-medium disabled:opacity-40"
+          variant="outline"
         >
           Older
-        </button>
+        </Button>
       </nav>
 
       {selected ? (
@@ -277,63 +274,56 @@ function AuditTable({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-stone-100 text-stone-600">
-          <tr>
-            <th scope="col" className="px-3 py-2 font-medium">
-              Time
-            </th>
-            <th scope="col" className="px-3 py-2 font-medium">
-              Company
-            </th>
-            <th scope="col" className="px-3 py-2 font-medium">
-              Actor
-            </th>
-            <th scope="col" className="px-3 py-2 font-medium">
-              Action
-            </th>
-            <th scope="col" className="px-3 py-2 font-medium">
-              Entity
-            </th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <Table aria-label="Audit entries">
+        <TableHeader>
+          <TableRow>
+            <TableHead scope="col">Time</TableHead>
+            <TableHead scope="col">Company</TableHead>
+            <TableHead scope="col">Actor</TableHead>
+            <TableHead scope="col">Action</TableHead>
+            <TableHead scope="col">Entity</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {entries.map((entry) => (
-            <tr
+            <TableRow
               key={entry.id}
-              className={`border-t border-stone-200 ${entry.id === selectedId ? "bg-brand-50" : "hover:bg-stone-50"}`}
+              data-state={entry.id === selectedId ? "selected" : undefined}
             >
-              <td className="px-3 py-2 whitespace-nowrap">
-                <button
+              <TableCell>
+                <Button
                   type="button"
                   onClick={() => onSelect(entry.id)}
                   aria-expanded={entry.id === selectedId}
-                  className="text-left font-medium text-brand-700 underline-offset-4 hover:underline"
+                  variant="link"
+                  className="px-0"
                 >
                   {formatNairobiTime(entry.occurredAt)}
-                </button>
-              </td>
-              <td className="px-3 py-2">
+                </Button>
+              </TableCell>
+              <TableCell className="min-w-40 max-w-64 break-words whitespace-normal">
                 {entry.organization?.name ?? (
                   <span className="text-stone-500">Platform</span>
                 )}
-              </td>
-              <td className="px-3 py-2">
+              </TableCell>
+              <TableCell className="min-w-40 max-w-64 break-all whitespace-normal">
                 <span className="text-xs text-stone-500">
                   {entry.actor.type}
                 </span>{" "}
                 {actorLabel(entry)}
-              </td>
-              <td className="px-3 py-2 font-mono text-xs">{entry.action}</td>
-              <td className="px-3 py-2 font-mono text-xs">
+              </TableCell>
+              <TableCell className="font-mono text-xs">
+                {entry.action}
+              </TableCell>
+              <TableCell className="font-mono text-xs">
                 {entry.entity.type}
                 {entry.entity.id ? ` ${entry.entity.id}` : ""}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -365,17 +355,15 @@ function AuditEntryDetail({
   return (
     <section
       aria-label="Audit entry"
-      className="mt-6 rounded-lg border border-stone-200 bg-white p-5"
+      className="mt-6 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-6"
     >
       <div className="flex items-start justify-between gap-4">
-        <h2 className="font-mono text-base font-semibold">{entry.action}</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-sm font-medium text-stone-600 underline-offset-4 hover:underline"
-        >
+        <h2 className="min-w-0 font-mono text-base font-semibold break-all">
+          {entry.action}
+        </h2>
+        <Button type="button" onClick={onClose} variant="outline">
           Close
-        </button>
+        </Button>
       </div>
 
       <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[10rem_1fr]">
@@ -405,7 +393,7 @@ function AuditEntryDetail({
 
       <details className="mt-4 text-sm">
         <summary className="cursor-pointer text-stone-600">Raw JSON</summary>
-        <div className="mt-2 grid gap-4 md:grid-cols-2">
+        <div className="mt-2 grid min-w-0 gap-4 md:grid-cols-2 [&>pre]:min-w-0">
           <pre className="overflow-x-auto rounded-md bg-stone-100 p-3 text-xs">
             {JSON.stringify(entry.before, null, 2)}
           </pre>

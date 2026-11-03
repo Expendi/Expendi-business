@@ -5,8 +5,10 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
+import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import { PauseFlow } from "~/components/pause-flow";
 import { inputClass, linkClass, secondaryButton } from "~/components/styles";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiTime } from "~/lib/format";
@@ -28,8 +30,8 @@ export function ControlsView() {
 
   return (
     <section className="max-w-3xl">
-      <h1 className="text-xl font-semibold">Controls</h1>
-      <p className="mt-1 text-sm text-stone-600">
+      <h1 className="text-2xl font-semibold tracking-tight">Controls</h1>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
         Pause payouts for every company or for one. Pausing sends nothing and
         takes effect at once; every change needs a reason and a second
         confirmation, and is audited.
@@ -41,68 +43,79 @@ export function ControlsView() {
       )}
 
       {result.isPending ? (
-        <p className="mt-6 text-sm text-stone-500">Loading…</p>
+        <PageLoading label="Loading payout controls…" />
       ) : result.isError ? (
-        <p role="alert" className="mt-6 text-sm text-error-700">
-          {describeApiError(result.error)}
-        </p>
+        <PageError>{describeApiError(result.error)}</PageError>
       ) : (
         <>
-          <div className="mt-6 rounded-lg border border-stone-200 bg-white p-4">
-            <h2 className="text-base font-semibold">All companies</h2>
-            <p className="mt-1 text-sm">
-              {result.data.platformPayoutsPaused
-                ? "Every company's payouts are paused."
-                : "Payouts are running."}{" "}
-              <span className="text-stone-500">
-                Last changed {formatNairobiTime(result.data.platformUpdatedAt)}.
-              </span>
-            </p>
-            {canAct ? (
-              <div className="mt-3">
-                {result.data.platformPayoutsPaused ? (
-                  <PauseFlow
-                    action="unpause"
-                    label="Unpause every company's payouts"
-                  />
-                ) : (
-                  <PauseFlow
-                    action="pause"
-                    label="Pause every company's payouts"
-                  />
-                )}
-              </div>
-            ) : null}
-          </div>
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>
+                <h2>All companies</h2>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mt-1 text-sm">
+                {result.data.platformPayoutsPaused
+                  ? "Every company's payouts are paused."
+                  : "Payouts are running."}{" "}
+                <span className="text-stone-500">
+                  Last changed{" "}
+                  {formatNairobiTime(result.data.platformUpdatedAt)}.
+                </span>
+              </p>
+              {canAct ? (
+                <div className="mt-3">
+                  {result.data.platformPayoutsPaused ? (
+                    <PauseFlow
+                      action="unpause"
+                      label="Unpause every company's payouts"
+                    />
+                  ) : (
+                    <PauseFlow
+                      action="pause"
+                      label="Pause every company's payouts"
+                    />
+                  )}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
 
-          <div className="mt-6 rounded-lg border border-stone-200 bg-white p-4">
-            <h2 className="text-base font-semibold">Paused companies</h2>
-            {result.data.pausedCompanies.length === 0 ? (
-              <p className="mt-1 text-sm text-stone-500">None.</p>
-            ) : (
-              <ul className="mt-2 space-y-4">
-                {result.data.pausedCompanies.map((company) => (
-                  <li key={company.id}>
-                    <Link
-                      href={`/companies/${company.id}`}
-                      className={linkClass}
-                    >
-                      {company.name}
-                    </Link>
-                    {canAct ? (
-                      <div className="mt-2">
-                        <PauseFlow
-                          action="unpause"
-                          organizationId={company.id}
-                          label={`Unpause ${company.name}'s payouts`}
-                        />
-                      </div>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>
+                <h2>Paused companies</h2>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {result.data.pausedCompanies.length === 0 ? (
+                <PageEmpty title="No individually paused companies." />
+              ) : (
+                <ul className="mt-2 space-y-4">
+                  {result.data.pausedCompanies.map((company) => (
+                    <li key={company.id}>
+                      <Link
+                        href={`/companies/${company.id}`}
+                        className={linkClass}
+                      >
+                        {company.name}
+                      </Link>
+                      {canAct ? (
+                        <div className="mt-2">
+                          <PauseFlow
+                            action="unpause"
+                            organizationId={company.id}
+                            label={`Unpause ${company.name}'s payouts`}
+                          />
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
 
           {canAct ? <PauseOneCompany /> : null}
         </>
@@ -124,43 +137,58 @@ function PauseOneCompany() {
   }
 
   return (
-    <div className="mt-6 rounded-lg border border-stone-200 bg-white p-4">
-      <h2 className="text-base font-semibold">Pause one company</h2>
-      <p className="mt-1 text-sm text-stone-600">
-        Find the company under{" "}
-        <Link href="/companies" className={linkClass}>
-          Companies
-        </Link>{" "}
-        and pause it from its page, or paste its ID here.
-      </p>
-      <form onSubmit={onChoose} className="mt-3 flex items-end gap-3">
-        <label className="flex-1 text-sm">
-          Company ID
-          <input
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            className={inputClass}
-          />
-        </label>
-        <button type="submit" className={secondaryButton}>
-          Choose
-        </button>
-      </form>
-      {invalid ? (
-        <p role="alert" className="mt-2 text-sm text-error-700">
-          That isn&apos;t a company ID.
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>
+          <h2>Pause one company</h2>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="mt-1 text-sm text-stone-600">
+          Find the company under{" "}
+          <Link href="/companies" className={linkClass}>
+            Companies
+          </Link>{" "}
+          and pause it from its page, or paste its ID here.
         </p>
-      ) : null}
-      {companyId ? (
-        <div className="mt-3">
-          <PauseFlow
-            key={companyId}
-            action="pause"
-            organizationId={companyId}
-            label="Pause this company's payouts"
-          />
-        </div>
-      ) : null}
-    </div>
+        <form
+          onSubmit={onChoose}
+          className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
+        >
+          <label className="min-w-0 flex-1 text-sm">
+            Company ID
+            <input
+              value={input}
+              aria-invalid={invalid}
+              aria-describedby={invalid ? "company-id-error" : undefined}
+              onChange={(event) => setInput(event.target.value)}
+              className={inputClass}
+            />
+          </label>
+          <button type="submit" className={secondaryButton}>
+            Choose
+          </button>
+        </form>
+        {invalid ? (
+          <p
+            id="company-id-error"
+            role="alert"
+            className="mt-2 text-sm text-error-700"
+          >
+            That isn&apos;t a company ID.
+          </p>
+        ) : null}
+        {companyId ? (
+          <div className="mt-3">
+            <PauseFlow
+              key={companyId}
+              action="pause"
+              organizationId={companyId}
+              label="Pause this company's payouts"
+            />
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }

@@ -11,6 +11,7 @@ import type {
 } from "@expendi-business/shared";
 import { STAFF_REASON_MIN_LENGTH } from "@expendi-business/shared";
 
+import { PageError } from "~/components/page-state";
 import { SecondConfirmation } from "~/components/second-confirmation";
 import {
   inputClass,
@@ -102,19 +103,22 @@ export function ResolveFlow({ payoutId }: { payoutId: string }) {
   return (
     <form
       onSubmit={onReview}
-      className="rounded-lg border border-stone-200 bg-white p-4"
+      className="rounded-xl border border-border bg-card p-4 sm:p-6"
     >
       <fieldset>
         <legend className="text-sm font-medium">Outcome</legend>
         {OUTCOMES.map((option) => (
-          <label key={option.value} className="mt-2 flex gap-2 text-sm">
+          <label
+            key={option.value}
+            className="mt-3 flex gap-3 rounded-lg border border-border p-3 text-sm has-checked:border-primary has-checked:bg-accent/40"
+          >
             <input
               type="radio"
               name="outcome"
               value={option.value}
               checked={outcome === option.value}
               onChange={() => setOutcome(option.value)}
-              className="mt-1"
+              className="mt-1 size-4 shrink-0 accent-primary"
             />
             <span>
               <span className="font-medium">{option.label}</span>
@@ -136,11 +140,9 @@ export function ResolveFlow({ payoutId }: { payoutId: string }) {
         />
       </label>
       {prepare.isError ? (
-        <p role="alert" className="mt-2 text-sm text-error-700">
-          {describeApiError(prepare.error)}
-        </p>
+        <PageError>{describeApiError(prepare.error)}</PageError>
       ) : null}
-      <div className="mt-3 flex gap-3">
+      <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="submit"
           disabled={prepare.isPending}
@@ -165,7 +167,7 @@ export function ResolveFlow({ payoutId }: { payoutId: string }) {
 
 function EvidenceSummary({ evidence }: { evidence: PayoutEvidence }) {
   return (
-    <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[12rem_1fr]">
+    <dl className="mt-4 grid grid-cols-1 gap-x-4 gap-y-3 text-sm sm:grid-cols-[12rem_minmax(0,1fr)]">
       <dt className="text-stone-600">Paycrest says</dt>
       <dd>{evidence.paycrestStatus ?? "— (no Paycrest order)"}</dd>
       <dt className="text-stone-600">Transfers to the deposit address</dt>

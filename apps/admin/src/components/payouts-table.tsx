@@ -4,7 +4,15 @@ import type { StaffPayoutSummary } from "@expendi-business/shared";
 
 import { formatKesCents, formatNairobiTime, formatUsdc } from "~/lib/format";
 import { PayoutStatusBadge } from "./payout-status";
-import { cellClass, headCellClass, linkClass, tableClass } from "./styles";
+import { linkClass } from "./styles";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
 
 /** What a payout pays: a claim, bill, float or withdrawal, or pay in a payroll run. */
 export function subjectLabel(payout: StaffPayoutSummary): string {
@@ -19,65 +27,51 @@ export function PayoutsTable({
   showCompany: boolean;
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-      <table className={tableClass}>
-        <thead className="bg-stone-100 text-stone-600">
-          <tr>
-            <th scope="col" className={headCellClass}>
-              Created
-            </th>
-            {showCompany ? (
-              <th scope="col" className={headCellClass}>
-                Company
-              </th>
-            ) : null}
-            <th scope="col" className={headCellClass}>
-              For
-            </th>
-            <th scope="col" className={headCellClass}>
-              Amount
-            </th>
-            <th scope="col" className={headCellClass}>
-              Status
-            </th>
-            <th scope="col" className={headCellClass}>
-              Paycrest order / reason
-            </th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <Table aria-label="Payouts">
+        <TableHeader>
+          <TableRow>
+            <TableHead scope="col">Created</TableHead>
+            {showCompany ? <TableHead scope="col">Company</TableHead> : null}
+            <TableHead scope="col">For</TableHead>
+            <TableHead scope="col">Amount</TableHead>
+            <TableHead scope="col">Status</TableHead>
+            <TableHead scope="col">Paycrest order / reason</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {payouts.map((payout) => (
-            <tr key={payout.id} className="border-t border-stone-200 align-top">
-              <td className={`${cellClass} whitespace-nowrap`}>
+            <TableRow key={payout.id}>
+              <TableCell>
                 <Link href={`/payouts/${payout.id}`} className={linkClass}>
                   {formatNairobiTime(payout.createdAt)}
                 </Link>
-              </td>
+              </TableCell>
               {showCompany ? (
-                <td className={cellClass}>
+                <TableCell className="min-w-40 max-w-64 break-words whitespace-normal">
                   <Link
                     href={`/companies/${payout.organization.id}`}
                     className="underline-offset-4 hover:underline"
                   >
                     {payout.organization.name}
                   </Link>
-                </td>
+                </TableCell>
               ) : null}
-              <td className={cellClass}>
+              <TableCell>
                 {subjectLabel(payout)}
                 <span className="block text-xs text-stone-500">
                   {payout.method.replace("_", " ")} via {payout.provider}
                 </span>
-              </td>
-              <td className={`${cellClass} whitespace-nowrap`}>
+              </TableCell>
+              <TableCell className="tabular-nums">
                 {payout.method === "usdc" && payout.amountToTransferUsdc
                   ? formatUsdc(payout.amountToTransferUsdc)
                   : formatKesCents(payout.amountKesCents)}
-              </td>
-              <td className={cellClass}>
+              </TableCell>
+              <TableCell>
                 <PayoutStatusBadge status={payout.status} />
-              </td>
-              <td className={`${cellClass} max-w-sm`}>
+              </TableCell>
+              <TableCell className="min-w-56 max-w-sm break-words whitespace-normal">
                 {payout.providerOrderId ? (
                   <span className="block font-mono text-xs break-all">
                     {payout.providerOrderId}
@@ -88,11 +82,11 @@ export function PayoutsTable({
                     {payout.failureReason}
                   </span>
                 ) : null}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

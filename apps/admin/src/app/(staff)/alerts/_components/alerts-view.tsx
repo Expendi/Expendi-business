@@ -5,12 +5,14 @@ import Link from "next/link";
 
 import type { OpsAlert, OpsAlertKind } from "@expendi-business/shared";
 
+import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import {
   cellClass,
   headCellClass,
   linkClass,
   tableClass,
 } from "~/components/styles";
+import { Table } from "~/components/ui/table";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiTime } from "~/lib/format";
@@ -68,25 +70,25 @@ export function AlertsView() {
 
   return (
     <section className="max-w-6xl">
-      <h1 className="text-xl font-semibold">Alerts</h1>
-      <p className="mt-1 text-sm text-stone-600">
+      <h1 className="text-2xl font-semibold tracking-tight">Alerts</h1>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
         An alert opens when its cause appears and resolves on its own once the
         cause clears. Each one is emailed to the alert list once.
       </p>
 
       {result.isPending ? (
-        <p className="mt-6 text-sm text-stone-500">Loading…</p>
+        <PageLoading label="Loading alerts…" />
       ) : result.isError ? (
-        <p role="alert" className="mt-6 text-sm text-error-700">
-          {describeApiError(result.error)}
-        </p>
+        <PageError>{describeApiError(result.error)}</PageError>
       ) : (
         <>
           <h2 className="mt-6 text-base font-semibold">
             Open ({result.data.open.length})
           </h2>
           {result.data.open.length === 0 ? (
-            <p className="mt-1 text-sm text-stone-500">No open alerts.</p>
+            <PageEmpty title="No open alerts.">
+              New problems will appear here. This page updates every minute.
+            </PageEmpty>
           ) : (
             <AlertsTable alerts={result.data.open} />
           )}
@@ -96,7 +98,7 @@ export function AlertsView() {
             {result.data.recentlyResolved.length})
           </h2>
           {result.data.recentlyResolved.length === 0 ? (
-            <p className="mt-1 text-sm text-stone-500">None.</p>
+            <PageEmpty title="No recently resolved alerts." />
           ) : (
             <AlertsTable alerts={result.data.recentlyResolved} />
           )}
@@ -113,9 +115,9 @@ export function AlertsView() {
 
 function AlertsTable({ alerts }: { alerts: readonly OpsAlert[] }) {
   return (
-    <div className="mt-2 overflow-x-auto rounded-lg border border-stone-200 bg-white">
-      <table className={tableClass}>
-        <thead className="bg-stone-100 text-stone-600">
+    <div className="mt-3 overflow-hidden rounded-xl border border-border bg-card">
+      <Table className={tableClass} aria-label="Operational alerts">
+        <thead className="bg-muted/50 text-muted-foreground">
           <tr>
             <th scope="col" className={headCellClass}>
               Alert
@@ -136,7 +138,7 @@ function AlertsTable({ alerts }: { alerts: readonly OpsAlert[] }) {
             <AlertRow key={alert.id} alert={alert} />
           ))}
         </tbody>
-      </table>
+      </Table>
     </div>
   );
 }
@@ -144,8 +146,8 @@ function AlertsTable({ alerts }: { alerts: readonly OpsAlert[] }) {
 function AlertRow({ alert }: { alert: OpsAlert }) {
   const cause = causeLink(alert);
   return (
-    <tr className="border-t border-stone-200 align-top">
-      <td className={`${cellClass} max-w-md`}>
+    <tr className="border-t border-border transition-colors hover:bg-muted/50">
+      <td className={`${cellClass} min-w-64 max-w-md break-words`}>
         <span className="block text-xs font-medium tracking-wide text-stone-500 uppercase">
           {KIND_LABELS[alert.kind]}
         </span>
@@ -166,7 +168,7 @@ function AlertRow({ alert }: { alert: OpsAlert }) {
           </Link>
         ) : null}
       </td>
-      <td className={cellClass}>
+      <td className={`${cellClass} min-w-40 max-w-64 break-words`}>
         {alert.organization ? (
           <Link
             href={`/companies/${alert.organization.id}`}
@@ -194,7 +196,7 @@ function AlertRow({ alert }: { alert: OpsAlert }) {
           </span>
         ) : null}
       </td>
-      <td className={`${cellClass} max-w-xs`}>
+      <td className={`${cellClass} min-w-40 max-w-xs break-words`}>
         <EmailStatus email={alert.email} />
       </td>
     </tr>

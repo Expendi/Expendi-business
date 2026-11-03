@@ -1,5 +1,13 @@
 import type { DiffKind } from "~/lib/json-diff";
 import { diffJson } from "~/lib/json-diff";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
 
 const ROW_STYLES: Record<DiffKind, string> = {
   added: "bg-emerald-50",
@@ -29,40 +37,40 @@ export function JsonDiff({
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border border-stone-200">
-      <table className="w-full text-left font-mono text-xs">
-        <thead className="bg-stone-100 font-sans text-stone-600">
-          <tr>
-            <th scope="col" className="px-3 py-2 font-medium">
-              Field
-            </th>
-            <th scope="col" className="px-3 py-2 font-medium">
-              Before
-            </th>
-            <th scope="col" className="px-3 py-2 font-medium">
-              After
-            </th>
-            <th scope="col" className="px-3 py-2 font-medium">
+    <div className="overflow-hidden rounded-lg border border-border">
+      <Table
+        aria-label="Before and after changes"
+        className="font-mono text-xs"
+      >
+        <TableHeader className="font-sans">
+          <TableRow>
+            <TableHead scope="col">Field</TableHead>
+            <TableHead scope="col">Before</TableHead>
+            <TableHead scope="col">After</TableHead>
+            <TableHead scope="col">
               <span className="sr-only">Change</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.map((row) => (
-            <tr
-              key={row.path}
-              className={`border-t border-stone-200 align-top ${ROW_STYLES[row.kind]}`}
-            >
-              <td className="px-3 py-2 text-stone-700">{row.path}</td>
-              <td className="px-3 py-2 break-all">{row.before ?? "—"}</td>
-              <td className="px-3 py-2 break-all">{row.after ?? "—"}</td>
-              <td className="px-3 py-2 font-sans text-stone-500">
+            <TableRow key={row.path} className={ROW_STYLES[row.kind]}>
+              <TableCell className="min-w-32 max-w-64 break-all whitespace-normal">
+                {row.path}
+              </TableCell>
+              <TableCell className="min-w-32 max-w-80 break-all whitespace-normal">
+                {row.before ?? "—"}
+              </TableCell>
+              <TableCell className="min-w-32 max-w-80 break-all whitespace-normal">
+                {row.after ?? "—"}
+              </TableCell>
+              <TableCell className="font-sans text-muted-foreground">
                 {KIND_LABELS[row.kind]}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

@@ -6,15 +6,32 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import {
-  cellClass,
-  headCellClass,
-  inputClass,
-  linkClass,
-  primaryButton,
-  secondaryButton,
-  tableClass,
-} from "~/components/styles";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "~/components/ui/empty";
+import { Field, FieldGroup, FieldLabel } from "~/components/ui/field";
+import { Input } from "~/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "~/components/ui/table";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiTime } from "~/lib/format";
@@ -37,28 +54,42 @@ export function CompaniesView() {
   }
 
   return (
-    <section>
-      <h1 className="text-xl font-semibold">Companies</h1>
-      <p className="mt-1 text-sm text-stone-600">Search by name or KRA PIN.</p>
-      <form
-        key={search}
-        onSubmit={onSearch}
-        className="mt-6 flex max-w-xl items-end gap-3"
-      >
-        <label className="flex-1 text-sm">
-          Name or KRA PIN
-          <input
-            name="search"
-            defaultValue={search}
-            placeholder="e.g. Acme or P051234567X"
-            className={inputClass}
-          />
-        </label>
-        <button type="submit" className={primaryButton}>
-          Search
-        </button>
-      </form>
-      <CompanyResults key={search} search={search} />
+    <section className="flex flex-col gap-6">
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight">Companies</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Search by name or KRA PIN.
+        </p>
+      </header>
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <h2>Company directory</h2>
+          </CardTitle>
+          <CardDescription>
+            Find a company to review its account and payouts.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-6">
+          <form key={search} onSubmit={onSearch} className="max-w-xl">
+            <FieldGroup className="flex-row items-end gap-3">
+              <Field className="min-w-0 flex-1">
+                <FieldLabel htmlFor="company-search">
+                  Name or KRA PIN
+                </FieldLabel>
+                <Input
+                  id="company-search"
+                  name="search"
+                  defaultValue={search}
+                  placeholder="e.g. Acme or P051234567X"
+                />
+              </Field>
+              <Button type="submit">Search</Button>
+            </FieldGroup>
+          </form>
+          <CompanyResults key={search} search={search} />
+        </CardContent>
+      </Card>
     </section>
   );
 }
@@ -74,92 +105,95 @@ function CompanyResults({ search }: { search: string }) {
   });
 
   if (result.isPending) {
-    return <p className="mt-6 text-sm text-stone-500">Loading…</p>;
+    return (
+      <p role="status" className="text-sm text-muted-foreground">
+        Loading…
+      </p>
+    );
   }
   if (result.isError) {
     return (
-      <p role="alert" className="mt-6 text-sm text-error-700">
-        {describeApiError(result.error)}
-      </p>
+      <Alert variant="destructive">
+        <AlertDescription>{describeApiError(result.error)}</AlertDescription>
+      </Alert>
     );
   }
 
   const { companies, nextCursor } = result.data;
   return (
-    <div className="mt-6">
+    <div className="flex flex-col gap-4">
       {companies.length === 0 ? (
-        <p className="text-sm text-stone-500">No companies match.</p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>No companies match.</EmptyTitle>
+            <EmptyDescription>
+              Try another company name or KRA PIN.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className={tableClass}>
-            <thead className="bg-stone-100 text-stone-600">
-              <tr>
-                <th scope="col" className={headCellClass}>
-                  Company
-                </th>
-                <th scope="col" className={headCellClass}>
-                  KRA PIN
-                </th>
-                <th scope="col" className={headCellClass}>
-                  Payouts
-                </th>
-                <th scope="col" className={headCellClass}>
-                  Signed up
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="min-w-0">
+          <Table aria-label="Company directory">
+            <TableHeader>
+              <TableRow>
+                <TableHead scope="col">Company</TableHead>
+                <TableHead scope="col">KRA PIN</TableHead>
+                <TableHead scope="col">Payouts</TableHead>
+                <TableHead scope="col">Signed up</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {companies.map((company) => (
-                <tr key={company.id} className="border-t border-stone-200">
-                  <td className={cellClass}>
-                    <Link
-                      href={`/companies/${company.id}`}
-                      className={linkClass}
+                <TableRow key={company.id}>
+                  <TableCell className="min-w-40 max-w-72 whitespace-normal wrap-anywhere">
+                    <Button
+                      asChild
+                      variant="link"
+                      className="h-auto justify-start px-0 text-left whitespace-normal wrap-anywhere"
                     >
-                      {company.name}
-                    </Link>
-                  </td>
-                  <td className={`${cellClass} font-mono text-xs`}>
-                    {company.kraPin ?? "—"}
-                  </td>
-                  <td className={cellClass}>
-                    {company.payoutsPaused ? (
-                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">
-                        Paused
-                      </span>
-                    ) : (
-                      <span className="text-xs text-stone-500">Running</span>
-                    )}
-                  </td>
-                  <td className={`${cellClass} whitespace-nowrap`}>
-                    {formatNairobiTime(company.createdAt)}
-                  </td>
-                </tr>
+                      <Link href={`/companies/${company.id}`}>
+                        {company.name}
+                      </Link>
+                    </Button>
+                  </TableCell>
+                  <TableCell>{company.kraPin ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={company.payoutsPaused ? "secondary" : "outline"}
+                    >
+                      {company.payoutsPaused ? "Paused" : "Running"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{formatNairobiTime(company.createdAt)}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
-      <nav aria-label="Pages" className="mt-4 flex items-center gap-4 text-sm">
-        <button
+      <nav
+        aria-label="Pages"
+        className="flex flex-wrap items-center gap-4 text-sm"
+      >
+        <Button
           type="button"
           disabled={cursors.length === 1}
           onClick={() => setCursors((stack) => stack.slice(0, -1))}
-          className={secondaryButton}
+          variant="outline"
         >
           Previous
-        </button>
-        <span className="text-stone-600">Page {cursors.length}</span>
-        <button
+        </Button>
+        <span className="text-muted-foreground">Page {cursors.length}</span>
+        <Button
           type="button"
           disabled={!nextCursor || result.isPlaceholderData}
           onClick={() => {
             if (nextCursor) setCursors((stack) => [...stack, nextCursor]);
           }}
-          className={secondaryButton}
+          variant="outline"
         >
           Next
-        </button>
+        </Button>
       </nav>
     </div>
   );

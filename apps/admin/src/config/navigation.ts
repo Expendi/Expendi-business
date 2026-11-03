@@ -1,14 +1,57 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  ArrowLeftRightIcon,
+  BellIcon,
+  BookOpenIcon,
+  Building2Icon,
+  ScrollTextIcon,
+  SlidersHorizontalIcon,
+} from "lucide-react";
+
 export interface NavItem {
   title: string;
   href: string;
+  icon: LucideIcon;
+  group: "Operations" | "Monitoring" | "Administration";
 }
 
 export const navItems: NavItem[] = [
-  { title: "Companies", href: "/companies" },
-  { title: "Payouts", href: "/payouts" },
-  { title: "Alerts", href: "/alerts" },
-  { title: "System health", href: "/health" },
-  { title: "Controls", href: "/controls" },
-  { title: "Audit log", href: "/audit-log" },
-  { title: "Zoho Books", href: "/zoho-books" },
+  {
+    title: "Companies",
+    href: "/companies",
+    icon: Building2Icon,
+    group: "Operations",
+  },
+  {
+    title: "Payouts",
+    href: "/payouts",
+    icon: ArrowLeftRightIcon,
+    group: "Operations",
+  },
+  { title: "Alerts", href: "/alerts", icon: BellIcon, group: "Monitoring" },
+  {
+    title: "System health",
+    href: "/health",
+    icon: ActivityIcon,
+    group: "Monitoring",
+  },
+  {
+    title: "Controls",
+    href: "/controls",
+    icon: SlidersHorizontalIcon,
+    group: "Administration",
+  },
+  {
+    title: "Audit log",
+    href: "/audit-log",
+    icon: ScrollTextIcon,
+    group: "Administration",
+  },
+  {
+    title: "Zoho Books",
+    href: "/zoho-books",
+    icon: BookOpenIcon,
+    group: "Administration",
+  },
 ];
