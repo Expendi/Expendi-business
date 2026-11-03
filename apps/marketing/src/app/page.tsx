@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 
+import { SiteFooter } from "~/components/layout/site-footer";
 import { Bento } from "~/components/sections/bento";
 import { ClosingCta } from "~/components/sections/closing-cta";
 import { CreateCompany } from "~/components/sections/create-company";
@@ -13,17 +14,20 @@ import { TrustItems } from "~/components/sections/trust-items";
 
 export default function HomePage(): JSX.Element {
   return (
-    <main id="website-main">
-      <Hero />
-      <TrustItems />
-      <Bento />
-      <QontoAi />
-      <InvoicingCards />
-      <Integrations />
-      <CreateCompany />
-      <Testimonials />
-      <Protection />
-      <ClosingCta />
-    </main>
+    <>
+      <main id="website-main">
+        <Hero />
+        <TrustItems />
+        <Bento />
+        <QontoAi />
+        <InvoicingCards />
+        <Integrations />
+        <CreateCompany />
+        <Testimonials />
+        <Protection />
+        <ClosingCta />
+      </main>
+      <SiteFooter />
+    </>
   );
 }
