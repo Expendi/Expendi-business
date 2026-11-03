@@ -52,7 +52,8 @@ const TESTIMONIALS: readonly Testimonial[] = [
   },
 ];
 
-const INITIAL_INDEX = 2;
+// Live Swiper starts at 0; later screenshots vary because autoplay runs off-screen.
+const INITIAL_INDEX = 0;
 const LAST_INDEX = TESTIMONIALS.length - 1;
 const PHOTO_SIZES = "(min-width: 1024px) 1249px, 100vw";
 
@@ -134,8 +135,9 @@ function attachSwipe(
     drag = null;
     if (!dragging) return;
     handlers.onEnd(
-      lastX - startX,
-      event.timeStamp - startTime < SHORT_SWIPE_MS,
+      event.type === "pointercancel" ? 0 : lastX - startX,
+      event.type !== "pointercancel" &&
+        event.timeStamp - startTime < SHORT_SWIPE_MS,
     );
   };
 
@@ -576,14 +578,76 @@ function NavButton({
 
 /**
  * "Our customers say it best" (qonto.com `wr-showreel`): click/drag carousel,
- * no autoplay, not looped. One active index drives the desktop track and the
+ * 6s autoplay until interaction/the last slide, not looped. One active index drives the desktop track and the
  * mobile fade slider; only the one matching the breakpoint is displayed.
  */
 export function Testimonials(): JSX.Element {
+  const rootRef = useRef<HTMLElement>(null);
+  const autoplayRef = useRef<gsap.core.Timeline | null>(null);
+  const activeRef = useRef(INITIAL_INDEX);
+  const interactedRef = useRef(false);
   const [active, setActive] = useState(INITIAL_INDEX);
+
+  const select = (index: number): void => {
+    interactedRef.current = true;
+    autoplayRef.current?.kill();
+    activeRef.current = index;
+    setActive(index);
+  };
+
+  useGSAP(
+    () => {
+      const root = rootRef.current;
+      if (!root) return;
+      const media = gsap.matchMedia();
+      media.add("(prefers-reduced-motion: no-preference)", () => {
+        if (interactedRef.current || activeRef.current === LAST_INDEX) return;
+        const timer = gsap.timeline({
+          repeat: LAST_INDEX - activeRef.current - 1,
+          repeatDelay: SLIDE_DURATION,
+        });
+        timer.call(
+          () => {
+            activeRef.current = clampIndex(activeRef.current + 1);
+            setActive(activeRef.current);
+          },
+          [],
+          6,
+        );
+        autoplayRef.current = timer;
+        const pause = (event: PointerEvent): void => {
+          if (event.pointerType === "mouse") timer.pause();
+        };
+        const resume = (): void => {
+          if (!interactedRef.current) timer.resume();
+        };
+        const stop = (): void => {
+          interactedRef.current = true;
+          timer.kill();
+        };
+        const carousel = root.querySelector<HTMLElement>(
+          '[aria-roledescription="carousel"]',
+        );
+        carousel?.addEventListener("pointerenter", pause);
+        carousel?.addEventListener("pointerleave", resume);
+        carousel?.addEventListener("pointerdown", stop);
+        carousel?.addEventListener("focusin", stop);
+        return () => {
+          carousel?.removeEventListener("pointerenter", pause);
+          carousel?.removeEventListener("pointerleave", resume);
+          carousel?.removeEventListener("pointerdown", stop);
+          carousel?.removeEventListener("focusin", stop);
+          autoplayRef.current = null;
+        };
+      });
+      return () => media.revert();
+    },
+    { scope: rootRef },
+  );
 
   return (
     <section
+      ref={rootRef}
       id="section-9"
       data-header-theme="dark"
       className="darkmode overflow-x-clip bg-primary-black py-48 text-primary-white md:py-64 lg:py-80"
@@ -599,21 +663,21 @@ export function Testimonials(): JSX.Element {
         </div>
 
         <div role="region" aria-roledescription="carousel" aria-label={HEADING}>
-          <SlideCarousel active={active} onSelect={setActive} />
-          <FadeCarousel active={active} onSelect={setActive} />
+          <SlideCarousel active={active} onSelect={select} />
+          <FadeCarousel active={active} onSelect={select} />
           <div className="relative z-20 mt-32 flex items-center justify-end gap-16">
             <NavButton
               direction="left"
               disabled={active === 0}
               onClick={() => {
-                setActive((index) => clampIndex(index - 1));
+                select(clampIndex(activeRef.current - 1));
               }}
             />
             <NavButton
               direction="right"
               disabled={active === LAST_INDEX}
               onClick={() => {
-                setActive((index) => clampIndex(index + 1));
+                select(clampIndex(activeRef.current + 1));
               }}
             />
           </div>

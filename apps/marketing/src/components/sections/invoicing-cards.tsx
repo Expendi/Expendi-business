@@ -271,6 +271,7 @@ function CardCarousel(): JSX.Element {
         if (!drag.dragging) {
           const dy = event.clientY - drag.startY;
           if (Math.abs(dy) > SWIPE_THRESHOLD && Math.abs(dy) > Math.abs(dx)) {
+            suppressClick = true;
             drag = null;
             return;
           }
@@ -291,7 +292,11 @@ function CardCarousel(): JSX.Element {
         drag = null;
         if (!dragging) return;
 
-        suppressClick = event.type === "pointerup";
+        suppressClick = true;
+        if (event.type === "pointercancel") {
+          settle(activeRef.current);
+          return;
+        }
         const dx = lastX - startX;
         const current = activeRef.current;
         const isShortSwipe =

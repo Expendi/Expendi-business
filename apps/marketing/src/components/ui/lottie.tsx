@@ -2,9 +2,14 @@
 
 import type { AnimationItem } from "lottie-web";
 import type { JSX, RefObject } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-import { prefersReducedMotion, ScrollTrigger, useGSAP } from "~/lib/gsap";
+import {
+  prefersReducedMotion,
+  REDUCED_MOTION_QUERY,
+  ScrollTrigger,
+  useGSAP,
+} from "~/lib/gsap";
 import { cn } from "~/lib/utils";
 
 /**
@@ -15,6 +20,12 @@ import { cn } from "~/lib/utils";
  * - `manual`: never plays by itself; drive it through `onReady`.
  */
 export type LottieMode = "loop" | "inview-once" | "hover" | "manual";
+
+function subscribeToReducedMotion(onChange: () => void): () => void {
+  const query = window.matchMedia(REDUCED_MOTION_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
 
 interface LottieProps {
   src: string;
@@ -44,6 +55,11 @@ export function Lottie({
   onReady,
   className,
 }: LottieProps): JSX.Element {
+  const reducedMotion = useSyncExternalStore(
+    subscribeToReducedMotion,
+    prefersReducedMotion,
+    () => false,
+  );
   const container = useRef<HTMLDivElement>(null);
   const [animation, setAnimation] = useState<AnimationItem | null>(null);
   const onReadyRef = useRef(onReady);
@@ -98,7 +114,14 @@ export function Lottie({
   useGSAP(
     () => {
       const element = container.current;
-      if (!animation || !element || prefersReducedMotion()) return;
+      if (!animation || !element) return;
+      if (reducedMotion) {
+        animation.goToAndStop(
+          reducedMotionFrame ?? Math.max(animation.totalFrames - 1, 0),
+          true,
+        );
+        return;
+      }
 
       if (mode === "loop") {
         const play = (): void => {
@@ -118,7 +141,7 @@ export function Lottie({
           },
         });
         if (trigger.isActive) play();
-        return;
+        return () => animation.pause();
       }
 
       if (mode === "inview-once") {
@@ -131,7 +154,7 @@ export function Lottie({
             animation.goToAndPlay(0, true);
           },
         });
-        return;
+        return () => animation.pause();
       }
 
       if (mode === "hover") {
@@ -145,12 +168,22 @@ export function Lottie({
         target.addEventListener("pointerenter", play);
         return () => {
           target.removeEventListener("pointerenter", play);
+          animation.pause();
         };
       }
     },
     {
       scope: container,
-      dependencies: [animation, mode, segmentStart, segmentEnd, hoverRef],
+      dependencies: [
+        animation,
+        mode,
+        segmentStart,
+        segmentEnd,
+        hoverRef,
+        reducedMotion,
+        reducedMotionFrame,
+      ],
+      revertOnUpdate: true,
     },
   );
 

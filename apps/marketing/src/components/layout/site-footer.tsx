@@ -103,7 +103,7 @@ function Ratings(): JSX.Element {
       {RATINGS.map(({ store, icon: Icon }) => (
         <div key={store} className="lg:flex lg:items-center lg:gap-8">
           <div className="flex items-center justify-center gap-4 lg:justify-start lg:gap-8">
-            <span className="h3-small">4.7</span>
+            <h3 className="h3-small">4.7</h3>
             <StarIcon className="size-20" />
           </div>
           <div className="flex items-center gap-4">

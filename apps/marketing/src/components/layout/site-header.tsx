@@ -186,6 +186,19 @@ export function SiteHeader(): JSX.Element {
   );
 
   useEffect(() => {
+    const query = window.matchMedia(DESKTOP_QUERY);
+    const resetMenus = (): void => {
+      setActiveMenu(null);
+      setDrawerOpen(false);
+      setCategoryOpen(false);
+    };
+    query.addEventListener("change", resetMenus);
+    return () => {
+      query.removeEventListener("change", resetMenus);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!drawerVisible) return;
     const { body } = document;
     const previousOverflow = body.style.overflow;

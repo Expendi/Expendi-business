@@ -25,7 +25,7 @@ const BACKGROUND: Record<SectionTheme, string> = {
 
 /**
  * Qonto's `<768` sticky "Open an account" bar. It slides up once the page is
- * scrolled past the hero, slides away when the footer's bottom block comes
+ * scrolled past 200px, slides away when the footer comes
  * into view, and takes the palette of whichever `data-header-theme` section
  * sits under its top edge (viewport bottom − 72px).
  */
@@ -46,12 +46,15 @@ export function MobileCtaBar(): JSX.Element {
       gsap.set(bar, {
         yPercent: 100,
         autoAlpha: 0,
+        pointerEvents: "none",
         backgroundColor: BACKGROUND[currentTheme],
       });
 
       const setVisible = contextSafe((next: boolean): void => {
         if (next === isVisible) return;
         isVisible = next;
+        bar.dataset.mobileCtaVisible = String(next);
+        gsap.set(bar, { pointerEvents: next ? "auto" : "none" });
         gsap.to(bar, {
           yPercent: next ? 0 : 100,
           autoAlpha: next ? 1 : 0,
@@ -73,13 +76,16 @@ export function MobileCtaBar(): JSX.Element {
         });
       });
 
-      const footerEnd = document.querySelector("footer > :last-child");
+      const footer = document.querySelector("footer");
       const reveal = ScrollTrigger.create({
         start: REVEAL_SCROLL_Y,
-        ...(footerEnd
-          ? { endTrigger: footerEnd, end: "top bottom" }
-          : { end: "max" }),
+        ...(footer
+          ? { endTrigger: footer, end: "top bottom" }
+          : { end: () => ScrollTrigger.maxScroll(window) + 1 }),
         onToggle: (self) => {
+          setVisible(self.isActive);
+        },
+        onRefresh: (self) => {
           setVisible(self.isActive);
         },
       });
@@ -109,8 +115,10 @@ export function MobileCtaBar(): JSX.Element {
   return (
     <aside
       ref={barRef}
+      aria-label="Mobile call-to-action"
+      data-mobile-cta-visible="false"
       className={cn(
-        "invisible fixed inset-x-0 bottom-0 z-1000 bg-[rgba(5,5,5,0.7)] px-16 opacity-0 backdrop-blur-[5px] md:hidden",
+        "invisible fixed inset-x-0 bottom-0 z-1000 bg-[rgba(5,5,5,0.7)] px-16 pb-[env(safe-area-inset-bottom)] opacity-0 backdrop-blur-[5px] md:hidden",
         theme === "dark" && "darkmode",
       )}
     >

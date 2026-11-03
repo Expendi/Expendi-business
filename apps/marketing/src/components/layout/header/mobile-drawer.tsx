@@ -11,16 +11,29 @@ import { LanguageSwitch } from "./language-switch";
 import { MenuHighlight } from "./menu-highlight";
 
 function slide(target: HTMLElement, open: boolean, seconds: number): void {
+  gsap.killTweensOf(target);
+  const duration = motionDuration(seconds);
+  if (duration === 0) {
+    gsap.set(target, {
+      x: 0,
+      xPercent: open ? 0 : 100,
+      visibility: open ? "visible" : "hidden",
+    });
+    return;
+  }
   if (open) gsap.set(target, { visibility: "visible" });
-  gsap.to(target, {
+  const timeline = gsap.timeline().to(target, {
+    // Strict Mode can reparse a percentage transform as a pixel translation.
+    // Reset both translation components so the offset cannot accumulate.
+    x: 0,
     xPercent: open ? 0 : 100,
-    duration: motionDuration(seconds),
+    duration,
     ease: EASE.qonto,
     overwrite: true,
-    onComplete: () => {
-      if (!open) gsap.set(target, { visibility: "hidden" });
-    },
   });
+  // Keep the closing panel visible during travel. Register the final set in
+  // the scoped timeline too, so interruption and unmount clean it up.
+  if (!open) timeline.set(target, { visibility: "hidden" });
 }
 
 interface MobileDrawerProps {
@@ -51,7 +64,7 @@ export function MobileDrawer({
       const drawer = drawerRef.current;
       const panel = categoryRef.current;
       if (!drawer || !panel) return;
-      gsap.set([drawer, panel], { xPercent: 100 });
+      gsap.set([drawer, panel], { x: 0, xPercent: 100 });
     },
     { scope: drawerRef },
   );

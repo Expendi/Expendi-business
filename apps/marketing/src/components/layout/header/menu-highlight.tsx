@@ -31,7 +31,7 @@ export function MenuHighlight({ highlight }: MenuHighlightProps): JSX.Element {
       >
         <div
           className={cn(
-            "w-full overflow-hidden rounded-lg md:h-310 lg:h-full lg:min-w-260",
+            "w-full overflow-hidden rounded-lg md:h-310 lg:h-full",
             isCutout && "flex items-end",
           )}
         >

@@ -140,6 +140,7 @@ interface MegaMenuPanelProps {
  */
 function MegaMenuPanel({ id, menu, open }: MegaMenuPanelProps): JSX.Element {
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const columns = menu.columns.length + (menu.highlight ? 1 : 0);
 
   const { contextSafe } = useGSAP(
     () => {
@@ -180,48 +181,50 @@ function MegaMenuPanel({ id, menu, open }: MegaMenuPanelProps): JSX.Element {
     <div
       ref={wrapperRef}
       id={id}
+      style={{ width: columns * 273 + (columns - 1) * 24 + 64 }}
       className={cn(
-        "absolute top-full left-[-32px] z-1000 w-max pt-16",
+        "absolute top-full left-[-32px] z-1000 max-w-[100vw] pt-16",
         open ? "block" : "hidden",
       )}
     >
       <div className="bg-primary-white text-primary-black overflow-hidden rounded-[32px]">
-        <div className="flex gap-24 p-32">
-          <div className="flex gap-24">
-            {menu.columns.map((column, columnIndex) => (
-              <ul key={columnIndex} className="w-273 shrink-0">
-                {column.map((group) => (
-                  <Fragment key={group.category}>
-                    <li className="text-grey-700 mt-32 mb-6 text-14 leading-22 first:mt-0">
-                      {group.category}
+        <div
+          className="grid gap-24 p-32"
+          style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+        >
+          {menu.columns.map((column, columnIndex) => (
+            <ul key={columnIndex} className="min-w-0">
+              {column.map((group) => (
+                <Fragment key={group.category}>
+                  <li className="text-grey-700 mt-32 mb-6 text-14 leading-22 first:mt-0">
+                    {group.category}
+                  </li>
+                  {group.items.map(({ label, href, icon: Icon }) => (
+                    <li key={label}>
+                      <a
+                        href={href}
+                        data-submenu-item
+                        onPointerEnter={(event) => {
+                          spotlight(event.currentTarget);
+                        }}
+                        onPointerLeave={() => {
+                          spotlight(null);
+                        }}
+                        className="flex items-center py-14 text-16 leading-26"
+                      >
+                        {Icon ? (
+                          <Icon className="mr-10 size-22 flex-none" />
+                        ) : null}
+                        <span>{label}</span>
+                      </a>
                     </li>
-                    {group.items.map(({ label, href, icon: Icon }) => (
-                      <li key={label}>
-                        <a
-                          href={href}
-                          data-submenu-item
-                          onPointerEnter={(event) => {
-                            spotlight(event.currentTarget);
-                          }}
-                          onPointerLeave={() => {
-                            spotlight(null);
-                          }}
-                          className="flex items-center py-14 text-16 leading-26"
-                        >
-                          {Icon ? (
-                            <Icon className="mr-10 size-22 flex-none" />
-                          ) : null}
-                          <span>{label}</span>
-                        </a>
-                      </li>
-                    ))}
-                  </Fragment>
-                ))}
-              </ul>
-            ))}
-          </div>
+                  ))}
+                </Fragment>
+              ))}
+            </ul>
+          ))}
           {menu.highlight ? (
-            <div className="mb-8 flex w-273 shrink-0 flex-col">
+            <div className="mb-8 flex min-w-0 flex-col">
               <MenuHighlight highlight={menu.highlight} />
             </div>
           ) : null}

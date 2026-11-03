@@ -13,6 +13,7 @@ import {
   EASE,
   gsap,
   prefersReducedMotion,
+  REDUCED_MOTION_QUERY,
   ScrollTrigger,
   useGSAP,
 } from "~/lib/gsap";
@@ -61,6 +62,12 @@ function subscribeToDesktop(onChange: () => void): () => void {
   return () => {
     query.removeEventListener("change", onChange);
   };
+}
+
+function subscribeToReducedMotion(onChange: () => void): () => void {
+  const query = window.matchMedia(REDUCED_MOTION_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
 }
 
 /**
@@ -126,6 +133,11 @@ function GradientBackdrop(): JSX.Element {
 }
 
 function AiStepsDesktop({ enabled }: { enabled: boolean }): JSX.Element {
+  const reducedMotion = useSyncExternalStore(
+    subscribeToReducedMotion,
+    prefersReducedMotion,
+    () => false,
+  );
   const rootRef = useRef<HTMLDivElement>(null);
   const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
   const barRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -133,6 +145,7 @@ function AiStepsDesktop({ enabled }: { enabled: boolean }): JSX.Element {
   const animationsRef = useRef<(AnimationItem | undefined)[]>([]);
   const selectRef = useRef<((index: number) => void) | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const activeIndexRef = useRef(0);
 
   useGSAP(
     (_context, contextSafe) => {
@@ -143,8 +156,9 @@ function AiStepsDesktop({ enabled }: { enabled: boolean }): JSX.Element {
       const bars = barRefs.current.filter(isPresent);
       const panels = panelRefs.current.filter(isPresent);
 
-      if (prefersReducedMotion()) {
+      if (reducedMotion) {
         const show = contextSafe((index: number): void => {
+          activeIndexRef.current = index;
           setActiveIndex(index);
           gsap.set(steps, {
             opacity: (i: number) => (i === index ? 1 : INACTIVE_STEP_OPACITY),
@@ -153,7 +167,7 @@ function AiStepsDesktop({ enabled }: { enabled: boolean }): JSX.Element {
           gsap.set(bars, { scaleY: (i: number) => (i === index ? 1 : 0) });
         });
         selectRef.current = show;
-        show(0);
+        show(activeIndexRef.current);
         return () => {
           selectRef.current = null;
         };
@@ -189,6 +203,7 @@ function AiStepsDesktop({ enabled }: { enabled: boolean }): JSX.Element {
 
       const activate: (index: number) => void = contextSafe(
         (index: number): void => {
+          activeIndexRef.current = index;
           setActiveIndex(index);
           fadeSteps.forEach((fade, i) => {
             fade(i === index ? 1 : INACTIVE_STEP_OPACITY);
@@ -231,13 +246,17 @@ function AiStepsDesktop({ enabled }: { enabled: boolean }): JSX.Element {
       });
 
       selectRef.current = activate;
-      activate(0);
+      activate(activeIndexRef.current);
 
       return () => {
         selectRef.current = null;
       };
     },
-    { scope: rootRef, dependencies: [enabled], revertOnUpdate: true },
+    {
+      scope: rootRef,
+      dependencies: [enabled, reducedMotion],
+      revertOnUpdate: true,
+    },
   );
 
   return (

@@ -75,10 +75,15 @@ function subscribeToConsent(onChange: () => void): () => void {
   };
 }
 
-function saveConsent(choice: ConsentChoice): void {
-  storedConsent = choice;
+interface ConsentSelection {
+  choice: ConsentChoice;
+  purposes?: PurposeChoices;
+}
+
+function saveConsent({ choice, purposes }: ConsentSelection): void {
+  storedConsent = purposes ? JSON.stringify({ choice, purposes }) : choice;
   try {
-    window.localStorage.setItem(CONSENT_STORAGE_KEY, choice);
+    window.localStorage.setItem(CONSENT_STORAGE_KEY, storedConsent);
   } catch (error) {
     console.warn(
       "Cookie consent could not be saved to localStorage; it applies to this visit only.",
@@ -116,7 +121,7 @@ function ConsentPopup(): JSX.Element {
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const [view, setView] = useState<ConsentView>("notice");
-  const [closingChoice, setClosingChoice] = useState<ConsentChoice | null>(
+  const [closingChoice, setClosingChoice] = useState<ConsentSelection | null>(
     null,
   );
 
@@ -173,8 +178,8 @@ function ConsentPopup(): JSX.Element {
     { scope: backdropRef, dependencies: [closingChoice] },
   );
 
-  const close = (choice: ConsentChoice): void => {
-    setClosingChoice((current) => current ?? choice);
+  const close = (choice: ConsentChoice, purposes?: PurposeChoices): void => {
+    setClosingChoice((current) => current ?? { choice, purposes });
   };
 
   const showView = (next: ConsentView): void => {
@@ -213,8 +218,8 @@ function ConsentPopup(): JSX.Element {
               onClose={() => {
                 showView("notice");
               }}
-              onSave={() => {
-                close("customized");
+              onSave={(choices) => {
+                close("customized", choices);
               }}
             />
           )}
@@ -293,7 +298,7 @@ function NoticeView({
 interface PreferencesViewProps {
   titleId: string;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (choices: PurposeChoices) => void;
 }
 
 /**
@@ -376,7 +381,9 @@ function PreferencesView({
       <button
         type="button"
         disabled={!isComplete}
-        onClick={onSave}
+        onClick={() => {
+          onSave(choices);
+        }}
         className="mt-41 mb-10 block h-37 cursor-pointer rounded-sm border border-[rgb(29,29,27)] px-20 text-16 leading-24 font-bold tracking-[0.16px] text-[rgb(68,68,68)] hover:opacity-70 disabled:cursor-default disabled:border-[rgb(160,160,160)] disabled:text-[rgb(148,148,148)] disabled:hover:opacity-100"
       >
         Save
