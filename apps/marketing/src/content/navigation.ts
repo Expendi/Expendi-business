@@ -406,7 +406,7 @@ export const NAV_MENUS: readonly NavMenu[] = [
     ],
     highlight: {
       title: "Discover Qonto AI",
-      description: "Your Qonto account comes with built-in AI agents.",
+      description: "Your Qonto account comes with built-in AI agents.\u00a0",
       href: "https://qonto.com/en/ai",
       image: "36901",
     },

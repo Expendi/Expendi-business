@@ -36,7 +36,7 @@ const CTA_HREF = "https://qonto.com/en/invoicing";
 const CARDS: readonly InvoicingCard[] = [
   {
     title: "Get ready for e-invoicing",
-    body: "As a Certified Approved Platform, Qonto includes fully compliant e-invoicing in all plans.",
+    body: "As a Certified Approved Platform, Qonto includes fully compliant e-invoicing in all plans.\u00a0",
     href: "https://qonto.com/en/invoicing/",
     media: {
       kind: "image",

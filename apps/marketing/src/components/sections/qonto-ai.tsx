@@ -281,7 +281,7 @@ function AiStepsDesktop({ enabled }: { enabled: boolean }): JSX.Element {
                       {step.title}
                     </button>
                   </h3>
-                  <p className="body-regular">{step.body}</p>
+                  <p className="text-18 leading-24">{step.body}</p>
                 </div>
               </div>
             ))}

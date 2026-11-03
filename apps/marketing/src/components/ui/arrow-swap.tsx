@@ -70,13 +70,15 @@ export function ArrowSwap({
       const play = (): void => {
         timeline.restart();
       };
-      const reset = (): void => {
-        timeline.pause(0);
+      const reset = (event: PointerEvent): void => {
+        if (event.pointerType === "mouse") timeline.pause(0);
       };
       trigger.addEventListener("pointerenter", play);
+      trigger.addEventListener("click", play);
       trigger.addEventListener("pointerleave", reset);
       return () => {
         trigger.removeEventListener("pointerenter", play);
+        trigger.removeEventListener("click", play);
         trigger.removeEventListener("pointerleave", reset);
       };
     },
