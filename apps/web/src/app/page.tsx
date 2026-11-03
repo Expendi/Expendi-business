@@ -4,14 +4,19 @@ import type { JSX } from "react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { CenteredCard } from "~/components/centered-card";
+import { BrandMark } from "~/components/brand-mark";
 import { FullScreenMessage } from "~/components/full-screen-message";
 import { PasskeyOffer } from "~/components/passkey-offer";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { Button } from "~/components/ui/button";
 import {
-  alertClass,
-  primaryButton,
-  secondaryButton,
-} from "~/components/styles";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { Separator } from "~/components/ui/separator";
 import { HOME_PATH } from "~/config/navigation";
 import { useAuth } from "~/contexts/auth-context";
 import { browserSupportsPasskeys, isPasskeyCancellation } from "~/lib/passkeys";
@@ -48,51 +53,65 @@ function SignInCard(): JSX.Element {
   }
 
   return (
-    <CenteredCard>
-      <h1 className="text-lg font-semibold">Expendi Business</h1>
-      <p className="mt-2 text-sm text-stone-600">
-        For company admins and accountants. Sign in with your work email;
-        we&apos;ll send you a code.
-      </p>
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-4 py-12">
+      <div className="flex items-center gap-3 text-lg font-semibold tracking-tight">
+        <BrandMark />
+        Expendi Business
+      </div>
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>
+            <h1>Sign in to your workspace</h1>
+          </CardTitle>
+          <CardDescription>
+            For company admins and accountants. Sign in with your work email;
+            we&apos;ll send you a code.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {message ? (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{message}</AlertDescription>
+            </Alert>
+          ) : null}
 
-      {message ? (
-        <p role="alert" className={alertClass}>
-          {message}
-        </p>
-      ) : null}
-
-      <button
-        type="button"
-        onClick={signInWithEmail}
-        disabled={passkeySignInPending}
-        className={`mt-6 w-full ${primaryButton}`}
-      >
-        Sign in with email
-      </button>
-
-      {browserSupportsPasskeys() ? (
-        <>
-          <div className="mt-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-stone-200" />
-            <p className="text-xs text-stone-500">Set up a passkey before?</p>
-            <div className="h-px flex-1 bg-stone-200" />
-          </div>
-          <button
+          <Button
             type="button"
-            onClick={() => void onPasskey()}
+            onClick={signInWithEmail}
             disabled={passkeySignInPending}
-            className={`mt-4 w-full ${secondaryButton}`}
+            className="w-full"
           >
-            {passkeySignInPending
-              ? "Waiting for your passkey…"
-              : "Sign in with a passkey"}
-          </button>
-          <p className="mt-2 text-xs text-stone-500">
-            A passkey on your phone works too: choose &ldquo;use a phone or
-            tablet&rdquo; when your browser asks.
-          </p>
-        </>
-      ) : null}
-    </CenteredCard>
+            Sign in with email
+          </Button>
+
+          {browserSupportsPasskeys() ? (
+            <>
+              <div className="mt-6 flex items-center gap-3">
+                <Separator className="flex-1" />
+                <p className="shrink-0 text-xs text-muted-foreground">
+                  Set up a passkey before?
+                </p>
+                <Separator className="flex-1" />
+              </div>
+              <Button
+                type="button"
+                onClick={() => void onPasskey()}
+                disabled={passkeySignInPending}
+                className="mt-4 w-full"
+                variant="outline"
+              >
+                {passkeySignInPending
+                  ? "Waiting for your passkey…"
+                  : "Sign in with a passkey"}
+              </Button>
+              <p className="mt-2 text-xs text-stone-500">
+                A passkey on your phone works too: choose &ldquo;use a phone or
+                tablet&rdquo; when your browser asks.
+              </p>
+            </>
+          ) : null}
+        </CardContent>
+      </Card>
+    </main>
   );
 }

@@ -5,6 +5,16 @@ import { Providers } from "./providers";
 
 import "~/app/styles.css";
 
+import { Outfit } from "next/font/google";
+
+import { TooltipProvider } from "~/components/ui/tooltip";
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: { default: "Expendi Business", template: "%s · Expendi Business" },
   description:
@@ -18,9 +28,11 @@ export default function RootLayout({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <html lang="en">
+    <html lang="en" className={outfit.variable}>
       <body className="min-h-screen font-sans">
-        <Providers>{children}</Providers>
+        <TooltipProvider>
+          <Providers>{children}</Providers>
+        </TooltipProvider>
       </body>
     </html>
   );

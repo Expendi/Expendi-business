@@ -1,6 +1,24 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  BanknoteIcon,
+  ChartBarIcon,
+  CircleCheckIcon,
+  ContactIcon,
+  FileTextIcon,
+  LayoutDashboardIcon,
+  ReceiptIcon,
+  RepeatIcon,
+  SettingsIcon,
+  UsersIcon,
+  WalletIcon,
+} from "lucide-react";
+
 export interface NavItem {
   title: string;
   href: string;
+  icon: LucideIcon;
+  group: "Workspace" | "Spend & pay" | "Manage" | "Insights";
 }
 
 /**
@@ -8,18 +26,48 @@ export interface NavItem {
  * read-only (spec §4). What differs is that only admins get actions.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
-  { title: "Overview", href: "/overview" },
-  { title: "Approvals", href: "/approvals" },
-  { title: "Expenses", href: "/expenses" },
-  { title: "Bills", href: "/bills" },
-  { title: "Recurring", href: "/recurring" },
-  { title: "Payees", href: "/payees" },
-  { title: "Payroll", href: "/payroll" },
-  { title: "Wallet", href: "/wallet" },
-  { title: "Team", href: "/team" },
-  { title: "Settings", href: "/settings" },
-  { title: "Activity", href: "/activity" },
-  { title: "Reports", href: "/reports" },
+  {
+    title: "Overview",
+    href: "/overview",
+    icon: LayoutDashboardIcon,
+    group: "Workspace",
+  },
+  { title: "Wallet", href: "/wallet", icon: WalletIcon, group: "Workspace" },
+  {
+    title: "Approvals",
+    href: "/approvals",
+    icon: CircleCheckIcon,
+    group: "Spend & pay",
+  },
+  {
+    title: "Expenses",
+    href: "/expenses",
+    icon: ReceiptIcon,
+    group: "Spend & pay",
+  },
+  { title: "Bills", href: "/bills", icon: FileTextIcon, group: "Spend & pay" },
+  {
+    title: "Recurring",
+    href: "/recurring",
+    icon: RepeatIcon,
+    group: "Spend & pay",
+  },
+  {
+    title: "Payroll",
+    href: "/payroll",
+    icon: BanknoteIcon,
+    group: "Spend & pay",
+  },
+  { title: "Payees", href: "/payees", icon: ContactIcon, group: "Manage" },
+  { title: "Team", href: "/team", icon: UsersIcon, group: "Manage" },
+  { title: "Settings", href: "/settings", icon: SettingsIcon, group: "Manage" },
+  { title: "Reports", href: "/reports", icon: ChartBarIcon, group: "Insights" },
+  {
+    title: "Activity",
+    href: "/activity",
+    icon: ActivityIcon,
+    group: "Insights",
+  },
 ];
 
 export const HOME_PATH = "/overview";
