@@ -1,0 +1,849 @@
+{
+  "base": "http://localhost:3003",
+  "results": [
+    {
+      "name": "desktop / no-preference / Business account",
+      "status": "pass",
+      "evidence": {
+        "links": 16,
+        "box": {
+          "x": 130,
+          "y": 80,
+          "width": 1228,
+          "height": 492
+        }
+      }
+    },
+    {
+      "name": "desktop / no-preference / Company creation",
+      "status": "pass",
+      "evidence": {
+        "links": 5,
+        "box": {
+          "x": 285.6875,
+          "y": 80,
+          "width": 931,
+          "height": 442
+        }
+      }
+    },
+    {
+      "name": "desktop / no-preference / Financial tools",
+      "status": "pass",
+      "evidence": {
+        "links": 11,
+        "box": {
+          "x": 443.3125,
+          "y": 80,
+          "width": 931,
+          "height": 486
+        }
+      }
+    },
+    {
+      "name": "desktop / no-preference / Credit",
+      "status": "pass",
+      "evidence": {
+        "links": 7,
+        "box": {
+          "x": 254.03125,
+          "y": 80,
+          "width": 931,
+          "height": 442
+        }
+      }
+    },
+    {
+      "name": "desktop / no-preference / Pricing",
+      "status": "pass",
+      "evidence": {
+        "links": 5,
+        "box": {
+          "x": 642.890625,
+          "y": 80,
+          "width": 634,
+          "height": 270
+        }
+      }
+    },
+    {
+      "name": "desktop / no-preference / About us",
+      "status": "pass",
+      "evidence": {
+        "links": 4,
+        "box": {
+          "x": 718.078125,
+          "y": 80,
+          "width": 634,
+          "height": 468
+        }
+      }
+    },
+    {
+      "name": "desktop / no-preference / country picker",
+      "status": "pass",
+      "evidence": [
+        {
+          "text": "Europe",
+          "href": "/en"
+        },
+        {
+          "text": "France",
+          "href": "https://qonto.com/fr"
+        },
+        {
+          "text": "Deutschland",
+          "href": "https://qonto.com/de"
+        },
+        {
+          "text": "España",
+          "href": "https://qonto.com/es"
+        },
+        {
+          "text": "Italia",
+          "href": "https://qonto.com/it"
+        },
+        {
+          "text": "Österreich",
+          "href": "https://qonto.com/de-at"
+        },
+        {
+          "text": "België",
+          "href": "https://qonto.com/fr-be"
+        },
+        {
+          "text": "Portugal",
+          "href": "https://qonto.com/pt"
+        },
+        {
+          "text": "Nederland",
+          "href": "https://qonto.com/nl"
+        }
+      ]
+    },
+    {
+      "name": "desktop / no-preference / sign-in hover",
+      "status": "pass"
+    },
+    {
+      "name": "desktop / no-preference / section themes both directions",
+      "status": "pass",
+      "evidence": [
+        {
+          "top": 0,
+          "theme": "dark",
+          "id": "section-1"
+        },
+        {
+          "top": 900,
+          "theme": "dark",
+          "id": "section-2"
+        },
+        {
+          "top": 1284,
+          "theme": "dark",
+          "id": "section-3"
+        },
+        {
+          "top": 2404,
+          "theme": "light",
+          "id": "section-4"
+        },
+        {
+          "top": 3304,
+          "theme": "light",
+          "id": "section-5"
+        },
+        {
+          "top": 4150.671875,
+          "theme": "light",
+          "id": "section-6"
+        },
+        {
+          "top": 4814.671875,
+          "theme": "light",
+          "id": "section-7"
+        },
+        {
+          "top": 5262.671875,
+          "theme": "light",
+          "id": "section-8"
+        },
+        {
+          "top": 5870.671875,
+          "theme": "dark",
+          "id": "section-9"
+        },
+        {
+          "top": 6938.671875,
+          "theme": "dark",
+          "id": "section-protection"
+        },
+        {
+          "top": 7384.671875,
+          "theme": "light",
+          "id": "section-11"
+        },
+        {
+          "top": 8048.671875,
+          "theme": "dark",
+          "id": ""
+        },
+        {
+          "top": 8048.671875,
+          "theme": "dark",
+          "id": ""
+        },
+        {
+          "top": 7384.671875,
+          "theme": "light",
+          "id": "section-11"
+        },
+        {
+          "top": 6938.671875,
+          "theme": "dark",
+          "id": "section-protection"
+        },
+        {
+          "top": 5870.671875,
+          "theme": "dark",
+          "id": "section-9"
+        },
+        {
+          "top": 5262.671875,
+          "theme": "light",
+          "id": "section-8"
+        },
+        {
+          "top": 4814.671875,
+          "theme": "light",
+          "id": "section-7"
+        },
+        {
+          "top": 4150.671875,
+          "theme": "light",
+          "id": "section-6"
+        },
+        {
+          "top": 3304,
+          "theme": "light",
+          "id": "section-5"
+        },
+        {
+          "top": 2404,
+          "theme": "light",
+          "id": "section-4"
+        },
+        {
+          "top": 1284,
+          "theme": "dark",
+          "id": "section-3"
+        },
+        {
+          "top": 900,
+          "theme": "dark",
+          "id": "section-2"
+        },
+        {
+          "top": 0,
+          "theme": "dark",
+          "id": "section-1"
+        }
+      ]
+    },
+    {
+      "name": "desktop / no-preference / footer locale and underline",
+      "status": "pass",
+      "evidence": [
+        {
+          "text": "France",
+          "href": "https://qonto.com/fr"
+        },
+        {
+          "text": "Deutschland",
+          "href": "https://qonto.com/de"
+        },
+        {
+          "text": "España",
+          "href": "https://qonto.com/es"
+        },
+        {
+          "text": "Italia",
+          "href": "https://qonto.com/it"
+        },
+        {
+          "text": "Österreich",
+          "href": "https://qonto.com/de-at"
+        },
+        {
+          "text": "België",
+          "href": "https://qonto.com/fr-be"
+        },
+        {
+          "text": "Portugal",
+          "href": "https://qonto.com/pt"
+        },
+        {
+          "text": "Nederland",
+          "href": "https://qonto.com/nl"
+        }
+      ]
+    },
+    {
+      "name": "390px / no-preference / drawer and all six submenus",
+      "status": "pass"
+    },
+    {
+      "name": "390px / no-preference / breakpoint clears stale drawer",
+      "status": "pass"
+    },
+    {
+      "name": "390px / no-preference / mobile themes and footer locale",
+      "status": "pass"
+    },
+    {
+      "name": "768px / no-preference / drawer and all six submenus",
+      "status": "pass"
+    },
+    {
+      "name": "768px / no-preference / breakpoint clears stale drawer",
+      "status": "pass"
+    },
+    {
+      "name": "768px / no-preference / mobile themes and footer locale",
+      "status": "pass"
+    },
+    {
+      "name": "desktop / reduce / Business account",
+      "status": "pass",
+      "evidence": {
+        "links": 16,
+        "box": {
+          "x": 130,
+          "y": 80,
+          "width": 1228,
+          "height": 492
+        }
+      }
+    },
+    {
+      "name": "desktop / reduce / Company creation",
+      "status": "pass",
+      "evidence": {
+        "links": 5,
+        "box": {
+          "x": 285.6875,
+          "y": 80,
+          "width": 931,
+          "height": 442
+        }
+      }
+    },
+    {
+      "name": "desktop / reduce / Financial tools",
+      "status": "pass",
+      "evidence": {
+        "links": 11,
+        "box": {
+          "x": 443.3125,
+          "y": 80,
+          "width": 931,
+          "height": 486
+        }
+      }
+    },
+    {
+      "name": "desktop / reduce / Credit",
+      "status": "pass",
+      "evidence": {
+        "links": 7,
+        "box": {
+          "x": 254.03125,
+          "y": 80,
+          "width": 931,
+          "height": 442
+        }
+      }
+    },
+    {
+      "name": "desktop / reduce / Pricing",
+      "status": "pass",
+      "evidence": {
+        "links": 5,
+        "box": {
+          "x": 642.890625,
+          "y": 80,
+          "width": 634,
+          "height": 270
+        }
+      }
+    },
+    {
+      "name": "desktop / reduce / About us",
+      "status": "pass",
+      "evidence": {
+        "links": 4,
+        "box": {
+          "x": 718.078125,
+          "y": 80,
+          "width": 634,
+          "height": 468
+        }
+      }
+    },
+    {
+      "name": "desktop / reduce / country picker",
+      "status": "pass",
+      "evidence": [
+        {
+          "text": "Europe",
+          "href": "/en"
+        },
+        {
+          "text": "France",
+          "href": "https://qonto.com/fr"
+        },
+        {
+          "text": "Deutschland",
+          "href": "https://qonto.com/de"
+        },
+        {
+          "text": "España",
+          "href": "https://qonto.com/es"
+        },
+        {
+          "text": "Italia",
+          "href": "https://qonto.com/it"
+        },
+        {
+          "text": "Österreich",
+          "href": "https://qonto.com/de-at"
+        },
+        {
+          "text": "België",
+          "href": "https://qonto.com/fr-be"
+        },
+        {
+          "text": "Portugal",
+          "href": "https://qonto.com/pt"
+        },
+        {
+          "text": "Nederland",
+          "href": "https://qonto.com/nl"
+        }
+      ]
+    },
+    {
+      "name": "desktop / reduce / sign-in hover",
+      "status": "pass"
+    },
+    {
+      "name": "desktop / reduce / section themes both directions",
+      "status": "pass",
+      "evidence": [
+        {
+          "top": 0,
+          "theme": "dark",
+          "id": "section-1"
+        },
+        {
+          "top": 900,
+          "theme": "dark",
+          "id": "section-2"
+        },
+        {
+          "top": 1284,
+          "theme": "dark",
+          "id": "section-3"
+        },
+        {
+          "top": 2404,
+          "theme": "light",
+          "id": "section-4"
+        },
+        {
+          "top": 3304,
+          "theme": "light",
+          "id": "section-5"
+        },
+        {
+          "top": 4150.671875,
+          "theme": "light",
+          "id": "section-6"
+        },
+        {
+          "top": 4814.671875,
+          "theme": "light",
+          "id": "section-7"
+        },
+        {
+          "top": 5262.671875,
+          "theme": "light",
+          "id": "section-8"
+        },
+        {
+          "top": 5870.671875,
+          "theme": "dark",
+          "id": "section-9"
+        },
+        {
+          "top": 6938.671875,
+          "theme": "dark",
+          "id": "section-protection"
+        },
+        {
+          "top": 7384.671875,
+          "theme": "light",
+          "id": "section-11"
+        },
+        {
+          "top": 8048.671875,
+          "theme": "dark",
+          "id": ""
+        },
+        {
+          "top": 8048.671875,
+          "theme": "dark",
+          "id": ""
+        },
+        {
+          "top": 7384.671875,
+          "theme": "light",
+          "id": "section-11"
+        },
+        {
+          "top": 6938.671875,
+          "theme": "dark",
+          "id": "section-protection"
+        },
+        {
+          "top": 5870.671875,
+          "theme": "dark",
+          "id": "section-9"
+        },
+        {
+          "top": 5262.671875,
+          "theme": "light",
+          "id": "section-8"
+        },
+        {
+          "top": 4814.671875,
+          "theme": "light",
+          "id": "section-7"
+        },
+        {
+          "top": 4150.671875,
+          "theme": "light",
+          "id": "section-6"
+        },
+        {
+          "top": 3304,
+          "theme": "light",
+          "id": "section-5"
+        },
+        {
+          "top": 2404,
+          "theme": "light",
+          "id": "section-4"
+        },
+        {
+          "top": 1284,
+          "theme": "dark",
+          "id": "section-3"
+        },
+        {
+          "top": 900,
+          "theme": "dark",
+          "id": "section-2"
+        },
+        {
+          "top": 0,
+          "theme": "dark",
+          "id": "section-1"
+        }
+      ]
+    },
+    {
+      "name": "desktop / reduce / footer locale and underline",
+      "status": "pass",
+      "evidence": [
+        {
+          "text": "France",
+          "href": "https://qonto.com/fr"
+        },
+        {
+          "text": "Deutschland",
+          "href": "https://qonto.com/de"
+        },
+        {
+          "text": "España",
+          "href": "https://qonto.com/es"
+        },
+        {
+          "text": "Italia",
+          "href": "https://qonto.com/it"
+        },
+        {
+          "text": "Österreich",
+          "href": "https://qonto.com/de-at"
+        },
+        {
+          "text": "België",
+          "href": "https://qonto.com/fr-be"
+        },
+        {
+          "text": "Portugal",
+          "href": "https://qonto.com/pt"
+        },
+        {
+          "text": "Nederland",
+          "href": "https://qonto.com/nl"
+        }
+      ]
+    },
+    {
+      "name": "390px / reduce / drawer and all six submenus",
+      "status": "pass"
+    },
+    {
+      "name": "390px / reduce / breakpoint clears stale drawer",
+      "status": "pass"
+    },
+    {
+      "name": "390px / reduce / mobile themes and footer locale",
+      "status": "pass"
+    },
+    {
+      "name": "768px / reduce / drawer and all six submenus",
+      "status": "pass"
+    },
+    {
+      "name": "768px / reduce / breakpoint clears stale drawer",
+      "status": "pass"
+    },
+    {
+      "name": "768px / reduce / mobile themes and footer locale",
+      "status": "pass"
+    },
+    {
+      "name": "1024px / all desktop panels fit viewport",
+      "status": "pass"
+    },
+    {
+      "name": "consent / declined / 1440px / no-preference",
+      "status": "pass",
+      "evidence": {
+        "stored": "declined"
+      }
+    },
+    {
+      "name": "consent / declined / 390px / no-preference",
+      "status": "pass",
+      "evidence": {
+        "stored": "declined"
+      }
+    },
+    {
+      "name": "consent / declined / 1440px / reduce",
+      "status": "pass",
+      "evidence": {
+        "stored": "declined"
+      }
+    },
+    {
+      "name": "consent / declined / 390px / reduce",
+      "status": "pass",
+      "evidence": {
+        "stored": "declined"
+      }
+    },
+    {
+      "name": "consent / accepted / 1440px / no-preference",
+      "status": "pass",
+      "evidence": {
+        "stored": "accepted"
+      }
+    },
+    {
+      "name": "consent / accepted / 390px / no-preference",
+      "status": "pass",
+      "evidence": {
+        "stored": "accepted"
+      }
+    },
+    {
+      "name": "consent / accepted / 1440px / reduce",
+      "status": "pass",
+      "evidence": {
+        "stored": "accepted"
+      }
+    },
+    {
+      "name": "consent / accepted / 390px / reduce",
+      "status": "pass",
+      "evidence": {
+        "stored": "accepted"
+      }
+    },
+    {
+      "name": "consent / customized / 1440px / no-preference",
+      "status": "pass",
+      "evidence": {
+        "stored": "{\"choice\":\"customized\",\"purposes\":{\"functional\":false,\"audience\":false,\"personalization\":false,\"advertising\":false,\"advertising-partners\":false,\"marketing\":false,\"analytics\":true}}"
+      }
+    },
+    {
+      "name": "consent / customized / 390px / no-preference",
+      "status": "pass",
+      "evidence": {
+        "stored": "{\"choice\":\"customized\",\"purposes\":{\"functional\":false,\"audience\":false,\"personalization\":false,\"advertising\":false,\"advertising-partners\":false,\"marketing\":false,\"analytics\":true}}"
+      }
+    },
+    {
+      "name": "consent / customized / 1440px / reduce",
+      "status": "pass",
+      "evidence": {
+        "stored": "{\"choice\":\"customized\",\"purposes\":{\"functional\":false,\"audience\":false,\"personalization\":false,\"advertising\":false,\"advertising-partners\":false,\"marketing\":false,\"analytics\":true}}"
+      }
+    },
+    {
+      "name": "consent / customized / 390px / reduce",
+      "status": "pass",
+      "evidence": {
+        "stored": "{\"choice\":\"customized\",\"purposes\":{\"functional\":false,\"audience\":false,\"personalization\":false,\"advertising\":false,\"advertising-partners\":false,\"marketing\":false,\"analytics\":true}}"
+      }
+    },
+    {
+      "name": "no browser runtime errors",
+      "status": "fail",
+      "error": "Expected values to be strictly deep-equal:\n+ actual - expected\n\n+ [\n+   {\n+     message: \"Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\\n\" +\n+       '\\n' +\n+       \"- A server/client branch `if (typeof window !== 'undefined')`.\\n\" +\n+       \"- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.\\n\" +\n+       \"- Date formatting in a user's locale which doesn't match the server.\\n\" +\n+       '- External changing data without sending a snapshot of it along with the HTML.\\n' +\n+       '- Invalid HTML tag nesting.\\n' +\n+       '\\n' +\n+       'It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.\\n' +\n+       '\\n' +\n+       'https://react.dev/link/hydration-mismatch\\n' +\n+       '\\n' +\n+       '  ...\\n' +\n+       '    <RedirectBoundary>\\n' +\n+       '      <RedirectErrorBoundary router={{...}}>\\n' +\n+       '        <InnerLayoutRouter url=\"/\" tree={[...]} params={{}} renderTree={{...}} segmentPath={[...]} ...>\\n' +\n+       '          <SegmentViewNode type=\"page\" pagePath=\"page.tsx\">\\n' +\n+       '            <SegmentTrieNode>\\n' +\n+       '            <HomePage>\\n' +\n+       '              <SiteHeader>\\n' +\n+       '              <main>\\n' +\n+       '              <MobileCtaBar>\\n' +\n+       '              <SiteFooter>\\n' +\n+       '                <FooterRoot className=\"text-16 le...\">\\n' +\n+       '                  <footer ref={{current:null}} className=\"text-16 le...\">\\n' +\n+       '                    <div data-header-theme=\"dark\" className=\"darkmode r...\">\\n' +\n+       '                      <div className=\"mx-auto gr...\">\\n' +\n+       '                        <div className=\"col-span-1...\">\\n' +\n+       '                          <PricingCard>\\n' +\n+       '                          <Ratings>\\n' +\n+       '                            <div className=\"my-32 flex...\">\\n' +\n+       '                              <div className=\"lg:flex lg...\">\\n' +\n+       '                                <div className=\"flex items...\">\\n' +\n+       '+                                 <h3 className=\"h3-small\">\\n' +\n+       '-                                 <span className=\"h3-small\">\\n' +\n+       '                                  ...\\n' +\n+       '                                ...\\n' +\n+       '                              ...\\n' +\n+       '                        ...\\n' +\n+       '                    ...\\n' +\n+       '              ...\\n' +\n+       '          ...\\n' +\n+       '        ...\\n',\n+     reducedMotion: 'reduce',\n+     width: 1440\n+   }\n+ ]\n- []\n"
+    },
+    {
+      "name": "live reference / 1440px menu geometry",
+      "status": "pass",
+      "evidence": [
+        {
+          "title": "Business account",
+          "box": {
+            "x": 130,
+            "y": 96,
+            "width": 1228,
+            "height": 476
+          }
+        },
+        {
+          "title": "Company creation",
+          "box": {
+            "x": 286,
+            "y": 96,
+            "width": 931,
+            "height": 426
+          }
+        },
+        {
+          "title": "Financial tools",
+          "box": {
+            "x": 444,
+            "y": 96,
+            "width": 931,
+            "height": 470
+          }
+        },
+        {
+          "title": "Credit",
+          "box": {
+            "x": 254.5,
+            "y": 96,
+            "width": 931,
+            "height": 426
+          }
+        },
+        {
+          "title": "Pricing",
+          "box": {
+            "x": 644,
+            "y": 96,
+            "width": 634,
+            "height": 254
+          }
+        },
+        {
+          "title": "About us",
+          "box": {
+            "x": 720,
+            "y": 96,
+            "width": 634,
+            "height": 452
+          }
+        }
+      ]
+    },
+    {
+      "name": "live reference / 1024px menu geometry",
+      "status": "pass",
+      "evidence": [
+        {
+          "title": "Business account",
+          "box": {
+            "x": 0,
+            "y": 96,
+            "width": 1023.984375,
+            "height": 528
+          }
+        },
+        {
+          "title": "Company creation",
+          "box": {
+            "x": 53,
+            "y": 96,
+            "width": 918,
+            "height": 452
+          }
+        },
+        {
+          "title": "Financial tools",
+          "box": {
+            "x": 53,
+            "y": 96,
+            "width": 918,
+            "height": 470
+          }
+        },
+        {
+          "title": "Credit",
+          "box": {
+            "x": 53,
+            "y": 96,
+            "width": 918,
+            "height": 426
+          }
+        },
+        {
+          "title": "Pricing",
+          "box": {
+            "x": 195,
+            "y": 96,
+            "width": 634,
+            "height": 254
+          }
+        },
+        {
+          "title": "About us",
+          "box": {
+            "x": 373,
+            "y": 96,
+            "width": 621,
+            "height": 452
+          }
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "width": 1440,
+      "reducedMotion": "reduce",
+      "message": "Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.\n- Date formatting in a user's locale which doesn't match the server.\n- External changing data without sending a snapshot of it along with the HTML.\n- Invalid HTML tag nesting.\n\nIt can also happen if the client has a browser extension installed which messes with the HTML before React loaded.\n\nhttps://react.dev/link/hydration-mismatch\n\n  ...\n    <RedirectBoundary>\n      <RedirectErrorBoundary router={{...}}>\n        <InnerLayoutRouter url=\"/\" tree={[...]} params={{}} renderTree={{...}} segmentPath={[...]} ...>\n          <SegmentViewNode type=\"page\" pagePath=\"page.tsx\">\n            <SegmentTrieNode>\n            <HomePage>\n              <SiteHeader>\n              <main>\n              <MobileCtaBar>\n              <SiteFooter>\n                <FooterRoot className=\"text-16 le...\">\n                  <footer ref={{current:null}} className=\"text-16 le...\">\n                    <div data-header-theme=\"dark\" className=\"darkmode r...\">\n                      <div className=\"mx-auto gr...\">\n                        <div className=\"col-span-1...\">\n                          <PricingCard>\n                          <Ratings>\n                            <div className=\"my-32 flex...\">\n                              <div className=\"lg:flex lg...\">\n                                <div className=\"flex items...\">\n+                                 <h3 className=\"h3-small\">\n-                                 <span className=\"h3-small\">\n                                  ...\n                                ...\n                              ...\n                        ...\n                    ...\n              ...\n          ...\n        ...\n"
+    }
+  ]
+}

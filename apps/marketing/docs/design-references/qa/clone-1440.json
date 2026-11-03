@@ -1,0 +1,399 @@
+{
+  "geometry": [
+    {
+      "id": "section-1",
+      "top": 0,
+      "height": 900,
+      "width": 1440,
+      "background": "rgb(5, 5, 5)",
+      "heading": "Business account.Finance management.Company creation.",
+      "text": "4.7of 5Business account.Finance management.Company creation.Open an accountFind the right plan",
+      "headings": [
+        {
+          "text": "Business account.Finance management.Company creation.",
+          "x": 48,
+          "y": 488,
+          "width": 870,
+          "height": 240,
+          "font": "700 72px / 80px",
+          "color": "rgb(255, 255, 255)"
+        }
+      ]
+    },
+    {
+      "id": "section-2",
+      "top": 900,
+      "height": 384,
+      "width": 1440,
+      "background": "rgb(5, 5, 5)",
+      "text": "Made in FranceQonto is a French company headquartered in Paris.750,000+ clientsuse Qonto daily to run their business.24/7 human supportWe're available via chat, email, and phone.",
+      "headings": [
+        {
+          "text": "Made in France",
+          "x": 48,
+          "y": 1108,
+          "width": 408,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(255, 255, 255)"
+        },
+        {
+          "text": "750,000+ clients",
+          "x": 504,
+          "y": 1108,
+          "width": 408,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(255, 255, 255)"
+        },
+        {
+          "text": "24/7 human support",
+          "x": 960,
+          "y": 1108,
+          "width": 408,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(255, 255, 255)"
+        }
+      ]
+    },
+    {
+      "id": "section-3",
+      "top": 1284,
+      "height": 1120,
+      "width": 1440,
+      "background": "rgb(5, 5, 5)",
+      "heading": "Business account, AI-powered.",
+      "text": "Business account, AI-powered.Account remunerationEarn up to 5%* on your Qonto account balance.PaySEPA & global transfers, virtual cards, & Apple Pay/Google Pay.Get paidInvoices with embedded payment links, Tap to Pay & POS terminals.Credit suiteA range of working capital solutions, integrated into your business account.Mastercard debit and credit cardsChoose instant or deferred debit. Limits up to €200,000/month.Discover our business account",
+      "headings": [
+        {
+          "text": "Business account, AI-powered.",
+          "x": 48,
+          "y": 1364,
+          "width": 998.546875,
+          "height": 64,
+          "font": "600 56px / 64px",
+          "color": "rgb(255, 255, 255)"
+        },
+        {
+          "text": "Account remuneration",
+          "x": 73,
+          "y": 1509,
+          "width": 382,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(255, 255, 255)"
+        },
+        {
+          "text": "Pay",
+          "x": 528,
+          "y": 1508,
+          "width": 384,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(255, 255, 255)"
+        },
+        {
+          "text": "Get paid",
+          "x": 984,
+          "y": 1508,
+          "width": 384,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(255, 255, 255)"
+        },
+        {
+          "text": "Credit suite",
+          "x": 72,
+          "y": 1724,
+          "width": 384,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(255, 255, 255)"
+        },
+        {
+          "text": "Mastercard debit and credit cards",
+          "x": 528,
+          "y": 1940,
+          "width": 510,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(255, 255, 255)"
+        }
+      ]
+    },
+    {
+      "id": "section-4",
+      "top": 2404,
+      "height": 900,
+      "width": 1440,
+      "background": "rgb(255, 255, 255)",
+      "heading": "Qonto AI.Your choice, your control.",
+      "text": "Qonto AI.Your choice, your control.Agents, inside QontoAsk Agents directly inside Qonto, right within the workflows you already use.MCP, in your AI toolsConnect Qonto MCP to the AI tools you already work with every day.Visibility & accountabilityAI drafts the work, you review & approve. All actions logged and traceable.Discover Qonto AIQonto AI.Your choice, your control.Agents, inside QontoAsk Agents directly inside Qonto, right within the workflows you already use.MCP, in your AI toolsConnect Qonto MCP to the AI tools you already work with every day.Visibility & accountabilityAI drafts the work, you review & approve. All actions logged and traceable.Discover Qonto AI",
+      "headings": [
+        {
+          "text": "Qonto AI.Your choice, your control.",
+          "x": 96,
+          "y": 2484,
+          "width": 506,
+          "height": 96,
+          "font": "600 40px / 48px",
+          "color": "rgb(5, 5, 5)"
+        },
+        {
+          "text": "Agents, inside Qonto",
+          "x": 138,
+          "y": 2660,
+          "width": 424,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(5, 5, 5)"
+        },
+        {
+          "text": "MCP, in your AI tools",
+          "x": 138,
+          "y": 2820,
+          "width": 424,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(5, 5, 5)"
+        },
+        {
+          "text": "Visibility & accountability",
+          "x": 138,
+          "y": 2980,
+          "width": 424,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(5, 5, 5)"
+        }
+      ]
+    },
+    {
+      "id": "section-5",
+      "top": 3304,
+      "height": 846.671875,
+      "width": 1440,
+      "background": "rgb(255, 255, 255)",
+      "heading": "Compliant invoicing, zero effort",
+      "text": "Compliant invoicing, zero effortDiscover invoicingDiscover invoicingGet ready for e-invoicingAs a Certified Approved Platform, Qonto includes fully compliant e-invoicing in all plans. Quotes & invoices, faster with AIQonto AI drafts invoices & quotes, you review them. Track status and get paid faster with payment links.Supplier invoices, minus the adminAI imports supplier invoices and flags what to check. You review & pay in a click. Reconciliation is automated.Get ready for e-invoicingAs a Certified Approved Platform, Qonto includes fully compliant e-invoicing in all plans. Quotes & invoices, faster with AIQonto AI drafts invoices & quotes, you review them. Track status and get paid faster with payment links.Supplier invoices, minus the adminAI imports supplier invoices and flags what to check. You review & pay in a click. Reconciliation is automated.",
+      "headings": [
+        {
+          "text": "Compliant invoicing, zero effort",
+          "x": 48,
+          "y": 3384,
+          "width": 818.84375,
+          "height": 64,
+          "font": "600 56px / 64px",
+          "color": "rgb(5, 5, 5)"
+        },
+        {
+          "text": "Get ready for e-invoicing",
+          "x": 48,
+          "y": 3946.65625,
+          "width": 414.65625,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(5, 5, 5)"
+        },
+        {
+          "text": "Quotes & invoices, faster with AI",
+          "x": 506.65625,
+          "y": 3946.671875,
+          "width": 414.671875,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(5, 5, 5)"
+        },
+        {
+          "text": "Supplier invoices, minus the admin",
+          "x": 965.328125,
+          "y": 3946.65625,
+          "width": 414.65625,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(5, 5, 5)"
+        }
+      ]
+    },
+    {
+      "id": "section-6",
+      "top": 4150.671875,
+      "height": 664,
+      "width": 1440,
+      "background": "rgb(255, 255, 255)",
+      "heading": "Keep all your tools connected",
+      "text": "Keep all your tools connectedConnect over 2,000 external tools & accounts directly to Qonto - let all your data sync automatically.",
+      "headings": [
+        {
+          "text": "Keep all your tools connected",
+          "x": 112,
+          "y": 4358.671875,
+          "width": 596,
+          "height": 128,
+          "font": "600 56px / 64px",
+          "color": "rgb(5, 5, 5)"
+        }
+      ]
+    },
+    {
+      "id": "section-7",
+      "top": 4814.671875,
+      "height": 448,
+      "width": 1440,
+      "background": "rgb(255, 255, 255)",
+      "heading": "Create your company with Qonto",
+      "text": "Create your company with QontoCreate your companySimple and fastDitch the paperwork. We'll have you up and running in 24 hours.The right fit for your businessQonto works for all business structures: SAS, SASU, SARL, EURL, SCI, and micro-enterprises.We're with you all the wayFrom start to KBIS, we're with you - and available every day to help.Create your company",
+      "headings": [
+        {
+          "text": "Create your company with Qonto",
+          "x": 48,
+          "y": 4894.671875,
+          "width": 863.75,
+          "height": 64,
+          "font": "600 56px / 64px",
+          "color": "rgb(5, 5, 5)"
+        },
+        {
+          "text": "Simple and fast",
+          "x": 48,
+          "y": 5086.671875,
+          "width": 408,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(5, 5, 5)"
+        },
+        {
+          "text": "The right fit for your business",
+          "x": 504,
+          "y": 5086.671875,
+          "width": 408,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(5, 5, 5)"
+        },
+        {
+          "text": "We're with you all the way",
+          "x": 960,
+          "y": 5086.671875,
+          "width": 408,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(5, 5, 5)"
+        }
+      ]
+    },
+    {
+      "id": "section-8",
+      "top": 5262.671875,
+      "height": 608,
+      "width": 1440,
+      "background": "rgb(255, 255, 255)",
+      "text": "",
+      "headings": []
+    },
+    {
+      "id": "section-9",
+      "top": 5870.671875,
+      "height": 1068,
+      "width": 1440,
+      "background": "rgb(5, 5, 5)",
+      "heading": "Our customers say it best",
+      "text": "Our customers say it bestLire les témoignages“Qonto adapts as our team grows. No more time-consuming, low-value processes. Employee expense management becomes simple.”Oksana Besnier, Financer Manager at Poiscaille“I needed to move fast when launching my business. Having a platform like Qonto - bringing all the essential services together in one place - was the best solution for me.”Pierre-Louis Vouteau, Founder of Ooak Data“I'd recommend Qonto to everyone. In my view, it's the ideal financial management solution for all businesses, regardless of their size or needs.”Pierre-Antoine Errard, Founder of Solarian“I'd recommend Qonto to any entrepreneur looking for more than a bank - a true partner for their projects. I can finally spend time on my sites instead of on the phone with my bank.”André Schmitte, Founder of AS Projets“Qonto adapts as our team grows. No more time-consuming, low-value processes. Employee expense management becomes simple.”Oksana Besnier, Financer Manager at Poiscaille“I needed to move fast when launching my business. Having a platform like Qonto - bringing all the essential services together in one place - was the best solution for me.”Pierre-Louis Vouteau, Founder of Ooak Data“I'd recommend Qonto to everyone. In my view, it's the ideal financial management solution for all businesses, regardless of their size or needs.”Pierre-Antoine Errard, Founder of Solarian“I'd recommend Qonto to any entrepreneur looking for more than a bank - a true partner for their projects. I can finally spend time on my sites instead of on the phone with my bank.”André Schmitte, Founder of AS Projets",
+      "headings": [
+        {
+          "text": "Our customers say it best",
+          "x": 48,
+          "y": 5950.671875,
+          "width": 675.484375,
+          "height": 64,
+          "font": "600 56px / 64px",
+          "color": "rgb(255, 255, 255)"
+        }
+      ]
+    },
+    {
+      "id": "section-protection",
+      "top": 6938.671875,
+      "height": 446,
+      "width": 1440,
+      "background": "rgb(5, 5, 5)",
+      "heading": "First-class protection for your business.",
+      "text": "First-class protection for your business.Learn moreLegally protected customer fundsRegulated financial institutionTop standards in IT security & data protection",
+      "headings": [
+        {
+          "text": "First-class protection for your business.",
+          "x": 48,
+          "y": 7087.671875,
+          "width": 546,
+          "height": 96,
+          "font": "600 40px / 48px",
+          "color": "rgb(255, 255, 255)"
+        }
+      ]
+    },
+    {
+      "id": "section-11",
+      "top": 7384.671875,
+      "height": 664,
+      "width": 1440,
+      "background": "rgb(255, 255, 255)",
+      "heading": "Complicated?Not with Qonto.",
+      "text": "Complicated?Not with Qonto.Open your business account in just 10 minutes.Open an accountFind the right plan",
+      "headings": [
+        {
+          "text": "Complicated?Not with Qonto.",
+          "x": 48,
+          "y": 7580.671875,
+          "width": 660,
+          "height": 128,
+          "font": "600 56px / 64px",
+          "color": "rgb(255, 255, 255)"
+        }
+      ]
+    },
+    {
+      "id": "",
+      "top": 8048.671875,
+      "height": 1287,
+      "width": 1440,
+      "background": "rgba(0, 0, 0, 0)",
+      "text": "PricingFind the best plan for your business needs.4.7on App Store4.7on Play Store4.7on TrustpilotBUSINESS ACCOUNTOpen Business Bank AccountBusiness Account for FreelancersAccount RemunerationBank Account for AssociationsBUSINESS CARDSOne CardVirtual CardPlus CardSee all cardsCOMPANY CREATIONCreate a CompanyCapital DepositGET PAIDPOS TerminalPayment LinksTap-to-Pay iPhoneTap-to-Pay AndroidFINANCINGBusiness FinancingPay LaterOverdraftFINANCIAL TOOLSExpense Management SoftwarePre-accounting SolutionInvoicing ToolCash-flow ManagementIntegrationsQuotes ManagementRESOURCESProduct TourBanking ComparatorsFinancial GlossarySWIFT/BIC Code FinderQonto InsightsSee all resourcesCOMPANYOur StoryPressOur CustomersSustainability & InclusionCareersBlogFAQ & SupportRecommend QontoEthics CharterFOR DEVELOPERSQonto EmbedQonto APICookies Legal Documents Privacy Policy Security AI at Qonto Status Page Change language, current:enSelect your countryExplore our country-specific features in your preferred language.EuropeFranceDeutschlandEspañaItaliaÖsterreichBelgiëPortugalNederlandChange language, current:enSelect your countryExplore our country-specific features in your preferred language.EuropeFranceDeutschlandEspañaItaliaÖsterreichBelgiëPortugalNederlandQonto SA is a Société Anonyme under French law, registered at the Paris Trade Register (n° 819 489 626) having its headquarters at 6 Impasse Bonne Nouvelle, 75010 Paris, France.Qonto SA is a licensed payment institution authorized by the French Autorité de Contrôle Prudentiel et de Résolution (ACPR), under the registration number 16958 granted on 21/06/2018.The entirety of the funds collected from our customers is safeguarded in compliance with the relevant legislation. A part of these funds is either held by our partner banks, Crédit Mutuel Arkéa, Société Générale, Natixis or Rothschild Martin Maurel, or invested in qualified money market funds, with the corresponding fund units held by Société Générale. In the case of bankruptcy of one of these partner banks, the deposits are covered up to €100,000 per institution and per client by the Fonds de Garantie des Dépôts et de Résolution (FGDR). The remaining part of the funds is fully covered by two stand-alone guarantees, one granted by Crédit Agricole CIB, a subsidiary of Crédit Agricole S.A., the other by BNP Paribas.",
+      "headings": [
+        {
+          "text": "4.7",
+          "x": 64,
+          "y": 8292.671875,
+          "width": 36.296875,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(255, 255, 255)"
+        },
+        {
+          "text": "4.7",
+          "x": 64,
+          "y": 8348.671875,
+          "width": 36.296875,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(255, 255, 255)"
+        },
+        {
+          "text": "4.7",
+          "x": 64,
+          "y": 8404.671875,
+          "width": 36.296875,
+          "height": 32,
+          "font": "600 24px / 32px",
+          "color": "rgb(255, 255, 255)"
+        }
+      ]
+    }
+  ],
+  "documentSize": {
+    "width": 1440,
+    "height": 9336
+  },
+  "errors": [],
+  "brokenImages": []
+}

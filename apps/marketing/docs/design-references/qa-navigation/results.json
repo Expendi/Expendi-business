@@ -1,0 +1,722 @@
+{
+  "base": "http://localhost:3004",
+  "results": [
+    {
+      "name": "desktop / no-preference / Business account",
+      "status": "pass",
+      "evidence": {
+        "links": 16,
+        "box": {
+          "x": 130,
+          "y": 80,
+          "width": 1228,
+          "height": 492
+        }
+      }
+    },
+    {
+      "name": "desktop / no-preference / Company creation",
+      "status": "pass",
+      "evidence": {
+        "links": 5,
+        "box": {
+          "x": 285.6875,
+          "y": 80,
+          "width": 931,
+          "height": 442
+        }
+      }
+    },
+    {
+      "name": "desktop / no-preference / Financial tools",
+      "status": "pass",
+      "evidence": {
+        "links": 11,
+        "box": {
+          "x": 443.3125,
+          "y": 80,
+          "width": 931,
+          "height": 486
+        }
+      }
+    },
+    {
+      "name": "desktop / no-preference / Credit",
+      "status": "pass",
+      "evidence": {
+        "links": 7,
+        "box": {
+          "x": 254.03125,
+          "y": 80,
+          "width": 931,
+          "height": 442
+        }
+      }
+    },
+    {
+      "name": "desktop / no-preference / Pricing",
+      "status": "pass",
+      "evidence": {
+        "links": 5,
+        "box": {
+          "x": 642.890625,
+          "y": 80,
+          "width": 634,
+          "height": 270
+        }
+      }
+    },
+    {
+      "name": "desktop / no-preference / About us",
+      "status": "pass",
+      "evidence": {
+        "links": 4,
+        "box": {
+          "x": 718.078125,
+          "y": 80,
+          "width": 634,
+          "height": 468
+        }
+      }
+    },
+    {
+      "name": "desktop / no-preference / country picker",
+      "status": "pass",
+      "evidence": [
+        {
+          "text": "Europe",
+          "href": "/en"
+        },
+        {
+          "text": "France",
+          "href": "https://qonto.com/fr"
+        },
+        {
+          "text": "Deutschland",
+          "href": "https://qonto.com/de"
+        },
+        {
+          "text": "España",
+          "href": "https://qonto.com/es"
+        },
+        {
+          "text": "Italia",
+          "href": "https://qonto.com/it"
+        },
+        {
+          "text": "Österreich",
+          "href": "https://qonto.com/de-at"
+        },
+        {
+          "text": "België",
+          "href": "https://qonto.com/fr-be"
+        },
+        {
+          "text": "Portugal",
+          "href": "https://qonto.com/pt"
+        },
+        {
+          "text": "Nederland",
+          "href": "https://qonto.com/nl"
+        }
+      ]
+    },
+    {
+      "name": "desktop / no-preference / sign-in hover",
+      "status": "pass"
+    },
+    {
+      "name": "desktop / no-preference / section themes both directions",
+      "status": "pass",
+      "evidence": [
+        {
+          "top": 0,
+          "theme": "dark",
+          "id": "section-1"
+        },
+        {
+          "top": 900,
+          "theme": "dark",
+          "id": "section-2"
+        },
+        {
+          "top": 1284,
+          "theme": "dark",
+          "id": "section-3"
+        },
+        {
+          "top": 2404,
+          "theme": "light",
+          "id": "section-4"
+        },
+        {
+          "top": 3304,
+          "theme": "light",
+          "id": "section-5"
+        },
+        {
+          "top": 4150.671875,
+          "theme": "light",
+          "id": "section-6"
+        },
+        {
+          "top": 4814.671875,
+          "theme": "light",
+          "id": "section-7"
+        },
+        {
+          "top": 5262.671875,
+          "theme": "light",
+          "id": "section-8"
+        },
+        {
+          "top": 5870.671875,
+          "theme": "dark",
+          "id": "section-9"
+        },
+        {
+          "top": 6938.671875,
+          "theme": "dark",
+          "id": "section-protection"
+        },
+        {
+          "top": 7384.671875,
+          "theme": "light",
+          "id": "section-11"
+        },
+        {
+          "top": 8048.671875,
+          "theme": "dark",
+          "id": ""
+        },
+        {
+          "top": 8048.671875,
+          "theme": "dark",
+          "id": ""
+        },
+        {
+          "top": 7384.671875,
+          "theme": "light",
+          "id": "section-11"
+        },
+        {
+          "top": 6938.671875,
+          "theme": "dark",
+          "id": "section-protection"
+        },
+        {
+          "top": 5870.671875,
+          "theme": "dark",
+          "id": "section-9"
+        },
+        {
+          "top": 5262.671875,
+          "theme": "light",
+          "id": "section-8"
+        },
+        {
+          "top": 4814.671875,
+          "theme": "light",
+          "id": "section-7"
+        },
+        {
+          "top": 4150.671875,
+          "theme": "light",
+          "id": "section-6"
+        },
+        {
+          "top": 3304,
+          "theme": "light",
+          "id": "section-5"
+        },
+        {
+          "top": 2404,
+          "theme": "light",
+          "id": "section-4"
+        },
+        {
+          "top": 1284,
+          "theme": "dark",
+          "id": "section-3"
+        },
+        {
+          "top": 900,
+          "theme": "dark",
+          "id": "section-2"
+        },
+        {
+          "top": 0,
+          "theme": "dark",
+          "id": "section-1"
+        }
+      ]
+    },
+    {
+      "name": "desktop / no-preference / footer locale and underline",
+      "status": "pass",
+      "evidence": [
+        {
+          "text": "France",
+          "href": "https://qonto.com/fr"
+        },
+        {
+          "text": "Deutschland",
+          "href": "https://qonto.com/de"
+        },
+        {
+          "text": "España",
+          "href": "https://qonto.com/es"
+        },
+        {
+          "text": "Italia",
+          "href": "https://qonto.com/it"
+        },
+        {
+          "text": "Österreich",
+          "href": "https://qonto.com/de-at"
+        },
+        {
+          "text": "België",
+          "href": "https://qonto.com/fr-be"
+        },
+        {
+          "text": "Portugal",
+          "href": "https://qonto.com/pt"
+        },
+        {
+          "text": "Nederland",
+          "href": "https://qonto.com/nl"
+        }
+      ]
+    },
+    {
+      "name": "390px / no-preference / drawer and all six submenus",
+      "status": "pass"
+    },
+    {
+      "name": "390px / no-preference / breakpoint clears stale drawer",
+      "status": "pass"
+    },
+    {
+      "name": "390px / no-preference / mobile themes and footer locale",
+      "status": "pass"
+    },
+    {
+      "name": "768px / no-preference / drawer and all six submenus",
+      "status": "pass"
+    },
+    {
+      "name": "768px / no-preference / breakpoint clears stale drawer",
+      "status": "pass"
+    },
+    {
+      "name": "768px / no-preference / mobile themes and footer locale",
+      "status": "pass"
+    },
+    {
+      "name": "desktop / reduce / Business account",
+      "status": "pass",
+      "evidence": {
+        "links": 16,
+        "box": {
+          "x": 130,
+          "y": 80,
+          "width": 1228,
+          "height": 492
+        }
+      }
+    },
+    {
+      "name": "desktop / reduce / Company creation",
+      "status": "pass",
+      "evidence": {
+        "links": 5,
+        "box": {
+          "x": 285.6875,
+          "y": 80,
+          "width": 931,
+          "height": 442
+        }
+      }
+    },
+    {
+      "name": "desktop / reduce / Financial tools",
+      "status": "pass",
+      "evidence": {
+        "links": 11,
+        "box": {
+          "x": 443.3125,
+          "y": 80,
+          "width": 931,
+          "height": 486
+        }
+      }
+    },
+    {
+      "name": "desktop / reduce / Credit",
+      "status": "pass",
+      "evidence": {
+        "links": 7,
+        "box": {
+          "x": 254.03125,
+          "y": 80,
+          "width": 931,
+          "height": 442
+        }
+      }
+    },
+    {
+      "name": "desktop / reduce / Pricing",
+      "status": "pass",
+      "evidence": {
+        "links": 5,
+        "box": {
+          "x": 642.890625,
+          "y": 80,
+          "width": 634,
+          "height": 270
+        }
+      }
+    },
+    {
+      "name": "desktop / reduce / About us",
+      "status": "pass",
+      "evidence": {
+        "links": 4,
+        "box": {
+          "x": 718.078125,
+          "y": 80,
+          "width": 634,
+          "height": 468
+        }
+      }
+    },
+    {
+      "name": "desktop / reduce / country picker",
+      "status": "pass",
+      "evidence": [
+        {
+          "text": "Europe",
+          "href": "/en"
+        },
+        {
+          "text": "France",
+          "href": "https://qonto.com/fr"
+        },
+        {
+          "text": "Deutschland",
+          "href": "https://qonto.com/de"
+        },
+        {
+          "text": "España",
+          "href": "https://qonto.com/es"
+        },
+        {
+          "text": "Italia",
+          "href": "https://qonto.com/it"
+        },
+        {
+          "text": "Österreich",
+          "href": "https://qonto.com/de-at"
+        },
+        {
+          "text": "België",
+          "href": "https://qonto.com/fr-be"
+        },
+        {
+          "text": "Portugal",
+          "href": "https://qonto.com/pt"
+        },
+        {
+          "text": "Nederland",
+          "href": "https://qonto.com/nl"
+        }
+      ]
+    },
+    {
+      "name": "desktop / reduce / sign-in hover",
+      "status": "pass"
+    },
+    {
+      "name": "desktop / reduce / section themes both directions",
+      "status": "pass",
+      "evidence": [
+        {
+          "top": 0,
+          "theme": "dark",
+          "id": "section-1"
+        },
+        {
+          "top": 900,
+          "theme": "dark",
+          "id": "section-2"
+        },
+        {
+          "top": 1284,
+          "theme": "dark",
+          "id": "section-3"
+        },
+        {
+          "top": 2404,
+          "theme": "light",
+          "id": "section-4"
+        },
+        {
+          "top": 3304,
+          "theme": "light",
+          "id": "section-5"
+        },
+        {
+          "top": 4150.671875,
+          "theme": "light",
+          "id": "section-6"
+        },
+        {
+          "top": 4814.671875,
+          "theme": "light",
+          "id": "section-7"
+        },
+        {
+          "top": 5262.671875,
+          "theme": "light",
+          "id": "section-8"
+        },
+        {
+          "top": 5870.671875,
+          "theme": "dark",
+          "id": "section-9"
+        },
+        {
+          "top": 6938.671875,
+          "theme": "dark",
+          "id": "section-protection"
+        },
+        {
+          "top": 7384.671875,
+          "theme": "light",
+          "id": "section-11"
+        },
+        {
+          "top": 8048.671875,
+          "theme": "dark",
+          "id": ""
+        },
+        {
+          "top": 8048.671875,
+          "theme": "dark",
+          "id": ""
+        },
+        {
+          "top": 7384.671875,
+          "theme": "light",
+          "id": "section-11"
+        },
+        {
+          "top": 6938.671875,
+          "theme": "dark",
+          "id": "section-protection"
+        },
+        {
+          "top": 5870.671875,
+          "theme": "dark",
+          "id": "section-9"
+        },
+        {
+          "top": 5262.671875,
+          "theme": "light",
+          "id": "section-8"
+        },
+        {
+          "top": 4814.671875,
+          "theme": "light",
+          "id": "section-7"
+        },
+        {
+          "top": 4150.671875,
+          "theme": "light",
+          "id": "section-6"
+        },
+        {
+          "top": 3304,
+          "theme": "light",
+          "id": "section-5"
+        },
+        {
+          "top": 2404,
+          "theme": "light",
+          "id": "section-4"
+        },
+        {
+          "top": 1284,
+          "theme": "dark",
+          "id": "section-3"
+        },
+        {
+          "top": 900,
+          "theme": "dark",
+          "id": "section-2"
+        },
+        {
+          "top": 0,
+          "theme": "dark",
+          "id": "section-1"
+        }
+      ]
+    },
+    {
+      "name": "desktop / reduce / footer locale and underline",
+      "status": "pass",
+      "evidence": [
+        {
+          "text": "France",
+          "href": "https://qonto.com/fr"
+        },
+        {
+          "text": "Deutschland",
+          "href": "https://qonto.com/de"
+        },
+        {
+          "text": "España",
+          "href": "https://qonto.com/es"
+        },
+        {
+          "text": "Italia",
+          "href": "https://qonto.com/it"
+        },
+        {
+          "text": "Österreich",
+          "href": "https://qonto.com/de-at"
+        },
+        {
+          "text": "België",
+          "href": "https://qonto.com/fr-be"
+        },
+        {
+          "text": "Portugal",
+          "href": "https://qonto.com/pt"
+        },
+        {
+          "text": "Nederland",
+          "href": "https://qonto.com/nl"
+        }
+      ]
+    },
+    {
+      "name": "390px / reduce / drawer and all six submenus",
+      "status": "pass"
+    },
+    {
+      "name": "390px / reduce / breakpoint clears stale drawer",
+      "status": "pass"
+    },
+    {
+      "name": "390px / reduce / mobile themes and footer locale",
+      "status": "pass"
+    },
+    {
+      "name": "768px / reduce / drawer and all six submenus",
+      "status": "pass"
+    },
+    {
+      "name": "768px / reduce / breakpoint clears stale drawer",
+      "status": "pass"
+    },
+    {
+      "name": "768px / reduce / mobile themes and footer locale",
+      "status": "pass"
+    },
+    {
+      "name": "1024px / all desktop panels fit viewport",
+      "status": "pass"
+    },
+    {
+      "name": "consent / declined / 1440px / no-preference",
+      "status": "pass",
+      "evidence": {
+        "stored": "declined"
+      }
+    },
+    {
+      "name": "consent / declined / 390px / no-preference",
+      "status": "pass",
+      "evidence": {
+        "stored": "declined"
+      }
+    },
+    {
+      "name": "consent / declined / 1440px / reduce",
+      "status": "pass",
+      "evidence": {
+        "stored": "declined"
+      }
+    },
+    {
+      "name": "consent / declined / 390px / reduce",
+      "status": "pass",
+      "evidence": {
+        "stored": "declined"
+      }
+    },
+    {
+      "name": "consent / accepted / 1440px / no-preference",
+      "status": "pass",
+      "evidence": {
+        "stored": "accepted"
+      }
+    },
+    {
+      "name": "consent / accepted / 390px / no-preference",
+      "status": "pass",
+      "evidence": {
+        "stored": "accepted"
+      }
+    },
+    {
+      "name": "consent / accepted / 1440px / reduce",
+      "status": "pass",
+      "evidence": {
+        "stored": "accepted"
+      }
+    },
+    {
+      "name": "consent / accepted / 390px / reduce",
+      "status": "pass",
+      "evidence": {
+        "stored": "accepted"
+      }
+    },
+    {
+      "name": "consent / customized / 1440px / no-preference",
+      "status": "pass",
+      "evidence": {
+        "stored": "{\"choice\":\"customized\",\"purposes\":{\"functional\":false,\"audience\":false,\"personalization\":false,\"advertising\":false,\"advertising-partners\":false,\"marketing\":false,\"analytics\":true}}"
+      }
+    },
+    {
+      "name": "consent / customized / 390px / no-preference",
+      "status": "pass",
+      "evidence": {
+        "stored": "{\"choice\":\"customized\",\"purposes\":{\"functional\":false,\"audience\":false,\"personalization\":false,\"advertising\":false,\"advertising-partners\":false,\"marketing\":false,\"analytics\":true}}"
+      }
+    },
+    {
+      "name": "consent / customized / 1440px / reduce",
+      "status": "pass",
+      "evidence": {
+        "stored": "{\"choice\":\"customized\",\"purposes\":{\"functional\":false,\"audience\":false,\"personalization\":false,\"advertising\":false,\"advertising-partners\":false,\"marketing\":false,\"analytics\":true}}"
+      }
+    },
+    {
+      "name": "consent / customized / 390px / reduce",
+      "status": "pass",
+      "evidence": {
+        "stored": "{\"choice\":\"customized\",\"purposes\":{\"functional\":false,\"audience\":false,\"personalization\":false,\"advertising\":false,\"advertising-partners\":false,\"marketing\":false,\"analytics\":true}}"
+      }
+    },
+    {
+      "name": "no browser runtime errors",
+      "status": "pass"
+    }
+  ],
+  "errors": []
+}
