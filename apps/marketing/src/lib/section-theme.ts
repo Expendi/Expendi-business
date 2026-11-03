@@ -37,7 +37,7 @@ export function useSectionTheme(
         });
       });
     },
-    { dependencies: [offset] },
+    { dependencies: [offset], revertOnUpdate: true },
   );
 
   return theme;

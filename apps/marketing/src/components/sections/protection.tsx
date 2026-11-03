@@ -155,7 +155,7 @@ function ProtectionCard(): JSX.Element {
       style={GLOW_CARD_STYLE}
       className="col-span-full mt-24 rounded-2xl border border-transparent px-16 py-24 shadow-[0_0_20px_0_rgba(255,255,255,0.08)] md:mt-32 md:rounded-3xl md:px-24 md:py-32 lg:col-span-7 lg:mt-0 lg:p-48"
     >
-      <div className="mt-24 flex h-full flex-col justify-center gap-x-56 gap-y-32 md:mt-32 md:flex-row lg:mt-0 lg:justify-end">
+      <div className="mt-24 flex flex-col lg:h-full justify-center gap-x-56 gap-y-32 md:mt-32 md:flex-row lg:mt-0 lg:justify-end">
         {BADGES.map((badge) => (
           <div
             key={badge.asset}
