@@ -50,13 +50,13 @@ Expendi Business is for Kenyan startups and growing teams. To sign in, accept an
 
 ## Graphics
 
-| Asset             | Spec                               | File                                           |
-| ----------------- | ---------------------------------- | ---------------------------------------------- |
-| App icon          | 512 × 512 PNG                      | `apps/mobile/assets/play-store-icon.png`       |
-| Feature graphic   | 1024 × 500 PNG, no transparency    | `apps/mobile/assets/play-feature-graphic.png`  |
-| Phone screenshots | 2–8, 9:16, 1080 × 1920 recommended | **To capture** from a device or emulator build |
+| Asset             | Spec                               | File                                          |
+| ----------------- | ---------------------------------- | --------------------------------------------- |
+| App icon          | 512 × 512 PNG                      | `apps/mobile/assets/play-store-icon.png`      |
+| Feature graphic   | 1024 × 500 PNG, no transparency    | `apps/mobile/assets/play-feature-graphic.png` |
+| Phone screenshots | 2–8, 9:16, 1080 × 1920 recommended | `apps/mobile/assets/play-screenshots/01–05`   |
 
-Suggested screenshots, in order: overview (paid / outstanding / due next), claim capture, approvals with Approve & pay, bills and recurring payments, payroll run, petty cash float.
+The five screenshots are real captures of the demo company "Kilima Studio" on the dev API, framed with captions: spending overview, recording spending with a receipt, the review step, a saved payment with its receipt, and recent payments. Bills, approvals and payroll aren't shown yet: adding payees needs an approval passkey, which a local debug build can't create. Capture those from a Play-installed build once passkeys work there.
 
 ## App content (draft answers)
 
