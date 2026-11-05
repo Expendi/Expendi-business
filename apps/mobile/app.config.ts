@@ -7,7 +7,7 @@ const APP_ID = "app.expendi.business";
  * `apps/web/public/.well-known/`.
  */
 const PASSKEY_DOMAIN = "business.expendi.app";
-const EAS_PROJECT_ID = "3c092318-4971-433e-b238-6b4586e09bac";
+const EAS_PROJECT_ID = "4ad31c10-418e-472c-a46f-24935b23480e";
 /** Must match the channel `src/lib/push.ts` creates and the API sends to. */
 const PUSH_CHANNEL_ID = "default";
 
@@ -15,7 +15,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Expendi Business",
   slug: "expendi-business",
-  owner: "chizaalabs",
+  owner: "chizaa",
   scheme: "expendi-business",
   version: "0.1.0",
   orientation: "portrait",
