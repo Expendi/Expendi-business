@@ -70,6 +70,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@babel/plugin-transform-react-jsx": "7.29.7",
     "@expendi-business/eslint-config": "workspace:*",
     "@expendi-business/prettier-config": "workspace:*",
     "@expendi-business/tsconfig": "workspace:*",
