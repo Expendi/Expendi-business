@@ -123,7 +123,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     [
       "expo-notifications",
-      { color: "#111827", defaultChannel: PUSH_CHANNEL_ID },
+      {
+        icon: "./assets/notification-icon.png",
+        color: "#111827",
+        defaultChannel: PUSH_CHANNEL_ID,
+      },
     ],
   ],
 });
