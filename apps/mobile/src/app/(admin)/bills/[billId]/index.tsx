@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Image, Linking, Text, View } from "react-native";
+import { ActivityIndicator, Image, Linking, View } from "react-native";
 
 import type {
   BillDetail,
@@ -18,6 +18,7 @@ import { Button } from "~/components/button";
 import { ConfirmSheet } from "~/components/confirm-sheet";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { AttachInvoice } from "~/features/bills/attach-invoice";
 import { formatBillAmount, storedAmount } from "~/features/bills/bill-amount";

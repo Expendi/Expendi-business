@@ -1,9 +1,10 @@
 import type { JSX } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import type { ExpenseWarning } from "@expendi-business/shared";
 
 import { Badge } from "~/components/badge";
+import { Text } from "~/components/text";
 import { formatKesCents } from "~/lib/money";
 import { formatIsoDate } from "./dates";
 

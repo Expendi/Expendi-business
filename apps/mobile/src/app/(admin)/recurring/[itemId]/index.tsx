@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import type { RecurringItem } from "@expendi-business/shared";
 
@@ -12,6 +12,7 @@ import { Button } from "~/components/button";
 import { ConfirmSheet } from "~/components/confirm-sheet";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { formatBillAmount } from "~/features/bills/bill-amount";
 import { BillStatusBadge, HEADING_LABELS } from "~/features/bills/bill-status";
 import { ReviewRow } from "~/features/claims/claim-editor";

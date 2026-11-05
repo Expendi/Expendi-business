@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Image, Switch, Text, View } from "react-native";
+import { Image, Switch, View } from "react-native";
 
 import type {
   FloatSummary,
@@ -20,6 +20,7 @@ import type { ClaimDraft, DraftState } from "../claims/draft";
 import type { AttachedSms } from "../claims/sms-evidence";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import {
   CategoryField,

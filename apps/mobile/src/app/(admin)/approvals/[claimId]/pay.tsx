@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 
 import type {
   ClaimApproval,
@@ -11,6 +11,7 @@ import type { Company } from "~/features/company/company-provider";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { ApprovalPasskeyGate } from "~/features/approval";
 import { describePaymentResult, previewRows } from "~/features/claims/payment";
 import {
@@ -152,7 +153,9 @@ function CostPreview({ approval }: { approval: ClaimApproval }): JSX.Element {
         >
           {previewRows(preview).map((row) => (
             <View key={row.label} className="flex-row justify-between gap-4">
-              <Text className="text-base text-gray-600">{row.label}</Text>
+              <Text className="flex-1 text-base text-gray-600">
+                {row.label}
+              </Text>
               <Text className="flex-1 text-right text-base font-semibold text-gray-900">
                 {row.value}
               </Text>

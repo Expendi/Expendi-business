@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 
 import type { WalletHistoryItem } from "@expendi-business/shared";
 
@@ -8,6 +8,7 @@ import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { RequireAdmin } from "~/features/company/require-admin";
 import {
   describeCounterparty,

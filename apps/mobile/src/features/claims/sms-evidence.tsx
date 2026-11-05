@@ -1,12 +1,13 @@
 import type { JSX } from "react";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { MPESA_SMS_MAX_LENGTH } from "@expendi-business/shared";
 
 import type { Prefill } from "./draft";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { describeApiError } from "~/lib/api";
 import { readPastedSms, smsPrefill } from "./draft";

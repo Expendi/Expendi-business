@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import type { ClaimDetail } from "@expendi-business/shared";
 import {
@@ -12,6 +12,7 @@ import {
 import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ConfirmSheet } from "~/components/confirm-sheet";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { describeApiError } from "~/lib/api";
 import { formatIsoDate, localIsoDate } from "./dates";

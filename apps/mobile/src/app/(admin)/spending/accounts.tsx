@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { useState } from "react";
-import { ActivityIndicator, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Switch, View } from "react-native";
 
 import type {
   PaidFromAccount,
@@ -13,6 +13,7 @@ import { Button } from "~/components/button";
 import { ConfirmSheet } from "~/components/confirm-sheet";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { RequireAdmin } from "~/features/company/require-admin";
 import { FilterChips } from "~/features/payees/filter-chips";

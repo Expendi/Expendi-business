@@ -1,5 +1,7 @@
 import type { JSX } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+
+import { Text } from "~/components/text";
 
 export interface ChipOption<T extends string> {
   value: T;

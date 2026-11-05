@@ -1,11 +1,12 @@
 import type { JSX } from "react";
 import { useState } from "react";
-import { Linking, Share, Text, View } from "react-native";
+import { Linking, Share, View } from "react-native";
 
 import type { Company } from "~/features/company/company-provider";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { RequireAdmin } from "~/features/company/require-admin";
 import {
   expiryLabel,

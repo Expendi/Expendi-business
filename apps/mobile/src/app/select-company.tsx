@@ -1,12 +1,13 @@
 import type { JSX } from "react";
 import { Redirect, useRouter } from "expo-router";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ListRow } from "~/components/list-row";
 import { LoadingScreen } from "~/components/loading-screen";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { AccountErrorScreen } from "~/features/company/account-error-screen";
 import { useCompanySession } from "~/features/company/company-provider";
 import { ROLE_LABELS } from "~/features/company/roles";

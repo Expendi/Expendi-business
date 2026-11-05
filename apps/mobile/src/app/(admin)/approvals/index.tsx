@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import type { Claim, ExpenseStatus } from "@expendi-business/shared";
 
@@ -9,6 +9,7 @@ import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { WarningBadges } from "~/features/claims/claim-warnings";
 import { formatIsoDate } from "~/features/claims/dates";
 import { useClaimQueue } from "~/features/claims/use-claim-approval";

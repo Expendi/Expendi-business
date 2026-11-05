@@ -1,12 +1,13 @@
 import type { JSX } from "react";
 import { useLinkWithPasskey } from "@privy-io/expo/passkey";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { isSupported as isPasskeySupported } from "react-native-passkeys";
 
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { useAuth } from "~/features/auth/auth-provider";
 import {
   isPasskeyAlreadyOnDevice,

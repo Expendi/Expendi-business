@@ -1,8 +1,9 @@
 import type { JSX } from "react";
-import { Modal, Text, View } from "react-native";
+import { Modal, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button } from "~/components/button";
+import { Text } from "~/components/text";
 
 /**
  * Explains notifications before the system asks, once: a "Don't allow" on

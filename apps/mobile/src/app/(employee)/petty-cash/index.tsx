@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 
 import type { FloatSummary } from "@expendi-business/shared";
 
@@ -8,6 +8,7 @@ import type { Company } from "~/features/company/company-provider";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { RequireCompany } from "~/features/claims/require-company";
 import {
   FloatBalanceCard,

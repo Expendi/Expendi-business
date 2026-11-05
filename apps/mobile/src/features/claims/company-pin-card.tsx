@@ -1,7 +1,8 @@
 import type { JSX } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import { CopyButton } from "~/components/copy-button";
+import { Text } from "~/components/text";
 import { useOrganization } from "~/features/company/use-organization";
 
 /**

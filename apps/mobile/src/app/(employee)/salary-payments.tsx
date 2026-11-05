@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 
 import type { MySalaryPayment } from "@expendi-business/shared";
 
@@ -8,6 +8,7 @@ import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { formatIsoDate } from "~/features/claims/dates";
 import { RequireCompany } from "~/features/claims/require-company";
 import { MY_PAYMENT_STATUS_LABELS } from "~/features/payroll/payroll-display";

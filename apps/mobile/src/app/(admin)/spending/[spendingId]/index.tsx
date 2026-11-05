@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ActivityIndicator, Image, Linking, Text, View } from "react-native";
+import { ActivityIndicator, Image, Linking, View } from "react-native";
 
 import type {
   CompanySpendingDetail,
@@ -12,6 +12,7 @@ import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { ReviewRow } from "~/features/claims/claim-editor";
 import { formatIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";

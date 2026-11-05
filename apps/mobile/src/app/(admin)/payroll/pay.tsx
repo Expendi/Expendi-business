@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import type {
   PayeeChangeHold,
@@ -14,6 +14,7 @@ import type { Company } from "~/features/company/company-provider";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { ApprovalPasskeyGate } from "~/features/approval";
 import { holdFrom, holdWarning } from "~/features/bills/bill-payment";
 import { describeBillPaymentError } from "~/features/bills/use-bill-payment";
@@ -167,7 +168,7 @@ function Rows({ rows }: { rows: readonly PreviewRow[] }): JSX.Element {
     <>
       {rows.map((row) => (
         <View key={row.label} className="flex-row justify-between gap-4">
-          <Text className="text-base text-gray-600">{row.label}</Text>
+          <Text className="flex-1 text-base text-gray-600">{row.label}</Text>
           <Text className="flex-1 text-right text-base font-semibold text-gray-900">
             {row.value}
           </Text>

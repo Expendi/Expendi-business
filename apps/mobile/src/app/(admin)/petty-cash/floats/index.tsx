@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import type { FloatSummary } from "@expendi-business/shared";
 
@@ -9,6 +9,7 @@ import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { formatIsoDate, localIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
 import { holderName, kes } from "~/features/petty-cash/float-display";

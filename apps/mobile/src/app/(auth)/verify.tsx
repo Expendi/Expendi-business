@@ -2,11 +2,13 @@ import type { JSX } from "react";
 import { useLoginWithEmail } from "@privy-io/expo";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
+import { BrandMark } from "~/components/brand-mark";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { useAuth } from "~/features/auth/auth-provider";
 
@@ -59,51 +61,64 @@ export default function VerifyScreen(): JSX.Element {
   }
 
   return (
-    <Screen>
-      <View className="gap-2 pt-8">
-        <Text className="text-3xl font-bold text-gray-900">
-          Check your email
-        </Text>
-        <Text className="text-base text-gray-600">
-          Enter the 6-digit code we sent to {sentTo}.
-        </Text>
-      </View>
+    <Screen centered>
+      <View className="mx-auto w-full max-w-md gap-6">
+        <BrandMark size={40} />
+        <View className="gap-2">
+          <Text
+            accessibilityRole="header"
+            className="text-2xl font-semibold leading-8 text-gray-900"
+          >
+            Check your email
+          </Text>
+          <Text selectable className="text-base leading-6 text-gray-600">
+            Enter the 6-digit code we sent to {sentTo}.
+          </Text>
+        </View>
 
-      <View className="gap-4">
-        <TextField
-          label="Code"
-          value={code}
-          onChangeText={handleCodeChange}
-          keyboardType="number-pad"
-          textContentType="oneTimeCode"
-          autoComplete="one-time-code"
-          maxLength={CODE_LENGTH}
-          autoFocus
-          editable={!verifying}
-        />
-        <ErrorMessage message={error} />
-        {notice ? (
-          <Text className="text-sm text-gray-600">{notice}</Text>
-        ) : null}
-        <Button
-          label="Sign in"
-          loading={verifying}
-          disabled={code.length !== CODE_LENGTH}
-          onPress={() => void verify(code)}
-        />
-        <Button
-          label="Send a new code"
-          variant="ghost"
-          loading={emailState.status === "sending-code"}
-          disabled={verifying}
-          onPress={() => void resend()}
-        />
-        <Button
-          label="Use a different email"
-          variant="ghost"
-          disabled={verifying}
-          onPress={() => router.back()}
-        />
+        <View className="gap-4 rounded-2xl border border-gray-200 bg-white p-5">
+          <TextField
+            label="Code"
+            helper="The code has 6 digits."
+            style={{
+              fontVariant: ["tabular-nums"],
+              letterSpacing: 8,
+              textAlign: "center",
+              fontSize: 24,
+            }}
+            value={code}
+            onChangeText={handleCodeChange}
+            keyboardType="number-pad"
+            textContentType="oneTimeCode"
+            autoComplete="one-time-code"
+            maxLength={CODE_LENGTH}
+            autoFocus
+            editable={!verifying}
+          />
+          <ErrorMessage message={error} />
+          {notice ? (
+            <Text className="text-sm text-gray-600">{notice}</Text>
+          ) : null}
+          <Button
+            label="Sign in"
+            loading={verifying}
+            disabled={code.length !== CODE_LENGTH}
+            onPress={() => void verify(code)}
+          />
+          <Button
+            label="Send a new code"
+            variant="ghost"
+            loading={emailState.status === "sending-code"}
+            disabled={verifying}
+            onPress={() => void resend()}
+          />
+          <Button
+            label="Use a different email"
+            variant="ghost"
+            disabled={verifying}
+            onPress={() => router.back()}
+          />
+        </View>
       </View>
     </Screen>
   );

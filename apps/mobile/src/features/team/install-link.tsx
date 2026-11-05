@@ -1,10 +1,11 @@
 import type { JSX } from "react";
 import { useState } from "react";
-import { Share, Text, View } from "react-native";
+import { Share, View } from "react-native";
 
 import { Button } from "~/components/button";
 import { CopyButton } from "~/components/copy-button";
 import { ErrorMessage } from "~/components/error-message";
+import { Text } from "~/components/text";
 
 interface InstallLinkProps {
   url: string;
