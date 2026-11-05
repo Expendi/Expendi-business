@@ -8,7 +8,7 @@
     "dev": "expo start --dev-client",
     "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path ../../.prettierignore --ignore-path .gitignore",
     "ios": "expo run:ios",
-    "eas-build-post-install": "node scripts/check-release.mjs",
+    "eas-build-post-install": "pnpm --filter @expendi-business/shared build && node scripts/check-release.mjs",
     "release:check": "node scripts/check-release.mjs --production",
     "release:build:android": "pnpm dlx eas-cli build --profile production --platform android",
     "release:build:ios": "pnpm dlx eas-cli build --profile production --platform ios",
