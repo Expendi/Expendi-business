@@ -10,6 +10,8 @@ const PASSKEY_DOMAIN = "business.expendi.app";
 const EAS_PROJECT_ID = "4ad31c10-418e-472c-a46f-24935b23480e";
 /** Must match the channel `src/lib/push.ts` creates and the API sends to. */
 const PUSH_CHANNEL_ID = "default";
+/** `brand-500` in tailwind.config.js; `assets/icon.png` is drawn on it too. */
+const BRAND_CORAL = "#FF7E5F";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -37,7 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: APP_ID,
     adaptiveIcon: {
       foregroundImage: "./assets/icon-foreground.png",
-      backgroundColor: "#FFFFFF",
+      backgroundColor: BRAND_CORAL,
     },
     edgeToEdgeEnabled: true,
     // Push on Android goes through Firebase Cloud Messaging. EAS builds get
@@ -97,7 +99,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "expo-splash-screen",
       {
         backgroundColor: "#FFFFFF",
-        image: "./assets/icon-foreground.png",
+        image: "./assets/splash-icon.png",
         imageWidth: 200,
       },
     ],
