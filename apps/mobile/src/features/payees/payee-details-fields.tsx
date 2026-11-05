@@ -2,7 +2,7 @@ import type { JSX } from "react";
 import type { TextInputProps } from "react-native";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 
 import type { PayeeKind, PayeeMethod } from "@expendi-business/shared";
 import {
@@ -20,6 +20,7 @@ import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { OptionPicker } from "~/components/option-picker";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { shortAddress } from "~/features/wallet/usdc-amount";
 import { useWithdrawalAddresses } from "~/features/wallet/use-withdrawal-addresses";

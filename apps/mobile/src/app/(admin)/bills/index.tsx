@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import type { Bill } from "@expendi-business/shared";
 import { BILL_PAYMENT_MAX_BILLS } from "@expendi-business/shared";
@@ -10,6 +10,7 @@ import type { Company } from "~/features/company/company-provider";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { formatBillAmount } from "~/features/bills/bill-amount";
 import {
   groupOpenBills,

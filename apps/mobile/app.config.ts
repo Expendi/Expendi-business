@@ -56,6 +56,44 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-secure-store",
     "expo-web-browser",
     [
+      "expo-font",
+      {
+        android: {
+          fonts: [
+            {
+              fontFamily: "Outfit",
+              fontDefinitions: [
+                {
+                  path: "./node_modules/@expo-google-fonts/outfit/400Regular/Outfit_400Regular.ttf",
+                  weight: 400,
+                },
+                {
+                  path: "./node_modules/@expo-google-fonts/outfit/500Medium/Outfit_500Medium.ttf",
+                  weight: 500,
+                },
+                {
+                  path: "./node_modules/@expo-google-fonts/outfit/600SemiBold/Outfit_600SemiBold.ttf",
+                  weight: 600,
+                },
+                {
+                  path: "./node_modules/@expo-google-fonts/outfit/700Bold/Outfit_700Bold.ttf",
+                  weight: 700,
+                },
+              ],
+            },
+          ],
+        },
+        ios: {
+          fonts: [
+            "./node_modules/@expo-google-fonts/outfit/400Regular/Outfit_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/outfit/500Medium/Outfit_500Medium.ttf",
+            "./node_modules/@expo-google-fonts/outfit/600SemiBold/Outfit_600SemiBold.ttf",
+            "./node_modules/@expo-google-fonts/outfit/700Bold/Outfit_700Bold.ttf",
+          ],
+        },
+      },
+    ],
+    [
       "expo-splash-screen",
       {
         backgroundColor: "#FFFFFF",

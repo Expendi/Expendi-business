@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Switch, View } from "react-native";
 
 import type { Payee, PayeeKind, PayeeMethod } from "@expendi-business/shared";
 import { PAYEE_KINDS, PAYEE_METHODS } from "@expendi-business/shared";
@@ -12,6 +12,7 @@ import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { RequireAdmin } from "~/features/company/require-admin";
 import { FilterChips } from "~/features/payees/filter-chips";

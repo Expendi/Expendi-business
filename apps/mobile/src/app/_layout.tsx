@@ -5,12 +5,14 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
+import { Text } from "~/components/text";
 import { useAuth } from "~/features/auth/auth-provider";
 import { PushNotifications } from "~/features/notifications/push-notifications";
 import { readPublicEnv } from "~/lib/env";
 import { AppProviders } from "~/providers/app-providers";
+import { colors } from "~/theme/colors";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -34,6 +36,10 @@ function withHeader(title: string) {
     title,
     headerBackButtonDisplayMode: "minimal",
     headerShadowVisible: false,
+    headerTintColor: colors.text,
+    headerStyle: { backgroundColor: colors.background },
+    contentStyle: { backgroundColor: colors.background },
+    headerTitleStyle: { fontFamily: "Outfit", fontWeight: "600" },
   } as const;
 }
 

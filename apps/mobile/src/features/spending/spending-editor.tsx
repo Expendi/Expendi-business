@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Image, Switch, Text, View } from "react-native";
+import { Image, Switch, View } from "react-native";
 
 import type {
   Category,
@@ -27,6 +27,7 @@ import type { SpendingExtras } from "./spending-draft";
 import type { ChipOption } from "~/features/payees/filter-chips";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import {
   CategoryField,

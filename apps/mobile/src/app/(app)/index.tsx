@@ -1,17 +1,21 @@
 import type { JSX } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { ArrowLeftRight, LogOut, Plus } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import type { MeResponse } from "@expendi-business/shared";
 
 import type { Company } from "~/features/company/company-provider";
 import { Badge } from "~/components/badge";
+import { BrandMark } from "~/components/brand-mark";
 import { Button } from "~/components/button";
-import { ListRow } from "~/components/list-row";
 import { LoadingScreen } from "~/components/loading-screen";
 import { Screen } from "~/components/screen";
+import { Section } from "~/components/section";
+import { SegmentedControl } from "~/components/segmented-control";
+import { Text } from "~/components/text";
 import { useAuth } from "~/features/auth/auth-provider";
 import { useCompanySession } from "~/features/company/company-provider";
 import { ROLE_LABELS } from "~/features/company/roles";
@@ -20,6 +24,11 @@ import {
   AdminHomeContent,
   EmployeeHomeContent,
 } from "~/features/overview/home-content";
+import {
+  QuickActions,
+  WorkspaceNavigation,
+} from "~/features/overview/workspace-navigation";
+import { colors } from "~/theme/colors";
 
 type Membership = MeResponse["memberships"][number];
 
@@ -36,11 +45,14 @@ export default function HomeScreen(): JSX.Element {
   const meQuery = useMe();
   const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
+  const [tab, setTab] = useState<"overview" | "workspace">("overview");
 
   if (state.status !== "ready") {
     return <LoadingScreen label="Loading your company" />;
   }
   const { me, company, companies } = state;
+  const hasOverview = company.role === "admin" || company.role === "employee";
+  const showWorkspace = tab === "workspace" || !hasOverview;
 
   async function handleSignOut(): Promise<void> {
     setSigningOut(true);
@@ -67,105 +79,56 @@ export default function HomeScreen(): JSX.Element {
         onSwitch={() => router.push("/select-company")}
       />
 
-      {company.role === "admin" ? (
+      {hasOverview ? (
+        <SegmentedControl
+          label="Home sections"
+          value={tab}
+          options={[
+            { value: "overview", label: "Overview" },
+            { value: "workspace", label: "Workspace" },
+          ]}
+          onChange={setTab}
+        />
+      ) : null}
+
+      {!showWorkspace ? (
+        <QuickActions isAdmin={company.role === "admin"} />
+      ) : null}
+
+      {!showWorkspace && company.role === "admin" ? (
         <AdminHomeContent
           key={company.organizationId}
           organizationId={company.organizationId}
         />
-      ) : company.role === "employee" ? (
+      ) : !showWorkspace && company.role === "employee" ? (
         <EmployeeHomeContent
           key={company.organizationId}
           organizationId={company.organizationId}
         />
       ) : null}
 
-      <ListRow
-        title="Claims"
-        subtitle={
-          company.role === "admin"
-            ? "Everyone’s claims, and your own"
-            : "Submit a receipt and get paid back"
-        }
-        onPress={() => router.push("/claims")}
-      />
+      {showWorkspace ? (
+        <>
+          <WorkspaceNavigation isAdmin={company.role === "admin"} />
+          <Account me={me} />
 
-      <ListRow
-        title="My petty cash"
-        subtitle="What’s left on your float, and what you spent"
-        onPress={() => router.push("/petty-cash")}
-      />
-
-      <ListRow
-        title="My salary payments"
-        subtitle="Your pay from this company"
-        onPress={() => router.push("/salary-payments")}
-      />
-
-      {company.role === "admin" ? (
-        <View className="gap-3">
-          <ListRow
-            title="Approvals"
-            subtitle="Claims waiting for you to approve and pay"
-            onPress={() => router.push("/approvals")}
-          />
-          <ListRow
-            title="Bills"
-            subtitle="What’s due, overdue and paid"
-            onPress={() => router.push("/bills")}
-          />
-          <ListRow
-            title="Wallet"
-            subtitle="Deposit USDC and see the balance"
-            onPress={() => router.push("/wallet")}
-          />
-          <ListRow
-            title="Team"
-            subtitle="Invite people and manage roles"
-            onPress={() => router.push("/team")}
-          />
-          <ListRow
-            title="Payees"
-            subtitle="Suppliers, subscriptions and others the company pays"
-            onPress={() => router.push("/payees")}
-          />
-          <ListRow
-            title="Payroll"
-            subtitle="Salaries and payroll runs. Only admins see them."
-            onPress={() => router.push("/payroll")}
-          />
-          <ListRow
-            title="Petty cash floats"
-            subtitle="Issue, top up and close floats; see what’s left"
-            onPress={() => router.push("/petty-cash/floats")}
-          />
-          <ListRow
-            title="Company spending"
-            subtitle="Spending already paid from the bank, card or cash"
-            onPress={() => router.push("/spending")}
-          />
-          <ListRow
-            title="Monthly export"
-            subtitle="Download and share reports and receipts"
-            onPress={() => router.push("/export")}
-          />
-        </View>
+          <View className="gap-3">
+            <Button
+              label="Create another company"
+              icon={Plus}
+              variant="ghost"
+              onPress={() => router.push("/create-company")}
+            />
+            <Button
+              label="Sign out"
+              icon={LogOut}
+              variant="secondary"
+              loading={signingOut}
+              onPress={() => void handleSignOut()}
+            />
+          </View>
+        </>
       ) : null}
-
-      <Account me={me} />
-
-      <View className="gap-3">
-        <Button
-          label="Create another company"
-          variant="ghost"
-          onPress={() => router.push("/create-company")}
-        />
-        <Button
-          label="Sign out"
-          variant="secondary"
-          loading={signingOut}
-          onPress={() => void handleSignOut()}
-        />
-      </View>
     </Screen>
   );
 }
@@ -180,18 +143,33 @@ function CompanyHeader({
   onSwitch: () => void;
 }): JSX.Element {
   return (
-    <View className="gap-2 pt-8">
+    <View className="gap-3">
+      <View className="flex-row items-center gap-2">
+        <BrandMark size={24} />
+        <Text className="text-sm font-medium text-gray-600">
+          Expendi Business
+        </Text>
+      </View>
       <Text
         accessibilityRole="header"
-        className="text-3xl font-bold text-gray-900"
+        className="text-2xl font-semibold leading-8 text-gray-900"
       >
         {company.name}
       </Text>
-      <View className="flex-row items-center gap-3">
+      <View className="flex-row flex-wrap items-center gap-3">
         <Badge label={ROLE_LABELS[company.role]} />
         {canSwitch ? (
-          <Pressable accessibilityRole="button" hitSlop={12} onPress={onSwitch}>
-            <Text className="text-sm font-semibold text-gray-900 underline">
+          <Pressable
+            accessibilityRole="button"
+            className="min-h-11 flex-row items-center justify-center gap-2"
+            onPress={onSwitch}
+          >
+            <ArrowLeftRight
+              size={16}
+              color={colors.brandStrong}
+              accessible={false}
+            />
+            <Text className="text-sm font-semibold text-brand-700">
               Switch company
             </Text>
           </Pressable>
@@ -203,22 +181,21 @@ function CompanyHeader({
 
 function Account({ me }: { me: MeResponse }): JSX.Element {
   return (
-    <View className="gap-3">
-      <Text className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-        Your account
-      </Text>
+    <Section title="Your account">
       <View className="gap-1">
         {me.user.fullName ? (
           <Text className="text-base font-semibold text-gray-900">
             {me.user.fullName}
           </Text>
         ) : null}
-        <Text className="text-base text-gray-600">{me.user.email}</Text>
+        <Text selectable className="text-sm text-gray-600">
+          {me.user.email}
+        </Text>
       </View>
       {me.memberships.map((membership) => (
         <View
           key={membership.id}
-          className="flex-row items-center justify-between rounded-xl border border-gray-200 px-4 py-3"
+          className="flex-row items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3"
         >
           <View className="flex-1 gap-0.5">
             <Text className="text-base font-semibold text-gray-900">
@@ -233,6 +210,6 @@ function Account({ me }: { me: MeResponse }): JSX.Element {
           </Text>
         </View>
       ))}
-    </View>
+    </Section>
   );
 }

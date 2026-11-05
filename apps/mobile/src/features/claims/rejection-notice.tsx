@@ -1,5 +1,7 @@
 import type { JSX } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+
+import { Text } from "~/components/text";
 
 export function RejectionNotice({ reason }: { reason: string }): JSX.Element {
   return (

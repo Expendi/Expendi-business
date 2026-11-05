@@ -1,5 +1,7 @@
 import type { JSX } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+
+import { Text } from "~/components/text";
 
 export interface PickerOption<T extends string> {
   value: T;
@@ -40,13 +42,13 @@ export function OptionPicker<T extends string>({
             accessibilityState={{ checked: selected, disabled }}
             disabled={disabled}
             onPress={() => onChange(option.value)}
-            className={`min-h-14 flex-row items-center gap-3 rounded-xl border px-4 py-3 active:opacity-80 ${selected ? "border-gray-900 bg-gray-50" : "border-gray-300 bg-white"} ${disabled ? "opacity-50" : ""}`}
+            className={`min-h-14 flex-row items-center gap-3 rounded-xl border px-4 py-3 active:opacity-80 ${selected ? "border-brand-700 bg-brand-50" : "border-gray-300 bg-white"} ${disabled ? "opacity-50" : ""}`}
           >
             <View
-              className={`h-5 w-5 items-center justify-center rounded-full border-2 ${selected ? "border-gray-900" : "border-gray-400"}`}
+              className={`h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${selected ? "border-brand-700" : "border-gray-400"}`}
             >
               {selected ? (
-                <View className="h-2.5 w-2.5 rounded-full bg-gray-900" />
+                <View className="h-2.5 w-2.5 rounded-full bg-brand-700" />
               ) : null}
             </View>
             <View className="flex-1 gap-0.5">

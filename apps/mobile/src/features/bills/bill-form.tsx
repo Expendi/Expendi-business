@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 
 import type {
   Bill,
@@ -26,6 +26,7 @@ import type { PickerOption } from "~/components/option-picker";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { OptionPicker } from "~/components/option-picker";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { ReceiptPicker } from "~/features/claims/receipt-picker";
 import { useCategories } from "~/features/claims/use-claims";

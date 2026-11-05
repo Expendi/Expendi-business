@@ -2,10 +2,11 @@ import type { BarcodeScanningResult } from "expo-camera";
 import type { JSX } from "react";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRef } from "react";
-import { Linking, Modal, Text, View } from "react-native";
+import { Linking, Modal, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button } from "~/components/button";
+import { Text } from "~/components/text";
 
 const QR_ONLY = { barcodeTypes: ["qr" as const] };
 

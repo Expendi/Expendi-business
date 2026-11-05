@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import type {
   FloatDetail,
@@ -10,6 +10,7 @@ import type {
 } from "@expendi-business/shared";
 
 import { Badge } from "~/components/badge";
+import { Text } from "~/components/text";
 import { ClaimStatusBadge } from "~/features/claims/claim-status";
 import { formatIsoDate, localIsoDate } from "~/features/claims/dates";
 import {
@@ -45,8 +46,8 @@ export function FloatBalanceCard({
       <View className="gap-2">
         {balanceRows(float).map((row) => (
           <View key={row.label} className="flex-row justify-between gap-4">
-            <Text className="text-base text-gray-600">{row.label}</Text>
-            <Text className="text-base font-semibold text-gray-900">
+            <Text className="flex-1 text-base text-gray-600">{row.label}</Text>
+            <Text className="flex-1 text-right text-base font-semibold text-gray-900">
               {row.value}
             </Text>
           </View>

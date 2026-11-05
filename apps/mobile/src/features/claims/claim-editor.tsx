@@ -1,7 +1,7 @@
 import type { JSX, ReactNode } from "react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Image, Text, View } from "react-native";
+import { ActivityIndicator, Image, View } from "react-native";
 
 import type {
   Category,
@@ -23,6 +23,7 @@ import type { PickerOption } from "~/components/option-picker";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { OptionPicker } from "~/components/option-picker";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { describeApiError } from "~/lib/api";
 import { formatKesCents } from "~/lib/money";

@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import type { PayrollRun } from "@expendi-business/shared";
 
@@ -10,6 +10,7 @@ import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { ListRow } from "~/components/list-row";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { formatIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
 import {

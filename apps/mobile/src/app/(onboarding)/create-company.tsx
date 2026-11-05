@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import {
   createOrganizationRequestSchema,
@@ -11,6 +11,7 @@ import {
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { useAuth } from "~/features/auth/auth-provider";
 import { useCompanySession } from "~/features/company/company-provider";

@@ -1,10 +1,11 @@
 import type { JSX, ReactNode } from "react";
 import { useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import { isSupported as isPasskeySupported } from "react-native-passkeys";
 
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
+import { Text } from "~/components/text";
 import { useAuth } from "~/features/auth/auth-provider";
 import { describeApiError } from "~/lib/api";
 import {

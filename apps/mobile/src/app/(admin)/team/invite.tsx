@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import type {
   InviteMemberResponse,
@@ -19,6 +19,7 @@ import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { OptionPicker } from "~/components/option-picker";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { RequireAdmin } from "~/features/company/require-admin";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "~/features/company/roles";

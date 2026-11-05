@@ -2,7 +2,7 @@ import type { JSX } from "react";
 import * as Crypto from "expo-crypto";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 
 import type { Withdrawal, WithdrawalAddress } from "@expendi-business/shared";
 
@@ -13,6 +13,7 @@ import { CopyButton } from "~/components/copy-button";
 import { ErrorMessage } from "~/components/error-message";
 import { OptionPicker } from "~/components/option-picker";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import {
   ApprovalPasskeyGate,
@@ -262,7 +263,7 @@ function Detail({
 }): JSX.Element {
   return (
     <View className="flex-row justify-between gap-4">
-      <Text className="text-base text-gray-600">{label}</Text>
+      <Text className="flex-1 text-base text-gray-600">{label}</Text>
       <Text className="flex-1 text-right text-base font-semibold text-gray-900">
         {value}
       </Text>

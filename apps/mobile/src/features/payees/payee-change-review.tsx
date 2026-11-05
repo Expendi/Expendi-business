@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import type { Payee, PayeeChangeChallenge } from "@expendi-business/shared";
 
@@ -8,6 +8,7 @@ import type { DetailRow } from "./payee-display";
 import type { PayeeChangeRequest } from "./use-payees";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
+import { Text } from "~/components/text";
 import { describeApprovalError } from "~/features/approval";
 import { describeApiError } from "~/lib/api";
 import { DetailRowList } from "./detail-row-list";

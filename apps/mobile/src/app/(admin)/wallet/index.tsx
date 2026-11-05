@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ArrowUpRight, History, MapPin, Wallet } from "lucide-react-native";
+import { ActivityIndicator, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 
 import type { ActiveWallet } from "@expendi-business/shared";
@@ -11,6 +12,7 @@ import { CopyButton } from "~/components/copy-button";
 import { ErrorMessage } from "~/components/error-message";
 import { ListRow } from "~/components/list-row";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { RequireAdmin } from "~/features/company/require-admin";
 import {
   isMissingWallet,
@@ -19,6 +21,7 @@ import {
 } from "~/features/wallet/use-company-wallet";
 import { describeApiError } from "~/lib/api";
 import { formatKesCents, formatUsdc } from "~/lib/money";
+import { colors } from "~/theme/colors";
 
 export default function WalletRoute(): JSX.Element {
   return (
@@ -88,9 +91,9 @@ function BaseOnlyWarning(): JSX.Element {
   return (
     <View
       accessibilityRole="alert"
-      className="gap-1 rounded-2xl border-2 border-amber-500 bg-amber-50 p-4"
+      className="gap-1 rounded-xl border border-amber-300 bg-amber-50 p-4"
     >
-      <Text className="text-lg font-bold text-amber-900">
+      <Text className="text-base font-semibold text-amber-900">
         Send USDC on Base only
       </Text>
       <Text className="text-sm text-amber-900">
@@ -141,14 +144,21 @@ function WalletDetails({ wallet }: { wallet: ActiveWallet }): JSX.Element {
   const router = useRouter();
   return (
     <View className="gap-8">
-      <View className="gap-1">
-        <Text className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-          Balance
-        </Text>
-        <Text className="text-3xl font-bold text-gray-900">
+      <View className="gap-3 rounded-2xl border border-gray-200 bg-white p-5">
+        <View className="flex-row items-center gap-2">
+          <Wallet size={18} color={colors.brandStrong} accessible={false} />
+          <Text className="text-sm font-medium text-gray-600">
+            Company wallet · Base
+          </Text>
+        </View>
+        <Text
+          selectable
+          className="text-3xl font-semibold leading-10 text-gray-900"
+          style={{ fontVariant: ["tabular-nums"] }}
+        >
           {formatUsdc(wallet.usdcBalance)} USDC
         </Text>
-        <Text className="text-base text-gray-600">
+        <Text selectable className="text-sm leading-5 text-gray-600">
           {wallet.kesEquivalent
             ? `≈ KES ${formatKesCents(wallet.kesEquivalent.kesCents)} at ${wallet.kesEquivalent.rate} KES per USDC`
             : "KES rate unavailable"}
@@ -158,32 +168,38 @@ function WalletDetails({ wallet }: { wallet: ActiveWallet }): JSX.Element {
       <View className="gap-3">
         <ListRow
           title="History"
+          icon={History}
           subtitle="Deposits, payments, refunds and withdrawals"
           onPress={() => router.push("/wallet/history")}
         />
         <ListRow
           title="Withdraw"
+          icon={ArrowUpRight}
           subtitle="Send USDC to an allowlisted address"
           onPress={() => router.push("/wallet/withdraw")}
         />
         <ListRow
           title="Withdrawal addresses"
+          icon={MapPin}
           subtitle="The only addresses you can withdraw to"
           onPress={() => router.push("/wallet/addresses")}
         />
       </View>
 
       <View className="gap-4">
-        <Text className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+        <Text
+          accessibilityRole="header"
+          className="text-lg font-semibold text-gray-900"
+        >
           Deposit address · Base
         </Text>
-        <View className="items-center rounded-2xl border border-gray-200 p-6">
+        <View className="items-center rounded-2xl border border-gray-200 bg-white p-6">
           <QRCode value={wallet.address} size={180} />
         </View>
         <Text
           selectable
           accessibilityLabel={`Deposit address ${wallet.address}`}
-          className="rounded-xl bg-gray-50 p-4 font-mono text-sm text-gray-900"
+          className="rounded-xl border border-gray-200 bg-white p-4 font-mono text-sm leading-5 text-gray-900"
         >
           {wallet.address}
         </Text>

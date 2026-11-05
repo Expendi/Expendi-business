@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 
 import type {
   Payee,
@@ -17,6 +17,7 @@ import type { PayeeChangeRequest } from "~/features/payees/use-payees";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { ApprovalPasskeyGate } from "~/features/approval";
 import { RequireAdmin } from "~/features/company/require-admin";
 import { PayeeChangeReview } from "~/features/payees/payee-change-review";

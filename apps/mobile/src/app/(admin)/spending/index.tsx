@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import type {
   CompanySpending,
@@ -14,6 +14,7 @@ import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { WarningBadges } from "~/features/claims/claim-warnings";
 import { RequireAdmin } from "~/features/company/require-admin";
 import { FilterChips } from "~/features/payees/filter-chips";

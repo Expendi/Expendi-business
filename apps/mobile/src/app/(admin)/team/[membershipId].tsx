@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 
 import type { AssignableRole, Member } from "@expendi-business/shared";
 import { ASSIGNABLE_ROLES } from "@expendi-business/shared";
@@ -13,6 +13,7 @@ import { ConfirmSheet } from "~/components/confirm-sheet";
 import { ErrorMessage } from "~/components/error-message";
 import { OptionPicker } from "~/components/option-picker";
 import { Screen } from "~/components/screen";
+import { Text } from "~/components/text";
 import { useCompanySession } from "~/features/company/company-provider";
 import { RequireAdmin } from "~/features/company/require-admin";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "~/features/company/roles";

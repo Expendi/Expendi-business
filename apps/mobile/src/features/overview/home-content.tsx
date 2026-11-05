@@ -1,8 +1,18 @@
 import type { JSX, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
+import {
+  Banknote,
+  CalendarCheck,
+  ChevronLeft,
+  ChevronRight,
+  CircleCheck,
+  Receipt,
+  Users,
+  Wallet,
+} from "lucide-react-native";
 import { useCallback, useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import type {
   CashObligation,
@@ -14,13 +24,19 @@ import {
 } from "@expendi-business/shared";
 
 import { Button } from "~/components/button";
+import { EmptyState } from "~/components/empty-state";
+import { ErrorMessage } from "~/components/error-message";
 import { ListRow } from "~/components/list-row";
+import { OverviewSkeleton } from "~/components/overview-skeleton";
+import { Section } from "~/components/section";
+import { Text } from "~/components/text";
 import { useClaimList } from "~/features/claims/use-claims";
 import { useMySalaryPayments } from "~/features/payroll/use-payroll";
 import { useFloats } from "~/features/petty-cash/use-floats";
 import { describeApiError } from "~/lib/api";
 import { formatUsdc } from "~/lib/money";
 import { useApi } from "~/providers/api-provider";
+import { colors } from "~/theme/colors";
 import {
   cashFootnote,
   cashHeadline,
@@ -33,27 +49,12 @@ import {
   shiftMonth,
 } from "./overview-display";
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}): JSX.Element {
-  return (
-    <View className="gap-3 border-t border-gray-200 pt-5">
-      <Text
-        accessibilityRole="header"
-        className="text-lg font-semibold text-gray-900"
-      >
-        {title}
-      </Text>
-      {children}
-    </View>
-  );
-}
 function Note({ children }: { children: ReactNode }): JSX.Element {
-  return <Text className="text-sm text-gray-600">{children}</Text>;
+  return (
+    <Text selectable className="text-sm leading-5 text-gray-600">
+      {children}
+    </Text>
+  );
 }
 
 export function AdminHomeContent({
@@ -88,11 +89,11 @@ export function AdminHomeContent({
         overviewPersonSchema,
       ),
   });
-  if (overview.isPending) return <Note>Loading spending overview…</Note>;
+  if (overview.isPending) return <OverviewSkeleton />;
   if (overview.isError)
     return (
       <View className="gap-2">
-        <Note>{describeApiError(overview.error)}</Note>
+        <ErrorMessage message={describeApiError(overview.error)} />
         <Button
           label="Try overview again"
           onPress={() => void overview.refetch()}
@@ -127,46 +128,82 @@ export function AdminHomeContent({
     }
   }
   return (
-    <View className="gap-6">
-      <View className="gap-2 rounded-xl bg-gray-900 p-5">
-        <Text className="text-sm text-gray-300">
-          Cash check · through {data.cash.through}
-        </Text>
-        <Text className="text-2xl font-bold text-white">
-          {cashHeadline(data.cash)}
-        </Text>
-        <Text className="text-base text-white">
-          {formatUsdc(data.cash.balanceUsdc)} USDC ·{" "}
-          {data.cash.balanceKes === null
-            ? "KES rate unavailable"
-            : kes(data.cash.balanceKes)}
-        </Text>
-        <Text className="text-sm text-gray-300">
-          Available after payments being made:{" "}
-          {data.cash.availableKes === null
-            ? "unavailable"
-            : kes(data.cash.availableKes)}
-        </Text>
-        {outsideLine === null ? null : (
-          <Text className="text-sm text-gray-300">{outsideLine}</Text>
-        )}
-        <Text className="text-sm text-gray-300">{cashFootnote(data.cash)}</Text>
-      </View>
-      <Section title="Where is the money going?">
-        <View className="flex-row items-center justify-between gap-2">
-          <Button
-            label="Previous"
-            variant="ghost"
-            onPress={() => setMonth(shiftMonth(data.month, -1))}
-          />
-          <Text className="text-base font-semibold">{data.month}</Text>
-          <Button
-            label="Next"
-            variant="ghost"
-            onPress={() => setMonth(shiftMonth(data.month, 1))}
-          />
+    <View className="gap-7">
+      <View className="gap-5 rounded-2xl border border-gray-200 bg-white p-5">
+        <View className="flex-row items-center gap-2">
+          <Wallet size={18} color={colors.brandStrong} accessible={false} />
+          <Text className="text-sm font-medium text-gray-600">
+            Company wallet
+          </Text>
         </View>
-        <Text className="text-2xl font-bold text-gray-900">
+        <View className="gap-1">
+          <Text
+            selectable
+            className="text-3xl font-semibold leading-10 text-gray-900"
+            style={{ fontVariant: ["tabular-nums"] }}
+          >
+            {formatUsdc(data.cash.balanceUsdc)} USDC
+          </Text>
+          <Text
+            selectable
+            className="text-base text-gray-600"
+            style={{ fontVariant: ["tabular-nums"] }}
+          >
+            {data.cash.balanceKes === null
+              ? "KES rate unavailable"
+              : kes(data.cash.balanceKes)}
+          </Text>
+        </View>
+        <View className="gap-2 rounded-xl bg-brand-50 p-4">
+          <Text className="text-xs font-medium text-brand-800">
+            Cash check · through {data.cash.through}
+          </Text>
+          <Text
+            selectable
+            className="text-lg font-semibold leading-6 text-gray-900"
+          >
+            {cashHeadline(data.cash)}
+          </Text>
+          <Text selectable className="text-sm leading-5 text-gray-700">
+            Available after payments being made:{" "}
+            {data.cash.availableKes === null
+              ? "unavailable"
+              : kes(data.cash.availableKes)}
+          </Text>
+        </View>
+        {outsideLine === null ? null : <Note>{outsideLine}</Note>}
+        <Note>{cashFootnote(data.cash)}</Note>
+      </View>
+      <Section title="Spending overview">
+        <View className="flex-row items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white p-1">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Previous month"
+            className="h-12 w-12 items-center justify-center rounded-lg active:bg-gray-100"
+            onPress={() => setMonth(shiftMonth(data.month, -1))}
+          >
+            <ChevronLeft size={20} color={colors.text} accessible={false} />
+          </Pressable>
+          <Text
+            accessibilityLiveRegion="polite"
+            className="flex-1 text-center text-sm font-semibold text-gray-900"
+          >
+            {data.month}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Next month"
+            className="h-12 w-12 items-center justify-center rounded-lg active:bg-gray-100"
+            onPress={() => setMonth(shiftMonth(data.month, 1))}
+          >
+            <ChevronRight size={20} color={colors.text} accessible={false} />
+          </Pressable>
+        </View>
+        <Text
+          selectable
+          className="text-3xl font-semibold leading-10 text-gray-900"
+          style={{ fontVariant: ["tabular-nums"] }}
+        >
           {kes(data.currentKes)}
         </Text>
         <Note>
@@ -180,7 +217,7 @@ export function AdminHomeContent({
           <Note>No spending recorded in either month.</Note>
         ) : null}
       </Section>
-      <Section title="What is outstanding?">
+      <Section title="Needs attention">
         <Note>
           {data.outstanding.overdue.length} overdue ·{" "}
           {data.outstanding.dueToday.length} due today
@@ -196,6 +233,7 @@ export function AdminHomeContent({
           ),
         )}
         <ListRow
+          icon={CircleCheck}
           title={`${data.outstanding.claims.length} claims waiting for approval`}
           subtitle={kes(
             data.outstanding.claims
@@ -224,18 +262,31 @@ export function AdminHomeContent({
           />
         ))}
       </Section>
-      <Section title="What needs to be paid next?">
+      <Section title="Upcoming payments" description="Due in the next 30 days">
         {data.cash.obligations.length === 0 ? (
-          <Note>Nothing due in the next 30 days.</Note>
+          <EmptyState
+            icon={CalendarCheck}
+            title="Nothing due"
+            message="No payments are due in the next 30 days."
+          />
         ) : (
           data.cash.obligations.map((row) => (
             <View
               key={`${row.kind}:${row.id}:${row.dueOn}`}
-              className="gap-2 border-b border-gray-100 pb-3"
+              className="gap-3 rounded-xl border border-gray-200 bg-white p-4"
             >
-              <Text className="font-semibold text-gray-900">
-                {row.name} · {obligationAmount(row)}
-              </Text>
+              <View className="flex-row items-start justify-between gap-3">
+                <Text className="flex-1 text-base font-medium text-gray-900">
+                  {row.name}
+                </Text>
+                <Text
+                  selectable
+                  className="flex-1 text-right text-base font-semibold text-gray-900"
+                  style={{ fontVariant: ["tabular-nums"] }}
+                >
+                  {obligationAmount(row)}
+                </Text>
+              </View>
               <Note>
                 {row.dueOn} ·{" "}
                 {row.kind === "forecast"
@@ -255,17 +306,28 @@ export function AdminHomeContent({
           ))
         )}
       </Section>
-      <Section title="What has been paid?">
+      <Section title="Recent payments">
         {data.recentPayments.length === 0 ? (
-          <Note>
-            No payments in {data.previousMonth} or {data.month}.
-          </Note>
+          <EmptyState
+            icon={Receipt}
+            title="No payments yet"
+            message={`No payments in ${data.previousMonth} or ${data.month}.`}
+          />
         ) : (
           data.recentPayments.map((row) => (
-            <View key={row.id} className="gap-1">
-              <Text className="font-semibold text-gray-900">
-                {row.name} · {kes(row.amountKes)}
-              </Text>
+            <View key={row.id} className="gap-2 border-b border-gray-200 pb-3">
+              <View className="flex-row items-start justify-between gap-3">
+                <Text className="flex-1 text-base font-medium text-gray-900">
+                  {row.name}
+                </Text>
+                <Text
+                  selectable
+                  className="flex-1 text-right text-base font-semibold text-gray-900"
+                  style={{ fontVariant: ["tabular-nums"] }}
+                >
+                  {kes(row.amountKes)}
+                </Text>
+              </View>
               <Note>
                 {row.date} ·{" "}
                 {row.channel === "expendi"
@@ -278,11 +340,19 @@ export function AdminHomeContent({
           ))
         )}
       </Section>
-      <Section title="Per person">
+      <Section title="People">
+        {data.people.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No spending by person"
+            message="People will appear here when they have spending to review."
+          />
+        ) : null}
         {data.people.map((row) => (
           <ListRow
             key={row.id}
             title={row.name}
+            icon={Users}
             onPress={() => setPersonId(row.id === personId ? null : row.id)}
           />
         ))}
@@ -299,7 +369,7 @@ export function AdminHomeContent({
           </View>
         ) : null}
         {personId !== null && person.data ? (
-          <View className="gap-3 rounded-xl border border-gray-200 p-4">
+          <View className="gap-3 rounded-xl border border-gray-200 bg-white p-4">
             <Text accessibilityRole="header" className="text-lg font-bold">
               {person.data.name}
             </Text>
@@ -359,10 +429,19 @@ function Breakdown({
   return (
     <View className="gap-3">
       {rows.map((row) => (
-        <View key={row.id} className="gap-1">
-          <Text className="font-semibold text-gray-900">
-            {row.name} · {kes(row.currentKes)}
-          </Text>
+        <View key={row.id} className="gap-1 border-b border-gray-200 pb-3">
+          <View className="flex-row items-start justify-between gap-3">
+            <Text className="flex-1 text-sm font-medium text-gray-900">
+              {row.name}
+            </Text>
+            <Text
+              selectable
+              className="flex-1 text-right text-sm font-semibold text-gray-900"
+              style={{ fontVariant: ["tabular-nums"] }}
+            >
+              {kes(row.currentKes)}
+            </Text>
+          </View>
           <Note>Previous month: {kes(row.previousKes)}</Note>
         </View>
       ))}
@@ -416,9 +495,11 @@ export function EmployeeHomeContent({
                 />
               ))}
             {claims.data.pages[0]?.claims.length === 0 ? (
-              <Note>
-                No claims yet. Add a receipt to claim back a purchase.
-              </Note>
+              <EmptyState
+                icon={Receipt}
+                title="No claims yet"
+                message="Add a receipt to claim back a purchase."
+              />
             ) : null}
           </>
         )}
@@ -435,7 +516,11 @@ export function EmployeeHomeContent({
           <Note>{describeApiError(floats.error)}</Note>
         ) : (
           <>
-            <Text className="text-2xl font-bold text-gray-900">
+            <Text
+              selectable
+              className="text-3xl font-semibold text-gray-900"
+              style={{ fontVariant: ["tabular-nums"] }}
+            >
               {kes(openFloatLeft(floats.data.floats))}
             </Text>
             <Note>
@@ -456,7 +541,11 @@ export function EmployeeHomeContent({
         ) : salary.isError ? (
           <Note>{describeApiError(salary.error)}</Note>
         ) : salary.data.length === 0 ? (
-          <Note>No salary payments yet.</Note>
+          <EmptyState
+            icon={Banknote}
+            title="No salary payments yet"
+            message="Your salary payments will appear here once they are processed."
+          />
         ) : (
           salary.data.slice(0, 5).map((row) => (
             <Note key={row.id}>

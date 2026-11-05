@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { useState } from "react";
-import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, View } from "react-native";
 
 import { MAX_RECEIPTS_PER_CLAIM } from "@expendi-business/shared";
 
@@ -8,6 +8,7 @@ import type { ReceiptSource } from "./receipt-upload";
 import type { ReceiptSlot, ReceiptSlots } from "./use-receipt-slots";
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
+import { Text } from "~/components/text";
 import { pickReceiptImage } from "./receipt-upload";
 
 const NO_CAMERA =
