@@ -1,0 +1,3 @@
+# EAS file variables (GOOGLE_SERVICES_JSON) exist only on EAS builders, so
+# hashing them makes the runtime version differ between local and EAS.
+**/eas-environment-secrets/**
