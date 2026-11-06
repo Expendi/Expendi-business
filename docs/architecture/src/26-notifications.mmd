@@ -1,0 +1,24 @@
+flowchart TD
+  EVENTS["Domain events, queued in the same transaction as the change<br/>claim_submitted → other admins<br/>claim_rejected → claimant<br/>claim_paid · claim_payout_failed → claimant (+ admins on failure)<br/>bill_due_soon · bill_due_today · bill_overdue → admins, also email<br/>wallet_short → admins, also email<br/>payroll_ready → admins<br/>salary_paid → employee<br/>float_issued · float_topped_up → float holder"]
+  REM["spending-reminders job · 15 min<br/>from 08:00 Nairobi"] --> EVENTS
+  DRAFTS["payroll-drafts job"] --> EVENTS
+  DOMAIN["claims · bills · payroll · floats services"] --> EVENTS
+
+  EVENTS --> NOTIFY["notify(tx, event)"]
+  NOTIFY --> OUT[("notification_outbox<br/>one row per channel<br/>dedupe on (org, key, channel)")]
+
+  APP["Mobile app"] -- "POST /me/push-tokens<br/>DELETE on sign-out" --> TOK[("push_tokens")]
+
+  OUT --> PUSHJOB["push-notifications job · 5 s<br/>50 rows, SKIP LOCKED<br/>recipients = active members at send time"]
+  TOK --> PUSHJOB
+  PUSHJOB -- "push, 100 per request" --> EXPO["Expo Push → FCM / APNs"]
+  PUSHJOB -- "email once per recipient" --> RESEND["Resend"]
+  PUSHJOB --> STATE{"Result"}
+  STATE -- ok --> SENT["sent_at set"]
+  STATE -- error --> RETRY["stays queued with last_error"]
+  STATE -- "older than 24 h" --> ABAND["abandoned"]
+
+  SENT --> RCPTJOB["push-receipts job · 5 min<br/>rows sent 15 min to 1 day ago"]
+  RCPTJOB -- getReceipts --> EXPO
+  RCPTJOB --> DIS["disable tokens of uninstalled apps"]
+  EXPO -. "tap opens the claim in the right company" .-> APP

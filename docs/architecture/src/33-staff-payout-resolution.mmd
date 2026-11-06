@@ -1,0 +1,23 @@
+sequenceDiagram
+  actor S as Ops admin
+  participant UI as Ops app /payouts/[id]
+  participant API as /internal/payouts
+  participant PC as Paycrest
+  participant B as Base RPC
+  participant DB as Postgres
+
+  S->>UI: open a needs_review payout
+  UI->>API: GET /payouts/:id (details, ledger, audit trail)
+  opt re-fetch
+    UI->>API: POST /refetch
+    API->>PC: getOrder
+    API->>DB: forward-only syncPayoutOrder + audit payout.refetched
+  end
+  UI->>API: POST /resolve/prepare (paid or failed)
+  API->>PC: order evidence
+  API->>B: transaction evidence
+  API->>DB: staff_confirmations row (intent hash, 5 min)
+  API-->>UI: confirmation token
+  S->>UI: second confirmation
+  UI->>API: POST /resolve/confirm
+  API->>DB: payout paid or failed, optional missing ledger debit, subject hooks, audit payout.resolved

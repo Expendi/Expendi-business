@@ -1,0 +1,33 @@
+flowchart TD
+  subgraph Connect["Connect (once per company)"]
+    C1["Ops admin: POST /internal/companies/:id/zoho/connect-link<br/>7-day link, token hash stored"] --> C2["Staff send the link to the accountant"]
+    C2 --> C3["GET /integrations/zoho/connect?token=<br/>signed 15-min state"]
+    C3 --> C4["Zoho OAuth consent<br/>settings.READ · accountants.READ<br/>expenses.CREATE · expenses.READ"]
+    C4 --> C5["GET /integrations/zoho/callback<br/>Multi-DC accounts-server allowlist · code exchange"]
+    C5 --> C6["Refresh token sealed with AES-256-GCM<br/>(ACCOUNTING_TOKEN_KEY) · link spent · audit"]
+    C6 --> C7["Ops: choose organization (must be KES)"]
+    C7 --> C8["Ops: PUT /mapping<br/>paid-through · default expense · petty cash · salaries<br/>per-category + per paid-from account"]
+  end
+
+  subgraph Enqueue["What queues a sync (accounting_syncs, one per subject)"]
+    Q1["Claim paid through Expendi"]
+    Q2["Float or company spending recorded"]
+    Q3["Bill paid or paid outside (not payroll)"]
+    Q4["Payroll run paid (one expense per run)"]
+  end
+
+  C8 --> READY(["Connection active"])
+  READY -. "only when a connection exists" .-> Enqueue
+  Enqueue --> SY[("accounting_syncs: pending")]
+  SY --> JOB["zoho-sync job · 60 s · 20 rows"]
+  JOB --> F1["Find expense by reference (subject id)"]
+  F1 -- "none" --> F2["createExpense with mapped accounts"]
+  F1 -- "one" --> F3
+  F1 -- "several" --> FAIL["failed (permanent)"]
+  F2 --> F3["Attach first receipt image or PDF from R2<br/>(bill invoice before proof of payment)"]
+  F3 --> OK["synced"]
+  JOB -- "429" --> RL["rate_limited: retry in 15 min"]
+  JOB -- "token rejected" --> NR["connection needs_reconnect<br/>new connect link fixes it, mapping kept"]
+  JOB -- "other error" --> BO["backoff 1 m · 5 m · 15 m · 1 h · 3 h"]
+  BO -- "6 attempts" --> FAIL
+  FAIL -- "Ops requeue" --> SY

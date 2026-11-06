@@ -1,0 +1,25 @@
+flowchart TD
+  ENTRY["HTTP routes · station jobs · webhooks"] --> DOMAIN
+
+  subgraph DOMAIN["Domain services"]
+    direction LR
+    D1["expenses · bills · recurring<br/>payroll · floats"]
+    D2["payees · withdrawal · organization<br/>membership · users · phone-verification · overview"]
+  end
+
+  DOMAIN -- "Approve & pay" --> ENGINE
+
+  subgraph ENGINE["Money engine"]
+    direction LR
+    PAYMENTS["payments<br/>Approve & pay helpers"] --> PAYOUT["payout<br/>prepare · approve · fund<br/>sync · retry · discard"]
+    PAYOUT --> APPROVAL["approval<br/>WebAuthn"]
+    PAYOUT --> ALLOW["allowlist"]
+    PAYOUT --> WALLET["wallet<br/>ledger"]
+  end
+
+  ENGINE -. "subject hooks: claim · bill · float<br/>at approval and on every status change" .-> DOMAIN
+
+  DOMAIN --> RECORDS["Records + ops<br/>notification · zoho · export · import · alerts · staff"]
+  ENGINE --> RECORDS
+  DOMAIN & ENGINE & RECORDS --> AUDIT[("audit_log")]
+  DOMAIN & ENGINE & RECORDS --> PROVIDERS["Provider clients<br/>(next diagram)"]

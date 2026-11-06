@@ -1,0 +1,32 @@
+flowchart LR
+  SCHED["station/scheduler.ts<br/>setInterval per job<br/>pg_try_advisory_lock"]
+
+  SCHED --> J1["reconcile-paycrest<br/>60 s · lock 72001"]
+  SCHED --> J2["confirm-onchain<br/>60 s · lock 72002"]
+  SCHED --> J3["bill-status<br/>15 min · lock 72035"]
+  SCHED --> J4["recurring-bills<br/>15 min · lock 72036"]
+  SCHED --> J5["payroll-drafts<br/>15 min · lock 72038"]
+  SCHED --> J6["monthly-export<br/>15 min · lock 72022<br/>from the 1st, Nairobi"]
+  SCHED --> J7["spending-reminders<br/>15 min · lock 72043<br/>from 08:00 Nairobi"]
+  SCHED --> J8["push-notifications<br/>5 s · lock 72020"]
+  SCHED --> J9["push-receipts<br/>5 min · lock 72021"]
+  SCHED --> J10["zoho-sync<br/>60 s · lock 72031"]
+  SCHED --> J11["alert-checks<br/>60 s · lock 72026"]
+
+  J1 -- "getOrder" --> PC["Paycrest"]
+  J1 --> O1["payout status + ledger debits<br/>+ station heartbeat"]
+  J2 -- "getTransactionReceipt" --> RPC["Base RPC"]
+  J2 --> O2["onchain USDC payouts → paid / needs_review"]
+  J3 --> O3["bills: upcoming → due → overdue"]
+  J4 --> O4["next bill for each active recurring item"]
+  J5 --> O5["draft payroll runs 5 days before pay day<br/>+ admin notifications"]
+  J6 --> O6["last month's export → R2<br/>+ email to accountants"]
+  J7 -- "rate for cash check" --> PC
+  J7 --> O7["due-date reminders + wallet-short warnings<br/>→ notification_outbox"]
+  J8 -- "push" --> EXPO["Expo Push"]
+  J8 -- "email" --> RES["Resend"]
+  J9 -- "getReceipts" --> EXPO
+  J9 --> O9["disable tokens of uninstalled apps"]
+  J10 -- "createExpense + attachReceipt" --> ZB["Zoho Books"]
+  J10 --> O10["accounting_syncs → synced / failed"]
+  J11 --> O11["ops_alerts rows + email to ALERT_EMAILS"]

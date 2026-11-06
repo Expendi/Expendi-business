@@ -1,0 +1,14 @@
+flowchart TD
+  IDX["index.ts"] --> BOOT["secrets/bootstrap<br/>dotenv → initializeSecrets()"]
+  BOOT -- "SECRETS_MANAGER=doppler" --> DOP["Doppler fetch<br/>10 s timeout"]
+  BOOT -- "env (default)" --> ENV["process.env"]
+  DOP --> ENV
+  ENV --> SRV["server.ts (dynamic import)"]
+  SRV --> RT["ManagedRuntime(MainLayer)<br/>builds every layer up front"]
+  RT --> DBC["Database pool<br/>assertRestrictedRole"]
+  RT --> SERVE["@hono/node-server on PORT"]
+  RT --> ST["startStation()<br/>11 jobs"]
+  SERVE -. "SIGTERM/SIGINT" .-> STOP["close server → stop jobs → dispose runtime"]
+  RAIL["Railway deploy"] --> MIG["preDeploy: migrate<br/>(owner role, advisory lock)"]
+  MIG --> IDX
+  RAIL -. "healthcheck" .-> HC["/health"]

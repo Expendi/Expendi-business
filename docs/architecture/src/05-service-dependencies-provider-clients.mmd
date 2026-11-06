@@ -1,0 +1,53 @@
+flowchart LR
+  subgraph Services["Services"]
+    AUTHS["auth · staff-auth"]
+    WALLET["wallet"]
+    PAYOUT["payout"]
+    PAYMENTS["payments · withdrawal · bills · payees"]
+    OVER["overview · alerts"]
+    EXP["expenses"]
+    PV["phone-verification"]
+    MAILERS["membership · approval · payees · payroll<br/>phone-verification · notification · export · alerts"]
+    NOTIF["notification"]
+    FILES["expenses · bills · export · zoho"]
+    ZOHOS["zoho"]
+    STAFF["staff"]
+  end
+
+  subgraph Clients["Provider clients (Effect layers)"]
+    PRIVYA["PrivyAuth"]
+    PRIVYW["PrivyWallets"]
+    PAYC["Paycrest"]
+    ALC["AlchemyWebhook"]
+    RPC["BaseRpc"]
+    FS["FileStorage"]
+    MAIL["EmailSender"]
+    OTP["OtpProvider"]
+    PUSH["PushSender"]
+    ZC["Zoho + ZohoAccessTokens<br/>+ AccountingTokenKey"]
+    RX["ReceiptExtractor"]
+  end
+
+  AUTHS --> PRIVYA
+  WALLET --> PRIVYW & ALC & RPC
+  WALLET -- "refund detection" --> PAYC
+  PAYOUT --> PRIVYW & PAYC & RPC
+  PAYMENTS & OVER --> PAYC
+  STAFF --> PAYC & RPC
+  EXP --> RX
+  FILES --> FS
+  MAILERS --> MAIL
+  PV --> OTP
+  NOTIF --> PUSH
+  ZOHOS --> ZC
+
+  PRIVYA & PRIVYW --> PRIVY["Privy API"]
+  PAYC --> PCAPI["Paycrest v2 API"]
+  ALC --> ALAPI["Alchemy Notify API"]
+  RPC --> BASEAPI["Base JSON-RPC"]
+  FS --> R2["Cloudflare R2 (SigV4)<br/>off without R2_* vars"]
+  MAIL --> RES["Resend<br/>fails cleanly without key"]
+  OTP --> TEL["Telnyx Verify<br/>off without TELNYX_* vars"]
+  PUSH --> EXPO["Expo Push"]
+  ZC --> ZAPI["Zoho accounts + Books API"]
+  RX --> CL["Anthropic API<br/>off without ANTHROPIC_API_KEY"]

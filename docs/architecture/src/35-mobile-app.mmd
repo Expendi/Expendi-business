@@ -1,0 +1,43 @@
+flowchart LR
+  ROOT["Root stack<br/>Query → Privy → Api → Company providers"] --> AUTHG["(auth) · signed out<br/>sign-in · verify · set-up-passkey"]
+  ROOT --> APPG["(app) gates<br/>full name → company → role"]
+  APPG --> ONB["(onboarding)/create-company<br/>→ wallet?welcome=1"]
+  APPG --> SEL["select-company"]
+  APPG --> HOME["Overview / Workspace<br/>admin: overview + people<br/>employee: claims, float, salary<br/>accountant: workspace only"]
+
+  subgraph EMP["Any member"]
+    CL["claims · list, new, detail, edit"]
+    PCASH["petty-cash · my float, record spending"]
+    SAL["salary-payments"]
+  end
+
+  subgraph ADM["Admin only (★ needs approval passkey)"]
+    APR["approvals · queue<br/>★ pay one claim"]
+    BL["bills · list, new, detail, edit, mark paid<br/>★ pay selected bills"]
+    PY["payees · list, detail<br/>★ new · ★ payment details"]
+    PR["payroll · runs, salaries, run detail<br/>★ salary amount · ★ pay run · ★ margin settings"]
+    FL["floats · list, new, detail, top-up, return, close<br/>★ pay movement"]
+    RC["recurring · list, new, detail, edit, pause/resume/end"]
+    SP["spending · list, new, detail, edit, paid-from accounts"]
+    WL["wallet · balance + deposit QR, history<br/>★ withdraw · ★ addresses"]
+    TM["team · members, invite (share sheet), edit"]
+    EX["export · generate + share links"]
+  end
+
+  HOME --> EMP & ADM
+
+  CL --> A1["/claims · /categories<br/>/receipts/upload-url · /receipts/:id/extract · /receipts/sms"]
+  PCASH --> A2["/floats?mine=true · /floats/:id/spending"]
+  SAL --> A3["/me/salary-payments"]
+  APR --> A4["/claims approval · confirm · retry · reject"]
+  BL --> A5["/bills/* · /receipts/upload-url"]
+  PY --> A6["/payees/* · /members · /withdrawal-addresses"]
+  PR --> A7["/salaries/* · /payroll-runs/* · /settings/payroll-margin/*"]
+  FL --> A8["/floats/*"]
+  RC --> A9["/recurring-items/*"]
+  SP --> A10["/company-spending/* · /paid-from-accounts/*"]
+  WL --> A11["/wallet · /wallet/history · /withdrawals/* · /withdrawal-addresses/*"]
+  TM --> A12["/members/*"]
+  EX --> A13["/reports/exports"]
+  ADM -. "★ screens" .-> A14["/me/approval-passkey/*<br/>react-native-passkeys create / get"]
+  ROOT -. "app-wide" .-> A15["/me/push-tokens"]
