@@ -111,7 +111,10 @@ The founder asked for something lightweight that shows, at any moment, where the
 
 ### Later
 
-Company cards, including paying card-only subscriptions · approval chains · budgets and spending limits · automatic payment on the due date · payroll tax calculation (PAYE, NSSF, SHIF, Housing Levy), payslips and statutory filings · QuickBooks/Xero sync · mileage and per diem · invoicing · countries other than Kenya · currencies other than KES · Slack alerts
+- **USD bank accounts** through Polygon Open Money Stack virtual accounts: each company gets its own US account details, and ACH and wire deposits land in its wallet as USDC. Added 2026-11-06. Offered to companies outside Kenya, since Polygon blocks Kenya for now (section 14). It ships with the first countries other than Kenya, and reaches Kenyan companies if Polygon lifts the block.
+- **Company cards** through Lithic: virtual and physical cards for staff, with per-card limits, funded from the company's USDC. Cards also pay card-only subscriptions (section 6.20). Added 2026-11-06.
+
+Approval chains · budgets and spending limits · automatic payment on the due date · payroll tax calculation (PAYE, NSSF, SHIF, Housing Levy), payslips and statutory filings · QuickBooks/Xero sync · mileage and per diem · invoicing · countries other than Kenya · currencies other than KES · Slack alerts
 
 ---
 
@@ -636,6 +639,8 @@ The consumer backend's wallet audit findings (`backend/docs/privy-backend-securi
 | Wallets                            | Privy server wallets with policies, on Base, holding USDC                                                                                                                                                                                                      |
 | Cash-out                           | Paycrest (USDC on Base → KES to M-Pesa numbers, Tills, Paybills and Kenyan banks). USDC payees are paid by direct transfer from the company wallet.                                                                                                            |
 | Top-ups (after go-live)            | Qadi (KES via M-Pesa → USDC on Base)                                                                                                                                                                                                                           |
+| USD accounts (later)               | Polygon Open Money Stack virtual accounts: USD by ACH or wire arrives in the company wallet as USDC (section 3)                                                                                                                                                |
+| Company cards (later)              | Lithic card issuing, funded from the company's USDC (section 3)                                                                                                                                                                                                |
 | eTIMS verification (after go-live) | DigiTax                                                                                                                                                                                                                                                        |
 | Receipt reading                    | Claude vision model with structured output                                                                                                                                                                                                                     |
 | App                                | Expo, private test releases, EAS Update for over-the-air fixes                                                                                                                                                                                                 |
@@ -762,6 +767,23 @@ Dennis confirmed 1–5, 8 and 9 on 2026-11-01. Expendi is **not offering an API 
   - **Settlement time per channel:** not documented. Measure each channel in the Checkpoint B live payouts.
   - **Name checks:** Paycrest's account check returns only "OK" for KES M-Pesa, with no name, so it doesn't confirm who receives the money. Every order carries the name Expendi has for the payee. Whether banks return a name is checked at Checkpoint B.
 
+- **USD bank accounts (Polygon Open Money Stack):** offered outside Kenya first. Polygon's [jurisdictions page](https://docs.polygon.technology/payments/supported-jurisdictions-networks) (read 2026-11-06) is a blocklist: everywhere else is supported.
+  - **Blocked:** Kenya is listed under "FATF gray list, blocked for bank ramps". The block is checked against the business's incorporation and physical address and each associated person's address, so as written it also excludes a Delaware parent whose owners live in Kenya.
+  - **Not blocked:** Nigeria, Ghana, Uganda, Tanzania, Rwanda, South Africa, Zambia, Egypt and Morocco aren't on either list.
+  - **Sign-up:** a company's country decides whether the admin sees the USD account option, and a refused customer comes back `rejected` with `failure.code: countryProhibited`.
+
+  Ask Polygon:
+  - Do virtual accounts count as bank ramps under the Kenya rule, and when does Kenya come off the list?
+  - Can deposits settle as USDC on Base? The virtual-account docs only show Polygon, though OMS supports USDC on Base. The Privy wallet is registered as an external wallet (`walletExternal`).
+  - What are the fees? The docs' example charges a $1 OMS fee on a $500 deposit, plus any fee we set.
+  - How do we get access? OMS is in early access, and Polygon enables virtual accounts on request.
+
+- **Company cards (Lithic):** confirm the fit before building.
+  - **Kenya:** Lithic says it issues internationally and runs KYB for "business addresses in any supported country", but doesn't list the countries. Confirm it can issue to Kenyan companies and staff.
+  - **Funding from USDC:** either Lithic's stablecoin pilot (USDC on Base, enabled per program), or approving each card payment against the company wallet through Auth Stream Access (answer within 3 seconds; Lithic declines after 6) and settling in USD.
+  - **Money safety:** staff spend on a card without an admin's passkey for each payment, so cards need their own named purpose in section 7, with per-card limits (Lithic Auth Rules: amount, merchant category, velocity) counted against the daily cap.
+  - **Access:** pricing is by quote. The sandbox is self-serve; production goes through Lithic sales.
+
 - ~~**Privy policies:** confirm which conditions they can enforce on ERC-20 transfers (section 7).~~ Settled by T5: they can cap USDC transfer amounts (`docs/decisions/privy-wallet-policies.md`). Dennis decided the rest on 2026-11-01: the default per-transaction maximum is 3,100 USDC, and he holds the management key, ops-only.
 - ~~**Passkey approvals:** confirm whether the backend can verify a passkey signature against the passkey Privy registered (Privy exposes its public key), or whether money approvals need their own WebAuthn credential, as in the consumer backend (T8).~~ **Decided (Dennis, 2026-11-01): Expendi's own WebAuthn credential.** Each admin enrols an approval passkey once, and the backend verifies it with `@simplewebauthn/server`, as the consumer backend does. Privy's passkey is unproven for this: passkeys are off in the app, and its `public_key` is optional and undocumented. It can be imported into the same table later.
 
@@ -783,6 +805,8 @@ Dennis confirmed 1–5, 8 and 9 on 2026-11-01. Expendi is **not offering an API 
 1. Email DigiTax (info@namiri.tech): can one account serve many companies, and how does the License Key work? Which buyer PIN is checked? What does a check cost? How often does the purchases feed update, and can it include supplier PIN, VAT and totals?
 2. Start Meta's WhatsApp business verification.
 3. Agree a USDC float with Qadi for top-ups, and brief Qadi on the B2B use (`backend/docs/qadi-partner-brief.md` currently says Expendi is not a B2B payments platform).
+4. Request Open Money Stack access from Polygon (polygon.technology/get-access) and ask the USD bank account questions under "To settle".
+5. Open a Lithic sandbox (app.lithic.com/signup) and ask Lithic sales the company card questions under "To settle".
 
 ---
 
