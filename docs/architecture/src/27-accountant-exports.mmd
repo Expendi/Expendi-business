@@ -1,0 +1,21 @@
+flowchart TD
+  MAN["Admin: POST /reports/exports<br/>(mobile Export or web Reports)"] --> GEN["generateExport(month)<br/>future month refused"]
+  JOB["monthly-export job · 15 min<br/>from the 1st, Nairobi<br/>companies with an accountant"] --> FIND{"Monthly export<br/>for last month exists?"}
+  FIND -- no --> GEN
+  FIND -- yes --> MAIL
+
+  GEN --> READ["readExportData · READ ONLY transaction<br/>expenses · paid bills · float transfers<br/>outstanding bills · receipt_files"]
+  READ --> R1["Workbook: money out · outstanding bills · float transfers"]
+  READ --> R2C["CSV zip: the same three tables"]
+  READ --> R3["Receipts zip: files from R2, or SMS text"]
+  R1 & R2C & R3 --> UP["Upload to R2<br/>org/&lt;org&gt;/exports/&lt;id&gt;/&lt;file&gt;"]
+  UP --> ROWS["report_exports (expires in 30 days)<br/>report_export_links (token hash only)<br/>audit report_export.generated"]
+  ROWS --> LINKS["Links: API_PUBLIC_URL/downloads/reports/&lt;token&gt;/&lt;file&gt;"]
+  ROWS --> MAIL["Per accountant: new token, Resend email<br/>idempotency key per link · audit report_export.emailed"]
+
+  LINKS --> DL["GET /downloads/reports/:token/:file<br/>token + 30-day check (410 when expired)"]
+  MAIL --> DL
+  DL --> R2URL["302 to a 15-minute R2 URL"]
+
+  DIRECT["Web Reports: GET /reports/:month/:format<br/>workbook · csv · receipts · etims"] --> FRESH["Built fresh for download"]
+  ETIMS["eTIMS CSV: every expense in the month<br/>except rejected · never stored"] --> FRESH

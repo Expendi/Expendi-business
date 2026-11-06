@@ -1,0 +1,33 @@
+flowchart LR
+  SIGN["/ · Privy email or passkey"] --> GATE["(company) layout<br/>signed in · full name · company picker<br/>employees sent to the app<br/>accountants: view only"]
+  GATE --> OV["/overview"]
+  GATE --> WA["/wallet ★"]
+  GATE --> AP["/approvals ★<br/>up to 20 claims, one passkey"]
+  GATE --> EXPN["/expenses"]
+  GATE --> BI["/bills ★<br/>up to 20 bills, one passkey"]
+  GATE --> RE["/recurring"]
+  GATE --> PA["/payroll ★"]
+  GATE --> PE["/payees ★"]
+  GATE --> TE["/team"]
+  GATE --> SE["/settings<br/>categories · approval passkey"]
+  GATE --> RP["/reports"]
+  GATE --> AC["/activity"]
+  GATE --> IM["/imports<br/>(linked from expenses + bills)"]
+
+  OV --> B1["/overview · /overview/people/:id"]
+  WA --> B2["/wallet · history · /withdrawals · /withdrawal-addresses"]
+  AP --> B3["/claims · approval · confirm · retry · reject"]
+  EXPN --> B4["/expenses · /categories · /members"]
+  BI --> B5["/bills/* · /bills/upload-url · /wallet (rate) · /paid-from-accounts"]
+  RE --> B6["/recurring-items/*"]
+  PA --> B7["/salaries/* · /payroll-runs/* · /settings/payroll-margin/*"]
+  PE --> B8["/payees/* · /withdrawal-addresses"]
+  TE --> B9["/members/*"]
+  SE --> B10["/organizations/:id · /categories/* · /me/approval-passkey/*"]
+  RP --> B11["/reports/:month/:format · /reports/exports"]
+  AC --> B12["/activity"]
+  IM --> B13["/imports/preview · /imports/commit · /imports history"]
+
+  WEBH["Vercel hosting"] -.- SIGN
+  WK["/.well-known/apple-app-site-association<br/>/.well-known/assetlinks.json"] -. "lets app passkeys work on the site" .- SIGN
+  BRW["@simplewebauthn/browser"] -.- AP & BI & SE

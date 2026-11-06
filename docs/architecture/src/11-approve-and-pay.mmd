@@ -1,0 +1,42 @@
+sequenceDiagram
+  autonumber
+  actor Admin as Admin (mobile or web)
+  participant API as API route
+  participant PM as payments helpers
+  participant PO as payout engine
+  participant AP as approval (WebAuthn)
+  participant PC as Paycrest
+  participant PW as Privy wallet
+  participant B as Base
+
+  Admin->>API: POST …/approval or …/payment (selected items)
+  API->>PM: awaitingPayoutFor(subject)
+  PM->>PO: preparePayouts
+  PO->>PC: rates + institutions (validate recipient, quote)
+  PO->>PO: max debit = quote + 0.25 USDC + 0.5%, per-transaction cap, idempotency key
+  PO-->>API: payouts in awaiting_approval
+  API->>AP: startApproval(approve_payouts, intent hash of the batch)
+  AP-->>Admin: WebAuthn challenge (5 min) + totals
+  Admin->>Admin: fingerprint / face on the approval passkey
+  Admin->>API: POST …/:challengeId/confirm
+  API->>AP: verifyApproval (challenge burned first, signature + counter checked)
+  API->>PO: approvePayouts
+  PO->>PO: lock wallet row, intent hash must match, allowlist re-check
+  PO->>PO: company + platform pause, balance minus reserved, daily or payroll cap
+  PO->>PO: status approved, subject hook (claim/bill/float → paying), audit
+  loop each payout, failures isolated
+    alt KES payout
+      PO->>PC: createOrder (reference = payout id, refund address = company wallet)
+      PO->>PO: checkOrder: address, chain, token, recipient, rate, amounts, deposit window
+      PO->>PW: sendUsdc(amountToTransfer → order deposit address)
+    else USDC payee or withdrawal
+      PO->>PW: sendUsdc(exact amount → allowlisted address)
+    end
+    PW->>B: USDC transfer, gas sponsored
+    PO->>PO: status paying + ledger debit
+  end
+  API-->>Admin: paying / failed / needs_review per item
+  PC-)API: POST /webhooks/paycrest (HMAC)
+  API->>PC: getOrder (body never trusted)
+  API->>PO: syncPayoutOrder → paid, subject hook (claim/bill/float → paid)
+  Note over PO,PC: reconcile-paycrest (60 s) and confirm-onchain (60 s) do the same if a webhook is missed

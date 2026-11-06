@@ -1,0 +1,17 @@
+flowchart TD
+  ISS["Admin issues a float<br/>holder: active, not accountant, confirmed phone<br/>one open float per person"] --> MOV["float open + issue movement: pending"]
+  TOP["Top-up<br/>(refused while a payment is pending)"] --> MOV2["top_up movement: pending"]
+  MOV & MOV2 --> ENG["Payout engine · passkey<br/>hook re-checks float, amount, phone"]
+  ENG -- paid --> OK["movement paid · notify holder"]
+  ENG -- failed --> FAIL["movement failed → retry → pending"]
+
+  OK --> SPEND["Holder records a purchase<br/>POST /floats/:id/spending · claim rules apply"]
+  SPEND --> SPLITF{"Fits the balance?"}
+  SPLITF -- yes --> REC["expense float / recorded<br/>queue Zoho (petty cash account)"]
+  SPLITF -- "partly" --> OVER["fitting part recorded<br/>excess → claim submitted with the receipts<br/>→ normal claim Approve & pay"]
+
+  BAL["Balance = paid issues + top-ups<br/>− spending − returns − write-offs"]
+  OK & REC & OVER --> BAL
+  BAL --> RET["Return cash → return movement (recorded)"]
+  BAL --> CLOSE["Close · refused while a payment is in flight<br/>leftover needs a reason → write_off<br/>unapproved payouts discarded"]
+  CLOSE --> CLOSED["float closed"]

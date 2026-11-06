@@ -1,0 +1,21 @@
+flowchart TD
+  CAP["Evidence on the phone<br/>photo · screenshot · pasted M-Pesa SMS · eTIMS QR"] --> UPL["POST /receipts/upload-url<br/>receipt_files unique (org, sha256)<br/>R2 key org/&lt;org&gt;/receipts/&lt;uuid&gt;<br/>presigned PUT, 5 min"]
+  CAP --> SMS["POST /receipts/sms<br/>parseMpesaSms · stored as text"]
+  UPL --> EXT["Optional POST /receipts/:id/extract<br/>image ≤ 5 MB → Claude · cached<br/>off without ANTHROPIC_API_KEY"]
+  UPL & SMS & EXT --> SUB["POST /claims · submitClaim"]
+
+  SUB --> C1{"Rules"}
+  C1 -- "future date · no receipt · archived category<br/>receipt size mismatch (R2 HEAD)<br/>SMS code/amount mismatch · eTIMS mismatch" --> E400["refused"]
+  C1 -- "M-Pesa code or eTIMS invoice<br/>already used in the company" --> E409["409 duplicate"]
+  C1 -- ok --> WARN["Warnings kept on the claim<br/>near duplicate (same person, amount, ±1 day)<br/>older than 60 days"]
+  WARN --> SAVED["status submitted · heading Petty cash<br/>audit · notify other admins"]
+
+  SAVED --> DEC{"Admin decision"}
+  DEC -- reject with reason --> REJ["rejected · notify claimant"]
+  REJ -- "owner edits" --> SAVED
+  DEC -- "Approve & pay" --> CHK["Claimant has confirmed phone + full name<br/>payout key claim:&lt;id&gt;:&lt;n&gt;<br/>preview + wallet cover"]
+  CHK --> ENG["Payout engine (passkey)<br/>hook: amount + phone unchanged → paying<br/>self-approval flagged"]
+  ENG -- "payout paid" --> PAID["paid · notify claimant<br/>queue Zoho expense"]
+  ENG -- "payout failed" --> PF["payout_failed · notify claimant + admins"]
+  ENG -- "needs_review" --> STAY["stays paying until staff resolve"]
+  PF -- "POST /claims/:id/retry<br/>to current number, new passkey" --> ENG

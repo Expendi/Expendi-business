@@ -1,0 +1,11 @@
+flowchart TD
+  NEW["claims/new"] --> EV{"Evidence"}
+  EV -- "photo / screenshot" --> IMG["expo-image-picker<br/>resize to JPEG · SHA-256"]
+  IMG --> URL["POST /receipts/upload-url<br/>{contentType, byteSize, sha256, kind}"]
+  URL --> PUT["PUT bytes to the signed R2 URL"]
+  PUT --> READ{"Read receipt?"}
+  READ -- yes --> EXT["POST /receipts/:id/extract<br/>Claude pre-fill<br/>(off when ANTHROPIC_API_KEY is unset)"]
+  EV -- "pasted M-Pesa SMS" --> SMS["parseMpesaSms on the phone<br/>POST /receipts/sms"]
+  EV -- "eTIMS QR" --> QR["expo-camera QR scan<br/>parseEtimsQr + raw payload"]
+  EXT & READ & SMS & QR --> FORM["Employee confirms amount, date,<br/>merchant, category, M-Pesa code"]
+  FORM --> SUB["POST /claims"]
