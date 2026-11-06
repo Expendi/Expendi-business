@@ -1,0 +1,15 @@
+flowchart TD
+  SAL["Salary = recurring item (heading salaries)<br/>employee or personnel payee · M-Pesa or bank"] --> AMT["Net pay change<br/>passkey (change_salary) · emails admins"]
+  MARGIN["Payroll margin (default 20%)<br/>passkey (change_payroll_margin)"] --> CAP
+  JOB["payroll-drafts job · 15 min<br/>salary_pay_dates_to_draft(today, 5 days)"] --> RUN["payroll_runs: draft (one per pay date)<br/>one bill per salary<br/>cap = salaries × (100 + margin)%"]
+  SAL --> JOB
+  RUN --> NOTIF["notify payroll_ready → admins"]
+  RUN --> EDIT["Draft-only edits<br/>adjust amount + reason · leave out (bill cancelled)<br/>one-off payment (extra bill)"]
+  EDIT --> RUN
+  RUN --> PAYALL["POST /payroll-runs/:runId/payment<br/>Approve & pay all · 24 h payee hold applies"]
+  PAYALL --> SPLIT["Salary over KES 300,000 → near-even parts<br/>keys payroll:&lt;billId&gt;:&lt;n&gt;[:partK]"]
+  SPLIT --> CAP["Engine at approval:<br/>paid so far + batch ≤ cap_kes"]
+  CAP --> ENG["Payout engine · one passkey"]
+  ENG --> STATUS["Each person's bill: paid or payout_failed<br/>salary_paid → employee<br/>run paid → one Zoho expense"]
+  STATUS -- "retry one person<br/>(only unpaid parts)" --> ENG
+  STATUS --> MINE["Employee: GET /me/salary-payments"]

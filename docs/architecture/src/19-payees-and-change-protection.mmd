@@ -1,0 +1,12 @@
+flowchart TD
+  NEWP["Create payee or change payment details<br/>M-Pesa phone · Till · Paybill · bank · USDC · outside"] --> VAL["Validate details<br/>bank against Paycrest list · EIP-55 USDC address<br/>employee payee needs confirmed phone"]
+  VAL --> CH["startApproval(change_payee, intent hash)<br/>→ confirmation_required"]
+  CH --> PK["Admin passkey"]
+  PK --> CONF["POST /payees/changes/:challengeId/confirm<br/>hash must match · details_changed_at = now"]
+  CONF --> NOTE["Audit (numbers masked)<br/>email every active admin"]
+  CONF --> HOLD{"Paying within 24 h of the change?"}
+  HOLD -- yes --> SECOND["409 payee_details_changed<br/>client resends with secondConfirmation"]
+  HOLD -- no --> PAYOK["Payable"]
+  SECOND --> PAYOK
+  PAYOK --> APPR["At approval: refused if details changed<br/>after the payout was prepared"]
+  OTHER["Name, kind, archive"] -. "no passkey needed" .-> PAYOK

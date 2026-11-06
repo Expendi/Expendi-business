@@ -1,0 +1,33 @@
+sequenceDiagram
+  actor U as Person
+  participant C as Mobile or web
+  participant P as Privy
+  participant API as API
+  participant DB as Postgres
+
+  alt first time
+    U->>C: email
+    C->>P: send code, loginWithCode
+  else returning
+    C->>P: login passkey (relying party business.expendi.app)
+  end
+  P-->>C: access token
+  C->>API: GET /me (Bearer token)
+  API->>P: verify token (JWKS or local key)
+  opt first login
+    API->>P: fetch email
+    API->>DB: create or link users row, activate pending invites, audit
+  end
+  API-->>C: user + memberships
+  opt after an email sign-in
+    C->>P: offer to link a login passkey
+  end
+  alt no full name
+    C->>API: PATCH /me
+  end
+  alt no company
+    C->>API: POST /organizations (sign-up, wallet setup starts)
+  else several companies
+    C->>C: pick one (stored per user)
+  end
+  C->>API: /organizations/:id/* with the chosen company

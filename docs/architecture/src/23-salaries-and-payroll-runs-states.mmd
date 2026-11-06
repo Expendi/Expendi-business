@@ -1,0 +1,9 @@
+stateDiagram-v2
+  direction LR
+  [*] --> draft: payroll-drafts job
+  draft --> paying: first approval
+  paying --> paid: nothing paying, failed or unpaid
+  paying --> partly_failed: some payments failed
+  partly_failed --> paying: retry approved
+  partly_failed --> paid: retries paid
+  paid --> [*]

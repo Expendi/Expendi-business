@@ -1,0 +1,23 @@
+stateDiagram-v2
+  direction LR
+  [*] --> upcoming: created before due date
+  [*] --> due: created on due date
+  [*] --> overdue: created after due date
+  upcoming --> due: bill-status job
+  upcoming --> overdue: bill-status job
+  due --> overdue: bill-status job
+  upcoming --> paying: approved
+  due --> paying: approved
+  overdue --> paying: approved
+  payout_failed --> paying: retry approved
+  paying --> paid: every part paid
+  paying --> payout_failed: a part failed, none in flight
+  upcoming --> paid_outside: marked paid outside
+  due --> paid_outside: marked paid outside
+  overdue --> paid_outside: marked paid outside
+  upcoming --> cancelled: cancelled or left out of payroll
+  due --> cancelled: cancelled or left out of payroll
+  overdue --> cancelled: cancelled or left out of payroll
+  paid --> [*]
+  paid_outside --> [*]
+  cancelled --> [*]

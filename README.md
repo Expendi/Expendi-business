@@ -82,6 +82,217 @@ Source: [`services/bills`](apps/api/src/services/bills), [`services/recurring`](
 
 Source: [`services/export`](apps/api/src/services/export), [`services/zoho`](apps/api/src/services/zoho), [`services/import`](apps/api/src/services/import), [`apps/admin`](apps/admin), [`apps/web`](apps/web).
 
+## How it fits together
+
+_Drawn from the source code on 2026-11-06, with API migrations through `0066`. Only implemented code is shown, and anything switched off or not wired yet is marked. Each diagram is a PNG in [`docs/architecture`](docs/architecture); click one to open it full size. The Mermaid source for each is in [`docs/architecture/src`](docs/architecture/src). To redraw one after editing it, run `npx -y @mermaid-js/mermaid-cli -i docs/architecture/src/<name>.mmd -o docs/architecture/<name>.png -w 1600 -s 2 -b white`._
+
+1. [Platform](#platform): the apps, the API, providers, jobs and data
+2. [Money path](#money-path): wallets, deposits, Approve & pay, payouts, withdrawals
+3. [Spending](#spending): sign-up, claims, payees, bills, payroll, floats, overview
+4. [Records and operations](#records-and-operations): notifications, exports, Zoho, imports, alerts, Ops app
+5. [Apps](#apps): sign-in, mobile screens, web pages
+6. [Not wired yet](#not-wired-yet)
+
+### Platform
+
+#### System overview
+
+All four apps import `packages/shared` (zod schemas, types, parsers and money helpers), so the clients and the API validate the same shapes.
+
+![System overview](docs/architecture/01-system-overview.png)
+
+#### Request pipeline
+
+![Request pipeline](docs/architecture/02-request-pipeline.png)
+
+#### API boot
+
+![API boot](docs/architecture/03-api-boot.png)
+
+#### Service layers
+
+All services live in `apps/api/src/services/` and are wired as Effect layers in `layers/main.ts`. Routes and jobs call domain services; anything that moves money goes through the one payout engine.
+
+![Service layers](docs/architecture/04-service-layers.png)
+
+| Service              | Depends on                                                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `expenses`           | payments, payout, phone-verification (payout-phone gate), notification, zoho, FileStorage, ReceiptExtractor, audit                                |
+| `bills`              | payees, recurring, payments, payout, expenses (bills paid outside), payroll (run status), notification, zoho, FileStorage, Paycrest (rate), audit |
+| `recurring`          | bills and payees tables (next bill), audit                                                                                                        |
+| `payroll`            | bills, recurring, payments, payout, approval (salary and margin changes), notification, zoho, EmailSender, audit                                  |
+| `floats`             | payout, wallet, phone-verification, expense rules, notification, zoho, audit                                                                      |
+| `payees`             | approval, allowlist, phone-verification, Paycrest (bank list), EmailSender, audit                                                                 |
+| `withdrawal`         | payout, wallet, Paycrest                                                                                                                          |
+| `organization`       | wallet, audit                                                                                                                                     |
+| `membership`         | EmailSender, config (install URL)                                                                                                                 |
+| `phone-verification` | OtpProvider (Telnyx), EmailSender, audit                                                                                                          |
+| `overview`           | wallet ledger, Paycrest (rate)                                                                                                                    |
+| `payments`           | payout, wallet, Paycrest                                                                                                                          |
+| `payout`             | approval, allowlist, wallet, chain, Paycrest, PrivyWallets, BaseRpc, subject hooks (expenses, bills, floats), audit                               |
+| `approval`           | approval settings, auth (recent sign-in), EmailSender, audit                                                                                      |
+| `allowlist`          | approval, audit                                                                                                                                   |
+| `wallet`             | PrivyWallets, AlchemyWebhook, BaseRpc, Paycrest Gateway (refund detection), audit                                                                 |
+| `notification`       | PushSender, EmailSender, overview (cash check for reminders)                                                                                      |
+| `zoho`               | Zoho client, Zoho access-token cache, AccountingTokenKey, FileStorage, audit                                                                      |
+| `export`             | FileStorage, EmailSender, audit                                                                                                                   |
+| `import`             | shared spreadsheet parser, payees/floats/expenses/bills/recurring tables, audit                                                                   |
+| `alerts`             | EmailSender, overview (cash check), Paycrest (rate)                                                                                               |
+| `staff`              | PrivyAuth, payout, alerts, wallet, chain, Paycrest, BaseRpc, audit                                                                                |
+| `auth`               | PrivyAuth, membership (invite activation), audit                                                                                                  |
+| `audit`              | Postgres only                                                                                                                                     |
+
+#### Service dependencies: provider clients
+
+![Service dependencies: provider clients](docs/architecture/05-service-dependencies-provider-clients.png)
+
+#### Background jobs (station)
+
+Every API instance runs each job on an in-process interval; a Postgres advisory lock lets only one instance do the work per tick. Postgres tables are the queues.
+
+![Background jobs (station)](docs/architecture/06-background-jobs.png)
+
+#### Data model and isolation
+
+Migrations run as the owner role before each Railway deploy (`apps/api/drizzle`, latest `0066`). The API connects as `expendi_business_app`, which can't bypass RLS.
+
+![Data model and isolation](docs/architecture/07-data-model-and-isolation.png)
+
+### Money path
+
+#### Company wallet creation
+
+![Company wallet creation](docs/architecture/08-company-wallet-creation.png)
+
+#### Deposits and refunds coming in
+
+![Deposits and refunds coming in](docs/architecture/09-deposits-and-refunds-coming-in.png)
+
+#### Wallet ledger
+
+![Wallet ledger](docs/architecture/10-wallet-ledger.png)
+
+#### Approve & pay (claims, bills, floats, payroll, withdrawals)
+
+Every money action uses the same engine. Claims, bills, floats and payroll runs plug in through subject hooks; payroll payments are bills linked to a run.
+
+![Approve & pay (claims, bills, floats, payroll, withdrawals)](docs/architecture/11-approve-and-pay.png)
+
+#### Paycrest order safety checks
+
+![Paycrest order safety checks](docs/architecture/12-paycrest-order-safety-checks.png)
+
+#### Payout states
+
+![Payout states](docs/architecture/13-payout-states.png)
+
+#### Withdrawals and the address allowlist
+
+![Withdrawals and the address allowlist](docs/architecture/14-withdrawals-and-the-address-allowlist.png)
+
+#### Passkey enrolment
+
+![Passkey enrolment](docs/architecture/15-passkey-enrolment.png)
+
+### Spending
+
+#### Company sign-up, team and payout phones
+
+![Company sign-up, team and payout phones](docs/architecture/16-company-sign-up-team-and-payout-phones.png)
+
+#### Staff claims
+
+![Staff claims](docs/architecture/17-staff-claims.png)
+
+![Staff claims — states](docs/architecture/18-staff-claims-states.png)
+
+#### Payees and change protection
+
+![Payees and change protection](docs/architecture/19-payees-and-change-protection.png)
+
+#### Bills and recurring payments
+
+![Bills and recurring payments](docs/architecture/20-bills-and-recurring-payments.png)
+
+![Bills and recurring payments — states](docs/architecture/21-bills-and-recurring-payments-states.png)
+
+#### Salaries and payroll runs
+
+![Salaries and payroll runs](docs/architecture/22-salaries-and-payroll-runs.png)
+
+![Salaries and payroll runs — states](docs/architecture/23-salaries-and-payroll-runs-states.png)
+
+#### Petty cash floats
+
+![Petty cash floats](docs/architecture/24-petty-cash-floats.png)
+
+#### Spending overview
+
+![Spending overview](docs/architecture/25-spending-overview.png)
+
+### Records and operations
+
+#### Notifications
+
+![Notifications](docs/architecture/26-notifications.png)
+
+#### Accountant exports
+
+![Accountant exports](docs/architecture/27-accountant-exports.png)
+
+#### Zoho Books sync
+
+![Zoho Books sync](docs/architecture/28-zoho-books-sync.png)
+
+![Zoho Books sync — states](docs/architecture/29-zoho-books-sync-states.png)
+
+#### Spreadsheet imports
+
+![Spreadsheet imports](docs/architecture/30-spreadsheet-imports.png)
+
+#### Alerts and audit
+
+![Alerts and audit](docs/architecture/31-alerts-and-audit.png)
+
+#### Ops app (apps/admin)
+
+Staff sign in with Privy; the API accepts them only if their email is an active `staff_users` row. `ops_viewer` can read everything, and only `ops_admin` can act. Risky actions need a second confirmation: same staff member, same intent, five minutes, single use.
+
+![Ops app (apps/admin)](docs/architecture/32-ops-app.png)
+
+#### Staff payout resolution
+
+![Staff payout resolution](docs/architecture/33-staff-payout-resolution.png)
+
+### Apps
+
+#### Sign-in and company selection
+
+![Sign-in and company selection](docs/architecture/34-sign-in-and-company-selection.png)
+
+#### Mobile app (apps/mobile)
+
+![Mobile app (apps/mobile)](docs/architecture/35-mobile-app.png)
+
+#### Claim capture on the phone
+
+![Claim capture on the phone](docs/architecture/36-claim-capture-on-the-phone.png)
+
+#### Web dashboard (apps/web · business.expendi.app)
+
+![Web dashboard (apps/web · business.expendi.app)](docs/architecture/37-web-dashboard.png)
+
+### Not wired yet
+
+These came up while mapping the code for the diagrams above.
+
+- **Payout phone confirmation has no screen.** The API has `/me/payout-phone`, `/resend` and `/confirm`, but neither the mobile app nor the web dashboard calls them. Claim payouts, floats and employee payees all require a confirmed number.
+- **Receipt reading is off.** It's implemented, but every receipt comes back unread until `ANTHROPIC_API_KEY` is set, and it isn't set in the deployed environment.
+- **Bill invoices aren't read.** Invoice uploads work; reading an invoice and its eTIMS QR code isn't wired to bills yet (`services/bills/files.ts`).
+- **Some areas are mobile-only or web-only.** The web dashboard has no claim submission, petty cash floats or company spending pages. Category management and imports are web-only.
+- **Optional providers fail quietly.** Without the R2 settings, uploads return 503. Without Telnyx, payout phones can't be confirmed. Without Resend, every email fails cleanly. Without `ALERT_EMAILS`, alerts are only logged.
+- **System health shows one job.** Only `reconcile-paycrest` records a heartbeat, so the Ops health page lists just that job.
+
 ## Pending to complete the current MVP
 
 ### 1. Provider setup and acceptance testing
@@ -118,6 +329,20 @@ See [known issues and open decisions](docs/handoffs/next-session.md#7-known-issu
 - [ ] Complete the first 30 days of operations and success measurement.
 
 Runbooks: [pilot release](docs/runbooks/pilot-release.md) and [pilot launch checklist](docs/handoffs/phase-4-pilot-launch.md).
+
+## Planned after the MVP: USD accounts and company cards
+
+Added to the [MVP spec's roadmap](docs/expense-mvp-spec.md#later) on 2026-11-06; neither is in the implementation guide. Both need answers from the provider before building. The questions are listed in the spec's [To settle](docs/expense-mvp-spec.md#to-settle) section.
+
+- [ ] **USD bank accounts (Polygon Open Money Stack):** each company gets its own US account details, and ACH and wire deposits arrive in its wallet as USDC.
+  - **Where:** Polygon blocks Kenya for bank-rail flows, checking the company's address and its owners' addresses. This launches for companies outside Kenya and reaches Kenya if Polygon lifts the block. Nigeria, Ghana, Uganda, Tanzania, Rwanda, South Africa, Zambia, Egypt and Morocco aren't on Polygon's blocked lists.
+  - **In the product:** the company's country decides whether an admin sees the USD account option.
+  - **To confirm:** deposits settling as USDC on Base, fees, and early access.
+- [ ] **Company cards (Lithic):** virtual and physical staff cards with per-card limits, funded from the company's USDC.
+  - **Funding:** through Lithic's stablecoin pilot (USDC on Base), or by approving each card payment against the company wallet in real time.
+  - **What it unlocks:** paying card-only subscriptions, and the card-transaction linking listed under Part 1 below.
+  - **Money safety:** staff pay without an admin passkey for each payment, so cards need their own named purpose and limits in the spec's [money-safety rules](docs/expense-mvp-spec.md#7-money-safety).
+  - **To confirm:** issuing to Kenyan companies and staff, and pricing.
 
 ## Pending to complete the full implementation guide
 
@@ -217,7 +442,7 @@ The mobile app needs a native development build for its native integrations. Dep
 
 ## Docs
 
-- [MVP spec](docs/expense-mvp-spec.md): agreed Kenya spending scope, flows, data model and go-live checklist.
+- [MVP spec](docs/expense-mvp-spec.md): agreed Kenya spending scope, flows, data model, go-live checklist and the roadmap after the MVP.
 - [Build plan](docs/expense-mvp-build-plan.md): 51 ordered tasks and acceptance checkpoints.
 - [Build handoffs](docs/handoffs/README.md): implementation notes and QA by phase.
 - [Next-session handoff](docs/handoffs/next-session.md): outstanding setup, QA and known issues; consult newer runbooks for deployment updates.
