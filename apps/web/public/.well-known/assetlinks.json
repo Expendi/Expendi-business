@@ -8,6 +8,8 @@
       "namespace": "android_app",
       "package_name": "app.expendi.business",
       "sha256_cert_fingerprints": [
+        "26:1F:B4:10:A1:86:2F:D0:2E:4C:7D:4E:A3:30:98:FA:A4:F8:54:7A:18:7A:2D:85:E7:37:A5:0A:06:FA:B2:06",
+        "13:E6:D1:94:0C:03:DA:FD:80:38:7C:0B:3D:8D:8C:CE:B1:C5:A8:C1:C4:9D:9A:64:D7:FC:BF:44:7C:25:9A:86",
         "F1:64:51:AB:5B:D3:08:40:23:3E:A2:72:A9:4E:99:F3:E1:A5:DB:18:F1:EE:73:6E:F7:4B:94:67:9B:C5:74:37"
       ]
     }
