@@ -237,9 +237,9 @@ function CompanyImports({
               }}
             >
               <option value="history">
-                Paid expenses — money already spent
+                Paid expenses: money already spent
               </option>
-              <option value="bill">Unpaid bills — money you still owe</option>
+              <option value="bill">Unpaid bills: money you still owe</option>
             </select>
           </label>
           <label className="text-sm">
@@ -354,7 +354,7 @@ function CompanyImports({
                     </option>
                     {file.parsed.headers.map((header, i) => (
                       <option key={header} value={header}>
-                        {header} —{" "}
+                        {header}:{" "}
                         {file.parsed.rows[0]?.[i]?.slice(0, 60) ??
                           "empty in first row"}
                       </option>

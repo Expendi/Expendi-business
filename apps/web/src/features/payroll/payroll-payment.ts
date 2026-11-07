@@ -166,17 +166,24 @@ export function capRows(payment: PayrollRunPayment): PreviewRow[] {
   ];
 }
 
-/** e.g. "2 paid · 1 being paid · 1 failed"; null before the run is approved. */
+/**
+ * e.g. "13 paid · 1 failed", or "2 paid · 1 being paid, 1 failed" (one
+ * middle dot a line); null before the run is approved.
+ */
 export function progressInWords(
   run: Pick<PayrollRun, "status" | "progress">,
 ): string | null {
   if (run.status === "draft") return null;
   const { paid, paying, failed } = run.progress;
-  return [
-    `${String(paid)} paid`,
+  const parts = [
+    ...(paid > 0 || paying + failed === 0 ? [`${String(paid)} paid`] : []),
     ...(paying > 0 ? [`${String(paying)} being paid`] : []),
     ...(failed > 0 ? [`${String(failed)} failed`] : []),
-  ].join(" · ");
+  ];
+  const [first = "", ...rest] = parts;
+  return rest.length === 2
+    ? `${first} · ${rest.join(", ")}`
+    : parts.join(" · ");
 }
 
 /** The people whose payment failed, each retried on their own. */

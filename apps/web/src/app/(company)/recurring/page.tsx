@@ -1,10 +1,16 @@
-import type { Metadata } from "next";
-import type { JSX } from "react";
+import { redirect } from "next/navigation";
 
-import { RecurringView } from "./_components/recurring-view";
+import { recurringRedirect } from "./recurring-redirect";
 
-export const metadata: Metadata = { title: "Recurring" };
-
-export default function RecurringPage(): JSX.Element {
-  return <RecurringView />;
+/**
+ * Recurring payments live in the Bills page's side sheet now: the list,
+ * or one payment when a link names it (`?itemId=`).
+ */
+export default async function RecurringPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<never> {
+  const { itemId } = await searchParams;
+  redirect(recurringRedirect(itemId));
 }

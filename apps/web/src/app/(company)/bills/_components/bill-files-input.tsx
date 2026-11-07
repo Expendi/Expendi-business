@@ -1,9 +1,12 @@
 "use client";
 
-import type { JSX } from "react";
+import type { DragEvent, JSX } from "react";
+import { cn } from "cn";
+import { PaperclipIcon, UploadIcon } from "lucide-react";
 import { useId, useState } from "react";
 
-import { textButton } from "~/components/styles";
+import { TextLinkButton } from "~/components/data/actions";
+import { FieldDescription, FieldError } from "~/components/ui/field";
 import {
   BILL_FILE_ACCEPT,
   describeUploadError,
@@ -19,8 +22,8 @@ export interface UploadedBillFile {
 
 /**
  * Picks invoices (or proof of payment) from the desktop, PDFs included,
- * and uploads each straight to storage as it's picked. The bill takes the
- * uploaded files' ids when it's saved.
+ * by choosing or dropping them, and uploads each straight to storage as
+ * it's picked. The bill takes the uploaded files' ids when it's saved.
  */
 export function BillFilesInput({
   organizationId,
@@ -43,6 +46,8 @@ export function BillFilesInput({
   const inputId = useId();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const full = files.length >= max;
+  const blocked = disabled || uploading || full;
 
   async function upload(picked: readonly File[]): Promise<void> {
     setError(null);
@@ -75,52 +80,71 @@ export function BillFilesInput({
     }
   }
 
+  function onDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    const picked = Array.from(event.dataTransfer.files);
+    if (!blocked && picked.length > 0) void upload(picked);
+  }
+
   return (
-    <div className="text-sm">
-      <label htmlFor={inputId}>{label}</label>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <span className="text-xs leading-4 font-(--w-ui) text-gray-600">
+        {label}
+      </span>
       <input
         id={inputId}
         type="file"
         accept={BILL_FILE_ACCEPT}
         multiple
-        disabled={disabled || uploading || files.length >= max}
+        disabled={blocked}
         onChange={(event) => {
           const picked = Array.from(event.target.files ?? []);
           event.target.value = "";
           if (picked.length > 0) void upload(picked);
         }}
-        className="mt-1 block w-full text-sm file:mr-3 file:rounded-md file:border file:border-stone-300 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-100"
+        className="peer sr-only"
       />
-      <p className="mt-1 text-xs text-stone-500">
+      <label
+        htmlFor={inputId}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={onDrop}
+        className={cn(
+          "flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-control border border-dashed border-control-border bg-gray-50 p-3 text-center text-gray-600 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--focus-ring) hover:border-gray-400 hover:text-gray-900",
+          blocked &&
+            "cursor-not-allowed opacity-50 hover:border-control-border hover:text-gray-600",
+        )}
+      >
+        <UploadIcon aria-hidden="true" className="size-4" />
+        {uploading ? "Uploading…" : "Choose files or drop them here"}
+      </label>
+      <FieldDescription>
         A PDF, or a JPEG, PNG, WebP or HEIC image, up to 8 MB.
-      </p>
-      {uploading ? (
-        <p className="mt-1 text-xs text-stone-600">Uploading…</p>
-      ) : null}
+      </FieldDescription>
       {files.length > 0 ? (
-        <ul className="mt-2 space-y-1">
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
           {files.map((file) => (
-            <li key={file.id} className="flex items-center gap-3">
-              <span className="break-all">{file.name}</span>
-              <button
-                type="button"
+            <li
+              key={file.id}
+              className="flex items-center gap-2 rounded-control border border-gray-200 px-2.5 py-2"
+            >
+              <PaperclipIcon
+                aria-hidden="true"
+                className="size-3.5 shrink-0 text-gray-500"
+              />
+              <span className="min-w-0 flex-1 truncate">{file.name}</span>
+              <TextLinkButton
                 disabled={disabled || uploading}
                 onClick={() =>
                   onChange(files.filter((other) => other.id !== file.id))
                 }
-                className={textButton}
               >
                 Remove
-              </button>
+              </TextLinkButton>
             </li>
           ))}
         </ul>
       ) : null}
-      {error ? (
-        <p className="mt-1 text-error-700" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {error ? <FieldError>{error}</FieldError> : null}
     </div>
   );
 }

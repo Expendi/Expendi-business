@@ -36,6 +36,7 @@ const payee = (n: number) => ({
   method: "mpesa_phone" as const,
   archived: false,
   payoutPhoneConfirmed: true,
+  accountEnding: null,
 });
 
 const run: PayrollRunDetail = {
@@ -47,6 +48,8 @@ const run: PayrollRunDetail = {
   capKes: "10800000",
   people: 2,
   leftOut: 0,
+  adjusted: 0,
+  oneOffs: 0,
   progress: { paid: 0, paying: 0, failed: 0 },
   createdAt: "2026-11-23T06:00:00.000Z",
   approvedAt: null,
@@ -423,12 +426,17 @@ describe("payroll display", () => {
         status: "partly_failed",
         progress: { paid: 2, paying: 1, failed: 1 },
       }),
+      failedOnly: progressInWords({
+        status: "partly_failed",
+        progress: { paid: 0, paying: 0, failed: 1 },
+      }),
       margins: ["20", "20%", "101", "1.5", ""].map(parseMarginPct),
     }).toEqual({
       under: { overCap: false, cents: "1800000" },
       over: { overCap: true, cents: "200000" },
       draft: null,
-      paying: "2 paid · 1 being paid · 1 failed",
+      paying: "2 paid · 1 being paid, 1 failed",
+      failedOnly: "1 failed",
       margins: [20, 20, null, null, null],
     });
   });

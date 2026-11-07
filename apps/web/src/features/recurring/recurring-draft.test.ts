@@ -3,10 +3,14 @@ import { describe, expect, it } from "vitest";
 import type { RecurringItem } from "@expendi-business/shared";
 import { createRecurringItemRequestSchema } from "@expendi-business/shared";
 
+import { RECURRING_ITEMS } from "~/app/dev/preview/_harness/fixtures/bills";
 import {
   blankDraft,
   defaultScheduleDay,
   draftFromItem,
+  firstDueOn,
+  reminderInWords,
+  sortRecurringItems,
   toCreateRequest,
   toUpdateRequest,
 } from "./recurring-draft";
@@ -147,5 +151,90 @@ describe("toUpdateRequest", () => {
     expect(
       toUpdateRequest(item, { ...draftFromItem(item), variable: true }),
     ).toEqual({ amountKes: null });
+  });
+});
+
+describe("firstDueOn", () => {
+  it("finds the first bill's due date as the API does", () => {
+    // #then
+    expect([
+      firstDueOn({
+        schedule: "monthly",
+        scheduleDay: 6,
+        startsOn: "2026-11-06",
+        endsOn: null,
+      }),
+      firstDueOn({
+        schedule: "monthly",
+        scheduleDay: 31,
+        startsOn: "2027-02-10",
+        endsOn: null,
+      }),
+      firstDueOn({
+        schedule: "monthly",
+        scheduleDay: 1,
+        startsOn: "2026-11-06",
+        endsOn: null,
+      }),
+      firstDueOn({
+        schedule: "quarterly",
+        scheduleDay: 15,
+        startsOn: "2026-11-20",
+        endsOn: null,
+      }),
+      firstDueOn({
+        schedule: "weekly",
+        scheduleDay: 4,
+        startsOn: "2026-11-06",
+        endsOn: null,
+      }),
+      firstDueOn({
+        schedule: "yearly",
+        scheduleDay: 1,
+        startsOn: "2026-11-06",
+        endsOn: "2027-06-30",
+      }),
+    ]).toEqual([
+      "2026-11-06",
+      "2027-02-28",
+      "2026-12-01",
+      "2027-02-15",
+      "2026-11-12",
+      null,
+    ]);
+  });
+});
+
+describe("sortRecurringItems", () => {
+  it("lists active payments soonest due first, then paused, then ended", () => {
+    // #when
+    const sorted = sortRecurringItems(RECURRING_ITEMS);
+
+    // #then
+    expect(sorted.map((one) => `${one.payee.name} ${one.state}`)).toEqual([
+      "Securex Guards active",
+      "Kilimani Properties active",
+      "Zuku active",
+      "Twiga Foods active",
+      "Figma active",
+      "Safaricom active",
+      "KRA active",
+      "Nairobi Water active",
+      "Kenya Power active",
+      "Google Workspace active",
+      "Jubilee Health paused",
+      "CarMax Mechanics paused",
+      "Canva ended",
+      "Hotpoint Appliances ended",
+    ]);
+  });
+
+  it("words the reminder lead time", () => {
+    // #then
+    expect([0, 1, 5].map(reminderInWords)).toEqual([
+      "On the due date",
+      "1 day before it’s due",
+      "5 days before it’s due",
+    ]);
   });
 });

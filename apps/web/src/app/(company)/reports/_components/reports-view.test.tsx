@@ -1,15 +1,48 @@
+import type { QueryKey } from "@tanstack/react-query";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GeneratedExport, ReportFormat } from "@expendi-business/shared";
+import type {
+  ExportSummary,
+  GeneratedExport,
+  ReportFormat,
+  ReportMonthSummary,
+} from "@expendi-business/shared";
 
+import {
+  REPORT_SPENDING_6,
+  REPORT_SUMMARY,
+  SHARED_EXPORTS,
+} from "~/app/dev/preview/_harness/fixtures/reports";
 import { DashboardProvider } from "~/contexts/dashboard-context";
+import { billKeys } from "~/features/payment-keys";
 import { ApiError } from "~/lib/api";
+import { FileContents } from "./file-sheet";
 import { nairobiMonth, shareMessage } from "./report-month";
-import { fetchReportFile } from "./reports-api";
-import { DOWNLOADS, ReportsView } from "./reports-view";
+import { fetchReportFile, reportKeys } from "./reports-api";
+import {
+  categoryRows,
+  changeLine,
+  deltaText,
+  DOWNLOADS,
+  etimsSub,
+  KIND_LABELS,
+  outstandingSub,
+  receiptsSub,
+  resolveMonth,
+  sortCategories,
+  sortExports,
+} from "./reports-display";
+import { ReportsView } from "./reports-view";
 
+const navigation = vi.hoisted(() => ({ params: new URLSearchParams() }));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/reports",
+  useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => navigation.params,
+}));
 vi.mock("@privy-io/react-auth", () => ({
   usePrivy: () => ({ getAccessToken: () => Promise.resolve("token") }),
 }));
@@ -21,12 +54,13 @@ const API = {
   getAccessToken: () => Promise.resolve("accountant-token"),
 };
 
-/** 00:30 on 1 November in Nairobi, still 31 October in UTC. */
-const FIRST_OF_NOVEMBER_IN_NAIROBI = new Date("2026-10-31T21:30:00Z");
+/** 09:00 on 6 November 2026 in Nairobi, as in the mocks. */
+const SIXTH_OF_NOVEMBER = new Date("2026-11-06T06:00:00Z");
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(FIRST_OF_NOVEMBER_IN_NAIROBI);
+  vi.setSystemTime(SIXTH_OF_NOVEMBER);
+  navigation.params = new URLSearchParams();
 });
 
 afterEach(() => {
@@ -34,11 +68,53 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function render(role: "admin" | "accountant"): string {
+type Seed = "data" | "loading" | "error";
+
+function failed(client: QueryClient, queryKey: QueryKey): void {
+  client
+    .getQueryCache()
+    .build(client, { queryKey })
+    .setState({
+      status: "error",
+      fetchStatus: "idle",
+      error: new ApiError(500, "Internal", "The API failed"),
+    });
+}
+
+function render(
+  role: "admin" | "accountant",
+  {
+    summary = "data",
+    spending = "data",
+    exports = SHARED_EXPORTS,
+  }: {
+    summary?: Seed;
+    spending?: Seed;
+    exports?: readonly ExportSummary[] | "error";
+  } = {},
+): string {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, retryOnMount: false } },
+  });
+  const summaryKey = reportKeys.summary(ORG, "2026-10");
+  const spendingKey = reportKeys.spending(ORG, "2026-10", 6);
+  if (summary === "data") client.setQueryData(summaryKey, REPORT_SUMMARY);
+  if (summary === "error") failed(client, summaryKey);
+  if (spending === "data") client.setQueryData(spendingKey, REPORT_SPENDING_6);
+  if (spending === "error") failed(client, spendingKey);
+  if (exports === "error") failed(client, reportKeys.exports(ORG));
+  else client.setQueryData(reportKeys.exports(ORG), exports);
+  client.setQueryData(billKeys.kesRate(ORG), {
+    status: "active",
+    address: "0x8f3a5b2c9d1e4f7a6b0c3d2e1f9a8b7c6d5e4c21",
+    chain: "base",
+    usdcBalance: "16420800000",
+    kesEquivalent: { kesCents: "211828320", rate: "129" },
+  });
   return renderToStaticMarkup(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={client}>
       <DashboardProvider
-        company={{ organizationId: ORG, name: "Acme Ltd", role }}
+        company={{ organizationId: ORG, name: "Mwangaza Logistics", role }}
       >
         <ReportsView />
       </DashboardProvider>
@@ -46,40 +122,363 @@ function render(role: "admin" | "accountant"): string {
   );
 }
 
+const text = (html: string) =>
+  html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&#x27;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ");
+
 describe("the reports page", () => {
-  it("offers an accountant the export, CSV files, receipts and eTIMS report for the month just ended in Nairobi", () => {
+  it("opens on the month just ended in Nairobi", () => {
     // #when
-    const html = render("accountant");
+    const html = text(render("accountant"));
+
+    // #then
+    expect(html).toContain("Month: October 2026");
+    expect(html).toContain(
+      "October 2026. Each file is made from today's records when you download it.",
+    );
+  });
+
+  it("sums up the month's export in four plain cards", () => {
+    // #when
+    const html = text(render("admin"));
 
     // #then
     expect({
-      month: [html.includes('max="2026-11"'), html.includes('value="2026-10"')],
-      downloads: DOWNLOADS.map(({ title }) =>
-        html.includes(`Download<span class="sr-only"> ${title}</span>`),
+      moneyOut: html.includes(
+        "Money out KES 1,920,000 92 payments · Up 4% on September",
+      ),
+      outstanding: html.includes("Outstanding bills KES 32,000 1 bill"),
+      receipts: html.includes("Receipts 65 6 expenses have none"),
+      etims: html.includes(
+        "With an eTIMS invoice 38 of 66 18 without one · 10 not required",
       ),
     }).toEqual({
-      month: [true, true],
-      downloads: [true, true, true, true],
+      moneyOut: true,
+      outstanding: true,
+      receipts: true,
+      etims: true,
     });
   });
 
-  it("doesn't offer an accountant links to share", () => {
+  it("lists the four downloads with their file names and what's in them", () => {
     // #when
     const html = render("accountant");
+    const plain = text(html);
 
     // #then
-    expect(html).not.toContain("Make links to share");
+    expect({
+      titles: DOWNLOADS.map(({ title }) =>
+        html.includes(`Download<span class="sr-only"> ${title}</span>`),
+      ),
+      files: [
+        "expendi-2026-10.xlsx",
+        "expendi-2026-10-csv.zip",
+        "expendi-2026-10-receipts.zip",
+        "expendi-2026-10-etims.csv",
+      ].map((name) => plain.includes(name)),
+      facts: [
+        "3 sheets",
+        "3 files",
+        "92 payments",
+        "65 receipts",
+        "66 expenses",
+      ].map((fact) => plain.includes(fact)),
+      inside: plain.split("What's inside").length - 1,
+    }).toEqual({
+      titles: [true, true, true, true],
+      files: [true, true, true, true],
+      facts: [true, true, true, true, true],
+      inside: 4,
+    });
   });
 
-  it("offers an admin the same downloads and links to share", () => {
+  it("offers an admin links to share, and tells an accountant about the monthly email", () => {
     // #when
-    const html = render("admin");
+    const admin = text(render("admin"));
+    const accountant = text(render("accountant"));
+
+    // #then
+    expect({
+      admin: [
+        admin.includes("Make links to share"),
+        admin.includes("You also get last month's export by email"),
+      ],
+      accountant: [
+        accountant.includes("Make links to share"),
+        accountant.includes("You also get last month's export by email"),
+      ],
+    }).toEqual({ admin: [true, false], accountant: [false, true] });
+  });
+
+  it("charts money out by month and heading, and lists each category against the month before", () => {
+    // #when
+    const html = text(render("admin"));
+
+    // #then
+    expect({
+      cards: ["Money out by month", "By heading", "By category"].map((title) =>
+        html.includes(title),
+      ),
+      range: html.includes("Show: Last 6 months"),
+      headings: [
+        "Petty cash",
+        "Transactions",
+        "Salaries & personnel",
+        "Subscriptions",
+      ].map((heading) => html.includes(heading)),
+      fuel: html.includes(
+        "Fuel & transport Transactions and Petty cash · 30 payments",
+      ),
+      change: html.includes("KES 124,000 KES 162,000 +31%"),
+    }).toEqual({
+      cards: [true, true, true],
+      range: true,
+      headings: [true, true, true, true],
+      fuel: true,
+      change: true,
+    });
+  });
+
+  it("lists the exports made with links, newest first", () => {
+    // #when
+    const html = text(render("accountant"));
+
+    // #then
+    expect({
+      first:
+        html.indexOf("October 2026 export") <
+        html.indexOf("September 2026 export"),
+      monthly: html.includes(
+        "October 2026 export Monthly email to accountants",
+      ),
+      shared: html.includes("Shared by Wanjiru Kamau"),
+      working: html.includes("Links work"),
+      expired: html.includes("Links expired"),
+      count: html.includes("7 exports"),
+    }).toEqual({
+      first: true,
+      monthly: true,
+      shared: true,
+      working: true,
+      expired: true,
+      count: true,
+    });
+  });
+
+  it("says what to do when nothing has been shared yet", () => {
+    // #when
+    const admin = text(render("admin", { exports: [] }));
+    const accountant = text(render("accountant", { exports: [] }));
 
     // #then
     expect([
-      DOWNLOADS.every(({ title }) => html.includes(title)),
-      html.includes("Make links to share"),
+      admin.includes("To send one now, make links to share."),
+      accountant.includes(
+        "Your first monthly export arrives by email on the 1st.",
+      ),
     ]).toEqual([true, true]);
+  });
+
+  it("shows each part that didn't load with Try again", () => {
+    // #when
+    const html = text(
+      render("admin", {
+        summary: "error",
+        spending: "error",
+        exports: "error",
+      }),
+    );
+
+    // #then
+    expect({
+      summary: html.includes("The month's figures didn't load"),
+      spending: html.includes("Spending didn't load"),
+      exports: html.includes("Shared exports didn't load"),
+      retry: html.split("Try again").length - 1,
+    }).toEqual({ summary: true, spending: true, exports: true, retry: 3 });
+  });
+
+  it("shows skeletons while the month loads", () => {
+    // #when
+    const html = render("admin", { summary: "loading", spending: "loading" });
+
+    // #then
+    expect([
+      html.includes('aria-busy="true"'),
+      text(html).includes("What's inside"),
+    ]).toEqual([true, false]);
+  });
+});
+
+describe("what's inside a download", () => {
+  it("names the workbook's sheets and shows the money out rows, reimbursements included", () => {
+    // #when
+    const html = text(
+      renderToStaticMarkup(
+        <FileContents
+          format="workbook"
+          summary={REPORT_SUMMARY}
+          partial={false}
+        />,
+      ),
+    );
+
+    // #then
+    expect({
+      sheets: [
+        "Sheet 1: Money out · 92 rows",
+        "Sheet 2: Outstanding bills · 1 row",
+        "Sheet 3: Float transfers · 2 rows",
+      ].map((label) => html.includes(label)),
+      reimbursement: html.includes("Reimbursement Brian Otieno 5,180"),
+      more: html.includes("And 87 more rows."),
+      noClaims: /\bclaims?\b/i.test(html),
+    }).toEqual({
+      sheets: [true, true, true],
+      reimbursement: true,
+      more: true,
+      noClaims: false,
+    });
+  });
+
+  it("warns about expenses without a receipt", () => {
+    // #when
+    const html = text(
+      renderToStaticMarkup(
+        <FileContents
+          format="receipts"
+          summary={REPORT_SUMMARY}
+          partial={false}
+        />,
+      ),
+    );
+
+    // #then
+    expect([
+      html.includes("65 files"),
+      html.includes("6 expenses have no receipt"),
+    ]).toEqual([true, true]);
+  });
+});
+
+describe("report wording", () => {
+  const context = {
+    month: "2026-10",
+    thisMonth: "2026-11",
+    today: "2026-11-06",
+  };
+
+  it("compares a month with the one before", () => {
+    // #then
+    expect([
+      changeLine(1_920_000, 1_838_000, context),
+      changeLine(900, 1000, context),
+      changeLine(1000, 1000, context),
+      changeLine(1000, 0, context),
+      changeLine(0, 0, context),
+      changeLine(1000, 900, { ...context, month: "2026-11" }),
+    ]).toEqual([
+      "Up 4% on September",
+      "Down 10% on September",
+      "Same as September",
+      "Nothing in September",
+      "Nothing in September either",
+      "So far, to 6 Nov",
+    ]);
+  });
+
+  it("writes a table's change column", () => {
+    // #then
+    expect([
+      deltaText(162, 124),
+      deltaText(90, 100),
+      deltaText(5, 5),
+      deltaText(5, 0),
+      deltaText(0, 0),
+    ]).toEqual(["+31%", "−10%", "Same", "New", "None"]);
+  });
+
+  it("calls a claim a reimbursement", () => {
+    // #then
+    expect(KIND_LABELS.claim).toBe("Reimbursement");
+  });
+
+  it("words the outstanding, receipts and eTIMS cards", () => {
+    // #given
+    const summary: ReportMonthSummary = {
+      ...REPORT_SUMMARY,
+      outstanding: {
+        ...REPORT_SUMMARY.outstanding,
+        rows: 3,
+        overdue: 2,
+        withoutAmount: 1,
+      },
+      receipts: { ...REPORT_SUMMARY.receipts, files: 4, expensesWithout: 0 },
+      etims: { ...REPORT_SUMMARY.etims, rows: 0 },
+    };
+
+    // #then
+    expect([
+      outstandingSub(summary),
+      receiptsSub(summary),
+      etimsSub(summary),
+      outstandingSub({
+        ...summary,
+        outstanding: { ...summary.outstanding, rows: 0 },
+      }),
+    ]).toEqual([
+      "3 bills · 2 overdue, 1 without an amount",
+      "Every expense has one",
+      "No expenses this month",
+      "None due by month end",
+    ]);
+  });
+
+  it("takes only a month up to this one from the URL", () => {
+    // #then
+    expect([
+      resolveMonth("2026-09", "2026-11"),
+      resolveMonth("2026-12", "2026-11"),
+      resolveMonth("October", "2026-11"),
+      resolveMonth(null, "2026-11"),
+    ]).toEqual(["2026-09", null, null, null]);
+  });
+
+  it("sorts categories by the chosen month, largest first, and by change", () => {
+    // #given
+    const rows = categoryRows(REPORT_SPENDING_6);
+
+    // #when
+    const byMonth = sortCategories(rows, { key: "current", dir: "desc" });
+    const byChange = sortCategories(rows, { key: "change", dir: "desc" });
+
+    // #then
+    expect([
+      byMonth.slice(0, 3).map((row) => row.name),
+      byChange[0]?.name,
+    ]).toEqual([
+      ["Salaries", "Suppliers", "Fuel & transport"],
+      "Meals & entertainment",
+    ]);
+  });
+
+  it("sorts shared exports by when they were made, newest first", () => {
+    // #when
+    const sorted = sortExports(SHARED_EXPORTS, { key: "made", dir: "desc" });
+
+    // #then
+    expect(sorted.map((exported) => exported.month)).toEqual([
+      "2026-10",
+      "2026-09",
+      "2026-09",
+      "2026-08",
+      "2026-06",
+      "2026-07",
+      "2026-06",
+    ]);
   });
 });
 

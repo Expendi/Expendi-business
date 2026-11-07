@@ -237,13 +237,29 @@ describe("previewRows", () => {
     if (!preview) throw new Error("no preview");
 
     // #then
-    expect(previewRows(preview).map((row) => row.value)).toEqual([
-      "KES 1,501.00",
-      "KES 1,500.50, rounded up to a whole shilling for M-Pesa",
-      "Person 1, M-Pesa ending 5678",
-      "11.664595 USDC",
-      "0.116646 USDC",
-      "11.781241 USDC",
+    expect(previewRows(preview)).toEqual([
+      { label: "They receive", value: { kind: "kes", cents: "150100" } },
+      {
+        label: "Submitted",
+        value: {
+          kind: "kes",
+          cents: "150050",
+          note: "rounded up to a whole shilling for M-Pesa",
+        },
+      },
+      {
+        label: "Paid to",
+        value: { kind: "text", text: "Person 1, M-Pesa ending 5678" },
+      },
+      { label: "USDC", value: { kind: "usdc", units: "11664595" } },
+      {
+        label: "Paycrest fee, at most",
+        value: { kind: "usdc", units: "116646" },
+      },
+      {
+        label: "Total, at most",
+        value: { kind: "usdc", units: "11781241" },
+      },
     ]);
   });
 });

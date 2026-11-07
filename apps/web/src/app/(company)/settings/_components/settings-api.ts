@@ -7,21 +7,30 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type {
   CategoriesResponse,
+  CompanyZohoResponse,
   CreateCategoryRequest,
+  CreatePaidFromAccountRequest,
   ManagedCategory,
   OrganizationResponse,
+  PaidFromAccount,
+  PaidFromAccountsResponse,
   PasskeyCreationOptions,
   UpdateCategoryRequest,
+  UpdatePaidFromAccountRequest,
 } from "@expendi-business/shared";
 import {
   approvalPasskeyStatusSchema,
   categoriesResponseSchema,
+  companyZohoResponseSchema,
   managedCategorySchema,
   organizationResponseSchema,
+  paidFromAccountSchema,
+  paidFromAccountsResponseSchema,
   passkeyCreationOptionsSchema,
 } from "@expendi-business/shared";
 
 import { useAuth } from "~/contexts/auth-context";
+import { billKeys } from "~/features/payment-keys";
 import { ApiError } from "~/lib/api";
 import {
   browserSupportsPasskeys,
@@ -36,7 +45,15 @@ export const settingsKeys = {
   /** Under `queryKeys.categories`, so refreshing the pickers refreshes this too. */
   archivedCategories: (organizationId: string) =>
     [...queryKeys.categories(organizationId), "archived"] as const,
+  /** Under the key Bills' picker reads, so a change refreshes both. */
+  archivedPaidFromAccounts: (organizationId: string) =>
+    [...billKeys.paidFromAccounts(organizationId), "archived"] as const,
+  zoho: (organizationId: string) =>
+    ["settings", organizationId, "zoho"] as const,
 };
+
+const paidFromAccountsPath = (organizationId: string) =>
+  `/organizations/${organizationId}/paid-from-accounts` as const;
 
 const categoriesPath = (organizationId: string) =>
   `/organizations/${organizationId}/categories` as const;
@@ -118,6 +135,95 @@ export function useChangeCategory(
       queryClient.invalidateQueries({
         queryKey: queryKeys.categories(organizationId),
       }),
+  });
+}
+
+/** The accounts company spending can be recorded as paid from (spec §6.23). */
+export function usePaidFromAccounts(
+  organizationId: string,
+): UseQueryResult<PaidFromAccountsResponse> {
+  const api = useApi();
+  return useQuery({
+    queryKey: billKeys.paidFromAccounts(organizationId),
+    queryFn: () =>
+      api.get(
+        paidFromAccountsPath(organizationId),
+        paidFromAccountsResponseSchema,
+      ),
+  });
+}
+
+export function useArchivedPaidFromAccounts(
+  organizationId: string,
+): UseQueryResult<PaidFromAccountsResponse> {
+  const api = useApi();
+  return useQuery({
+    queryKey: settingsKeys.archivedPaidFromAccounts(organizationId),
+    queryFn: () =>
+      api.get(
+        `${paidFromAccountsPath(organizationId)}?archived=true`,
+        paidFromAccountsResponseSchema,
+      ),
+  });
+}
+
+export type PaidFromAccountChange =
+  | { readonly kind: "create"; readonly fields: CreatePaidFromAccountRequest }
+  | {
+      readonly kind: "update";
+      readonly accountId: string;
+      readonly changes: UpdatePaidFromAccountRequest;
+    }
+  | { readonly kind: "archive"; readonly accountId: string };
+
+/** Admins only. An archived account stays on the spending that has it. */
+export function useChangePaidFromAccount(
+  organizationId: string,
+): UseMutationResult<PaidFromAccount, Error, PaidFromAccountChange> {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const path = paidFromAccountsPath(organizationId);
+  return useMutation({
+    mutationFn: (change) => {
+      switch (change.kind) {
+        case "create":
+          return api.post(path, change.fields, paidFromAccountSchema);
+        case "update":
+          return api.patch(
+            `${path}/${change.accountId}`,
+            change.changes,
+            paidFromAccountSchema,
+          );
+        case "archive":
+          return api.post(
+            `${path}/${change.accountId}/archive`,
+            undefined,
+            paidFromAccountSchema,
+          );
+      }
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: billKeys.paidFromAccounts(organizationId),
+      }),
+  });
+}
+
+/**
+ * The Zoho Books connection (spec §6.17), read-only: only Expendi staff
+ * connect, reconnect or retry.
+ */
+export function useZohoStatus(
+  organizationId: string,
+): UseQueryResult<CompanyZohoResponse> {
+  const api = useApi();
+  return useQuery({
+    queryKey: settingsKeys.zoho(organizationId),
+    queryFn: () =>
+      api.get(
+        `/organizations/${organizationId}/settings/zoho`,
+        companyZohoResponseSchema,
+      ),
   });
 }
 

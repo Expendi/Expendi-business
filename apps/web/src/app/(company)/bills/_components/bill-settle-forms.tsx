@@ -1,7 +1,8 @@
 "use client";
 
 import type { FormEvent, JSX } from "react";
-import { useState } from "react";
+import { BanIcon } from "lucide-react";
+import { useId, useState } from "react";
 
 import type { BillDetail } from "@expendi-business/shared";
 import {
@@ -11,14 +12,17 @@ import {
 } from "@expendi-business/shared";
 
 import type { UploadedBillFile } from "./bill-files-input";
+import { Callout } from "~/components/data/detail-sheet";
+import { Button } from "~/components/ui/button";
+import { Field, FieldError, FieldLabel } from "~/components/ui/field";
+import { Input } from "~/components/ui/input";
 import {
-  alertClass,
-  inputClass,
-  primaryButton,
-  secondaryButton,
-} from "~/components/styles";
+  NativeSelect,
+  NativeSelectOption,
+} from "~/components/ui/native-select";
+import { Textarea } from "~/components/ui/textarea";
+import { nairobiIsoDate } from "~/features/bills/bill-dates";
 import { blankToNull } from "~/features/bills/bill-draft";
-import { nairobiIsoDate } from "~/features/bills/bill-groups";
 import {
   useAttachBillFiles,
   useCancelBill,
@@ -27,6 +31,19 @@ import {
 } from "~/features/bills/bills-api";
 import { describeApiError } from "~/lib/api";
 import { BillFilesInput } from "./bill-files-input";
+import { Note } from "./note";
+import { SheetFooterPortal } from "./sheet-footer";
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Why the date paid can't be saved, or null. */
+export function paidOnError(paidOn: string, today: string): string | null {
+  if (!ISO_DATE.test(paidOn)) {
+    return "Enter the date it was paid as YYYY-MM-DD.";
+  }
+  if (paidOn > today) return "The date it was paid can't be in the future.";
+  return null;
+}
 
 /**
  * Paid outside Expendi (spec §6.20, §6.23): the date, an optional note and
@@ -36,15 +53,20 @@ import { BillFilesInput } from "./bill-files-input";
 export function MarkPaidOutsideForm({
   organizationId,
   bill,
+  footerSlot,
   onDone,
 }: {
   organizationId: string;
   bill: BillDetail;
+  footerSlot: HTMLElement | null;
   onDone: () => void;
 }): JSX.Element {
+  const uid = useId();
   const mark = useMarkBillPaidOutside(organizationId, bill.id);
   const accounts = usePaidFromAccounts(organizationId);
-  const [paidOn, setPaidOn] = useState(() => nairobiIsoDate(new Date()));
+  const [today] = useState(() => nairobiIsoDate(new Date()));
+  const [paidOn, setPaidOn] = useState(today);
+  const [dateError, setDateError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [accountId, setAccountId] = useState("");
   const [proof, setProof] = useState<UploadedBillFile[]>([]);
@@ -53,6 +75,12 @@ export function MarkPaidOutsideForm({
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const invalid = paidOnError(paidOn, today);
+    setDateError(invalid);
+    if (invalid) {
+      document.getElementById(`${uid}date`)?.focus();
+      return;
+    }
     mark.mutate(
       {
         paidOn,
@@ -65,85 +93,96 @@ export function MarkPaidOutsideForm({
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      aria-label="Mark paid outside Expendi"
-      className="space-y-3 rounded-md border border-stone-200 p-3"
-    >
-      <h3 className="text-sm font-semibold">Mark paid outside Expendi</h3>
-      <p className="text-xs text-stone-600">
-        It&apos;s also recorded as company spending, under the account it was
-        paid from.
-      </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-sm">
-          Date paid
-          <input
-            type="date"
-            value={paidOn}
-            onChange={(event) => setPaidOn(event.target.value)}
+    <>
+      <form
+        id={`${uid}form`}
+        onSubmit={onSubmit}
+        noValidate
+        aria-label="Mark paid outside Expendi"
+        className="flex flex-col gap-[18px]"
+      >
+        <Note>
+          It&apos;s also recorded as company spending, under the account it was
+          paid from.
+        </Note>
+        <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
+          <Field>
+            <FieldLabel htmlFor={`${uid}date`}>Date paid</FieldLabel>
+            <Input
+              id={`${uid}date`}
+              type="date"
+              value={paidOn}
+              max={today}
+              onChange={(event) => {
+                setPaidOn(event.target.value);
+                setDateError(null);
+              }}
+              disabled={busy}
+              className="tabular-nums"
+              aria-invalid={dateError ? true : undefined}
+            />
+            {dateError ? <FieldError>{dateError}</FieldError> : null}
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={`${uid}from`}>Paid from</FieldLabel>
+            <NativeSelect
+              id={`${uid}from`}
+              className="w-full"
+              value={accountId}
+              onChange={(event) => setAccountId(event.target.value)}
+              disabled={busy || accounts.isPending}
+            >
+              <NativeSelectOption value="">Not specified</NativeSelectOption>
+              {accounts.data
+                ?.filter((account) => !account.archived)
+                .map((account) => (
+                  <NativeSelectOption key={account.id} value={account.id}>
+                    {account.name}
+                  </NativeSelectOption>
+                ))}
+            </NativeSelect>
+          </Field>
+        </div>
+        <Field>
+          <FieldLabel htmlFor={`${uid}note`}>Note (optional)</FieldLabel>
+          <Input
+            id={`${uid}note`}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            maxLength={BILL_NOTES_MAX_LENGTH}
+            placeholder="Paid with the company card"
             disabled={busy}
-            className={inputClass}
           />
-        </label>
-        <label className="block text-sm">
-          Paid from
-          <select
-            value={accountId}
-            onChange={(event) => setAccountId(event.target.value)}
-            disabled={busy || accounts.isPending}
-            className={inputClass}
-          >
-            <option value="">Not specified</option>
-            {accounts.data
-              ?.filter((account) => !account.archived)
-              .map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-          </select>
-        </label>
-      </div>
-      <label className="block text-sm">
-        Note (optional)
-        <input
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          maxLength={BILL_NOTES_MAX_LENGTH}
-          placeholder="Paid with the company card"
-          disabled={busy}
-          className={inputClass}
+        </Field>
+        <BillFilesInput
+          organizationId={organizationId}
+          label="Proof of payment (optional)"
+          files={proof}
+          onChange={setProof}
+          onUploadingChange={setUploading}
+          max={MAX_BILL_FILES_PER_REQUEST}
+          disabled={mark.isPending}
         />
-      </label>
-      <BillFilesInput
-        organizationId={organizationId}
-        label="Proof of payment (optional)"
-        files={proof}
-        onChange={setProof}
-        onUploadingChange={setUploading}
-        max={MAX_BILL_FILES_PER_REQUEST}
-        disabled={mark.isPending}
-      />
-      {mark.isError ? (
-        <p className={alertClass} role="alert">
-          {describeApiError(mark.error)}
-        </p>
-      ) : null}
-      <div className="flex gap-3">
-        <button type="submit" disabled={busy} className={primaryButton}>
+        {mark.isError ? (
+          <Callout tone="error">
+            <p role="alert">{describeApiError(mark.error)}</p>
+          </Callout>
+        ) : null}
+      </form>
+      <SheetFooterPortal slot={footerSlot}>
+        <Button type="submit" form={`${uid}form`} disabled={busy}>
           {mark.isPending ? "Saving…" : "Mark as paid"}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
           onClick={onDone}
           disabled={mark.isPending}
-          className={secondaryButton}
         >
           Back
-        </button>
-      </div>
-    </form>
+        </Button>
+      </SheetFooterPortal>
+    </>
   );
 }
 
@@ -151,12 +190,15 @@ export function MarkPaidOutsideForm({
 export function CancelBillForm({
   organizationId,
   bill,
+  footerSlot,
   onDone,
 }: {
   organizationId: string;
   bill: BillDetail;
+  footerSlot: HTMLElement | null;
   onDone: () => void;
 }): JSX.Element {
+  const uid = useId();
   const cancel = useCancelBill(organizationId, bill.id);
   const [reason, setReason] = useState("");
 
@@ -166,50 +208,57 @@ export function CancelBillForm({
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      aria-label="Cancel this bill"
-      className="space-y-3 rounded-md border border-stone-200 p-3"
-    >
-      <h3 className="text-sm font-semibold">Cancel this bill?</h3>
-      <p className="text-xs text-stone-600">
-        {bill.payee.name} won’t be paid for this bill. It stays in the history
-        with your reason.
-      </p>
-      <label className="block text-sm">
-        Why won’t it be paid?
-        <input
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          maxLength={BILL_REASON_MAX_LENGTH}
-          placeholder="Subscription cancelled"
-          disabled={cancel.isPending}
-          className={inputClass}
-        />
-      </label>
-      {cancel.isError ? (
-        <p className={alertClass} role="alert">
-          {describeApiError(cancel.error)}
-        </p>
-      ) : null}
-      <div className="flex gap-3">
-        <button
+    <>
+      <form
+        id={`${uid}form`}
+        onSubmit={onSubmit}
+        aria-label="Cancel this bill"
+        className="flex flex-col gap-[18px]"
+      >
+        <Callout tone="warn" icon={BanIcon}>
+          <p>
+            {bill.payee.name} won’t be paid for this bill. It stays in the
+            history with your reason.
+          </p>
+        </Callout>
+        <Field>
+          <FieldLabel htmlFor={`${uid}reason`}>
+            Why won’t it be paid?
+          </FieldLabel>
+          <Textarea
+            id={`${uid}reason`}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            maxLength={BILL_REASON_MAX_LENGTH}
+            rows={3}
+            placeholder="Subscription cancelled"
+            disabled={cancel.isPending}
+          />
+        </Field>
+        {cancel.isError ? (
+          <Callout tone="error">
+            <p role="alert">{describeApiError(cancel.error)}</p>
+          </Callout>
+        ) : null}
+      </form>
+      <SheetFooterPortal slot={footerSlot}>
+        <Button
           type="submit"
+          form={`${uid}form`}
           disabled={cancel.isPending || reason.trim() === ""}
-          className={primaryButton}
         >
           {cancel.isPending ? "Cancelling…" : "Cancel bill"}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
           onClick={onDone}
           disabled={cancel.isPending}
-          className={secondaryButton}
         >
           Keep it
-        </button>
-      </div>
-    </form>
+        </Button>
+      </SheetFooterPortal>
+    </>
   );
 }
 
@@ -217,12 +266,15 @@ export function CancelBillForm({
 export function AddInvoicesForm({
   organizationId,
   bill,
+  footerSlot,
   onDone,
 }: {
   organizationId: string;
   bill: BillDetail;
+  footerSlot: HTMLElement | null;
   onDone: () => void;
 }): JSX.Element {
+  const uid = useId();
   const attach = useAttachBillFiles(organizationId, bill.id);
   const [invoices, setInvoices] = useState<UploadedBillFile[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -236,42 +288,45 @@ export function AddInvoicesForm({
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      aria-label="Add an invoice"
-      className="space-y-3 rounded-md border border-stone-200 p-3"
-    >
-      <BillFilesInput
-        organizationId={organizationId}
-        label="Invoice"
-        files={invoices}
-        onChange={setInvoices}
-        onUploadingChange={setUploading}
-        max={MAX_BILL_FILES_PER_REQUEST}
-        disabled={attach.isPending}
-      />
-      {attach.isError ? (
-        <p className={alertClass} role="alert">
-          {describeApiError(attach.error)}
-        </p>
-      ) : null}
-      <div className="flex gap-3">
-        <button
+    <>
+      <form
+        id={`${uid}form`}
+        onSubmit={onSubmit}
+        aria-label="Add an invoice"
+        className="flex flex-col gap-[18px]"
+      >
+        <BillFilesInput
+          organizationId={organizationId}
+          label="Invoice"
+          files={invoices}
+          onChange={setInvoices}
+          onUploadingChange={setUploading}
+          max={MAX_BILL_FILES_PER_REQUEST}
+          disabled={attach.isPending}
+        />
+        {attach.isError ? (
+          <Callout tone="error">
+            <p role="alert">{describeApiError(attach.error)}</p>
+          </Callout>
+        ) : null}
+      </form>
+      <SheetFooterPortal slot={footerSlot}>
+        <Button
           type="submit"
+          form={`${uid}form`}
           disabled={attach.isPending || uploading || invoices.length === 0}
-          className={primaryButton}
         >
           {attach.isPending ? "Attaching…" : "Attach"}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
           onClick={onDone}
           disabled={attach.isPending}
-          className={secondaryButton}
         >
           Back
-        </button>
-      </div>
-    </form>
+        </Button>
+      </SheetFooterPortal>
+    </>
   );
 }

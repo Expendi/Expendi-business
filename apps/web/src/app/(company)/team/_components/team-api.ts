@@ -37,6 +37,23 @@ export function useMembers(
   });
 }
 
+/**
+ * The signed-in person's membership in this company, to mark "You" in the
+ * list. The same `/me` query the company picker reads, so it is cached.
+ */
+export function useMyMembershipId(organizationId: string): string | null {
+  const { api, privyUserId } = useAuth();
+  const me = useQuery({
+    queryKey: queryKeys.me(privyUserId ?? ""),
+    queryFn: () => api.getMe(),
+  });
+  return (
+    me.data?.memberships.find(
+      (membership) => membership.organizationId === organizationId,
+    )?.id ?? null
+  );
+}
+
 /** Inviting someone who is still invited sends their email again. */
 export function useInviteMember(
   organizationId: string,

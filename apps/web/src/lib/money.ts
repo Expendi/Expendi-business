@@ -58,3 +58,76 @@ export function sumUnits(amounts: readonly string[]): string {
     .reduce((total, amount) => total + BigInt(amount), 0n)
     .toString();
 }
+
+/**
+ * KES cents as the pages show them: whole shillings drop the decimals, e.g.
+ * "4850000" → "48,500" and "699950" → "6,999.50".
+ */
+export function formatKes(cents: string): string {
+  const amount = splitMinorUnits(cents, KES_DECIMALS);
+  if (amount.fraction !== "00") return join(amount);
+  return `${amount.negative ? "-" : ""}${groupThousands(amount.whole)}`;
+}
+
+const MICRO = 1_000_000n;
+const RATE = /^(0|[1-9]\d{0,14})(\.\d{1,6})?$/;
+
+/**
+ * KES cents that USDC base units convert to at `rate` (KES per USDC, as the
+ * wallet reports it), rounded down; null when the rate isn't a plain decimal.
+ */
+export function usdcToKesCents(usdcUnits: string, rate: string): string | null {
+  if (!RATE.test(rate)) return null;
+  const [whole = "0", fraction = ""] = rate.split(".");
+  const rateMicro = BigInt(whole) * MICRO + BigInt(fraction.padEnd(6, "0"));
+  return ((BigInt(usdcUnits) * rateMicro * 100n) / (MICRO * MICRO)).toString();
+}
+
+/** KES cents and USD as USDC base units, kept apart until they're shown. */
+export interface CurrencyTotals {
+  readonly kes: string;
+  readonly usd: string;
+}
+
+/** Adds amounts per currency; a missing amount (a variable bill not entered yet) adds nothing. */
+export function totalsByCurrency(
+  amounts: readonly {
+    readonly currency: "kes" | "usd";
+    readonly amount: string | null;
+  }[],
+): CurrencyTotals {
+  const of = (currency: "kes" | "usd") =>
+    sumUnits(
+      amounts
+        .filter((entry) => entry.currency === currency)
+        .flatMap((entry) => (entry.amount === null ? [] : [entry.amount])),
+    );
+  return { kes: of("kes"), usd: of("usd") };
+}
+
+export interface ApproxKesTotal {
+  readonly kesCents: string;
+  /** USD was converted at today's rate, so the figure is shown after a muted "≈". */
+  readonly approximate: boolean;
+}
+
+/**
+ * One KES figure for a total that may include USD: the USD is converted at
+ * today's rate and the total is marked approximate. Null when there is USD
+ * but no rate to convert it with.
+ */
+export function approxKesTotal({
+  kes,
+  usd,
+  rate,
+}: CurrencyTotals & { readonly rate: string | null }): ApproxKesTotal | null {
+  if (BigInt(usd) === 0n) {
+    return { kesCents: BigInt(kes).toString(), approximate: false };
+  }
+  const converted = rate === null ? null : usdcToKesCents(usd, rate);
+  if (converted === null) return null;
+  return {
+    kesCents: (BigInt(kes) + BigInt(converted)).toString(),
+    approximate: true,
+  };
+}

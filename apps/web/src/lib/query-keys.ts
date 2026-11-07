@@ -1,4 +1,7 @@
-import type { ExpenseStatus } from "@expendi-business/shared";
+import type {
+  ExpenseStatus,
+  ExpenseSummaryQuery,
+} from "@expendi-business/shared";
 
 import type { ExpenseListParams } from "./customer-api";
 
@@ -14,6 +17,8 @@ export const queryKeys = {
     ["expenses", organizationId, "list", query] as const,
   expense: (organizationId: string, expenseId: string) =>
     ["expenses", organizationId, "detail", expenseId] as const,
+  expenseSummary: (organizationId: string, query: ExpenseSummaryQuery) =>
+    ["expenses", organizationId, "summary", query] as const,
   /** Every claim query of a company. */
   claims: (organizationId: string) => ["claims", organizationId] as const,
   claimQueue: (organizationId: string, status: ExpenseStatus) =>

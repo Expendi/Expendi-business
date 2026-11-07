@@ -8,7 +8,6 @@ import { CLAIM_APPROVAL_MAX_CLAIMS } from "@expendi-business/shared";
 
 import type { CustomerApi } from "~/lib/customer-api";
 import { describeApprovalError } from "~/lib/approval";
-import { formatKesCents, formatUsdc } from "~/lib/money";
 
 /**
  * Approve & pay's display logic (spec §6.7, §6.8), as the app has it
@@ -95,39 +94,53 @@ export function toggleSelection(
     : [...selected];
 }
 
+/** A KES amount (cents) with an optional note after it, a USDC amount, or words. */
+export type PreviewValue =
+  | { readonly kind: "kes"; readonly cents: string; readonly note?: string }
+  | { readonly kind: "usdc"; readonly units: string }
+  | { readonly kind: "text"; readonly text: string };
+
 export interface PreviewRow {
   readonly label: string;
-  readonly value: string;
+  readonly value: PreviewValue;
 }
 
-/** One claim's payment, as the admin confirms it (spec §6.7 step 2). */
+/** One reimbursement's payment, as the admin confirms it (spec §6.7 step 2). */
 export function previewRows(preview: ClaimPaymentPreview): PreviewRow[] {
   const rounded = preview.claimedKes !== preview.receivesKes;
+  const submitted: PreviewRow[] = rounded
+    ? [
+        {
+          label: "Submitted",
+          value: {
+            kind: "kes",
+            cents: preview.claimedKes,
+            note: "rounded up to a whole shilling for M-Pesa",
+          },
+        },
+      ]
+    : [];
   return [
     {
       label: "They receive",
-      value: `KES ${formatKesCents(preview.receivesKes)}`,
+      value: { kind: "kes", cents: preview.receivesKes },
     },
-    ...(rounded
-      ? [
-          {
-            label: "Claimed",
-            value: `KES ${formatKesCents(preview.claimedKes)}, rounded up to a whole shilling for M-Pesa`,
-          },
-        ]
-      : []),
+    ...submitted,
     {
       label: "Paid to",
-      value: `${preview.claimantName}, M-Pesa ending ${preview.phoneLast4}`,
+      value: {
+        kind: "text",
+        text: `${preview.claimantName}, M-Pesa ending ${preview.phoneLast4}`,
+      },
     },
-    { label: "USDC", value: `${formatUsdc(preview.usdc)} USDC` },
+    { label: "USDC", value: { kind: "usdc", units: preview.usdc } },
     {
       label: "Paycrest fee, at most",
-      value: `${formatUsdc(preview.feeAllowanceUsdc)} USDC`,
+      value: { kind: "usdc", units: preview.feeAllowanceUsdc },
     },
     {
       label: "Total, at most",
-      value: `${formatUsdc(preview.maxDebitUsdc)} USDC`,
+      value: { kind: "usdc", units: preview.maxDebitUsdc },
     },
   ];
 }

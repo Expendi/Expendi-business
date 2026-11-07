@@ -12,6 +12,7 @@ import {
   useState,
 } from "react";
 
+import type { ApiClient } from "~/lib/api";
 import type { CustomerApi } from "~/lib/customer-api";
 import { createApiClient } from "~/lib/api";
 import { createCustomerApi } from "~/lib/customer-api";
@@ -165,6 +166,35 @@ function deriveStatus(
     return "offering-passkey";
   }
   return "signed-in";
+}
+
+/**
+ * A session that is always signed in over the given API, with no Privy:
+ * the dev preview (`app/dev/preview`) renders pages with sample data in it.
+ */
+export function StaticAuthProvider({
+  api,
+  children,
+}: {
+  api: ApiClient;
+  children: ReactNode;
+}): JSX.Element {
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      status: "signed-in",
+      privyUserId: "preview",
+      notice: null,
+      api: createCustomerApi(api),
+      signInWithEmail: () => undefined,
+      signInWithPasskey: () => Promise.resolve(),
+      passkeySignInPending: false,
+      finishPasskeyOffer: () => undefined,
+      signOut: () => Promise.resolve(),
+      endSession: () => Promise.resolve(),
+    }),
+    [api],
+  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

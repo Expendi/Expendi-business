@@ -3,9 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApiClient } from "~/lib/api";
 import { createCustomerApi } from "~/lib/customer-api";
 import {
-  filtersFromForm,
   filtersFromParams,
   filtersToParams,
+  formatMonth,
+  hasChipFilters,
+  monthChoices,
+  toApiQuery,
 } from "./expense-filters";
 
 const PERSON = "00000000-0000-4000-8000-000000000001";
@@ -16,6 +19,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function fakeApi(data: unknown) {
+  const fetcher = vi.fn(() =>
+    Promise.resolve(Response.json({ success: true, data })),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const api = createCustomerApi(
+    createApiClient({
+      baseUrl: "https://api.example.com",
+      getAccessToken: () => Promise.resolve("token"),
+    }),
+  );
+  return { api, fetcher };
+}
+
 describe("expense filters in the URL", () => {
   it("reads every filter and writes it back the same", () => {
     // #given
@@ -25,6 +42,8 @@ describe("expense filters in the URL", () => {
       categoryId: CATEGORY,
       month: "2026-10",
       etimsStatus: "none",
+      status: "submitted",
+      noReceipt: "1",
     });
 
     // #when
@@ -41,6 +60,8 @@ describe("expense filters in the URL", () => {
         categoryId: CATEGORY,
         month: "2026-10",
         etimsStatus: "none",
+        status: "submitted",
+        noReceipt: true,
       },
       written: params.toString(),
     });
@@ -52,6 +73,8 @@ describe("expense filters in the URL", () => {
       membershipId: "someone",
       kind: "salary",
       month: "2026-13",
+      status: "lost",
+      noReceipt: "maybe",
       etimsStatus: "attached",
     });
 
@@ -62,51 +85,96 @@ describe("expense filters in the URL", () => {
     expect(written).toBe("etimsStatus=attached");
   });
 
-  it("leaves out the form's blank choices", () => {
-    // #given
-    const form = new FormData();
-    form.set("membershipId", "");
-    form.set("kind", "company");
-    form.set("month", "");
-
+  it("takes noReceipt as 1 or 0, or true or false", () => {
     // #when
-    const written = filtersToParams(filtersFromForm(form)).toString();
+    const read = ["1", "0", "true", "false"].map(
+      (value) =>
+        filtersFromParams(new URLSearchParams({ noReceipt: value })).noReceipt,
+    );
 
     // #then
-    expect(written).toBe("kind=company");
+    expect(read).toEqual([true, false, true, false]);
   });
 
-  it("asks the API for exactly the filters set, and the next page", async () => {
+  it("counts the chips set, not the kind tab", () => {
+    expect([
+      hasChipFilters({ kind: "company" }),
+      hasChipFilters({ kind: "company", noReceipt: false }),
+    ]).toEqual([false, true]);
+  });
+});
+
+describe("expense filters for the API", () => {
+  it("asks for exactly the filters set, the sort and the next page", async () => {
     // #given
-    const fetcher = vi.fn(() =>
-      Promise.resolve(
-        Response.json({
-          success: true,
-          data: { expenses: [], nextCursor: null },
+    const { api, fetcher } = fakeApi({ expenses: [], nextCursor: null });
+    const query = toApiQuery(
+      filtersFromParams(
+        new URLSearchParams({
+          kind: "claim",
+          month: "2026-10",
+          noReceipt: "1",
         }),
       ),
-    );
-    vi.stubGlobal("fetch", fetcher);
-    const api = createCustomerApi(
-      createApiClient({
-        baseUrl: "https://api.example.com",
-        getAccessToken: () => Promise.resolve("token"),
-      }),
     );
 
     // #when
     await api.listExpenses(ORG, {
-      ...filtersFromParams(
-        new URLSearchParams({ kind: "claim", month: "2026-10" }),
-      ),
+      ...query,
+      sort: "amount",
+      dir: "desc",
       limit: 50,
       cursor: "next-page",
     });
 
     // #then
     expect(fetcher).toHaveBeenCalledWith(
-      `https://api.example.com/organizations/${ORG}/expenses?kind=claim&month=2026-10&limit=50&cursor=next-page`,
+      `https://api.example.com/organizations/${ORG}/expenses?kind=claim&month=2026-10&noReceipt=true&sort=amount&dir=desc&limit=50&cursor=next-page`,
       expect.objectContaining({ method: "GET" }),
     );
+  });
+
+  it("asks the summary for the same filters, without paging", async () => {
+    // #given
+    const { api, fetcher } = fakeApi({
+      count: 0,
+      totalKes: "0",
+      waitingForApproval: { count: 0, totalKes: "0" },
+      withoutReceipt: { count: 0, totalKes: "0" },
+      withoutEtims: { count: 0, totalKes: "0" },
+      kinds: { claim: 0, petty_cash: 0, company: 0 },
+    });
+
+    // #when
+    await api.getExpensesSummary(
+      ORG,
+      toApiQuery({ status: "payout_failed", noReceipt: false }),
+    );
+
+    // #then
+    expect(fetcher).toHaveBeenCalledWith(
+      `https://api.example.com/organizations/${ORG}/expenses/summary?status=payout_failed&noReceipt=false`,
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+});
+
+describe("the month filter", () => {
+  it("offers the last twelve months, newest first, and an older chosen one", () => {
+    // #when
+    const months = monthChoices("2026-11", "2025-06");
+
+    // #then
+    expect({
+      first: months.slice(0, 3),
+      last: months.slice(-2),
+      count: months.length,
+      label: formatMonth("2026-11"),
+    }).toEqual({
+      first: ["2026-11", "2026-10", "2026-09"],
+      last: ["2025-12", "2025-06"],
+      count: 13,
+      label: "November 2026",
+    });
   });
 });

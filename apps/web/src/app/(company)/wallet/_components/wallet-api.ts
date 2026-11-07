@@ -12,11 +12,13 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import type {
   AllowlistChange,
   ApprovalChallenge,
   CreateWithdrawalRequest,
+  WalletHistoryItem,
   WalletHistoryResponse,
   WalletResponse,
   WalletSetup,
@@ -38,6 +40,7 @@ import {
 import type { ApprovalOutcome } from "~/lib/approval";
 import { useApi } from "~/lib/use-api";
 import { usePasskeyApproval } from "~/lib/use-approval";
+import { nairobiDay } from "./wallet-display";
 
 /**
  * The wallet routes the app uses (T21, T33): balance, history, the
@@ -54,6 +57,9 @@ export const walletKeys = {
     ["wallet", organizationId, "summary"] as const,
   history: (organizationId: string) =>
     ["wallet", organizationId, "history"] as const,
+  /** The ledger back to the start of the balance chart, in big pages. */
+  balanceHistory: (organizationId: string) =>
+    ["wallet", organizationId, "history", "balance"] as const,
   addresses: (organizationId: string) =>
     ["wallet", organizationId, "addresses"] as const,
 };
@@ -105,6 +111,51 @@ export function useWalletHistory(
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
   });
+}
+
+/** The API's largest history page. */
+const BALANCE_PAGE_SIZE = 100;
+
+/** Enough pages for a busy month; the chart stops there if there are more. */
+const BALANCE_MAX_PAGES = 10;
+
+/**
+ * The ledger back to `since` (a Nairobi day), for the balance chart and the
+ * month's money in and out. Loads further pages by itself until it gets
+ * there; `complete` is false while it's still on its way.
+ */
+export function useBalanceHistory(
+  organizationId: string,
+  since: string,
+): {
+  readonly items: readonly WalletHistoryItem[] | null;
+  readonly complete: boolean;
+} {
+  const api = useApi();
+  const history = useInfiniteQuery({
+    queryKey: walletKeys.balanceHistory(organizationId),
+    queryFn: ({ pageParam }) =>
+      api.get(
+        `${walletPath(organizationId)}/history?limit=${String(BALANCE_PAGE_SIZE)}${pageParam ? `&before=${pageParam}` : ""}`,
+        walletHistoryResponseSchema,
+      ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor,
+  });
+  const pages = history.data?.pages;
+  const items = pages?.flatMap((page) => page.items) ?? null;
+  const oldest = items?.at(-1)?.createdAt;
+  const reached = oldest === undefined || nairobiDay(oldest) < since;
+  const needsMore =
+    pages !== undefined &&
+    !reached &&
+    history.hasNextPage &&
+    pages.length < BALANCE_MAX_PAGES;
+  const { fetchNextPage, isFetchingNextPage } = history;
+  useEffect(() => {
+    if (needsMore && !isFetchingNextPage) void fetchNextPage();
+  }, [needsMore, isFetchingNextPage, fetchNextPage]);
+  return { items, complete: items !== null && !needsMore };
 }
 
 /** The company's allowlist, oldest first. */

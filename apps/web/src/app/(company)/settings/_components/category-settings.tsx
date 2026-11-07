@@ -1,7 +1,8 @@
 "use client";
 
 import type { FormEvent, JSX } from "react";
-import { useState } from "react";
+import { ArchiveIcon, ArchiveRestoreIcon, PlusIcon } from "lucide-react";
+import { useId, useState } from "react";
 
 import type { Category } from "@expendi-business/shared";
 import {
@@ -10,413 +11,467 @@ import {
 } from "@expendi-business/shared";
 
 import {
-  alertClass,
-  cellClass,
-  headCellClass,
-  inputClass,
-  primaryButton,
-  secondaryButton,
-  tableClass,
-  textButton,
-} from "~/components/styles";
+  Callout,
+  DetailSheet,
+  SheetActions,
+} from "~/components/data/detail-sheet";
+import { KindTabs } from "~/components/data/kind-tabs";
+import { RowCheckbox } from "~/components/data/table";
+import { Button } from "~/components/ui/button";
+import { Field, FieldError, FieldLabel } from "~/components/ui/field";
+import { Input } from "~/components/ui/input";
 import { describeApiError } from "~/lib/api";
 import {
   useActiveCategories,
   useArchivedCategories,
   useChangeCategory,
 } from "./settings-api";
+import {
+  PanelEmpty,
+  PanelError,
+  PanelSkeleton,
+  RowButton,
+  sameName,
+  SettingsList,
+  SettingsPanel,
+  SettingsRow,
+  Tag,
+  tidy,
+  useSheetForm,
+} from "./settings-panel";
 
-const ETIMS_LABELS = {
-  expected: "Invoice expected",
-  exempt: "No invoice expected",
-} as const;
+export const NO_INVOICE_EXPECTED = "No invoice expected";
 
-const etimsLabel = (category: Category) =>
-  category.etimsNotRequired ? ETIMS_LABELS.exempt : ETIMS_LABELS.expected;
+const CATEGORIES_SUB =
+  "A category marked “no invoice expected” (e.g. air tickets, bank charges) records new spending in it as not needing an eTIMS invoice. An archived category can't be picked for new spending; what already has it keeps it.";
+
+type CategoryTab = "active" | "archived";
+
+const byName = (a: Category, b: Category) => a.name.localeCompare(b.name);
 
 /**
  * The categories people pick when they record spending (spec §6.1, §6.6).
- * Admins add, rename, archive and mark them eTIMS-exempt; each change is
- * audited. Archiving keeps a category on spending that has it.
+ * Admins add, rename, mark eTIMS-exempt, archive and restore them; each
+ * change is audited. Archiving keeps a category on spending that has it.
  */
 export function CategorySettings({
   organizationId,
   canAct,
+  openId,
+  onOpen,
 }: {
   organizationId: string;
   canAct: boolean;
+  /** The category whose form is open (`?category=`), admins only. */
+  openId: string | null;
+  onOpen: (categoryId: string | null) => void;
 }): JSX.Element {
   const active = useActiveCategories(organizationId);
   const archived = useArchivedCategories(organizationId);
+  const restore = useChangeCategory(organizationId);
+  const [tab, setTab] = useState<CategoryTab>("active");
+  const [adding, setAdding] = useState(false);
+
+  const inUse = [...(active.data ?? [])].sort(byName);
+  const old = [...(archived.data ?? [])].sort(byName);
+  const editing = canAct
+    ? inUse.find((category) => category.id === openId)
+    : undefined;
+  const restoringId =
+    restore.isPending && restore.variables.kind === "restore"
+      ? restore.variables.categoryId
+      : null;
+
+  const addButton = (variant: "outline" | "default") => (
+    <Button
+      variant={variant}
+      size="md"
+      aria-haspopup="dialog"
+      onClick={() => setAdding(true)}
+    >
+      <PlusIcon aria-hidden="true" />
+      Add category
+    </Button>
+  );
+
+  const list = tab === "archived" ? old : inUse;
 
   return (
-    <section aria-labelledby="categories-heading" className="space-y-3">
-      <div>
-        <h2 id="categories-heading" className="text-base font-semibold">
-          Categories
-        </h2>
-        <p className="mt-1 max-w-3xl text-sm text-stone-600">
-          A category marked &ldquo;no invoice expected&rdquo; (e.g. air tickets,
-          bank charges) records new spending in it as not needing an eTIMS
-          invoice. An archived category can&apos;t be picked for new spending;
-          what already has it keeps it.
-        </p>
-      </div>
-
-      {canAct ? <AddCategoryForm organizationId={organizationId} /> : null}
-
+    <SettingsPanel
+      id="categories"
+      title="Categories"
+      sub={CATEGORIES_SUB}
+      actions={canAct && active.isSuccess ? addButton("outline") : null}
+      busy={active.isPending}
+    >
       {active.isPending ? (
-        <p className="text-sm text-stone-500">Loading categories…</p>
+        <PanelSkeleton lines={5} />
       ) : active.isError ? (
-        <div className="text-sm text-error-700" role="alert">
-          <p>{describeApiError(active.error)}</p>
-          <button
-            type="button"
-            onClick={() => void active.refetch()}
-            className={`mt-2 ${secondaryButton}`}
-          >
-            Try again
-          </button>
-        </div>
+        <PanelError
+          title="Categories didn't load"
+          message={describeApiError(active.error)}
+          onRetry={() => void active.refetch()}
+        />
       ) : (
-        <CategoryTable
-          label="Categories in use"
-          categories={active.data}
-          empty="No categories yet. Add one so people can record spending."
-          renderActions={
-            canAct
-              ? (category) => (
-                  <ActiveCategoryActions
-                    organizationId={organizationId}
-                    category={category}
-                  />
-                )
-              : null
-          }
-        />
-      )}
-
-      {archived.data && archived.data.length > 0 ? (
-        <div className="space-y-2 pt-2">
-          <h3 className="text-sm font-semibold">Archived</h3>
-          <CategoryTable
-            label="Archived categories"
-            categories={archived.data}
-            empty=""
-            renderActions={
-              canAct
-                ? (category) => (
-                    <RestoreCategory
-                      organizationId={organizationId}
-                      category={category}
-                    />
-                  )
-                : null
-            }
+        <>
+          <KindTabs
+            label="Categories"
+            tabs={[
+              { value: "active", label: "In use", count: inUse.length },
+              {
+                value: "archived",
+                label: "Archived",
+                count: archived.isSuccess ? old.length : undefined,
+              },
+            ]}
+            value={tab}
+            onChange={(next) => {
+              restore.reset();
+              setTab(next);
+            }}
+            controls="categories-list"
           />
-        </div>
+          {restore.isError ? (
+            <div role="alert" className="mx-5 mt-3">
+              <Callout tone="error">
+                <p>{describeApiError(restore.error)}</p>
+              </Callout>
+            </div>
+          ) : null}
+          {tab === "archived" && archived.isError ? (
+            <PanelError
+              title="Archived categories didn't load"
+              message={describeApiError(archived.error)}
+              onRetry={() => void archived.refetch()}
+            />
+          ) : list.length === 0 ? (
+            <div id="categories-list" role="tabpanel">
+              <PanelEmpty
+                action={
+                  tab === "active" && canAct ? addButton("default") : null
+                }
+              >
+                {tab === "archived"
+                  ? "No archived categories."
+                  : canAct
+                    ? "No categories yet. Add one so people can record spending."
+                    : "No categories yet."}
+              </PanelEmpty>
+            </div>
+          ) : (
+            <div id="categories-list" role="tabpanel">
+              <SettingsList
+                label={
+                  tab === "archived"
+                    ? "Archived categories"
+                    : "Categories in use"
+                }
+                compact
+              >
+                {list.map((category) => {
+                  const editable = canAct && tab === "active";
+                  return (
+                    <SettingsRow
+                      key={category.id}
+                      open={editable && category.id === openId}
+                      onOpen={editable ? () => onOpen(category.id) : undefined}
+                    >
+                      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="min-w-0 truncate font-(--w-name)">
+                          {category.name}
+                        </span>
+                        {category.etimsNotRequired ? (
+                          <Tag>{NO_INVOICE_EXPECTED}</Tag>
+                        ) : null}
+                      </span>
+                      {editable ? (
+                        <RowButton
+                          label={`Edit ${category.name}`}
+                          aria-haspopup="dialog"
+                          onClick={() => onOpen(category.id)}
+                        >
+                          Edit
+                        </RowButton>
+                      ) : canAct ? (
+                        <RowButton
+                          icon={ArchiveRestoreIcon}
+                          label={`Restore ${category.name}`}
+                          disabled={restore.isPending}
+                          onClick={() =>
+                            restore.mutate({
+                              kind: "restore",
+                              categoryId: category.id,
+                            })
+                          }
+                        >
+                          {restoringId === category.id
+                            ? "Restoring…"
+                            : "Restore"}
+                        </RowButton>
+                      ) : null}
+                    </SettingsRow>
+                  );
+                })}
+              </SettingsList>
+            </div>
+          )}
+        </>
+      )}
+      {canAct ? (
+        <CategorySheet
+          organizationId={organizationId}
+          open={adding || editing !== undefined}
+          category={editing ?? null}
+          existing={[...inUse, ...old]}
+          onClose={() => {
+            setAdding(false);
+            onOpen(null);
+          }}
+          onAdded={() => setTab("active")}
+        />
       ) : null}
-      {archived.isError ? (
-        <p className="text-sm text-error-700" role="alert">
-          Archived categories couldn&apos;t load.{" "}
-          {describeApiError(archived.error)}
-        </p>
-      ) : null}
-    </section>
+    </SettingsPanel>
   );
 }
 
-function CategoryTable({
-  label,
-  categories,
-  empty,
-  renderActions,
-}: {
-  label: string;
-  categories: readonly Category[];
-  empty: string;
-  renderActions: ((category: Category) => JSX.Element) | null;
-}): JSX.Element {
-  if (categories.length === 0) {
-    return (
-      <p className="max-w-3xl rounded-lg border border-dashed border-stone-300 bg-white p-4 text-sm text-stone-600">
-        {empty}
-      </p>
-    );
-  }
-  return (
-    <div className="max-w-3xl overflow-x-auto rounded-lg border border-stone-200 bg-white">
-      <table className={tableClass} aria-label={label}>
-        <thead className="bg-stone-100 text-stone-600">
-          <tr>
-            <th scope="col" className={headCellClass}>
-              Name
-            </th>
-            <th scope="col" className={headCellClass}>
-              eTIMS
-            </th>
-            {renderActions ? (
-              <th scope="col" className={headCellClass}>
-                <span className="sr-only">Actions</span>
-              </th>
-            ) : null}
-          </tr>
-        </thead>
-        <tbody>
-          {categories.map((category) => (
-            <tr
-              key={category.id}
-              className="border-t border-stone-200 align-top"
-            >
-              <td className={`${cellClass} font-medium`}>{category.name}</td>
-              <td className={cellClass}>{etimsLabel(category)}</td>
-              {renderActions ? (
-                <td className={`${cellClass} text-right`}>
-                  {renderActions(category)}
-                </td>
-              ) : null}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+interface CategoryForm {
+  readonly step: "form" | "archive";
+  readonly name: string;
+  readonly exempt: boolean;
+  readonly nameError: string | null;
 }
 
-function AddCategoryForm({
+const initialForm = (category: Category | null): CategoryForm => ({
+  step: "form",
+  name: category?.name ?? "",
+  exempt: category?.etimsNotRequired ?? false,
+  nameError: null,
+});
+
+/** Adding, editing or archiving a category, each a short form in the side sheet. */
+function CategorySheet({
   organizationId,
+  open,
+  category,
+  existing,
+  onClose,
+  onAdded,
 }: {
   organizationId: string;
+  open: boolean;
+  /** Null to add one. */
+  category: Category | null;
+  existing: readonly Category[];
+  onClose: () => void;
+  onAdded: () => void;
 }): JSX.Element {
-  const add = useChangeCategory(organizationId);
-  const [error, setError] = useState<string | null>(null);
+  const change = useChangeCategory(organizationId);
+  const { subject, form, setForm } = useSheetForm(open, category, initialForm);
+  const nameId = useId();
+  const exemptId = useId();
+  const unchanged =
+    subject !== null &&
+    tidy(form.name) === subject.name &&
+    form.exempt === subject.etimsNotRequired;
+
+  function close() {
+    change.reset();
+    onClose();
+  }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const values = new FormData(form);
-    const parsed = createCategoryRequestSchema.safeParse({
-      name: values.get("name"),
-      etimsNotRequired: values.get("etimsNotRequired") === "on",
-    });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Check the name.");
-      return;
-    }
-    setError(null);
-    add.mutate(
-      { kind: "create", fields: parsed.data },
-      { onSuccess: () => form.reset() },
-    );
-  }
-
-  return (
-    <form
-      onSubmit={onSubmit}
-      aria-label="Add a category"
-      className="flex max-w-3xl flex-wrap items-end gap-4 rounded-lg border border-stone-200 bg-white p-4"
-    >
-      <label className="min-w-56 flex-1 text-sm">
-        New category
-        <input
-          name="name"
-          maxLength={CATEGORY_NAME_MAX_LENGTH}
-          autoComplete="off"
-          placeholder="e.g. Courier"
-          className={inputClass}
-        />
-      </label>
-      <label className="flex items-center gap-2 py-2 text-sm">
-        <input
-          type="checkbox"
-          name="etimsNotRequired"
-          className="size-4 accent-brand-700"
-        />
-        No eTIMS invoice expected
-      </label>
-      <button type="submit" disabled={add.isPending} className={primaryButton}>
-        {add.isPending ? "Adding…" : "Add category"}
-      </button>
-      {error || add.isError ? (
-        <p className={`${alertClass} mt-0 w-full`} role="alert">
-          {error ?? describeApiError(add.error)}
-        </p>
-      ) : null}
-    </form>
-  );
-}
-
-function ActiveCategoryActions({
-  organizationId,
-  category,
-}: {
-  organizationId: string;
-  category: Category;
-}): JSX.Element {
-  const change = useChangeCategory(organizationId);
-  const [renaming, setRenaming] = useState(false);
-
-  if (renaming) {
-    return (
-      <RenameCategory
-        category={category}
-        saving={change.isPending}
-        error={change.isError ? describeApiError(change.error) : null}
-        onSave={(name) =>
-          change.mutate(
-            {
-              kind: "update",
-              categoryId: category.id,
-              changes: { name },
-            },
-            { onSuccess: () => setRenaming(false) },
+    const parsed = createCategoryRequestSchema.shape.name.safeParse(form.name);
+    const name = parsed.success ? tidy(parsed.data) : "";
+    const problem = !parsed.success
+      ? (parsed.error.issues[0]?.message ?? "Check the name.")
+      : existing.some(
+            (other) => other.id !== subject?.id && sameName(other.name, name),
           )
-        }
-        onCancel={() => {
-          change.reset();
-          setRenaming(false);
-        }}
-      />
-    );
-  }
-
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex flex-wrap justify-end gap-x-4 gap-y-1">
-        <button
-          type="button"
-          disabled={change.isPending}
-          onClick={() => setRenaming(true)}
-          className={textButton}
-        >
-          Rename
-        </button>
-        <button
-          type="button"
-          disabled={change.isPending}
-          onClick={() =>
-            change.mutate({
-              kind: "update",
-              categoryId: category.id,
-              changes: { etimsNotRequired: !category.etimsNotRequired },
-            })
-          }
-          className={textButton}
-        >
-          {category.etimsNotRequired
-            ? "Expect an invoice"
-            : "Mark no invoice expected"}
-        </button>
-        <button
-          type="button"
-          disabled={change.isPending}
-          onClick={() =>
-            change.mutate({ kind: "archive", categoryId: category.id })
-          }
-          className={textButton}
-        >
-          Archive
-        </button>
-      </div>
-      {change.isPending ? (
-        <span className="text-xs text-stone-500">Saving…</span>
-      ) : null}
-      {change.isError ? (
-        <p className="text-sm text-error-700" role="alert">
-          {describeApiError(change.error)}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function RenameCategory({
-  category,
-  saving,
-  error,
-  onSave,
-  onCancel,
-}: {
-  category: Category;
-  saving: boolean;
-  error: string | null;
-  onSave: (name: string) => void;
-  onCancel: () => void;
-}): JSX.Element {
-  const [invalid, setInvalid] = useState<string | null>(null);
-
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const parsed = createCategoryRequestSchema.shape.name.safeParse(
-      new FormData(event.currentTarget).get("name"),
-    );
-    if (!parsed.success) {
-      setInvalid(parsed.error.issues[0]?.message ?? "Check the name.");
+        ? `There's already a category called ${name}.`
+        : null;
+    if (problem) {
+      setForm((now) => ({ ...now, nameError: problem }));
+      document.getElementById(nameId)?.focus();
       return;
     }
-    setInvalid(null);
-    onSave(parsed.data);
+    if (subject === null) {
+      change.mutate(
+        { kind: "create", fields: { name, etimsNotRequired: form.exempt } },
+        {
+          onSuccess: () => {
+            onAdded();
+            close();
+          },
+        },
+      );
+      return;
+    }
+    change.mutate(
+      {
+        kind: "update",
+        categoryId: subject.id,
+        changes: {
+          ...(name === subject.name ? {} : { name }),
+          ...(form.exempt === subject.etimsNotRequired
+            ? {}
+            : { etimsNotRequired: form.exempt }),
+        },
+      },
+      { onSuccess: close },
+    );
+  }
+
+  const failed = change.isError ? (
+    <div role="alert">
+      <Callout tone="error">
+        <p>{describeApiError(change.error)}</p>
+      </Callout>
+    </div>
+  ) : null;
+
+  if (subject !== null && form.step === "archive") {
+    return (
+      <DetailSheet
+        open={open}
+        onClose={close}
+        dismissible={!change.isPending}
+        eyebrow={subject.name}
+        title="Archive this category?"
+        stepKey={`${subject.id}-archive`}
+        footer={
+          <>
+            <Button
+              disabled={change.isPending}
+              onClick={() =>
+                change.mutate(
+                  { kind: "archive", categoryId: subject.id },
+                  { onSuccess: close },
+                )
+              }
+            >
+              {change.isPending ? "Archiving…" : "Archive"}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={change.isPending}
+              onClick={() => {
+                change.reset();
+                setForm((now) => ({ ...now, step: "form" }));
+              }}
+            >
+              Keep it
+            </Button>
+          </>
+        }
+      >
+        {failed}
+        <Callout tone="neutral" icon={ArchiveIcon}>
+          <p>
+            {subject.name} can&apos;t be picked for new spending. What already
+            has it keeps it, and you can restore it later.
+          </p>
+        </Callout>
+      </DetailSheet>
+    );
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      aria-label={`Rename ${category.name}`}
-      className="flex flex-wrap items-center justify-end gap-2"
+    <DetailSheet
+      open={open}
+      onClose={close}
+      dismissible={!change.isPending}
+      eyebrow={subject?.name ?? "Categories"}
+      title={subject ? "Edit category" : "Add a category"}
+      stepKey={subject?.id ?? "new"}
+      footer={
+        <>
+          <Button
+            type="submit"
+            form="category-form"
+            disabled={change.isPending || unchanged}
+          >
+            {change.isPending
+              ? subject
+                ? "Saving…"
+                : "Adding…"
+              : subject
+                ? "Save"
+                : "Add category"}
+          </Button>
+          <Button variant="outline" disabled={change.isPending} onClick={close}>
+            Cancel
+          </Button>
+          {subject ? (
+            <SheetActions kind="secondary">
+              <Button
+                variant="ghost"
+                size="md"
+                disabled={change.isPending}
+                onClick={() => {
+                  change.reset();
+                  setForm((now) => ({ ...now, step: "archive" }));
+                }}
+              >
+                <ArchiveIcon aria-hidden="true" />
+                Archive
+              </Button>
+            </SheetActions>
+          ) : null}
+        </>
+      }
     >
-      <input
-        name="name"
-        defaultValue={category.name}
-        maxLength={CATEGORY_NAME_MAX_LENGTH}
-        aria-label="New name"
-        autoComplete="off"
-        className={`${inputClass} mt-0 w-48`}
-      />
-      <button type="submit" disabled={saving} className={secondaryButton}>
-        {saving ? "Saving…" : "Save"}
-      </button>
-      <button
-        type="button"
-        disabled={saving}
-        onClick={onCancel}
-        className={textButton}
+      <form
+        id="category-form"
+        aria-label={subject ? `Edit ${subject.name}` : "Add a category"}
+        noValidate
+        onSubmit={onSubmit}
+        className="flex flex-col gap-[18px]"
       >
-        Cancel
-      </button>
-      {invalid || error ? (
-        <p className="w-full text-right text-sm text-error-700" role="alert">
-          {invalid ?? error}
-        </p>
-      ) : null}
-    </form>
-  );
-}
-
-function RestoreCategory({
-  organizationId,
-  category,
-}: {
-  organizationId: string;
-  category: Category;
-}): JSX.Element {
-  const change = useChangeCategory(organizationId);
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <button
-        type="button"
-        disabled={change.isPending}
-        onClick={() =>
-          change.mutate({ kind: "restore", categoryId: category.id })
-        }
-        className={textButton}
-      >
-        {change.isPending ? "Restoring…" : "Restore"}
-      </button>
-      {change.isError ? (
-        <p className="text-sm text-error-700" role="alert">
-          {describeApiError(change.error)}
-        </p>
-      ) : null}
-    </div>
+        {failed}
+        <Field>
+          <FieldLabel htmlFor={nameId}>
+            {subject ? "Name" : "New category"}
+          </FieldLabel>
+          <Input
+            id={nameId}
+            value={form.name}
+            maxLength={CATEGORY_NAME_MAX_LENGTH}
+            autoComplete="off"
+            placeholder="e.g. Courier"
+            aria-invalid={form.nameError ? true : undefined}
+            onChange={(event) => {
+              const name = event.target.value;
+              setForm((now) => ({ ...now, name, nameError: null }));
+            }}
+          />
+          <FieldError>{form.nameError}</FieldError>
+        </Field>
+        <label
+          htmlFor={exemptId}
+          className="flex cursor-pointer items-start gap-2.5"
+        >
+          <RowCheckbox
+            id={exemptId}
+            className="mt-px"
+            checked={form.exempt}
+            onChange={(event) => {
+              const exempt = event.target.checked;
+              setForm((now) => ({ ...now, exempt }));
+            }}
+          />
+          <span>
+            <span className="block text-sm font-(--w-ui) text-gray-900">
+              No eTIMS invoice expected
+            </span>
+            <span className="block text-xs leading-4 text-gray-500">
+              {subject
+                ? "e.g. air tickets, bank charges. Changing this applies to new spending; what's already recorded keeps its eTIMS status."
+                : "e.g. air tickets, bank charges. New spending in it is recorded as not needing an eTIMS invoice."}
+            </span>
+          </span>
+        </label>
+      </form>
+    </DetailSheet>
   );
 }

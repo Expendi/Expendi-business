@@ -11,10 +11,12 @@ import { queryKeys } from "~/lib/query-keys";
 /** The company's categories that can be picked, A to Z. */
 export function useCategories(
   organizationId: string,
+  { enabled = true }: { enabled?: boolean } = {},
 ): UseQueryResult<CategoriesResponse> {
   const { api } = useAuth();
   return useQuery({
     queryKey: queryKeys.categories(organizationId),
     queryFn: () => api.listCategories(organizationId),
+    enabled,
   });
 }

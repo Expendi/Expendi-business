@@ -5,10 +5,13 @@ import type {
   ClaimDetail,
   ClaimPaymentResult,
   ClaimsPage,
+  ClaimsSummary,
   ExpenseDetail,
   ExpenseListQuery,
   ExpensesPage,
+  ExpensesSummary,
   ExpenseStatus,
+  ExpenseSummaryQuery,
   MembersResponse,
   MeResponse,
   OverviewPerson,
@@ -23,8 +26,10 @@ import {
   claimDetailSchema,
   claimPaymentResultSchema,
   claimsPageSchema,
+  claimsSummarySchema,
   expenseDetailSchema,
   expensesPageSchema,
+  expensesSummarySchema,
   membersResponseSchema,
   meResponseSchema,
   overviewPersonSchema,
@@ -90,6 +95,13 @@ export interface CustomerApi {
     organizationId: string,
     expenseId: string,
   ) => Promise<ExpenseDetail>;
+  /** Totals of every expense the filters match, and each kind tab's count. */
+  getExpensesSummary: (
+    organizationId: string,
+    query: ExpenseSummaryQuery,
+  ) => Promise<ExpensesSummary>;
+  /** Claims waiting for approval and those whose payment failed. */
+  getClaimsSummary: (organizationId: string) => Promise<ClaimsSummary>;
   listClaims: (
     organizationId: string,
     query: ClaimQueueQuery,
@@ -152,6 +164,16 @@ export function createCustomerApi(client: ApiClient): CustomerApi {
       client.get(
         `/organizations/${organizationId}/expenses/${expenseId}`,
         expenseDetailSchema,
+      ),
+    getExpensesSummary: (organizationId, query) =>
+      client.get(
+        withQuery(`/organizations/${organizationId}/expenses/summary`, query),
+        expensesSummarySchema,
+      ),
+    getClaimsSummary: (organizationId) =>
+      client.get(
+        `/organizations/${organizationId}/claims/summary`,
+        claimsSummarySchema,
       ),
     listClaims: (organizationId, query) =>
       client.get(

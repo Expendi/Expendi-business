@@ -1,9 +1,10 @@
 "use client";
 
-import type { JSX } from "react";
-import { useState } from "react";
+import type { JSX, Ref } from "react";
+import { CheckIcon, CopyIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { secondaryButton } from "~/components/styles";
+import { Button } from "~/components/ui/button";
 
 type CopyState = "idle" | "copied" | "failed";
 
@@ -11,11 +12,19 @@ type CopyState = "idle" | "copied" | "failed";
 export function CopyButton({
   value,
   label = "Copy",
+  ref,
 }: {
   value: string;
   label?: string;
+  ref?: Ref<HTMLButtonElement>;
 }): JSX.Element {
   const [state, setState] = useState<CopyState>("idle");
+
+  useEffect(() => {
+    if (state !== "copied") return;
+    const timer = setTimeout(() => setState("idle"), 2000);
+    return () => clearTimeout(timer);
+  }, [state]);
 
   function copy() {
     // Inside the promise, so a browser without the clipboard API (or an
@@ -29,17 +38,30 @@ export function CopyButton({
   }
 
   return (
-    <span className="inline-flex items-center gap-2">
-      <button type="button" onClick={copy} className={secondaryButton}>
-        {label}
-      </button>
-      <span role="status" className="text-sm text-stone-600">
-        {state === "copied"
-          ? "Copied"
-          : state === "failed"
-            ? "Couldn't copy. Select it and copy it instead."
-            : null}
+    <div className="flex flex-col gap-1.5">
+      <Button
+        ref={ref}
+        type="button"
+        variant="outline"
+        size="md"
+        onClick={copy}
+        className="w-full"
+      >
+        {state === "copied" ? (
+          <CheckIcon aria-hidden="true" />
+        ) : (
+          <CopyIcon aria-hidden="true" />
+        )}
+        {state === "copied" ? "Copied" : label}
+      </Button>
+      <span
+        role="status"
+        className="text-xs leading-4 text-gray-600 empty:hidden"
+      >
+        {state === "failed"
+          ? "Couldn't copy. Select it and copy it instead."
+          : ""}
       </span>
-    </span>
+    </div>
   );
 }
