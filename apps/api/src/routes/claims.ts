@@ -26,6 +26,7 @@ import {
   requestClaimRetry,
 } from "../services/expenses/claim-approval.js";
 import {
+  claimsSummary,
   getClaim,
   listClaims,
   rejectClaim,
@@ -86,7 +87,9 @@ const PREPARATION_FAILURES = {
  * Admins and employees submit their own; employees see only theirs, and
  * admins and accountants see all. Only the person who submitted a claim
  * edits it, until it's approved.
- * Only admins approve, pay, retry and reject.
+ * Only admins approve, pay, retry and reject. `/summary` counts the claims
+ * waiting for approval and those whose payment failed, of the ones the
+ * caller can see.
  */
 export function createClaimRoutes(
   runtime: AppRuntime,
@@ -168,6 +171,9 @@ export function createClaimRoutes(
         ),
       );
     })
+    .get("/summary", (c) =>
+      runEffect(runtime, c, claimsSummary(c.get("tenant"))),
+    )
     .post("/", (c) => {
       const tenant = c.get("tenant");
       return runEffect(

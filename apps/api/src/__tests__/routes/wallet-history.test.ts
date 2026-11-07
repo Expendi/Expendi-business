@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { WalletHistoryResponse } from "@expendi-business/shared";
@@ -11,7 +12,7 @@ import type { AppRuntime } from "../../runtime.js";
 import type { PayingCompany } from "../helpers/payouts.js";
 import { createApp } from "../../app.js";
 import { DatabaseService } from "../../db/client.js";
-import { walletTransactions } from "../../db/schema/index.js";
+import { payouts, walletTransactions } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 import {
   confirmWithdrawal,
@@ -178,11 +179,65 @@ describe("GET /organizations/:id/wallet/history", () => {
       recipientDetail: "•••• 5678",
       amountKesCents: "150000",
       status: "paying",
+      subjectId: claim.subjectId,
+      payrollRunId: null,
+      approvalId: claim.approvalId,
+      approvedAt: claim.approvedAt?.toISOString(),
+      paidAt: null,
+      rate: claim.rate,
+      failureReason: null,
     };
     expect(page.items.slice(1, 3).map((item) => item.payout)).toEqual([
       expected,
       expected,
     ]);
+  });
+
+  it("ties payouts approved with one passkey together, and says why one failed", async () => {
+    // #given two claims paid together, and one of them fails
+    const [first, second] = await payClaims(runtime, db, paying, [
+      claimRequest(),
+      claimRequest(),
+    ]);
+    if (!first || !second) throw new Error("no claim payouts");
+    await runInScope(
+      db,
+      { organizationId: paying.company.organizationId },
+      (tx) =>
+        tx
+          .update(payouts)
+          .set({
+            status: "failed",
+            failureReason: "The M-Pesa number is wrong.",
+          })
+          .where(eq(payouts.id, second.id)),
+    );
+
+    // #when
+    const page = await historyPage();
+
+    // #then
+    const byPayout = new Map(
+      page.items.flatMap((item) =>
+        item.payout ? [[item.payout.id, item.payout] as const] : [],
+      ),
+    );
+    expect({
+      sameApproval:
+        byPayout.get(first.id)?.approvalId ===
+        byPayout.get(second.id)?.approvalId,
+      approvalId: byPayout.get(first.id)?.approvalId,
+      failed: byPayout.get(second.id)?.failureReason,
+      subjects: [
+        byPayout.get(first.id)?.subjectId,
+        byPayout.get(second.id)?.subjectId,
+      ],
+    }).toEqual({
+      sameApproval: true,
+      approvalId: first.approvalId,
+      failed: "The M-Pesa number is wrong.",
+      subjects: [first.subjectId, second.subjectId],
+    });
   });
 
   it("never returns a full M-Pesa number", async () => {

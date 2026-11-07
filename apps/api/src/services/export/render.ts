@@ -72,7 +72,7 @@ export const SHEET_NAMES = {
 } as const;
 
 const KIND_LABELS: Readonly<Record<MoneyOutKind, string>> = {
-  claim: "Claim",
+  claim: "Reimbursement",
   float: "Float",
   bill: "Bill",
   salary: "Salary",

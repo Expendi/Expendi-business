@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { OVERVIEW_HEADINGS } from "./claims.js";
 import { formatKesAmount } from "./kes-amount.js";
+import { RECURRING_SCHEDULES } from "./recurring.js";
 
 const units = z.string().regex(/^-?\d+$/);
 export const overviewQuerySchema = z.object({
@@ -34,9 +35,19 @@ export const overviewPaymentSchema = z.object({
   channel: z.enum(["expendi", "outside", "float"]),
 });
 export const cashObligationSchema = z.object({
+  /**
+   * The bill (`/bills?billId=`), the payroll run (`/payroll?runId=`), or
+   * for a forecast the recurring payment or salary it will be billed from.
+   */
   id: z.string(),
   kind: z.enum(["bill", "payroll", "forecast"]),
   name: z.string(),
+  /** The bill's or recurring payment's note, e.g. "PAYE for October". */
+  notes: z.string().nullable(),
+  /** How often it repeats when it comes from a recurring payment or salary. */
+  schedule: z.enum(RECURRING_SCHEDULES).nullable(),
+  /** A payroll run's people still to pay; null for anything else. */
+  people: z.number().int().nonnegative().nullable(),
   dueOn: z.string(),
   amountKes: units.nullable(),
   status: z.string(),
@@ -62,6 +73,11 @@ const outstandingExpense = z.object({
   name: z.string(),
   amountKes: units,
   floatId: z.string().nullable(),
+  spentOn: z.string(),
+  /** The claimant or float holder. */
+  personName: z.string(),
+  categoryName: z.string(),
+  description: z.string().nullable(),
 });
 export const spendingOverviewSchema = z.object({
   month: z.string(),
@@ -76,6 +92,11 @@ export const spendingOverviewSchema = z.object({
     dueToday: z.array(cashObligationSchema),
     claims: z.array(outstandingExpense),
     noReceipt: z.array(outstandingExpense),
+    /**
+     * Petty cash spending with a receipt but no eTIMS invoice, in a
+     * category that expects one.
+     */
+    noEtims: z.array(outstandingExpense),
   }),
   cash: cashProjectionSchema.extend({
     balanceUsdc: units,

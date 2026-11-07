@@ -14,8 +14,9 @@ import { companySpendingReceiptSchema } from "./company-spending.js";
 /**
  * All expenses, for the web dashboard (spec §6.14): every claim, petty cash
  * purchase and company spending record, for admins and accountants.
- * Salaries and bills paid through Expendi aren't expenses here; a bill
- * marked paid outside is, once, as the company spending it recorded.
+ * Expenses are money already spent; money owed to suppliers is a bill. So
+ * salaries and bills aren't listed here, not even the company spending a
+ * bill marked paid outside Expendi records: that bill shows in Bills.
  */
 
 /**
@@ -44,8 +45,24 @@ export const expenseMonthSchema = z
 
 export const EXPENSES_PAGE_MAX_SIZE = 100;
 
-/** `GET …/expenses`: latest purchase date first, a page at a time. */
-export const expenseListQuerySchema = z.object({
+/**
+ * What the list sorts by: purchase date, the person's name, the merchant,
+ * the amount, or the status, most urgent first (payment failed, waiting
+ * for approval, being paid, rejected, paid, paid before Expendi, recorded).
+ * Ties go by purchase date, then when it was recorded, in the same
+ * direction.
+ */
+export const EXPENSE_SORT_KEYS = [
+  "date",
+  "person",
+  "merchant",
+  "amount",
+  "status",
+] as const;
+export type ExpenseSortKey = (typeof EXPENSE_SORT_KEYS)[number];
+
+/** The filters `GET …/expenses` and `GET …/expenses/summary` share. */
+const expenseFilterFields = {
   /** The claimant, the float holder, or the admin who recorded company spending. */
   membershipId: z.uuid({ error: "That person wasn't found." }).optional(),
   kind: expenseListKindSchema.optional(),
@@ -53,12 +70,40 @@ export const expenseListQuerySchema = z.object({
   /** By the purchase date. */
   month: expenseMonthSchema.optional(),
   etimsStatus: etimsStatusSchema.optional(),
+  status: expenseStatusSchema.optional(),
+  /** `true`: only those with no receipt; `false`: only those with one. */
+  noReceipt: z
+    .enum(["true", "false"], { error: "noReceipt is true or false." })
+    .transform((value) => value === "true")
+    .optional(),
+};
+
+/**
+ * `GET …/expenses`: a page at a time, latest purchase date first unless
+ * `sort` and `dir` say otherwise. A cursor only continues the sort it came
+ * from.
+ */
+export const expenseListQuerySchema = z.object({
+  ...expenseFilterFields,
+  sort: z
+    .enum(EXPENSE_SORT_KEYS, {
+      error: "sort is date, person, merchant, amount or status.",
+    })
+    .default("date"),
+  dir: z
+    .enum(["asc", "desc"], { error: "dir is asc or desc." })
+    .default("desc"),
   /** `nextCursor` from the previous page. */
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(EXPENSES_PAGE_MAX_SIZE).default(50),
 });
 
 export type ExpenseListQuery = z.input<typeof expenseListQuerySchema>;
+
+/** `GET …/expenses/summary`: the list's filters, without paging or sorting. */
+export const expenseSummaryQuerySchema = z.object(expenseFilterFields);
+
+export type ExpenseSummaryQuery = z.input<typeof expenseSummaryQuerySchema>;
 
 const kesCents = z.string().regex(/^\d+$/);
 
@@ -135,3 +180,27 @@ export const expenseDetailSchema = expenseSchema.extend({
 });
 
 export type ExpenseDetail = z.infer<typeof expenseDetailSchema>;
+
+const expenseTotalsSchema = z.object({
+  count: z.number().int().nonnegative(),
+  /** KES cents, as a decimal string. */
+  totalKes: kesCents,
+});
+
+/**
+ * `GET …/expenses/summary`: every expense the filters match, not just a
+ * page. `kinds` counts each tab with every filter but the kind.
+ */
+export const expensesSummarySchema = expenseTotalsSchema.extend({
+  waitingForApproval: expenseTotalsSchema,
+  withoutReceipt: expenseTotalsSchema,
+  /** eTIMS status `none`. */
+  withoutEtims: expenseTotalsSchema,
+  kinds: z.object({
+    claim: z.number().int().nonnegative(),
+    petty_cash: z.number().int().nonnegative(),
+    company: z.number().int().nonnegative(),
+  }),
+});
+
+export type ExpensesSummary = z.infer<typeof expensesSummarySchema>;

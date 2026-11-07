@@ -130,6 +130,9 @@ const serialiseObligation = (row: CashObligationView): CashObligation => ({
   id: row.id,
   kind: row.kind,
   name: row.name,
+  notes: row.notes,
+  schedule: row.schedule,
+  people: row.people,
   dueOn: row.dueOn,
   amountKes: row.amountKes?.toString() ?? null,
   status: row.status,
@@ -156,41 +159,62 @@ function serialiseCash(cash: CashCheck): SpendingOverview["cash"] {
   };
 }
 
-/** Claims waiting for approval, and petty cash spent without a receipt. */
+type OutstandingExpense = SpendingOverview["outstanding"]["claims"][number];
+
+/**
+ * Claims waiting for approval, and petty cash spent without a receipt or,
+ * with one, without the eTIMS invoice its category expects. An overspend's
+ * extra claim shares its float spending's receipt and invoice.
+ */
 function readOutstandingExpenses(tx: Transaction, organizationId: string) {
   return query(() =>
-    tx.execute<{
-      id: string;
-      name: string;
-      amountKes: string;
-      floatId: string | null;
-      kind: "claim" | "float";
-    }>(sql`
-      SELECT e.id::text, e.merchant AS name, e.amount_kes::text AS "amountKes",
-        e.float_id::text AS "floatId", e.kind::text AS kind
-      FROM expenses e
-      WHERE e.organization_id = ${organizationId}
-        AND (
-          (e.kind = 'claim' AND e.status = 'submitted')
-          OR (
-            e.kind = 'float'
-            AND NOT EXISTS (
+    tx.execute<
+      OutstandingExpense & { need: "approval" | "receipt" | "etims" }
+    >(sql`
+      SELECT id, name, "amountKes", "floatId", "spentOn", "personName",
+        "categoryName", description, need
+      FROM (
+        SELECT e.id::text, e.merchant AS name, e.amount_kes::text AS "amountKes",
+          e.float_id::text AS "floatId", e.spent_on::text AS "spentOn",
+          coalesce(nullif(btrim(u.full_name), ''), u.email) AS "personName",
+          c.name AS "categoryName", e.description,
+          CASE
+            WHEN e.kind = 'claim' THEN 'approval'
+            WHEN NOT EXISTS (
               SELECT 1 FROM receipt_files r
               WHERE r.expense_id IN (e.id, e.overspend_claim_id)
-            )
+            ) THEN 'receipt'
+            WHEN e.source = 'app'
+              AND coalesce(extra.etims_status, e.etims_status) = 'none'
+              THEN 'etims'
+          END AS need,
+          e.created_at
+        FROM expenses e
+        JOIN memberships m ON m.id = e.membership_id
+        JOIN users u ON u.id = m.user_id
+        JOIN categories c ON c.id = e.category_id
+        LEFT JOIN expenses extra ON extra.id = e.overspend_claim_id
+        WHERE e.organization_id = ${organizationId}
+          AND (
+            (e.kind = 'claim' AND e.status = 'submitted')
+            OR (e.kind = 'float' AND e.status = 'recorded')
           )
-        )
-      ORDER BY e.spent_on, e.created_at, e.id
+      ) outstanding
+      WHERE need IS NOT NULL
+      ORDER BY "spentOn", created_at, id
     `),
   ).pipe(
-    Effect.map(({ rows }) => ({
-      claims: rows
-        .filter((row) => row.kind === "claim")
-        .map(({ kind: _kind, ...row }) => row),
-      noReceipt: rows
-        .filter((row) => row.kind === "float")
-        .map(({ kind: _kind, ...row }) => row),
-    })),
+    Effect.map(({ rows }) => {
+      const needing = (need: "approval" | "receipt" | "etims") =>
+        rows
+          .filter((row) => row.need === need)
+          .map(({ need: _need, ...row }) => row);
+      return {
+        claims: needing("approval"),
+        noReceipt: needing("receipt"),
+        noEtims: needing("etims"),
+      };
+    }),
   );
 }
 
@@ -201,7 +225,7 @@ function readOutstandingExpenses(tx: Transaction, organizationId: string) {
  * otherwise a removed member or an archived payee is found too, for their
  * history.
  */
-function readPeople(
+export function readPeople(
   tx: Transaction,
   organizationId: string,
   options: { readonly current: boolean; readonly id?: string },

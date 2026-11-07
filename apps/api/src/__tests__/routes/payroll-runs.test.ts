@@ -181,9 +181,87 @@ describe("GET /organizations/:id/payroll-runs", () => {
         capKes: "12000000",
         people: 2,
         leftOut: 0,
+        adjusted: 0,
+        oneOffs: 0,
         approvedAt: null,
       },
     ]);
+  });
+
+  it("counts changed pay and one-offs, leaving out the people left out", async () => {
+    // #given Amina's pay changes, Brian gets a one-off, and Brian's changed salary is left out
+    const aminaBill = await billOf(amina);
+    const brianBill = await billOf(brian);
+    const change = (billId: string) =>
+      send("PATCH", `${base()}/${runId}/payments/${billId}`, {
+        amountKes: "61,000",
+        reason: "Overtime",
+      });
+    await change(aminaBill.id);
+    await change(brianBill.id);
+    await send("POST", `${base()}/${runId}/one-offs`, {
+      payeeId: brian.payeeId,
+      amountKes: "5,000",
+      reason: "Bonus",
+    });
+    await send(
+      "POST",
+      `${base()}/${runId}/payments/${brianBill.id}/leave-out`,
+      {
+        reason: "Unpaid leave",
+      },
+    );
+
+    // #when
+    const [run] = await dataOf(
+      await send("GET", base()),
+      payrollRunsResponseSchema,
+    );
+
+    // #then
+    expect(run).toMatchObject({
+      people: 2,
+      leftOut: 1,
+      adjusted: 1,
+      oneOffs: 1,
+    });
+  });
+
+  it("shows the last 4 digits a person is paid to, but never an employee's own M-Pesa number", async () => {
+    // #given a casual worker paid on M-Pesa, and another to a bank account
+    const mpesaId = await insertPersonnelPayee(
+      db,
+      company,
+      "Otieno",
+      "+254712345678",
+    );
+    const bankId = await insertPayee(db, company, {
+      kind: "personnel",
+      name: "Wekesa",
+      method: "bank",
+      bankCode: "KCBLKENX",
+      bankAccountNumber: "1100223344",
+      accountName: "Wekesa",
+      detailsChangedAt: new Date("2026-01-01T00:00:00Z"),
+    });
+    for (const payeeId of [mpesaId, bankId]) {
+      await send("POST", `${base()}/${runId}/one-offs`, {
+        payeeId,
+        amountKes: "2,500",
+        reason: "Stock take",
+        categoryId,
+      });
+    }
+
+    // #when
+    const run = await detail();
+
+    // #then
+    expect(
+      Object.fromEntries(
+        run.payments.map(({ payee }) => [payee.name, payee.accountEnding]),
+      ),
+    ).toEqual({ Amina: null, Brian: null, Otieno: "5678", Wekesa: "3344" });
   });
 
   it("shows everyone in the run with their pay", async () => {

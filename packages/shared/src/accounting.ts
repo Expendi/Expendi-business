@@ -259,3 +259,54 @@ export const accountingSyncsResponseSchema = z.object({
 export type AccountingSyncsResponse = z.infer<
   typeof accountingSyncsResponseSchema
 >;
+
+export const COMPANY_ZOHO_FAILED_SYNCS_SHOWN = 20;
+
+/**
+ * - `not_connected`: there's no connection, or staff disconnected it.
+ * - `pending`, `active`, `needs_reconnect`: as `accountingConnectionStatusSchema`.
+ */
+export const COMPANY_ZOHO_STATUSES = [
+  "not_connected",
+  "pending",
+  "active",
+  "needs_reconnect",
+] as const;
+export const companyZohoStatusSchema = z.enum(COMPANY_ZOHO_STATUSES);
+export type CompanyZohoStatus = z.infer<typeof companyZohoStatusSchema>;
+
+/** A paid item that didn't reach Zoho Books, as the company sees it. */
+export const companyFailedSyncSchema = z.object({
+  id: z.uuid(),
+  subjectType: accountingSyncSubjectTypeSchema,
+  subjectId: z.uuid(),
+  /** e.g. the reimbursement's merchant or the bill's payee; null if it can't be read. */
+  label: z.string().nullable(),
+  /** Why the last try failed, for people to read. */
+  reason: z.string().nullable(),
+  failedAt: z.iso.datetime(),
+});
+export type CompanyFailedSync = z.infer<typeof companyFailedSyncSchema>;
+
+/**
+ * `GET /organizations/:id/settings/zoho`: the company's Zoho Books
+ * connection, for its admins and accountants. Only Expendi staff connect,
+ * reconnect, disconnect or retry, so this is read-only.
+ */
+export const companyZohoResponseSchema = z.object({
+  status: companyZohoStatusSchema,
+  /** The Zoho organization the company books to; null until staff choose it. */
+  organizationName: z.string().nullable(),
+  /** When someone last finished the Zoho sign-in. */
+  connectedAt: z.iso.datetime().nullable(),
+  /** When an item last reached Zoho. */
+  lastSyncedAt: z.iso.datetime().nullable(),
+  counts: z.object({
+    pending: z.int().nonnegative(),
+    synced: z.int().nonnegative(),
+    failed: z.int().nonnegative(),
+  }),
+  /** The most recent failures, newest first. */
+  failed: z.array(companyFailedSyncSchema).max(COMPANY_ZOHO_FAILED_SYNCS_SHOWN),
+});
+export type CompanyZohoResponse = z.infer<typeof companyZohoResponseSchema>;

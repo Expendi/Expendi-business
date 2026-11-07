@@ -58,6 +58,18 @@ export const walletHistoryPayoutSchema = z.object({
   /** What the recipient receives (KES cents); the KES value for USDC. */
   amountKesCents: digits,
   status: payoutStatusSchema,
+  /** The claim, bill, float movement or withdrawal it pays. */
+  subjectId: z.uuid(),
+  /** Set for a salary or one-off paid in a payroll run (`/payroll?runId=`). */
+  payrollRunId: z.uuid().nullable(),
+  /** Payouts approved with one passkey confirmation share it. */
+  approvalId: z.uuid().nullable(),
+  approvedAt: z.iso.datetime().nullable(),
+  paidAt: z.iso.datetime().nullable(),
+  /** KES per USDC the payout was sent at; null until Paycrest gives one. */
+  rate: z.string().nullable(),
+  /** Why it failed, for people to read. */
+  failureReason: z.string().nullable(),
 });
 
 export type WalletHistoryPayout = z.infer<typeof walletHistoryPayoutSchema>;

@@ -7,11 +7,13 @@ import type {
   ExpenseDetail,
   ExpenseListKind,
   ExpensesPage,
+  ExpensesSummary,
   FloatApproval,
 } from "@expendi-business/shared";
 import {
   expenseDetailSchema,
   expensesPageSchema,
+  expensesSummarySchema,
   floatApprovalSchema,
   floatSpendingResultSchema,
 } from "@expendi-business/shared";
@@ -369,7 +371,7 @@ describe("GET /organizations/:id/expenses", () => {
     });
   });
 
-  it("lists a bill marked paid outside once, as company spending", async () => {
+  it("never lists the company spending a bill marked paid outside records, which still opens by its ID", async () => {
     // #given
     const payeeId = await insertPayee(db, company(), { name: "Safaricom" });
     const billId = await insertBill(db, company(), {
@@ -385,19 +387,25 @@ describe("GET /organizations/:id/expenses", () => {
       { method: "POST", body: { paidOn: "2026-10-09" } },
     );
     expect(marked.status, await marked.clone().text()).toBe(200);
+    const [spending] = await runInScope(db, asAdmin(), (tx) =>
+      tx
+        .select({ id: expenses.id })
+        .from(expenses)
+        .where(eq(expenses.billId, billId)),
+    );
+    const recorded = await seed("company");
 
     // #when
     const everything = (await listed()).expenses;
     const companyOnly = (await listed("?kind=company")).expenses;
+    const opened = await detail(spending?.id ?? "");
 
     // #then
     expect({
-      all: everything.map((expense) => [expense.listKind, expense.bill?.id]),
-      company: companyOnly.map((expense) => expense.bill),
-    }).toEqual({
-      all: [["company", billId]],
-      company: [{ id: billId, payeeName: "Safaricom", reference: null }],
-    });
+      all: everything.map((expense) => expense.id),
+      company: companyOnly.map((expense) => expense.id),
+      opened: opened.bill?.id,
+    }).toEqual({ all: [recorded], company: [recorded], opened: billId });
   });
 
   describe("filters", () => {
@@ -520,6 +528,35 @@ describe("GET /organizations/:id/expenses", () => {
       });
     });
 
+    it("narrows by status, and by whether it has a receipt", async () => {
+      // #given
+      const waiting = await seed("claim");
+      const rejected = await seed("claim", {
+        status: "rejected",
+        rejectedReason: "Not a work expense",
+      });
+      const recorded = await seed("company");
+      await attachPhoto(waiting);
+
+      // #when
+      const results = {
+        waiting: await idsListed("?status=submitted"),
+        rejected: await idsListed("?status=rejected"),
+        noReceipt: await idsListed("?noReceipt=true"),
+        withReceipt: await idsListed("?noReceipt=false"),
+        together: await idsListed("?status=submitted&noReceipt=true"),
+      };
+
+      // #then
+      expect(results).toEqual({
+        waiting: [waiting],
+        rejected: [rejected],
+        noReceipt: [rejected, recorded].sort(),
+        withReceipt: [waiting],
+        together: [],
+      });
+    });
+
     it.each([
       "month=2026-13",
       "month=2026-00",
@@ -530,6 +567,10 @@ describe("GET /organizations/:id/expenses", () => {
       "categoryId=office",
       "membershipId=someone",
       "etimsStatus=missing",
+      "status=late",
+      "noReceipt=1",
+      "sort=size",
+      "dir=up",
       "limit=0",
       "limit=101",
       "cursor=not-a-page",
@@ -624,6 +665,255 @@ describe("GET /organizations/:id/expenses", () => {
         }),
       );
     }
+  });
+});
+
+describe("GET /organizations/:id/expenses, sorted", () => {
+  async function named(fullName: string): Promise<string> {
+    const person = await createUser(db);
+    await db.update(users).set({ fullName }).where(eq(users.id, person.id));
+    return addMember(db, company(), person);
+  }
+
+  /** Every page of the sort, followed through its cursors. */
+  async function everyPage(query: string): Promise<string[]> {
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const page: ExpensesPage = await listed(
+        `?${query}&limit=2${cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`}`,
+      );
+      seen.push(...page.expenses.map((expense) => expense.id));
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return seen;
+  }
+
+  it("sorts by amount either way, a tie going by when it was recorded", async () => {
+    // #given
+    const fifty = await seed("company", { amountKes: 5_000n });
+    const ten = await seed("claim", { amountKes: 1_000n });
+    const thirty = await seed("company", { amountKes: 3_000n });
+    const thirtyLater = await seed("claim", { amountKes: 3_000n });
+    const twenty = await seed("claim", { amountKes: 2_000n });
+
+    // #when
+    const sorted = {
+      asc: await everyPage("sort=amount&dir=asc"),
+      desc: await everyPage("sort=amount&dir=desc"),
+    };
+
+    // #then
+    expect(sorted).toEqual({
+      asc: [ten, twenty, thirty, thirtyLater, fifty],
+      desc: [fifty, thirtyLater, thirty, twenty, ten],
+    });
+  });
+
+  it("sorts by merchant without regard to case, whatever the name holds", async () => {
+    // #given
+    const naivas = await seed("claim", { merchant: "Naivas | Sarit" });
+    const java = await seed("claim", { merchant: "java House" });
+    const artcaffe = await seed("company", { merchant: "Artcaffe" });
+    const quickmart = await seed("claim", { merchant: "Quickmart" });
+
+    // #when
+    const sorted = await everyPage("sort=merchant&dir=asc");
+
+    // #then
+    expect(sorted).toEqual([artcaffe, java, naivas, quickmart]);
+  });
+
+  it("sorts by the person's name", async () => {
+    // #given
+    const amina = await named("amina Hassan");
+    const brian = await named("Brian Otieno");
+    const byBrian = await seed("claim", { membershipId: brian });
+    const byAmina = await seed("claim", { membershipId: amina });
+    const byJane = await seed("claim");
+
+    // #when
+    const sorted = await everyPage("sort=person&dir=desc");
+
+    // #then
+    expect(sorted).toEqual([byJane, byBrian, byAmina]);
+  });
+
+  it("sorts by status, a failed payment first and recorded spending last", async () => {
+    // #given
+    const recorded = await seed("company");
+    const paid = await seed("claim", { status: "paid" });
+    const waiting = await seed("claim", { status: "submitted" });
+    const failed = await seed("claim", { status: "payout_failed" });
+    const rejected = await seed("claim", {
+      status: "rejected",
+      rejectedReason: "Not a work expense",
+    });
+
+    // #when
+    const sorted = await everyPage("sort=status&dir=asc");
+
+    // #then
+    expect(sorted).toEqual([failed, waiting, rejected, paid, recorded]);
+  });
+
+  it("sorts by purchase date oldest first", async () => {
+    // #given
+    const october = await seed("claim", { spentOn: "2026-10-03" });
+    const september = await seed("company", { spentOn: "2026-09-20" });
+    const november = await seed("claim", { spentOn: "2026-11-01" });
+
+    // #when
+    const sorted = await everyPage("sort=date&dir=asc");
+
+    // #then
+    expect(sorted).toEqual([september, october, november]);
+  });
+
+  it("refuses a cursor from another sort", async () => {
+    // #given
+    await seed("claim", { merchant: "Artcaffe" });
+    await seed("claim", { merchant: "Bolt" });
+    const { nextCursor } = await listed("?sort=merchant&dir=asc&limit=1");
+
+    // #when
+    const statuses = await Promise.all(
+      ["sort=amount", "sort=date", "sort=status"].map(async (sort) => {
+        const response = await read(
+          `?${sort}&limit=1&cursor=${encodeURIComponent(nextCursor ?? "")}`,
+        );
+        return response.status;
+      }),
+    );
+
+    // #then
+    expect(statuses).toEqual([400, 400, 400]);
+  });
+});
+
+describe("GET /organizations/:id/expenses/summary", () => {
+  async function summary(
+    query = "",
+    user: TestUser = admin(),
+  ): Promise<ExpensesSummary> {
+    return expensesSummarySchema.parse(
+      await dataOf(await read(`/summary${query}`, user)),
+    );
+  }
+
+  it("counts and totals every expense the filters match, however many pages", async () => {
+    // #given
+    const waiting = await seed("claim", {
+      amountKes: 100_000n,
+      etimsStatus: "attached",
+      etimsInvoiceNumber: "INV1",
+    });
+    await attachPhoto(waiting);
+    await seed("claim", { amountKes: 200_000n, etimsStatus: "none" });
+    await seed("float", {
+      amountKes: 50_000n,
+      etimsStatus: "not_required",
+    });
+    await seed("company", { amountKes: 400_000n, etimsStatus: "none" });
+
+    // #when
+    const result = await summary();
+
+    // #then
+    expect(result).toEqual({
+      count: 4,
+      totalKes: "750000",
+      waitingForApproval: { count: 2, totalKes: "300000" },
+      withoutReceipt: { count: 3, totalKes: "650000" },
+      withoutEtims: { count: 2, totalKes: "600000" },
+      kinds: { claim: 2, petty_cash: 1, company: 1 },
+    });
+  });
+
+  it("totals the kind asked for, and counts every kind's tab with the other filters", async () => {
+    // #given
+    await seed("claim", { amountKes: 100_000n });
+    await seed("claim", { amountKes: 100_000n, categoryId: mealsId });
+    await seed("float", { amountKes: 50_000n });
+    await seed("company", { amountKes: 400_000n });
+
+    // #when
+    const result = await summary(`?kind=claim&categoryId=${officeId}`);
+
+    // #then
+    expect({
+      count: result.count,
+      totalKes: result.totalKes,
+      kinds: result.kinds,
+    }).toEqual({
+      count: 1,
+      totalKes: "100000",
+      kinds: { claim: 1, petty_cash: 1, company: 1 },
+    });
+  });
+
+  it("never counts the company spending a bill marked paid outside records", async () => {
+    // #given
+    const billId = await insertBill(db, company(), {
+      payeeId: await insertPayee(db, company()),
+      categoryId: officeId,
+      dueOn: "2026-10-10",
+      status: "due",
+    });
+    const marked = await sendJson(
+      app,
+      companyPath(`/bills/${billId}/mark-paid-outside`),
+      admin(),
+      { method: "POST", body: { paidOn: "2026-10-09" } },
+    );
+    expect(marked.status, await marked.clone().text()).toBe(200);
+
+    // #when
+    const result = await summary();
+
+    // #then
+    expect({ count: result.count, kinds: result.kinds }).toEqual({
+      count: 0,
+      kinds: { claim: 0, petty_cash: 0, company: 0 },
+    });
+  });
+
+  it("shows an accountant what an admin sees, and refuses employees", async () => {
+    // #given
+    await seed("claim");
+    await seed("company");
+
+    // #when
+    const asEmployee = await read("/summary", employee);
+
+    // #then
+    expect(await summary("", accountant)).toEqual(await summary());
+    expect(asEmployee.status).toBe(403);
+  });
+
+  it.each(["kind=float", "noReceipt=yes", "status=late", "month=2026-1"])(
+    "refuses the malformed filter %s",
+    async (filter) => {
+      // #when
+      const response = await read(`/summary?${filter}`);
+
+      // #then
+      expect(response.status).toBe(400);
+    },
+  );
+
+  it("keeps each company's totals to itself", async () => {
+    // #given
+    const other = await createCompany(db);
+
+    // #then
+    await expectRouteIsolation(
+      app,
+      { db, companyA: company(), companyB: other },
+      (organizationId) => ({
+        path: `/organizations/${organizationId}/expenses/summary`,
+      }),
+    );
   });
 });
 

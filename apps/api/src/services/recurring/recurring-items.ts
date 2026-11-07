@@ -1,5 +1,5 @@
 import type { SQL } from "drizzle-orm";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Effect } from "effect";
 
@@ -85,11 +85,17 @@ export interface RecurringItemView {
     readonly id: string;
     readonly status: BillStatus;
     readonly dueOn: string;
+    readonly currency: BillCurrency;
     readonly amountKes: bigint | null;
     readonly amountUsdc: bigint | null;
   } | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+}
+
+export interface RecurringItemFilters {
+  /** Leaves out salaries, which payroll sets up and pays. */
+  readonly excludeSalaries?: boolean | undefined;
 }
 
 type ItemDeps = DatabaseService | AuditLog;
@@ -128,7 +134,7 @@ const userActor = (tenant: Tenant): AuditActor => ({
   id: tenant.userId,
 });
 
-function stateOf(
+export function recurringItemState(
   item: Pick<RecurringItemRow, "active" | "nextDueOn">,
 ): RecurringItemState {
   if (item.nextDueOn === null) return "ended";
@@ -149,6 +155,7 @@ const itemColumns = {
   nextBillId: nextBill.id,
   nextBillStatus: nextBill.status,
   nextBillDueOn: nextBill.dueOn,
+  nextBillCurrency: nextBill.currency,
   nextBillAmountKes: nextBill.amountKes,
   nextBillAmountUsdc: nextBill.amountUsdc,
 };
@@ -175,7 +182,7 @@ function toView(row: SelectedItem): RecurringItemView {
   const { item } = row;
   return {
     id: item.id,
-    state: stateOf(item),
+    state: recurringItemState(item),
     payee: {
       id: item.payeeId,
       name: row.payeeName,
@@ -200,12 +207,14 @@ function toView(row: SelectedItem): RecurringItemView {
     nextBill:
       row.nextBillId === null ||
       row.nextBillStatus === null ||
-      row.nextBillDueOn === null
+      row.nextBillDueOn === null ||
+      row.nextBillCurrency === null
         ? null
         : {
             id: row.nextBillId,
             status: row.nextBillStatus,
             dueOn: row.nextBillDueOn,
+            currency: row.nextBillCurrency,
             amountKes: row.nextBillAmountKes,
             amountUsdc: row.nextBillAmountUsdc,
           },
@@ -218,10 +227,19 @@ function toView(row: SelectedItem): RecurringItemView {
 export function listRecurringItems(
   tenant: Tenant,
   limit: number,
+  filters: RecurringItemFilters = {},
 ): Effect.Effect<RecurringItemView[], DatabaseError, DatabaseService> {
   return withScope(tenant, (tx) =>
     query(() =>
-      selectItems(tx, eq(recurringItems.organizationId, tenant.organizationId))
+      selectItems(
+        tx,
+        and(
+          eq(recurringItems.organizationId, tenant.organizationId),
+          filters.excludeSalaries
+            ? ne(recurringItems.overviewHeading, "salaries")
+            : undefined,
+        ),
+      )
         .orderBy(
           sql`${recurringItems.nextDueOn} IS NULL`,
           sql`NOT ${recurringItems.active}`,

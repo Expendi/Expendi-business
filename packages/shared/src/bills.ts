@@ -10,7 +10,12 @@ import {
   receiptFileKindSchema,
 } from "./claims.js";
 import { parseUsdToUsdcUnits } from "./kes-amount.js";
-import { payeeKindSchema, payeeMethodSchema } from "./payee.js";
+import { PAYEE_METHODS, payeeKindSchema, payeeMethodSchema } from "./payee.js";
+import {
+  RECURRING_ITEM_STATES,
+  recurringScheduleSchema,
+} from "./recurring-schedule.js";
+import { payoutStatusSchema } from "./wallet-history.js";
 
 /** Bill statuses (spec §6.20). */
 export const BILL_STATUSES = [
@@ -90,6 +95,37 @@ export const DATED_BILL_STATUSES = [
   "overdue",
 ] as const satisfies readonly BillStatus[];
 export type DatedBillStatus = (typeof DATED_BILL_STATUSES)[number];
+
+/** Settled for good: paid through Expendi, paid outside it, or cancelled. */
+export const SETTLED_BILL_STATUSES = [
+  "paid",
+  "paid_outside",
+  "cancelled",
+] as const satisfies readonly BillStatus[];
+
+/**
+ * The Bills page's tabs, by the bill's stage: still to pay, being paid,
+ * then history.
+ */
+export const BILL_LIST_VIEWS = ["open", "paying", "history"] as const;
+export const billListViewSchema = z.enum(BILL_LIST_VIEWS, {
+  error: "view is open, paying or history.",
+});
+export type BillListView = z.infer<typeof billListViewSchema>;
+
+export const BILL_LIST_VIEW_STATUSES = {
+  open: UNPAID_BILL_STATUSES,
+  paying: ["paying"],
+  history: SETTLED_BILL_STATUSES,
+} as const satisfies Readonly<Record<BillListView, readonly BillStatus[]>>;
+
+/** Created by a recurring payment, or entered once by hand. */
+export const BILL_SOURCES = ["recurring", "one_off"] as const;
+export type BillSource = (typeof BILL_SOURCES)[number];
+
+/** How the payee is paid, or `none` while they have no payment details. */
+export const BILL_METHOD_FILTERS = [...PAYEE_METHODS, "none"] as const;
+export type BillMethodFilter = (typeof BILL_METHOD_FILTERS)[number];
 
 /**
  * Where a bill sits in the overview (spec §5): Transactions or
@@ -295,26 +331,60 @@ export const cancelBillRequestSchema = z.object({
 export type CancelBillRequest = z.input<typeof cancelBillRequestSchema>;
 
 /**
+ * The filters `GET …/bills` and `GET …/bills/summary` share.
+ * `settledFrom` leaves out bills settled before that Nairobi day (paid,
+ * or cancelled), keeping every bill not yet settled.
+ */
+const billFilterFields = {
+  heading: z
+    .enum(OVERVIEW_HEADINGS, { error: "That isn't an overview heading." })
+    .optional(),
+  payeeId: z.uuid({ error: "That payee wasn't found." }).optional(),
+  categoryId: z.uuid({ error: "That category wasn't found." }).optional(),
+  method: z
+    .enum(BILL_METHOD_FILTERS, {
+      error:
+        "method is mpesa_phone, mpesa_till, mpesa_paybill, bank, usdc, outside or none.",
+    })
+    .optional(),
+  source: z
+    .enum(BILL_SOURCES, { error: "source is recurring or one_off." })
+    .optional(),
+  dueFrom: z.iso.date({ error: "dueFrom is a date, YYYY-MM-DD." }).optional(),
+  dueTo: z.iso.date({ error: "dueTo is a date, YYYY-MM-DD." }).optional(),
+  settledFrom: z.iso
+    .date({ error: "settledFrom is a date, YYYY-MM-DD." })
+    .optional(),
+};
+
+/**
  * `GET …/bills` filters. `status` takes several statuses separated by
- * commas, e.g. `overdue,due,upcoming`. Bills come sorted by due date,
- * earliest first.
+ * commas, e.g. `overdue,due,upcoming`, and narrows `view` when both are
+ * given. Salary bills are listed unless `excludePayroll=true`: the Bills
+ * page leaves them to Payroll. Bills come sorted by due date, earliest
+ * first.
  */
 export const listBillsQuerySchema = z.object({
+  view: billListViewSchema.optional(),
   status: z
     .string()
     .transform((value) => value.split(",").map((part) => part.trim()))
     .pipe(z.array(billStatusSchema))
     .optional(),
-  heading: z
-    .enum(OVERVIEW_HEADINGS, { error: "That isn't an overview heading." })
+  ...billFilterFields,
+  excludePayroll: z
+    .enum(["true", "false"], { error: "excludePayroll is true or false." })
+    .transform((value) => value === "true")
     .optional(),
-  payeeId: z.uuid({ error: "That payee wasn't found." }).optional(),
-  dueFrom: z.iso.date({ error: "dueFrom is a date, YYYY-MM-DD." }).optional(),
-  dueTo: z.iso.date({ error: "dueTo is a date, YYYY-MM-DD." }).optional(),
   limit: z.coerce.number().int().min(1).max(BILLS_LIST_MAX_SIZE).default(200),
 });
 
 export type ListBillsQuery = z.input<typeof listBillsQuerySchema>;
+
+/** `GET …/bills/summary`: the list's filters, without a tab or status. */
+export const billsSummaryQuerySchema = z.object(billFilterFields);
+
+export type BillsSummaryQuery = z.input<typeof billsSummaryQuerySchema>;
 
 const billPersonSchema = z.object({
   userId: z.uuid(),
@@ -361,6 +431,26 @@ export const billSchema = z.object({
   cancelledBy: billPersonSchema.nullable(),
   payoutId: z.uuid().nullable(),
   fileCount: z.number().int().nonnegative(),
+  /**
+   * The recurring payment that created it, enough to describe its schedule
+   * (`describeSchedule`) and link to it; null on a one-off bill. Always
+   * sent; optional only for clients built before it.
+   */
+  recurring: z
+    .object({
+      id: z.uuid(),
+      state: z.enum(RECURRING_ITEM_STATES),
+      schedule: recurringScheduleSchema,
+      scheduleDay: z.int(),
+      startsOn: z.iso.date(),
+    })
+    .nullish(),
+  /**
+   * A bill marked paid outside Expendi: the account its company spending
+   * says it was paid from, until then or when not given null. Always sent;
+   * optional only for clients built before it.
+   */
+  paidFromAccount: z.object({ id: z.uuid(), name: z.string() }).nullish(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
@@ -381,6 +471,18 @@ export type BillFile = z.infer<typeof billFileSchema>;
 
 export const billDetailSchema = billSchema.extend({
   files: z.array(billFileSchema),
+  /**
+   * Its latest payment through Expendi, e.g. why it failed; null when it
+   * was never paid through Expendi. Always sent; optional only for clients
+   * built before it.
+   */
+  payout: z
+    .object({
+      id: z.uuid(),
+      status: payoutStatusSchema,
+      failureReason: z.string().nullable(),
+    })
+    .nullish(),
 });
 
 export type BillDetail = z.infer<typeof billDetailSchema>;
@@ -388,3 +490,34 @@ export type BillDetail = z.infer<typeof billDetailSchema>;
 export const billsResponseSchema = z.array(billSchema);
 
 export type BillsResponse = z.infer<typeof billsResponseSchema>;
+
+const billTotalsSchema = z.object({
+  count: z.number().int().nonnegative(),
+  /** The KES bills' amounts, in KES cents. */
+  totalKes: z.string().regex(/^\d+$/),
+  /** The USD bills' amounts, in USDC base units, for the dashboard to convert at today's rate. */
+  totalUsdc: z.string().regex(/^\d+$/),
+});
+
+/**
+ * `GET …/bills/summary`, never counting salary bills. `views` follows the
+ * filters; the rest is company-wide whatever the filters, over the bills
+ * still to pay.
+ */
+export const billsSummarySchema = z.object({
+  /** How many bills each tab holds. */
+  views: z.object({
+    open: z.number().int().nonnegative(),
+    paying: z.number().int().nonnegative(),
+    history: z.number().int().nonnegative(),
+  }),
+  /** Every unpaid bill; `withoutAmount` of them wait for their amount. */
+  toPay: billTotalsSchema.extend({
+    withoutAmount: z.number().int().nonnegative(),
+  }),
+  overdue: billTotalsSchema,
+  dueToday: billTotalsSchema,
+  payoutFailed: billTotalsSchema,
+});
+
+export type BillsSummary = z.infer<typeof billsSummarySchema>;

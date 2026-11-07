@@ -4,13 +4,14 @@ import { z } from "zod";
 
 import {
   createRecurringItemRequestSchema,
+  listRecurringItemsQuerySchema,
   RECURRING_ITEMS_LIST_MAX_SIZE,
   updateRecurringItemRequestSchema,
 } from "@expendi-business/shared";
 
 import type { TenantVariables } from "../middleware/tenant.js";
 import type { AppRuntime } from "../runtime.js";
-import { NotFound } from "../errors.js";
+import { BadRequest, NotFound } from "../errors.js";
 import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
 import { requireAdminOrReader } from "../middleware/tenant.js";
@@ -34,6 +35,19 @@ function itemIdFrom(raw: string): Effect.Effect<string, NotFound> {
       );
 }
 
+function parseQuery(
+  query: Record<string, string>,
+): Effect.Effect<z.output<typeof listRecurringItemsQuerySchema>, BadRequest> {
+  const parsed = listRecurringItemsQuerySchema.safeParse(query);
+  return parsed.success
+    ? Effect.succeed(parsed.data)
+    : Effect.fail(
+        new BadRequest({
+          message: parsed.error.issues[0]?.message ?? "Invalid filters",
+        }),
+      );
+}
+
 /**
  * Mounted at `/organizations/:organizationId/recurring-items`. Admins, and
  * accountants read-only (spec §4); row-level security hides recurring
@@ -48,7 +62,15 @@ export function createRecurringItemRoutes(
       runEffect(
         runtime,
         c,
-        listRecurringItems(c.get("tenant"), RECURRING_ITEMS_LIST_MAX_SIZE),
+        parseQuery(c.req.query()).pipe(
+          Effect.flatMap((filters) =>
+            listRecurringItems(
+              c.get("tenant"),
+              RECURRING_ITEMS_LIST_MAX_SIZE,
+              filters,
+            ),
+          ),
+        ),
       ),
     )
     .get("/:itemId", (c) =>

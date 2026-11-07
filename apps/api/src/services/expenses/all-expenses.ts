@@ -18,6 +18,7 @@ import type {
   EtimsStatus,
   ExpenseKind,
   ExpenseListKind,
+  ExpenseSortKey,
   ExpenseSource,
   ExpenseStatus,
   ExpenseWarning,
@@ -52,8 +53,10 @@ import { readWarnings } from "./rules.js";
  * list, for admins and accountants; the route admits no one else. Each
  * expense row is listed once. Petty cash is spending from a float plus the
  * claims a float purchase overspent into; a float's issue and top-ups are
- * payouts in `float_movements`, never rows here. A bill marked paid outside
- * Expendi appears only as the company spending it recorded.
+ * payouts in `float_movements`, never rows here. Expenses are money already
+ * spent and bills money owed, so the company spending a bill marked paid
+ * outside Expendi records is never listed: the bill shows in Bills. It can
+ * still be opened by its ID.
  */
 
 /** `Expense` before serialisation turns bigints and dates into strings. */
@@ -109,14 +112,35 @@ export interface ExpensesPageView {
   readonly nextCursor: string | null;
 }
 
-export interface ExpenseListFilters {
+/** What `GET …/expenses` and `GET …/expenses/summary` both filter by. */
+export interface ExpenseFilters {
   readonly membershipId?: string | undefined;
   readonly kind?: ExpenseListKind | undefined;
   readonly categoryId?: string | undefined;
   readonly month?: string | undefined;
   readonly etimsStatus?: EtimsStatus | undefined;
+  readonly status?: ExpenseStatus | undefined;
+  readonly noReceipt?: boolean | undefined;
+}
+
+export interface ExpenseListFilters extends ExpenseFilters {
+  readonly sort: ExpenseSortKey;
+  readonly dir: "asc" | "desc";
   readonly cursor?: string | undefined;
   readonly limit: number;
+}
+
+interface ExpenseTotalsView {
+  readonly count: number;
+  readonly totalKes: string;
+}
+
+/** `ExpensesSummary`: every expense the filters match. */
+export interface ExpensesSummaryView extends ExpenseTotalsView {
+  readonly waitingForApproval: ExpenseTotalsView;
+  readonly withoutReceipt: ExpenseTotalsView;
+  readonly withoutEtims: ExpenseTotalsView;
+  readonly kinds: Readonly<Record<ExpenseListKind, number>>;
 }
 
 const expenseNotFound = new NotFound({ message: "Expense not found" });
@@ -180,9 +204,17 @@ const expenseColumns = {
   cursorAt: sql<string>`to_char(${expenses.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
 };
 
-const selectExpenses = (tx: Transaction, where: SQL | undefined) =>
+/** `sortValue` is the list's sort column as text, for its cursor. */
+const selectExpenses = (
+  tx: Transaction,
+  where: SQL | undefined,
+  sortValue: SQL = sql`NULL`,
+) =>
   tx
-    .select(expenseColumns)
+    .select({
+      ...expenseColumns,
+      sortValue: sql<string | null>`(${sortValue})::text`,
+    })
     .from(expenses)
     .innerJoin(categories, eq(categories.id, expenses.categoryId))
     .innerJoin(memberships, eq(memberships.id, expenses.membershipId))
@@ -245,31 +277,126 @@ function toExpenseView(row: ExpenseRow): ExpenseView {
   };
 }
 
+/** Payment failed first, then waiting for approval, down to recorded. */
+const STATUS_URGENCY: readonly ExpenseStatus[] = [
+  "payout_failed",
+  "submitted",
+  "paying",
+  "rejected",
+  "paid",
+  "paid_outside",
+  "recorded",
+];
+
+interface SortColumn {
+  /** Needs `users` joined, for the person's name. */
+  readonly expression: SQL;
+  /** A cursor's value of the column, cast back to its type. */
+  readonly fromCursor: (value: string) => SQL;
+  readonly cursorValue: RegExp;
+}
+
+/**
+ * The column each sort leads with; the purchase date, then when it was
+ * recorded, break ties. Names sort case-blind, byte by byte.
+ */
+const SORT_COLUMNS: Readonly<
+  Record<Exclude<ExpenseSortKey, "date">, SortColumn>
+> = {
+  person: {
+    expression: sql`lower(coalesce(${users.fullName}, ${users.email})) COLLATE "C"`,
+    fromCursor: (value) => sql`${value}::text COLLATE "C"`,
+    cursorValue: /^[\s\S]*$/,
+  },
+  merchant: {
+    expression: sql`lower(${expenses.merchant}) COLLATE "C"`,
+    fromCursor: (value) => sql`${value}::text COLLATE "C"`,
+    cursorValue: /^[\s\S]*$/,
+  },
+  amount: {
+    expression: sql`${expenses.amountKes}`,
+    fromCursor: (value) => sql`${value}::bigint`,
+    cursorValue: /^\d{1,19}$/,
+  },
+  status: {
+    expression: sql`CASE ${expenses.status} ${sql.join(
+      STATUS_URGENCY.map(
+        (status, rank) => sql`WHEN ${status} THEN ${sql.raw(String(rank))}`,
+      ),
+      sql` `,
+    )} END`,
+    fromCursor: (value) => sql`${value}::int`,
+    cursorValue: /^\d$/,
+  },
+};
+
+const sortColumnOf = (sort: ExpenseSortKey): SortColumn | null =>
+  sort === "date" ? null : SORT_COLUMNS[sort];
+
+/**
+ * The last row of a page: its purchase date, when it was recorded and its
+ * ID, then the sort column's value unless the sort is by date.
+ */
 const CURSOR_PATTERN =
-  /^(\d{4}-\d{2}-\d{2})\|(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z)\|([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+  /^(\d{4}-\d{2}-\d{2})\|(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z)\|([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\|([\s\S]*))?$/;
 
 const encodeCursor = (row: ExpenseRow): string =>
-  Buffer.from(`${row.spentOn}|${row.cursorAt}|${row.id}`, "utf8").toString(
-    "base64url",
-  );
+  Buffer.from(
+    [row.spentOn, row.cursorAt, row.id, row.sortValue]
+      .filter((part) => part !== null)
+      .join("|"),
+    "utf8",
+  ).toString("base64url");
 
-function decodeCursor(cursor: string): Effect.Effect<
-  {
-    readonly spentOn: string;
-    readonly at: string;
-    readonly id: string;
-  },
-  BadRequest
-> {
+/**
+ * The rows after a page's cursor, in the sort's order and `dir`. Only a
+ * cursor from a page of the same sort is taken.
+ */
+function afterCursor(
+  cursor: string,
+  column: SortColumn | null,
+  dir: "asc" | "desc",
+): Effect.Effect<SQL, BadRequest> {
   const match = CURSOR_PATTERN.exec(
     Buffer.from(cursor, "base64url").toString("utf8"),
   );
-  return match?.[1] && match[2] && match[3]
-    ? Effect.succeed({ spentOn: match[1], at: match[2], id: match[3] })
+  if (!match?.[1] || !match[2] || !match[3]) return Effect.fail(badCursor);
+  const [, spentOn, at, id, value] = match;
+  const rowKeys: SQL[] = [
+    sql`${expenses.spentOn}`,
+    sql`${expenses.createdAt}`,
+    sql`${expenses.id}`,
+  ];
+  const cursorKeys: SQL[] = [
+    sql`${spentOn}::date`,
+    sql`${at}::timestamptz`,
+    sql`${id}::uuid`,
+  ];
+  const after = (left: SQL[], right: SQL[]): SQL =>
+    sql`(${sql.join(left, sql`, `)}) ${dir === "asc" ? sql`>` : sql`<`} (${sql.join(right, sql`, `)})`;
+  if (column === null) {
+    return value === undefined
+      ? Effect.succeed(after(rowKeys, cursorKeys))
+      : Effect.fail(badCursor);
+  }
+  return value !== undefined && column.cursorValue.test(value)
+    ? Effect.succeed(
+        after(
+          [column.expression, ...rowKeys],
+          [column.fromCursor(value), ...cursorKeys],
+        ),
+      )
     : Effect.fail(badCursor);
 }
 
-function filtersWhere(filters: ExpenseListFilters): SQL | undefined {
+/** Every expense the list can show: the company's, bills' spending aside. */
+const listedExpenses = (tenant: Tenant): SQL | undefined =>
+  and(
+    eq(expenses.organizationId, tenant.organizationId),
+    isNull(expenses.billId),
+  );
+
+function filtersWhere(filters: ExpenseFilters): SQL | undefined {
   const month =
     filters.month === undefined ? undefined : monthRange(filters.month);
   return and(
@@ -286,10 +413,21 @@ function filtersWhere(filters: ExpenseListFilters): SQL | undefined {
     filters.etimsStatus === undefined
       ? undefined
       : eq(expenses.etimsStatus, filters.etimsStatus),
+    filters.status === undefined
+      ? undefined
+      : eq(expenses.status, filters.status),
+    filters.noReceipt === undefined
+      ? undefined
+      : filters.noReceipt
+        ? sql`${receiptCount} = 0`
+        : sql`${receiptCount} > 0`,
   );
 }
 
-/** Latest purchase date first, then latest recorded, a page at a time. */
+/**
+ * A page at a time, in the sort asked for: by default the latest purchase
+ * date first, then the latest recorded.
+ */
 export function listExpenses(
   tenant: Tenant,
   filters: ExpenseListFilters,
@@ -299,24 +437,24 @@ export function listExpenses(
   DatabaseService
 > {
   return Effect.gen(function* () {
+    const column = sortColumnOf(filters.sort);
     const after =
-      filters.cursor === undefined ? null : yield* decodeCursor(filters.cursor);
+      filters.cursor === undefined
+        ? undefined
+        : yield* afterCursor(filters.cursor, column, filters.dir);
+    const order = filters.dir === "asc" ? asc : desc;
     const rows = yield* withScope(tenant, (tx) =>
       query(() =>
         selectExpenses(
           tx,
-          and(
-            eq(expenses.organizationId, tenant.organizationId),
-            filtersWhere(filters),
-            after === null
-              ? undefined
-              : sql`(${expenses.spentOn}, ${expenses.createdAt}, ${expenses.id}) < (${after.spentOn}::date, ${after.at}::timestamptz, ${after.id}::uuid)`,
-          ),
+          and(listedExpenses(tenant), filtersWhere(filters), after),
+          column?.expression,
         )
           .orderBy(
-            desc(expenses.spentOn),
-            desc(expenses.createdAt),
-            desc(expenses.id),
+            ...(column === null ? [] : [order(column.expression)]),
+            order(expenses.spentOn),
+            order(expenses.createdAt),
+            order(expenses.id),
           )
           .limit(filters.limit + 1),
       ),
@@ -329,6 +467,71 @@ export function listExpenses(
         rows.length > filters.limit && last ? encodeCursor(last) : null,
     };
   });
+}
+
+/** Every condition holds; no conditions holds always. */
+const allOf = (...conditions: (SQL | undefined)[]): SQL =>
+  and(...conditions) ?? sql`TRUE`;
+
+const totalsWhere = (condition: SQL) => ({
+  count: sql<number>`count(*) FILTER (WHERE ${condition})::int`,
+  totalKes: sql<string>`coalesce(sum(${expenses.amountKes}) FILTER (WHERE ${condition}), 0)::text`,
+});
+
+/**
+ * The numbers above the list: every expense the filters match, however
+ * many pages that is, and how many each kind's tab would hold.
+ */
+export function expensesSummary(
+  tenant: Tenant,
+  filters: ExpenseFilters,
+): Effect.Effect<ExpensesSummaryView, DatabaseError, DatabaseService> {
+  const shown = allOf(
+    filters.kind === undefined ? undefined : LIST_KIND_FILTERS[filters.kind],
+  );
+  const kindCount = (kind: ExpenseListKind) =>
+    sql<number>`count(*) FILTER (WHERE ${allOf(LIST_KIND_FILTERS[kind])})::int`;
+  return withScope(tenant, (tx) =>
+    query(() =>
+      tx
+        .select({
+          shown: totalsWhere(shown),
+          waitingForApproval: totalsWhere(
+            allOf(shown, eq(expenses.status, "submitted")),
+          ),
+          withoutReceipt: totalsWhere(allOf(shown, sql`${receiptCount} = 0`)),
+          withoutEtims: totalsWhere(
+            allOf(shown, eq(expenses.etimsStatus, "none")),
+          ),
+          claim: kindCount("claim"),
+          pettyCash: kindCount("petty_cash"),
+          company: kindCount("company"),
+        })
+        .from(expenses)
+        .where(
+          and(
+            listedExpenses(tenant),
+            filtersWhere({ ...filters, kind: undefined }),
+          ),
+        ),
+    ).pipe(
+      Effect.flatMap(([row]) =>
+        row
+          ? Effect.succeed({
+              ...row.shown,
+              waitingForApproval: row.waitingForApproval,
+              withoutReceipt: row.withoutReceipt,
+              withoutEtims: row.withoutEtims,
+              kinds: {
+                claim: row.claim,
+                petty_cash: row.pettyCash,
+                company: row.company,
+              },
+            })
+          : Effect.dieMessage("an aggregate query returned no row"),
+      ),
+    ),
+  );
 }
 
 /**

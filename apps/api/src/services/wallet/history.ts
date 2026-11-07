@@ -25,6 +25,13 @@ export interface WalletHistoryPayout {
   readonly recipientDetail: string;
   readonly amountKesCents: bigint;
   readonly status: Payout["status"];
+  readonly subjectId: string;
+  readonly payrollRunId: string | null;
+  readonly approvalId: string | null;
+  readonly approvedAt: Date | null;
+  readonly paidAt: Date | null;
+  readonly rate: string | null;
+  readonly failureReason: string | null;
 }
 
 export interface WalletHistoryItem {
@@ -114,6 +121,13 @@ export function walletHistory(input: {
             recipientDetail: describeRecipient(payout.recipient),
             amountKesCents: payout.amountKes,
             status: payout.status,
+            subjectId: payout.subjectId,
+            payrollRunId: payout.payrollRunId,
+            approvalId: payout.approvalId,
+            approvedAt: payout.approvedAt,
+            paidAt: payout.paidAt,
+            rate: payout.rate,
+            failureReason: payout.failureReason,
           },
         })),
         nextCursor: rows.length > limit && last ? last.entry.id : null,

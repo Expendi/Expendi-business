@@ -16,7 +16,7 @@ export interface MonthBounds {
 const atNairobiMidnight = (date: string): Date =>
   new Date(`${date}T00:00:00+03:00`);
 
-function shiftMonth(month: string, by: number): string {
+export function shiftMonth(month: string, by: number): string {
   const [year = 0, monthNumber = 1] = month.split("-").map(Number);
   return new Date(Date.UTC(year, monthNumber - 1 + by, 1))
     .toISOString()

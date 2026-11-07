@@ -156,6 +156,7 @@ describe("POST /organizations/:id/salaries", () => {
         kind: "employee",
         method: "mpesa_phone",
         payoutPhoneConfirmed: false,
+        accountEnding: null,
       },
       category: { id: categoryId, name: "Salaries" },
       amountKes: "5000000",
@@ -168,7 +169,12 @@ describe("POST /organizations/:id/salaries", () => {
 
   it("puts personnel without an app login on payroll", async () => {
     // #given
-    const casualId = await insertPersonnelPayee(db, company, "Otieno");
+    const casualId = await insertPersonnelPayee(
+      db,
+      company,
+      "Otieno",
+      "+254712340915",
+    );
 
     // #when
     const response = await send(
@@ -179,6 +185,10 @@ describe("POST /organizations/:id/salaries", () => {
 
     // #then
     expect(response.status).toBe(201);
+    expect((await dataOf(response, salarySchema)).payee).toMatchObject({
+      kind: "personnel",
+      accountEnding: "0915",
+    });
   });
 
   it("pays a 31st on the last day of a shorter month", async () => {

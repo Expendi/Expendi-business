@@ -368,6 +368,8 @@ export interface InviteResult {
   readonly emailSent: boolean;
   /** For the admin to share themselves when the email didn't go out. */
   readonly installUrl: string | null;
+  /** The link the email carries: the dashboard's for an accountant. */
+  readonly inviteLink: string | null;
 }
 
 /**
@@ -387,7 +389,10 @@ export function inviteMember(
     const installUrl = Option.getOrNull((yield* ConfigService).appInstallUrl);
     const { member, change } = yield* recordInvitation(admin, invitation);
     const emailSent = yield* sendInviteEmail(member, change, installUrl);
-    return { member, emailSent, installUrl };
+    const inviteLink = isAccountant(member.role)
+      ? WEB_DASHBOARD_URL
+      : installUrl;
+    return { member, emailSent, installUrl, inviteLink };
   });
 }
 

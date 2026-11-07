@@ -6,11 +6,16 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type {
   ClaimDetail,
   ClaimsPage,
+  ClaimsSummary,
   ExpenseStatus,
   SubmitClaimRequest,
   UpdateClaimRequest,
 } from "@expendi-business/shared";
-import { claimDetailSchema, claimsPageSchema } from "@expendi-business/shared";
+import {
+  claimDetailSchema,
+  claimsPageSchema,
+  claimsSummarySchema,
+} from "@expendi-business/shared";
 
 import type { App } from "../../app.js";
 import type { Database } from "../../db/client.js";
@@ -512,6 +517,70 @@ describe("GET /organizations/:organizationId/claims", () => {
   it("is isolated between companies", async () => {
     await expectRouteIsolation(app, fixture, (organizationId) => ({
       path: `/organizations/${organizationId}/claims`,
+    }));
+  });
+});
+
+describe("GET /organizations/:organizationId/claims/summary", () => {
+  async function summary(user: TestUser): Promise<ClaimsSummary> {
+    const response = await sendJson(app, `${claimsPath()}/summary`, user);
+    expect(response.status, await response.clone().text()).toBe(200);
+    return claimsSummarySchema.parse(await dataOf(response));
+  }
+
+  it("counts and totals every claim waiting for approval and every failed payment", async () => {
+    // #given KES 1,500.50 each unless said otherwise
+    await submitted(employeeA);
+    await submitted(employeeB, { amountKes: "200" });
+    const failed = await submitted(employeeA);
+    await setStatus(failed.id, "payout_failed");
+    const rejected = await submitted(employeeB);
+    await setStatus(rejected.id, "rejected", "Not a work expense");
+
+    // #when
+    const result = await summary(company.admin);
+
+    // #then
+    expect(result).toEqual({
+      waiting: { count: 2, totalKes: "170050" },
+      payoutFailed: { count: 1, totalKes: "150050" },
+    });
+  });
+
+  it("shows an accountant what an admin sees, and an employee only their own", async () => {
+    // #given
+    const accountant = await createUser(db);
+    await addMember(db, company, accountant, { role: "accountant" });
+    await submitted(employeeA);
+    await submitted(employeeB);
+    await submitted(employeeB);
+
+    // #when
+    const results = {
+      admin: await summary(company.admin),
+      accountant: await summary(accountant),
+      employee: await summary(employeeA),
+    };
+
+    // #then
+    expect({
+      admin: results.admin.waiting.count,
+      accountant: results.accountant,
+      employee: results.employee.waiting.count,
+    }).toEqual({ admin: 3, accountant: results.admin, employee: 1 });
+  });
+
+  it("needs a signed-in caller", async () => {
+    // #when
+    const response = await app.request(`${claimsPath()}/summary`);
+
+    // #then
+    expect(response.status).toBe(401);
+  });
+
+  it("is isolated between companies", async () => {
+    await expectRouteIsolation(app, fixture, (organizationId) => ({
+      path: `/organizations/${organizationId}/claims/summary`,
     }));
   });
 });

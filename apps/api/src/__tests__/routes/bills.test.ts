@@ -1,17 +1,21 @@
 import { randomUUID } from "node:crypto";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type {
   Bill,
   BillDetail,
+  BillsSummary,
+  BillStatus,
   CreateBillRequest,
   ReceiptUploadResponse,
 } from "@expendi-business/shared";
 import {
   billDetailSchema,
   billsResponseSchema,
+  billsSummarySchema,
+  paidFromAccountSchema,
   receiptUploadResponseSchema,
 } from "@expendi-business/shared";
 
@@ -22,6 +26,7 @@ import type { TestCompany, TestUser } from "../helpers/db.js";
 import type { IsolationFixture } from "../helpers/isolation.js";
 import { createApp } from "../../app.js";
 import { DatabaseService } from "../../db/client.js";
+import { payouts, payrollRuns } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 import { nairobiDate } from "../../services/bills/status.js";
 import {
@@ -50,6 +55,8 @@ import {
   expectRouteIsolation,
   expectTableIsolation,
 } from "../helpers/isolation.js";
+import { addEmployeePayee } from "../helpers/payroll.js";
+import { insertRecurringItem } from "../helpers/recurring.js";
 import { makeTestRuntime } from "../helpers/runtime.js";
 import { TEST_DATABASE_URL_MIGRATE } from "../setup/test-database.js";
 
@@ -958,6 +965,7 @@ describe("invoices", () => {
 describe("admins only", () => {
   const routes = [
     ["GET", ""],
+    ["GET", "/summary"],
     ["GET", "/:id"],
     ["POST", ""],
     ["POST", "/upload-url"],
@@ -1057,6 +1065,7 @@ describe("company isolation", () => {
 
   it.each([
     ["GET", ""],
+    ["GET", "/summary"],
     ["GET", "/:id"],
     ["POST", ""],
     ["POST", "/upload-url"],
@@ -1078,4 +1087,442 @@ describe("company isolation", () => {
       },
     }));
   });
+});
+
+const asAdmin = () => ({
+  organizationId: company.organizationId,
+  userId: company.admin.id,
+  role: "admin" as const,
+});
+
+const walletIds = new Map<string, string>();
+
+/** A payout of a bill, from the company's one wallet. */
+async function billPayout(): Promise<string> {
+  let walletId = walletIds.get(company.organizationId);
+  if (walletId === undefined) {
+    walletId = (await createActiveWallet(db, company)).id;
+    walletIds.set(company.organizationId, walletId);
+  }
+  return insertBillPayout(db, company, walletId);
+}
+
+/**
+ * A bill straight to the table, in any status, with what that status
+ * needs: a payout once paid through Expendi, the day it was paid, who
+ * cancelled it. One-off and KES 2,500 by default.
+ */
+async function billWith(
+  status: BillStatus,
+  values: Partial<Parameters<typeof insertBill>[2]> = {},
+): Promise<string> {
+  const throughExpendi = ["paying", "paid", "payout_failed"].includes(status);
+  const paid = status === "paid" || status === "paid_outside";
+  return insertBill(db, company, {
+    payeeId: supplierId,
+    categoryId,
+    status,
+    dueOn: shiftDays(today, status === "upcoming" ? 5 : -1),
+    ...(throughExpendi && { payoutId: await billPayout() }),
+    ...(paid && { paidOn: today, paidAt: new Date() }),
+    ...(status === "paid_outside" && { markedPaidBy: company.admin.id }),
+    ...(status === "cancelled" && {
+      cancelledReason: "Not needed",
+      cancelledBy: company.admin.id,
+      cancelledAt: new Date(),
+    }),
+    ...values,
+  });
+}
+
+let payDays = 0;
+
+/** A salary in a payroll run of its own, which only Payroll shows. */
+async function insertPayrollBill(status: BillStatus): Promise<string> {
+  payDays += 1;
+  const person = await addEmployeePayee(db, company);
+  const [run] = await runInScope(db, asAdmin(), (tx) =>
+    tx
+      .insert(payrollRuns)
+      .values({
+        organizationId: company.organizationId,
+        payDate: shiftDays(today, -payDays),
+        totalKes: 6_000_000n,
+        salariesKes: 6_000_000n,
+        capKes: 7_200_000n,
+      })
+      .returning({ id: payrollRuns.id }),
+  );
+  if (!run) throw new Error("payroll run insert returned no row");
+  return billWith(status, {
+    payeeId: person.payeeId,
+    payrollRunId: run.id,
+    overviewHeading: "salaries",
+    amountKes: 6_000_000n,
+  });
+}
+
+async function addAccount(name: string): Promise<string> {
+  const response = await sendJson(
+    app,
+    `/organizations/${company.organizationId}/paid-from-accounts`,
+    company.admin,
+    { method: "POST", body: { name, kind: "bank" } },
+  );
+  if (response.status !== 201) {
+    throw new Error(`add account answered ${response.status}`);
+  }
+  return (await dataOf(response, paidFromAccountSchema)).id;
+}
+
+describe("GET /organizations/:organizationId/bills, for the Bills page", () => {
+  async function idsListed(query: string): Promise<string[]> {
+    const response = await send("GET", `${base()}${query}`);
+    expect(response.status, await response.clone().text()).toBe(200);
+    return (await dataOf(response, billsResponseSchema))
+      .map((bill) => bill.id)
+      .sort();
+  }
+
+  it("lists each tab's statuses: to pay, being paid, and history", async () => {
+    // #given
+    const toPay = [
+      await billWith("upcoming"),
+      await billWith("due"),
+      await billWith("overdue"),
+      await billWith("payout_failed"),
+    ];
+    const paying = await billWith("paying");
+    const history = [
+      await billWith("paid"),
+      await billWith("paid_outside"),
+      await billWith("cancelled"),
+    ];
+
+    // #when
+    const tabs = {
+      open: await idsListed("?view=open"),
+      paying: await idsListed("?view=paying"),
+      history: await idsListed("?view=history"),
+      overdueToPay: await idsListed("?view=open&status=overdue,paid"),
+    };
+
+    // #then
+    expect(tabs).toEqual({
+      open: [...toPay].sort(),
+      paying: [paying],
+      history: [...history].sort(),
+      overdueToPay: [toPay[2]],
+    });
+  });
+
+  it("filters by category, by how the payee is paid, and by source", async () => {
+    // #given
+    const rentId = await addCategory(db, company, "Rent");
+    const tillPayeeId = await insertPayee(db, company, {
+      method: "mpesa_till",
+      tillNumber: "123456",
+      accountName: "Mama Mboga",
+      detailsChangedAt: new Date("2026-01-01T00:00:00Z"),
+    });
+    const itemId = await insertRecurringItem(db, company, {
+      payeeId: supplierId,
+      categoryId,
+    });
+    const rent = await billWith("upcoming", { categoryId: rentId });
+    const till = await billWith("upcoming", { payeeId: tillPayeeId });
+    const recurring = await billWith("upcoming", { recurringItemId: itemId });
+
+    // #when
+    const results = {
+      category: await idsListed(`?categoryId=${rentId}`),
+      till: await idsListed("?method=mpesa_till"),
+      noDetails: await idsListed("?method=none"),
+      recurring: await idsListed("?source=recurring"),
+      oneOff: await idsListed("?source=one_off"),
+    };
+
+    // #then
+    expect(results).toEqual({
+      category: [rent],
+      till: [till],
+      noDetails: [rent, recurring].sort(),
+      recurring: [recurring],
+      oneOff: [rent, till].sort(),
+    });
+  });
+
+  it("lists salary bills unless asked to leave them to Payroll", async () => {
+    // #given
+    const salary = await insertPayrollBill("overdue");
+    const supplier = await billWith("overdue");
+
+    // #when
+    const results = {
+      everything: await idsListed(""),
+      bills: await idsListed("?excludePayroll=true"),
+      explicit: await idsListed("?excludePayroll=false"),
+    };
+
+    // #then
+    expect(results).toEqual({
+      everything: [salary, supplier].sort(),
+      bills: [supplier],
+      explicit: [salary, supplier].sort(),
+    });
+  });
+
+  it("leaves out bills settled before settledFrom, and keeps every bill not settled", async () => {
+    // #given
+    await billWith("paid", {
+      dueOn: shiftDays(today, -90),
+      paidOn: shiftDays(today, -60),
+    });
+    const paidLater = await billWith("paid_outside", {
+      dueOn: shiftDays(today, -90),
+      paidOn: shiftDays(today, -10),
+    });
+    const cancelledToday = await billWith("cancelled", {
+      dueOn: shiftDays(today, -90),
+      cancelledAt: new Date(),
+    });
+    const overdueLongAgo = await billWith("overdue", {
+      dueOn: shiftDays(today, -90),
+    });
+
+    // #when
+    const listed = await idsListed(`?settledFrom=${shiftDays(today, -30)}`);
+
+    // #then
+    expect(listed).toEqual([paidLater, cancelledToday, overdueLongAgo].sort());
+  });
+
+  it("gives a recurring bill its payment's schedule and state, and a one-off bill none", async () => {
+    // #given
+    const itemId = await insertRecurringItem(db, company, {
+      payeeId: supplierId,
+      categoryId,
+      scheduleDay: 31,
+      startsOn: "2026-01-31",
+      active: false,
+    });
+    const recurring = await billWith("upcoming", { recurringItemId: itemId });
+    const oneOff = await billWith("upcoming");
+
+    // #when
+    const bills = await dataOf(await send("GET", base()), billsResponseSchema);
+
+    // #then
+    expect(
+      Object.fromEntries(bills.map((bill) => [bill.id, bill.recurring])),
+    ).toEqual({
+      [recurring]: {
+        id: itemId,
+        state: "paused",
+        schedule: "monthly",
+        scheduleDay: 31,
+        startsOn: "2026-01-31",
+      },
+      [oneOff]: null,
+    });
+  });
+
+  it("shows the account a bill marked paid outside was paid from", async () => {
+    // #given
+    const accountId = await addAccount("KCB current account");
+    const bill = await createBill({ dueOn: shiftDays(today, -2) });
+    const unmarked = await createBill();
+    const marked = await send(
+      "POST",
+      `${base()}/${bill.id}/mark-paid-outside`,
+      { paidOn: today, paidFromAccountId: accountId },
+    );
+    expect(marked.status, await marked.clone().text()).toBe(200);
+
+    // #when
+    const bills = await dataOf(await send("GET", base()), billsResponseSchema);
+
+    // #then
+    expect(
+      Object.fromEntries(bills.map((row) => [row.id, row.paidFromAccount])),
+    ).toEqual({
+      [bill.id]: { id: accountId, name: "KCB current account" },
+      [unmarked.id]: null,
+    });
+  });
+
+  it.each([
+    "?view=late",
+    "?method=cash",
+    "?source=weekly",
+    "?excludePayroll=yes",
+    "?settledFrom=yesterday",
+    "?categoryId=rent",
+  ])("refuses the filter %s", async (query) => {
+    // #when
+    const response = await send("GET", `${base()}${query}`);
+
+    // #then
+    expect(response.status).toBe(400);
+  });
+});
+
+describe("GET /organizations/:organizationId/bills/:billId, its payment", () => {
+  it("says why its latest payment through Expendi failed", async () => {
+    // #given
+    const payoutId = await billPayout();
+    await runInScope(db, { organizationId: company.organizationId }, (tx) =>
+      tx
+        .update(payouts)
+        .set({ failureReason: "The paybill didn't accept the account number." })
+        .where(eq(payouts.id, payoutId)),
+    );
+    const billId = await billWith("payout_failed", { payoutId });
+
+    // #when
+    const response = await send("GET", `${base()}/${billId}`);
+
+    // #then
+    expect((await dataOf(response, billDetailSchema)).payout).toEqual({
+      id: payoutId,
+      status: "failed",
+      failureReason: "The paybill didn't accept the account number.",
+    });
+  });
+
+  it("has no payment when it was never paid through Expendi", async () => {
+    // #given
+    const bill = await createBill();
+
+    // #when
+    const response = await send("GET", `${base()}/${bill.id}`);
+
+    // #then
+    expect((await dataOf(response, billDetailSchema)).payout).toBeNull();
+  });
+});
+
+describe("GET /organizations/:organizationId/bills/summary", () => {
+  async function summary(
+    query = "",
+    user: Pick<TestUser, "privyUserId"> = company.admin,
+  ): Promise<BillsSummary> {
+    const response = await send(
+      "GET",
+      `${base()}/summary${query}`,
+      undefined,
+      user,
+    );
+    expect(response.status, await response.clone().text()).toBe(200);
+    return dataOf(response, billsSummarySchema);
+  }
+
+  const none = { count: 0, totalKes: "0", totalUsdc: "0" };
+
+  it("counts each tab, and totals what's still to pay in KES and in USD", async () => {
+    // #given KES in cents, USD in USDC base units
+    await billWith("upcoming", { amountKes: 1_000_000n });
+    await billWith("upcoming", { variable: true, amountKes: null });
+    await billWith("due", { amountKes: 250_000n });
+    await billWith("due", {
+      currency: "usd",
+      amountKes: null,
+      amountUsdc: 45_000_000n,
+    });
+    await billWith("overdue", { amountKes: 4_850_000n });
+    await billWith("payout_failed", { amountKes: 410_000n });
+    await billWith("paying", { amountKes: 9_900_000n });
+    await billWith("paid", { paidOn: today });
+    await billWith("cancelled", { cancelledAt: new Date() });
+
+    // #when
+    const result = await summary();
+
+    // #then
+    expect(result).toEqual({
+      views: { open: 6, paying: 1, history: 2 },
+      toPay: {
+        count: 6,
+        withoutAmount: 1,
+        totalKes: "6510000",
+        totalUsdc: "45000000",
+      },
+      overdue: { count: 1, totalKes: "4850000", totalUsdc: "0" },
+      dueToday: { count: 2, totalKes: "250000", totalUsdc: "45000000" },
+      payoutFailed: { count: 1, totalKes: "410000", totalUsdc: "0" },
+    });
+  });
+
+  it("counts the tabs with the filters, and the cards over every bill still to pay", async () => {
+    // #given
+    const rentId = await addCategory(db, company, "Rent");
+    await billWith("overdue", { categoryId: rentId, amountKes: 100_000n });
+    await billWith("paid", { categoryId: rentId, paidOn: today });
+    await billWith("overdue", { amountKes: 200_000n });
+    await billWith("paying");
+
+    // #when
+    const filtered = await summary(`?categoryId=${rentId}`);
+
+    // #then
+    expect({ views: filtered.views, overdue: filtered.overdue }).toEqual({
+      views: { open: 1, paying: 0, history: 1 },
+      overdue: { count: 2, totalKes: "300000", totalUsdc: "0" },
+    });
+  });
+
+  it("counts history only from settledFrom", async () => {
+    // #given
+    await billWith("paid", { paidOn: shiftDays(today, -200) });
+    await billWith("paid", { paidOn: shiftDays(today, -5) });
+
+    // #when
+    const result = await summary(`?settledFrom=${shiftDays(today, -180)}`);
+
+    // #then
+    expect(result.views.history).toBe(1);
+  });
+
+  it("never counts salaries, which Payroll shows", async () => {
+    // #given
+    await insertPayrollBill("overdue");
+    await insertPayrollBill("payout_failed");
+    await insertPayrollBill("paying");
+
+    // #when
+    const result = await summary();
+
+    // #then
+    expect(result).toEqual({
+      views: { open: 0, paying: 0, history: 0 },
+      toPay: { ...none, withoutAmount: 0 },
+      overdue: none,
+      dueToday: none,
+      payoutFailed: none,
+    });
+  });
+
+  it("shows an accountant what an admin sees", async () => {
+    // #given
+    const accountant = await createUser(db);
+    await addMember(db, company, accountant, { role: "accountant" });
+    await billWith("overdue");
+
+    // #when
+    const asAccountant = await summary("", accountant);
+
+    // #then
+    expect(asAccountant).toEqual(await summary());
+  });
+
+  it.each(["?method=cash", "?settledFrom=soon", "?payeeId=kplc"])(
+    "refuses the filter %s",
+    async (query) => {
+      // #when
+      const response = await send("GET", `${base()}/summary${query}`);
+
+      // #then
+      expect(response.status).toBe(400);
+    },
+  );
 });
