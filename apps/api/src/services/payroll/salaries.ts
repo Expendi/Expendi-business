@@ -80,6 +80,7 @@ export interface SalaryView {
     readonly method: PayeeMethod | null;
     readonly archived: boolean;
     readonly payoutPhoneConfirmed: boolean | null;
+    readonly accountEnding: string | null;
   };
   readonly category: { readonly id: string; readonly name: string };
   readonly amountKes: bigint;
@@ -143,6 +144,18 @@ const monthlyOn = (
 
 // ── Reading ──────────────────────────────────────────────────────────────
 
+/**
+ * The last 4 digits of the bank account or M-Pesa number a payee is paid
+ * to. An employee's M-Pesa number is their confirmed payout number, which
+ * is never shown, not even in part.
+ */
+export const payeeAccountEnding = sql<string | null>`CASE
+  WHEN ${payees.method} = 'mpesa_phone' AND ${payees.membershipId} IS NULL
+    AND length(${payees.phone}) > 4 THEN right(${payees.phone}, 4)
+  WHEN ${payees.method} = 'bank' AND length(${payees.bankAccountNumber}) > 4
+    THEN right(${payees.bankAccountNumber}, 4)
+END`;
+
 const salaryColumns = {
   item: recurringItems,
   payeeName: payees.name,
@@ -152,6 +165,7 @@ const salaryColumns = {
   payoutPhoneConfirmed: sql<
     boolean | null
   >`CASE WHEN ${payees.membershipId} IS NULL THEN NULL ELSE ${users.phone} IS NOT NULL END`,
+  accountEnding: payeeAccountEnding,
   categoryName: categories.name,
 };
 
@@ -182,6 +196,7 @@ function toView(row: SelectedSalary): SalaryView {
       method: row.payeeMethod,
       archived: row.payeeArchived,
       payoutPhoneConfirmed: row.payoutPhoneConfirmed,
+      accountEnding: row.accountEnding,
     },
     category: { id: item.categoryId, name: row.categoryName },
     amountKes: item.amountKes,

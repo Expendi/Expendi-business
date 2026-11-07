@@ -140,6 +140,12 @@ const payrollPayeeSchema = z.object({
   archived: z.boolean(),
   /** Employees only: whether they've confirmed an M-Pesa number. */
   payoutPhoneConfirmed: z.boolean().nullable(),
+  /**
+   * The last 4 digits of the bank account or M-Pesa number they're paid
+   * to, e.g. "0915"; null when there are no details, for Till and Paybill
+   * payments, and for an employee's own M-Pesa number, which is never shown.
+   */
+  accountEnding: z.string().nullable(),
 });
 
 export const salarySchema = z.object({
@@ -232,6 +238,10 @@ export const payrollRunSchema = z.object({
   /** Payments not left out. */
   people: z.int().nonnegative(),
   leftOut: z.int().nonnegative(),
+  /** Payments not left out whose amount was changed for this run. */
+  adjusted: z.int().nonnegative(),
+  /** One-off payments not left out. */
+  oneOffs: z.int().nonnegative(),
   /** How many payments are paid, being paid and failed (spec §6.21). */
   progress: z.object({
     paid: z.int().nonnegative(),

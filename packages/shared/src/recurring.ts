@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { BillStatus } from "./bills.js";
 import type { OverviewHeading } from "./claims.js";
+import type { RecurringSchedule } from "./recurring-schedule.js";
 import {
   billCurrencySchema,
   billHeadingSchema,
@@ -11,18 +12,20 @@ import {
 } from "./bills.js";
 import { kesAmountSchema } from "./claims.js";
 import { payeeKindSchema, payeeMethodSchema } from "./payee.js";
+import {
+  RECURRING_ITEM_STATES,
+  recurringScheduleSchema,
+} from "./recurring-schedule.js";
 
-/** How often a recurring payment falls due (spec §6.20). */
-export const RECURRING_SCHEDULES = [
-  "weekly",
-  "monthly",
-  "quarterly",
-  "yearly",
-] as const;
-export const recurringScheduleSchema = z.enum(RECURRING_SCHEDULES, {
-  error: "Pick weekly, monthly, quarterly or yearly.",
-});
-export type RecurringSchedule = z.infer<typeof recurringScheduleSchema>;
+export {
+  RECURRING_ITEM_STATES,
+  RECURRING_SCHEDULES,
+  recurringScheduleSchema,
+} from "./recurring-schedule.js";
+export type {
+  RecurringItemState,
+  RecurringSchedule,
+} from "./recurring-schedule.js";
 
 /**
  * Paid through Expendi, or outside it (e.g. a card-only subscription),
@@ -55,17 +58,24 @@ export const OUTSTANDING_BILL_STATUSES = [
   "paying",
 ] as const satisfies readonly BillStatus[];
 
-/**
- * `active` creates bills; `paused` stops until resumed, keeping its bills;
- * `ended` has no bills left to create, because its end date passed or an
- * admin ended it. Ending is final.
- */
-export const RECURRING_ITEM_STATES = ["active", "paused", "ended"] as const;
-export type RecurringItemState = (typeof RECURRING_ITEM_STATES)[number];
-
 export const REMINDER_DAYS_DEFAULT = 3;
 export const REMINDER_DAYS_MAX = 30;
 export const RECURRING_ITEMS_LIST_MAX_SIZE = 500;
+
+/**
+ * `GET …/recurring-items` filters. Salaries are listed unless
+ * `excludeSalaries=true`: the Bills page leaves them to Payroll.
+ */
+export const listRecurringItemsQuerySchema = z.object({
+  excludeSalaries: z
+    .enum(["true", "false"], { error: "excludeSalaries is true or false." })
+    .transform((value) => value === "true")
+    .optional(),
+});
+
+export type ListRecurringItemsQuery = z.input<
+  typeof listRecurringItemsQuerySchema
+>;
 
 /** ISO weekdays: 1 is Monday, 7 is Sunday. */
 export const WEEKDAY_NAMES = [
@@ -300,6 +310,12 @@ export const recurringItemSchema = z.object({
       id: z.uuid(),
       status: billStatusSchema,
       dueOn: z.iso.date(),
+      /**
+       * The bill's own currency: the item's, unless the payee's method
+       * changed since the bill was created. Always sent; optional only for
+       * clients built before it.
+       */
+      currency: billCurrencySchema.optional(),
       amountKes: z.string().regex(/^\d+$/).nullable(),
       amountUsdc: z.string().regex(/^\d+$/).nullable(),
     })

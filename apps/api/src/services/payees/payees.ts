@@ -20,7 +20,9 @@ import type {
   ApprovalSettings,
 } from "../approval/passkeys.js";
 import type { PayeeDetailsEmailInput } from "../email/payee-email.js";
+import { violatedUniqueConstraint } from "../../db/error.js";
 import {
+  bills,
   memberships,
   organizations,
   payees,
@@ -82,6 +84,12 @@ export interface PayeeView {
   readonly detailsChangedAt: Date | null;
   readonly secondConfirmationUntil: Date | null;
   readonly archived: boolean;
+  readonly member: {
+    readonly name: string | null;
+    readonly email: string;
+    readonly inTeam: boolean;
+  } | null;
+  readonly billCount: number;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -128,6 +136,10 @@ const archivedPayee = new Conflict({ message: "This payee is archived." });
 const alreadyAPayee = new Conflict({
   message: "This person is already a payee.",
 });
+const leftTheTeam = new Conflict({
+  message:
+    "This person has left the company, so their payee can't be restored.",
+});
 const notAdmin = new Forbidden({
   message: "Your role in this company can't do this",
 });
@@ -139,6 +151,11 @@ const payeeFields = {
   payoutPhoneConfirmed: sql<
     boolean | null
   >`CASE WHEN ${payees.membershipId} IS NULL THEN NULL ELSE ${users.phone} IS NOT NULL END`,
+  memberName: users.fullName,
+  memberEmail: users.email,
+  memberStatus: memberships.status,
+  /** Salaries are Payroll's, so only the bills the Bills page lists. */
+  billCount: sql<number>`(SELECT count(*)::int FROM ${bills} WHERE ${bills.payeeId} = ${payees.id} AND ${bills.payrollRunId} IS NULL)`,
 };
 
 const selectPayees = (tx: Transaction, where: SQL | undefined) =>
@@ -149,9 +166,17 @@ const selectPayees = (tx: Transaction, where: SQL | undefined) =>
     .leftJoin(users, eq(users.id, memberships.userId))
     .where(where);
 
+type SelectedPayee = Awaited<ReturnType<typeof selectPayees>>[number];
+
 function toView(
-  row: PayeeRow,
-  payoutPhoneConfirmed: boolean | null,
+  {
+    row,
+    payoutPhoneConfirmed,
+    memberName,
+    memberEmail,
+    memberStatus,
+    billCount,
+  }: SelectedPayee,
   now = Date.now(),
 ): PayeeView {
   const holdEnds = row.detailsChangedAt
@@ -168,6 +193,15 @@ function toView(
     secondConfirmationUntil:
       holdEnds && holdEnds.getTime() > now ? holdEnds : null,
     archived: row.archived,
+    member:
+      row.membershipId === null || memberEmail === null
+        ? null
+        : {
+            name: memberName,
+            email: memberEmail,
+            inTeam: memberStatus !== "removed",
+          },
+    billCount,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -185,9 +219,7 @@ function readPayee(
     ).limit(1),
   ).pipe(
     Effect.flatMap(([found]) =>
-      found
-        ? Effect.succeed(toView(found.row, found.payoutPhoneConfirmed))
-        : Effect.fail(notFound),
+      found ? Effect.succeed(toView(found)) : Effect.fail(notFound),
     ),
   );
 }
@@ -207,13 +239,7 @@ export function listPayees(
           filters.method && eq(payees.method, filters.method),
         ),
       ).orderBy(sql`lower(${payees.name}) COLLATE "C"`, payees.id),
-    ).pipe(
-      Effect.map((rows) =>
-        rows.map(({ row, payoutPhoneConfirmed }) =>
-          toView(row, payoutPhoneConfirmed),
-        ),
-      ),
-    ),
+    ).pipe(Effect.map((rows) => rows.map((found) => toView(found)))),
   );
 }
 
@@ -861,6 +887,98 @@ export function archivePayee(
           entity: { type: "payee", id: row.id },
           before: { archived: false },
           after: { archived: true },
+        });
+      }
+      return yield* readPayee(tx, admin.organizationId, row.id);
+    }),
+  );
+}
+
+/** Another active payee for the person, or their having left, keeps theirs archived. */
+function checkRestorableEmployee(
+  tx: Transaction,
+  row: PayeeRow,
+): Effect.Effect<void, Conflict | DatabaseError> {
+  const { membershipId } = row;
+  if (membershipId === null) return Effect.void;
+  return Effect.gen(function* () {
+    const [membership] = yield* query(() =>
+      tx
+        .select({ status: memberships.status })
+        .from(memberships)
+        .where(
+          and(
+            eq(memberships.organizationId, row.organizationId),
+            eq(memberships.id, membershipId),
+          ),
+        )
+        .limit(1),
+    );
+    if (!membership || membership.status === "removed") {
+      return yield* Effect.fail(leftTheTeam);
+    }
+    const others = yield* query(() =>
+      tx
+        .select({ id: payees.id })
+        .from(payees)
+        .where(
+          and(
+            eq(payees.organizationId, row.organizationId),
+            eq(payees.membershipId, membershipId),
+            eq(payees.archived, false),
+          ),
+        )
+        .limit(1),
+    );
+    if (others.length > 0) return yield* Effect.fail(alreadyAPayee);
+  });
+}
+
+/**
+ * Brings an archived payee back for new bills and payments, paid to the
+ * same details as before, so no passkey and no new hold. An employee payee
+ * comes back only while the person is in the company and has no other
+ * payee. Restoring a payee that isn't archived changes nothing.
+ */
+export function restorePayee(
+  admin: PayeeAdmin,
+  payeeId: string,
+): Effect.Effect<
+  PayeeView,
+  Forbidden | NotFound | Conflict | DatabaseError,
+  PayeeDeps
+> {
+  return withScope({ ...admin, role: "admin" }, (tx) =>
+    Effect.gen(function* () {
+      const audit = yield* AuditLog;
+      yield* requireActiveAdmin(tx, admin);
+      const row = yield* findPayeeRow(tx, admin.organizationId, payeeId, {
+        lock: true,
+      });
+      if (row.archived) {
+        yield* checkRestorableEmployee(tx, row);
+        yield* query(() =>
+          tx
+            .update(payees)
+            .set({ archived: false })
+            .where(eq(payees.id, row.id)),
+        ).pipe(
+          Effect.catchTag("DatabaseError", (error) =>
+            Effect.fail<Conflict | DatabaseError>(
+              violatedUniqueConstraint(error.cause) ===
+                "payees_one_active_per_membership"
+                ? alreadyAPayee
+                : error,
+            ),
+          ),
+        );
+        yield* audit.record(tx, {
+          actor: { type: "user", id: admin.userId },
+          organizationId: admin.organizationId,
+          action: "payee.restored",
+          entity: { type: "payee", id: row.id },
+          before: { archived: true },
+          after: { archived: false },
         });
       }
       return yield* readPayee(tx, admin.organizationId, row.id);

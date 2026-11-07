@@ -1,5 +1,5 @@
 import type { SQL } from "drizzle-orm";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Effect } from "effect";
 
 import type {
@@ -114,6 +114,17 @@ export interface ClaimDetailView extends ClaimView {
 export interface ClaimsPageView {
   readonly claims: readonly ClaimView[];
   readonly nextCursor: string | null;
+}
+
+interface ClaimTotalsView {
+  readonly count: number;
+  readonly totalKes: string;
+}
+
+/** `ClaimsSummary`. */
+export interface ClaimsSummaryView {
+  readonly waiting: ClaimTotalsView;
+  readonly payoutFailed: ClaimTotalsView;
 }
 
 const claimNotFound = new NotFound({ message: "Claim not found" });
@@ -345,6 +356,43 @@ export function listClaims(
         rows.length > options.limit && last ? encodeCursor(last) : null,
     };
   });
+}
+
+const totalsWithStatus = (status: ExpenseStatus) => ({
+  count: sql<number>`count(*) FILTER (WHERE ${expenses.status} = ${status})::int`,
+  totalKes: sql<string>`coalesce(sum(${expenses.amountKes}) FILTER (WHERE ${expenses.status} = ${status}), 0)::text`,
+});
+
+/**
+ * Every claim the caller can see that waits for an admin's approval, and
+ * every one whose payment failed: the Approvals tabs' counts, however many
+ * pages they hold.
+ */
+export function claimsSummary(
+  tenant: Tenant,
+): Effect.Effect<ClaimsSummaryView, DatabaseError, DatabaseService> {
+  return withScope(tenant, (tx) =>
+    query(() =>
+      tx
+        .select({
+          waiting: totalsWithStatus("submitted"),
+          payoutFailed: totalsWithStatus("payout_failed"),
+        })
+        .from(expenses)
+        .where(
+          and(
+            visibleClaims(tenant),
+            inArray(expenses.status, ["submitted", "payout_failed"]),
+          ),
+        ),
+    ).pipe(
+      Effect.flatMap(([row]) =>
+        row
+          ? Effect.succeed(row)
+          : Effect.dieMessage("an aggregate query returned no row"),
+      ),
+    ),
+  );
 }
 
 /** A claim the caller can see, with short-lived links to its receipts. */

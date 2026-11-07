@@ -14,16 +14,45 @@ const nairobiDate = z.preprocess(
   z.iso.date("Use a date like 2026-11-02.").optional(),
 );
 
+/** Who acted: a person's user ID, or Expendi's systems or staff. */
+export const ACTIVITY_ACTOR_GROUPS = ["system", "staff"] as const;
+
 /**
  * `GET /organizations/:id/activity` (spec §6.13, §6.14): the company's own
  * audit log, for its admins and accountants. `actionPrefix` matches the
- * start of the action, e.g. `payout.`. `from` and `to` are Africa/Nairobi
- * calendar days, both inclusive. `cursor` is the previous page's
- * `nextCursor`.
+ * start of the action, e.g. `payout.`. `actor` is a person's user ID (an
+ * entry's `actor.id`), `system` or `staff`. `entityType` and `entityId`
+ * pick one record's entries, e.g. `bill` and its ID. `from` and `to` are
+ * Africa/Nairobi calendar days, both inclusive. `cursor` is the previous
+ * page's `nextCursor`.
+ *
+ * With `actor` or `entityType`, a page can come back with fewer entries
+ * than `limit`, or none, and still have a `nextCursor`: keep loading until
+ * it's null.
  */
 export const activityQuerySchema = z
   .object({
     actionPrefix: z.preprocess(
+      blankIsUnset,
+      z.string().trim().min(1).max(100).optional(),
+    ),
+    actor: z.preprocess(
+      blankIsUnset,
+      z
+        .union([z.uuid(), z.enum(ACTIVITY_ACTOR_GROUPS)], {
+          error: "Choose a person, Expendi or the Expendi team.",
+        })
+        .optional(),
+    ),
+    entityType: z.preprocess(
+      blankIsUnset,
+      z
+        .string()
+        .trim()
+        .regex(/^[a-z][a-z_]{0,49}$/, "Choose a valid record type.")
+        .optional(),
+    ),
+    entityId: z.preprocess(
       blankIsUnset,
       z.string().trim().min(1).max(100).optional(),
     ),
@@ -42,6 +71,9 @@ export const activityQuerySchema = z
   })
   .refine((query) => !query.from || !query.to || query.from <= query.to, {
     message: "The start date is after the end date.",
+  })
+  .refine((query) => !query.entityId || query.entityType, {
+    message: "Choose the record's type as well as its ID.",
   });
 
 /** What the dashboard sends: the query string, before parsing. */
@@ -56,12 +88,27 @@ export const activityEntrySchema = z.object({
   actor: z.object({
     /** A person in the company, Expendi staff, or Expendi's own systems. */
     type: auditActorTypeSchema,
+    /** The person's user ID, for the `actor` filter; null for staff and systems. */
+    id: z.uuid().nullable(),
     /** The person's name, or their email until they give one; null for staff and systems. */
     name: z.string().nullable(),
   }),
   /** `<entity>.<past-tense verb>`, e.g. `category.archived`. */
   action: z.string(),
-  entity: z.object({ type: z.string(), id: z.string().nullable() }),
+  entity: z.object({
+    type: z.string(),
+    id: z.string().nullable(),
+    /**
+     * The record as people know it, e.g. "Twiga Foods, INV-4471" for a
+     * bill; null when it can't be read any more or has no name of its own.
+     */
+    label: z.string().nullable(),
+  }),
+  /**
+   * The passkey approval the entry was part of. Payments approved together
+   * share it, e.g. every bill paid with one passkey confirmation.
+   */
+  approvalId: z.uuid().nullable(),
   /** The values before and after, as recorded. */
   before: z.json().nullable(),
   after: z.json().nullable(),

@@ -18,12 +18,19 @@ import type { PayingCompany } from "../helpers/payouts.js";
 import { SoftwarePasskey } from "../../../scripts/lib/software-passkey.js";
 import { createApp } from "../../app.js";
 import { DatabaseService } from "../../db/client.js";
-import { payees, users } from "../../db/schema/index.js";
+import {
+  memberships,
+  payees,
+  payrollRuns,
+  users,
+} from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 import {
   confirmAllowlistChange,
   requestAllowlistChange,
 } from "../../services/allowlist/allowlist.js";
+import { insertBill } from "../helpers/bills.js";
+import { addCategory } from "../helpers/claims.js";
 import { addMember, createUser } from "../helpers/db.js";
 import {
   makeFakeEmailSender,
@@ -986,6 +993,240 @@ describe("edits without a passkey", () => {
   });
 });
 
+describe("restoring a payee", () => {
+  async function archived(payee: CreatePayeeRequest): Promise<Payee> {
+    const created = await create(payee);
+    await send("POST", `${base()}/${created.id}/archive`);
+    return created;
+  }
+
+  it("brings an archived payee back with the same details, audited", async () => {
+    // #given
+    const payee = await archived({
+      kind: "supplier",
+      name: "Acme",
+      details: bank,
+    });
+
+    // #when
+    const response = await send("POST", `${base()}/${payee.id}/restore`);
+
+    // #then
+    const restored = await dataOf<Payee>(response);
+    expect({
+      status: response.status,
+      archived: restored.archived,
+      details: restored.details,
+      active: await listed(),
+      archivedList: await listed("?archived=true"),
+      audit: (await payeeAudit("payee.restored")).map(
+        ({ actor_id, before, after }) => ({ actor_id, before, after }),
+      ),
+    }).toEqual({
+      status: 200,
+      archived: false,
+      details: bank,
+      active: ["Acme"],
+      archivedList: [],
+      audit: [
+        {
+          actor_id: paying.company.admin.id,
+          before: { archived: true },
+          after: { archived: false },
+        },
+      ],
+    });
+  });
+
+  it("changes nothing for a payee that isn't archived", async () => {
+    // #given
+    const payee = await create({ kind: "supplier", name: "Acme" });
+
+    // #when
+    const response = await send("POST", `${base()}/${payee.id}/restore`);
+
+    // #then
+    expect({
+      status: response.status,
+      archived: (await dataOf<Payee>(response)).archived,
+      audited: (await payeeAudit("payee.restored")).length,
+    }).toEqual({ status: 200, archived: false, audited: 0 });
+  });
+
+  it("refuses an employee's payee once they have another one", async () => {
+    // #given
+    const { membershipId } = await addEmployee();
+    const first = await archived({ kind: "employee", name: "W", membershipId });
+    await create({ kind: "employee", name: "Wanjiru", membershipId });
+
+    // #when
+    const response = await send("POST", `${base()}/${first.id}/restore`);
+
+    // #then
+    expect(response.status).toBe(409);
+    expect(await response.text()).toContain("already a payee");
+  });
+
+  it("refuses an employee's payee once they've left the company", async () => {
+    // #given
+    const { membershipId } = await addEmployee();
+    const payee = await archived({ kind: "employee", name: "W", membershipId });
+    await runInScope(
+      db,
+      { organizationId: paying.company.organizationId },
+      (tx) =>
+        tx
+          .update(memberships)
+          .set({ status: "removed" })
+          .where(eq(memberships.id, membershipId)),
+    );
+
+    // #when
+    const response = await send("POST", `${base()}/${payee.id}/restore`);
+
+    // #then
+    expect(response.status).toBe(409);
+    expect(await response.text()).toContain("left the company");
+  });
+
+  it("refuses an accountant, who reads payees but can't change them", async () => {
+    // #given
+    const accountant = await createUser(db);
+    await addMember(db, paying.company, accountant, { role: "accountant" });
+    const payee = await archived({ kind: "supplier", name: "Acme" });
+
+    // #when
+    const response = await send(
+      "POST",
+      `${base()}/${payee.id}/restore`,
+      undefined,
+      accountant.privyUserId,
+    );
+
+    // #then
+    expect(response.status).toBe(403);
+    expect(await listed("?archived=true")).toEqual(["Acme"]);
+  });
+
+  it("answers 404 for a payee that isn't the company's", async () => {
+    // #when
+    const statuses = await Promise.all(
+      [randomUUID(), "not-a-uuid"].map((id) =>
+        send("POST", `${base()}/${id}/restore`).then((r) => r.status),
+      ),
+    );
+
+    // #then
+    expect(statuses).toEqual([404, 404]);
+  });
+});
+
+describe("what the list shows about a payee", () => {
+  it("shows an employee payee's person, and whether they're still in the team", async () => {
+    // #given
+    const stays = await addEmployee();
+    await db
+      .update(users)
+      .set({ fullName: "Wanjiru Kamau" })
+      .where(eq(users.id, stays.user.id));
+    const leaves = await addEmployee();
+    await create({
+      kind: "employee",
+      name: "Wanjiru",
+      membershipId: stays.membershipId,
+    });
+    await create({
+      kind: "employee",
+      name: "Otieno",
+      membershipId: leaves.membershipId,
+    });
+    await create({ kind: "supplier", name: "Acme" });
+    await runInScope(
+      db,
+      { organizationId: paying.company.organizationId },
+      (tx) =>
+        tx
+          .update(memberships)
+          .set({ status: "removed" })
+          .where(eq(memberships.id, leaves.membershipId)),
+    );
+
+    // #when
+    const rows = await dataOf<Payee[]>(await send("GET", base()));
+
+    // #then
+    expect(
+      Object.fromEntries(rows.map((row) => [row.name, row.member])),
+    ).toEqual({
+      Acme: null,
+      Otieno: { name: null, email: leaves.user.email, inTeam: false },
+      Wanjiru: {
+        name: "Wanjiru Kamau",
+        email: stays.user.email,
+        inTeam: true,
+      },
+    });
+  });
+
+  it("counts each payee's bills, whatever their status, but never salaries", async () => {
+    // #given
+    const categoryId = await addCategory(db, paying.company, "Rent");
+    const supplier = await create({ kind: "supplier", name: "Acme" });
+    await create({ kind: "vendor", name: "Figma" });
+    const { membershipId } = await addEmployee();
+    const employeePayee = await create({
+      kind: "employee",
+      name: "Wanjiru",
+      membershipId,
+    });
+    await insertBill(db, paying.company, {
+      payeeId: supplier.id,
+      categoryId,
+    });
+    await insertBill(db, paying.company, {
+      payeeId: supplier.id,
+      categoryId,
+      status: "cancelled",
+      cancelledReason: "Duplicate",
+      cancelledBy: paying.company.admin.id,
+      cancelledAt: new Date(),
+    });
+    const [run] = await runInScope(
+      db,
+      {
+        organizationId: paying.company.organizationId,
+        userId: paying.company.admin.id,
+        role: "admin",
+      },
+      (tx) =>
+        tx
+          .insert(payrollRuns)
+          .values({
+            organizationId: paying.company.organizationId,
+            payDate: "2026-11-28",
+            totalKes: 6_000_000n,
+            salariesKes: 6_000_000n,
+            capKes: 7_200_000n,
+          })
+          .returning({ id: payrollRuns.id }),
+    );
+    await insertBill(db, paying.company, {
+      payeeId: employeePayee.id,
+      categoryId,
+      payrollRunId: run?.id,
+      overviewHeading: "salaries",
+    });
+
+    // #when
+    const rows = await dataOf<Payee[]>(await send("GET", base()));
+
+    // #then
+    expect(
+      Object.fromEntries(rows.map((row) => [row.name, row.billCount])),
+    ).toEqual({ Acme: 2, Figma: 0, Wanjiru: 0 });
+  });
+});
+
 describe("access", () => {
   it("refuses employees on every payee route", async () => {
     // #given
@@ -1003,6 +1244,7 @@ describe("access", () => {
       ["PATCH", `${base()}/${payee.id}`, { name: "Mine" }],
       ["POST", `${base()}/${payee.id}/details`, { details: till() }],
       ["POST", `${base()}/${payee.id}/archive`],
+      ["POST", `${base()}/${payee.id}/restore`],
       ["POST", `${base()}/changes/${randomUUID()}/confirm`, {}],
     ];
 
@@ -1045,6 +1287,10 @@ describe("access", () => {
       }),
       (id) => ({
         path: `/organizations/${id}/payees/${randomUUID()}/archive`,
+        init: { method: "POST" },
+      }),
+      (id) => ({
+        path: `/organizations/${id}/payees/${randomUUID()}/restore`,
         init: { method: "POST" },
       }),
       (id) => ({

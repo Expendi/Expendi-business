@@ -195,6 +195,7 @@ describe("POST /organizations/:organizationId/members", () => {
     expect(result).toMatchObject({
       emailSent: true,
       installUrl: TEST_APP_INSTALL_URL,
+      inviteLink: TEST_APP_INSTALL_URL,
       member: {
         name: "Jane Wanjiru",
         email: address,
@@ -366,6 +367,7 @@ describe("POST /organizations/:organizationId/members", () => {
     // #then
     expect(result).toMatchObject({
       emailSent: true,
+      inviteLink: WEB_DASHBOARD_URL,
       member: {
         name: "Grace CPA",
         email: address,
@@ -512,6 +514,28 @@ describe("POST /organizations/:organizationId/members", () => {
     expect(response.status).toBe(400);
   });
 
+  it("gives the admin an accountant's dashboard link to copy when their email fails", async () => {
+    // #given
+    email.state.failNext();
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    // #when
+    const result = await invited(
+      await invite({
+        email: randomEmail(),
+        fullName: "Grace CPA",
+        role: "accountant",
+      }),
+    );
+
+    // #then
+    expect(result).toMatchObject({
+      emailSent: false,
+      inviteLink: WEB_DASHBOARD_URL,
+      member: { role: "accountant", status: "invited" },
+    });
+  });
+
   it("keeps the invite when the email fails, says so, and logs only the membership ID", async () => {
     // #given
     const address = randomEmail();
@@ -533,6 +557,7 @@ describe("POST /organizations/:organizationId/members", () => {
     expect(result).toMatchObject({
       emailSent: false,
       installUrl: TEST_APP_INSTALL_URL,
+      inviteLink: TEST_APP_INSTALL_URL,
       member: { status: "invited" },
     });
     expect(await listed()).toContainEqual(result.member);
@@ -583,6 +608,7 @@ describe("inviting without APP_INSTALL_URL", () => {
     expect(result).toMatchObject({
       emailSent: false,
       installUrl: null,
+      inviteLink: null,
       member: { status: "invited" },
     });
     expect(unsetEmail.state.sent).toEqual([]);

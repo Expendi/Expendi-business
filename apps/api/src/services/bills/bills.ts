@@ -1,22 +1,42 @@
 import type { SQL } from "drizzle-orm";
-import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  notInArray,
+  or,
+  sql,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Effect } from "effect";
 
 import type {
   BillCurrency,
+  BillListView,
+  BillMethodFilter,
+  BillSource,
   BillStatus,
   CreateBillFields,
   MarkBillPaidOutsideFields,
   OverviewHeading,
   PayeeKind,
   PayeeMethod,
+  PayoutStatus,
+  RecurringItemState,
+  RecurringSchedule,
   UpdateBillFields,
 } from "@expendi-business/shared";
 import {
+  BILL_LIST_VIEW_STATUSES,
   currencyForPayeeMethod,
   DATED_BILL_STATUSES,
   defaultBillHeading,
+  SETTLED_BILL_STATUSES,
   UNPAID_BILL_STATUSES,
 } from "@expendi-business/shared";
 
@@ -31,8 +51,12 @@ import type { BillFileView } from "./files.js";
 import {
   bills,
   categories,
+  expenses,
+  paidFromAccounts,
   payees,
+  payouts,
   receiptFiles,
+  recurringItems,
   users,
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
@@ -47,6 +71,7 @@ import { recordBillSpending } from "../expenses/company.js";
 import { kesCentsFor } from "../paycrest/amounts.js";
 import { Paycrest } from "../paycrest/paycrest-client.js";
 import { onRecurringBillSettled } from "../recurring/next-bill.js";
+import { recurringItemState } from "../recurring/recurring-items.js";
 import { enqueuePaidBill } from "../zoho/enqueue.js";
 import {
   attachBillFiles,
@@ -107,21 +132,63 @@ export interface BillView {
   readonly cancelledBy: BillPersonView | null;
   readonly payoutId: string | null;
   readonly fileCount: number;
+  readonly recurring: {
+    readonly id: string;
+    readonly state: RecurringItemState;
+    readonly schedule: RecurringSchedule;
+    readonly scheduleDay: number;
+    readonly startsOn: string;
+  } | null;
+  readonly paidFromAccount: {
+    readonly id: string;
+    readonly name: string;
+  } | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
 
 export interface BillDetailView extends BillView {
   readonly files: readonly BillFileView[];
+  readonly payout: {
+    readonly id: string;
+    readonly status: PayoutStatus;
+    readonly failureReason: string | null;
+  } | null;
 }
 
-export interface BillFilters {
-  readonly status?: readonly BillStatus[] | undefined;
+/** What `GET …/bills` and `GET …/bills/summary` both filter by. */
+export interface BillFilterFields {
   readonly heading?: OverviewHeading | undefined;
   readonly payeeId?: string | undefined;
+  readonly categoryId?: string | undefined;
+  readonly method?: BillMethodFilter | undefined;
+  readonly source?: BillSource | undefined;
   readonly dueFrom?: string | undefined;
   readonly dueTo?: string | undefined;
+  /** Leaves out bills settled before this Nairobi day. */
+  readonly settledFrom?: string | undefined;
+}
+
+export interface BillFilters extends BillFilterFields {
+  readonly view?: BillListView | undefined;
+  readonly status?: readonly BillStatus[] | undefined;
+  readonly excludePayroll?: boolean | undefined;
   readonly limit: number;
+}
+
+interface BillTotalsView {
+  readonly count: number;
+  readonly totalKes: string;
+  readonly totalUsdc: string;
+}
+
+/** `BillsSummary`: counts per tab with the filters, the rest company-wide. */
+export interface BillsSummaryView {
+  readonly views: Readonly<Record<BillListView, number>>;
+  readonly toPay: BillTotalsView & { readonly withoutAmount: number };
+  readonly overdue: BillTotalsView;
+  readonly dueToday: BillTotalsView;
+  readonly payoutFailed: BillTotalsView;
 }
 
 type BillDeps = DatabaseService | AuditLog | FileStorage;
@@ -185,6 +252,8 @@ const userActor = (tenant: Tenant): AuditActor => ({
 
 const markedBy = alias(users, "marked_by");
 const cancelledBy = alias(users, "cancelled_by");
+/** The company spending a bill marked paid outside Expendi recorded; at most one. */
+const billSpending = alias(expenses, "bill_spending");
 
 const billColumns = {
   bill: bills,
@@ -198,6 +267,13 @@ const billColumns = {
   cancelledByName: cancelledBy.fullName,
   cancelledByEmail: cancelledBy.email,
   fileCount: sql<number>`(SELECT count(*)::int FROM ${receiptFiles} WHERE ${receiptFiles.billId} = ${bills.id})`,
+  recurringActive: recurringItems.active,
+  recurringNextDueOn: recurringItems.nextDueOn,
+  recurringSchedule: recurringItems.schedule,
+  recurringScheduleDay: recurringItems.scheduleDay,
+  recurringStartsOn: recurringItems.startsOn,
+  accountId: paidFromAccounts.id,
+  accountName: paidFromAccounts.name,
 };
 
 const selectBills = (tx: Transaction, where: SQL | undefined) =>
@@ -208,6 +284,12 @@ const selectBills = (tx: Transaction, where: SQL | undefined) =>
     .innerJoin(categories, eq(categories.id, bills.categoryId))
     .leftJoin(markedBy, eq(markedBy.id, bills.markedPaidBy))
     .leftJoin(cancelledBy, eq(cancelledBy.id, bills.cancelledBy))
+    .leftJoin(recurringItems, eq(recurringItems.id, bills.recurringItemId))
+    .leftJoin(billSpending, eq(billSpending.billId, bills.id))
+    .leftJoin(
+      paidFromAccounts,
+      eq(paidFromAccounts.id, billSpending.paidFromAccountId),
+    )
     .where(where);
 
 type SelectedBill = Awaited<ReturnType<typeof selectBills>>[number];
@@ -261,10 +343,77 @@ function toBillView(row: SelectedBill): BillView {
     ),
     payoutId: bill.payoutId,
     fileCount: row.fileCount,
+    recurring:
+      bill.recurringItemId === null ||
+      row.recurringActive === null ||
+      row.recurringSchedule === null ||
+      row.recurringScheduleDay === null ||
+      row.recurringStartsOn === null
+        ? null
+        : {
+            id: bill.recurringItemId,
+            state: recurringItemState({
+              active: row.recurringActive,
+              nextDueOn: row.recurringNextDueOn,
+            }),
+            schedule: row.recurringSchedule,
+            scheduleDay: row.recurringScheduleDay,
+            startsOn: row.recurringStartsOn,
+          },
+    paidFromAccount:
+      row.accountId === null || row.accountName === null
+        ? null
+        : { id: row.accountId, name: row.accountName },
     createdAt: bill.createdAt,
     updatedAt: bill.updatedAt,
   };
 }
+
+/** Every condition holds; no conditions holds always. */
+const allOf = (...conditions: (SQL | undefined)[]): SQL =>
+  and(...conditions) ?? sql`TRUE`;
+
+/** The Nairobi day a bill was settled: paid (either way), or cancelled. */
+const settledOn = sql`coalesce(${bills.paidOn}, (${bills.cancelledAt} AT TIME ZONE 'Africa/Nairobi')::date, ${bills.dueOn})`;
+
+/** Needs `payees` joined, for the payee's method. */
+function filtersWhere(filters: BillFilterFields): SQL | undefined {
+  const { method, source } = filters;
+  return and(
+    filters.heading === undefined
+      ? undefined
+      : eq(bills.overviewHeading, filters.heading),
+    filters.payeeId === undefined
+      ? undefined
+      : eq(bills.payeeId, filters.payeeId),
+    filters.categoryId === undefined
+      ? undefined
+      : eq(bills.categoryId, filters.categoryId),
+    method === undefined
+      ? undefined
+      : method === "none"
+        ? isNull(payees.method)
+        : eq(payees.method, method),
+    source === undefined
+      ? undefined
+      : source === "recurring"
+        ? isNotNull(bills.recurringItemId)
+        : isNull(bills.recurringItemId),
+    filters.dueFrom === undefined
+      ? undefined
+      : gte(bills.dueOn, filters.dueFrom),
+    filters.dueTo === undefined ? undefined : lte(bills.dueOn, filters.dueTo),
+    filters.settledFrom === undefined
+      ? undefined
+      : or(
+          notInArray(bills.status, [...SETTLED_BILL_STATUSES]),
+          sql`${settledOn} >= ${filters.settledFrom}::date`,
+        ),
+  );
+}
+
+const withStatus = (statuses: readonly BillStatus[]): SQL =>
+  inArray(bills.status, [...statuses]);
 
 /** Sorted by due date, earliest first. */
 export function listBills(
@@ -277,21 +426,12 @@ export function listBills(
         tx,
         and(
           eq(bills.organizationId, tenant.organizationId),
-          filters.status === undefined
+          filters.view === undefined
             ? undefined
-            : inArray(bills.status, [...filters.status]),
-          filters.heading === undefined
-            ? undefined
-            : eq(bills.overviewHeading, filters.heading),
-          filters.payeeId === undefined
-            ? undefined
-            : eq(bills.payeeId, filters.payeeId),
-          filters.dueFrom === undefined
-            ? undefined
-            : gte(bills.dueOn, filters.dueFrom),
-          filters.dueTo === undefined
-            ? undefined
-            : lte(bills.dueOn, filters.dueTo),
+            : withStatus(BILL_LIST_VIEW_STATUSES[filters.view]),
+          filters.status === undefined ? undefined : withStatus(filters.status),
+          filters.excludePayroll ? isNull(bills.payrollRunId) : undefined,
+          filtersWhere(filters),
         ),
       )
         .orderBy(asc(bills.dueOn), asc(bills.createdAt), asc(bills.id))
@@ -300,7 +440,80 @@ export function listBills(
   );
 }
 
-/** A bill with short-lived links to its invoice and any proof of payment. */
+const countWhere = (condition: SQL) =>
+  sql<number>`count(*) FILTER (WHERE ${condition})::int`;
+
+/** KES bills carry `amount_kes` and USD bills `amount_usdc`; the other is null. */
+const totalsWhere = (condition: SQL) => ({
+  count: countWhere(condition),
+  totalKes: sql<string>`coalesce(sum(${bills.amountKes}) FILTER (WHERE ${condition}), 0)::text`,
+  totalUsdc: sql<string>`coalesce(sum(${bills.amountUsdc}) FILTER (WHERE ${condition}), 0)::text`,
+});
+
+/**
+ * How many bills each tab of the Bills page holds with `filters`, and the
+ * numbers on its cards over every bill still to pay, whatever the filters.
+ * Salary bills are Payroll's, so neither counts them.
+ */
+export function billsSummary(
+  tenant: Tenant,
+  filters: BillFilterFields,
+): Effect.Effect<BillsSummaryView, DatabaseError, DatabaseService> {
+  const filtered = filtersWhere(filters);
+  const unpaid = withStatus(UNPAID_BILL_STATUSES);
+  return withScope(tenant, (tx) =>
+    query(() =>
+      tx
+        .select({
+          open: countWhere(
+            allOf(filtered, withStatus(BILL_LIST_VIEW_STATUSES.open)),
+          ),
+          paying: countWhere(
+            allOf(filtered, withStatus(BILL_LIST_VIEW_STATUSES.paying)),
+          ),
+          history: countWhere(
+            allOf(filtered, withStatus(BILL_LIST_VIEW_STATUSES.history)),
+          ),
+          toPay: totalsWhere(unpaid),
+          withoutAmount: countWhere(
+            allOf(unpaid, isNull(bills.amountKes), isNull(bills.amountUsdc)),
+          ),
+          overdue: totalsWhere(eq(bills.status, "overdue")),
+          dueToday: totalsWhere(eq(bills.status, "due")),
+          payoutFailed: totalsWhere(eq(bills.status, "payout_failed")),
+        })
+        .from(bills)
+        .innerJoin(payees, eq(payees.id, bills.payeeId))
+        .where(
+          and(
+            eq(bills.organizationId, tenant.organizationId),
+            isNull(bills.payrollRunId),
+          ),
+        ),
+    ).pipe(
+      Effect.flatMap(([row]) =>
+        row
+          ? Effect.succeed({
+              views: {
+                open: row.open,
+                paying: row.paying,
+                history: row.history,
+              },
+              toPay: { ...row.toPay, withoutAmount: row.withoutAmount },
+              overdue: row.overdue,
+              dueToday: row.dueToday,
+              payoutFailed: row.payoutFailed,
+            })
+          : Effect.dieMessage("an aggregate query returned no row"),
+      ),
+    ),
+  );
+}
+
+/**
+ * A bill with short-lived links to its invoice and any proof of payment,
+ * and its latest payment through Expendi.
+ */
 export function getBill(
   tenant: Tenant,
   billId: string,
@@ -310,7 +523,7 @@ export function getBill(
   DatabaseService | FileStorage
 > {
   return Effect.gen(function* () {
-    const { row, files } = yield* withScope(tenant, (tx) =>
+    const { row, files, payout } = yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
         const [row] = yield* query(() =>
           selectBills(
@@ -322,11 +535,34 @@ export function getBill(
           ).limit(1),
         );
         if (!row) return yield* Effect.fail(billNotFound);
+        const payoutId = row.bill.payoutId;
+        const [payout] =
+          payoutId === null
+            ? []
+            : yield* query(() =>
+                tx
+                  .select({
+                    id: payouts.id,
+                    status: payouts.status,
+                    failureReason: payouts.failureReason,
+                  })
+                  .from(payouts)
+                  .where(
+                    and(
+                      eq(payouts.organizationId, tenant.organizationId),
+                      eq(payouts.id, payoutId),
+                    ),
+                  ),
+              );
         const files = yield* readBillFiles(tx, tenant.organizationId, billId);
-        return { row, files };
+        return { row, files, payout: payout ?? null };
       }),
     );
-    return { ...toBillView(row), files: yield* billFileLinks(files) };
+    return {
+      ...toBillView(row),
+      files: yield* billFileLinks(files),
+      payout,
+    };
   });
 }
 

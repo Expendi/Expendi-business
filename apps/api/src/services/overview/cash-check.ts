@@ -1,7 +1,10 @@
 import { and, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { Effect } from "effect";
 
-import type { OverviewHeading } from "@expendi-business/shared";
+import type {
+  OverviewHeading,
+  RecurringSchedule,
+} from "@expendi-business/shared";
 import { UNPAID_BILL_STATUSES } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
@@ -56,6 +59,12 @@ export interface CashObligationView {
   /** The bill, the payroll run, or (a forecast) the recurring payment. */
   readonly id: string;
   readonly name: string;
+  /** The bill's note. */
+  readonly notes: string | null;
+  /** How often its recurring payment or salary repeats. */
+  readonly schedule: RecurringSchedule | null;
+  /** A payroll run's payments still to pay. */
+  readonly people: number | null;
   readonly heading: OverviewHeading;
   readonly dueOn: string;
   readonly status: CashObligationStatus;
@@ -161,6 +170,8 @@ function readUnpaidBills(
         payeeName: payees.name,
         payeeMethod: payees.method,
         recurringPayVia: recurringItems.payVia,
+        recurringSchedule: recurringItems.schedule,
+        notes: bills.notes,
         payrollRunId: bills.payrollRunId,
         heading: bills.overviewHeading,
         currency: bills.currency,
@@ -328,6 +339,9 @@ export function readCashCheck(
         kind: "bill",
         id: bill.id,
         name: bill.payeeName,
+        notes: bill.notes,
+        schedule: bill.recurringSchedule,
+        people: null,
         heading: bill.heading,
         dueOn: bill.dueOn,
         status:
@@ -344,6 +358,9 @@ export function readCashCheck(
         kind: "payroll",
         id: runId,
         name: "Payroll",
+        notes: null,
+        schedule: null,
+        people: run.amounts.length,
         heading: "salaries",
         dueOn: run.dueOn,
         status: run.failed
@@ -380,6 +397,9 @@ export function readCashCheck(
           kind: "forecast",
           id: item.id,
           name: item.payeeName,
+          notes: null,
+          schedule: item.schedule,
+          people: null,
           heading: item.heading,
           dueOn,
           status: "forecast",

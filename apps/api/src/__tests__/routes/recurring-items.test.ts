@@ -39,6 +39,7 @@ import {
   expectRouteIsolation,
   expectTableIsolation,
 } from "../helpers/isolation.js";
+import { addEmployeePayee, insertSalary } from "../helpers/payroll.js";
 import {
   billsOfItem,
   insertRecurringItem,
@@ -415,6 +416,80 @@ describe("GET /organizations/:organizationId/recurring-items", () => {
 
     // #then
     expect(fetched).toEqual(item);
+  });
+
+  it("gives the next bill its own currency and amount", async () => {
+    // #given
+    const item = await createItem({ amountKes: "45,000" });
+
+    // #when
+    const fetched = await getItem(item.id);
+
+    // #then
+    expect(fetched.nextBill).toMatchObject({
+      currency: "kes",
+      amountKes: "4500000",
+      amountUsdc: null,
+    });
+  });
+
+  it("lists salaries too, unless asked to leave them to Payroll", async () => {
+    // #given
+    const person = await addEmployeePayee(db, company);
+    const salaryId = await insertSalary(db, company, {
+      payeeId: person.payeeId,
+      categoryId,
+    });
+    const rent = await createItem();
+
+    // #when
+    const listed = async (query: string) =>
+      (
+        await dataOf(
+          await send("GET", `${base()}${query}`),
+          recurringItemsResponseSchema,
+        )
+      )
+        .map((item) => item.id)
+        .sort();
+    const results = {
+      everything: await listed(""),
+      bills: await listed("?excludeSalaries=true"),
+      explicit: await listed("?excludeSalaries=false"),
+    };
+
+    // #then
+    expect(results).toEqual({
+      everything: [salaryId, rent.id].sort(),
+      bills: [rent.id],
+      explicit: [salaryId, rent.id].sort(),
+    });
+  });
+
+  it("shows an accountant the list without salaries, as an admin sees it", async () => {
+    // #given
+    const accountant = await createUser(db);
+    await addMember(db, company, accountant, { role: "accountant" });
+    const person = await addEmployeePayee(db, company);
+    await insertSalary(db, company, { payeeId: person.payeeId, categoryId });
+    await createItem();
+
+    // #when
+    const read = (user: Pick<TestUser, "privyUserId">) =>
+      send("GET", `${base()}?excludeSalaries=true`, undefined, user).then(
+        (response) => dataOf(response, recurringItemsResponseSchema),
+      );
+
+    // #then
+    expect(await read(accountant)).toEqual(await read(company.admin));
+  });
+
+  it("refuses an excludeSalaries that isn't true or false", async () => {
+    // #when
+    const response = await send("GET", `${base()}?excludeSalaries=yes`);
+
+    // #then
+    expect(response.status).toBe(400);
   });
 
   it.each(["not-a-uuid", randomUUID()])("answers 404 for %s", async (id) => {

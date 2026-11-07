@@ -28,6 +28,7 @@ function salary(overrides: Partial<Salary> = {}): Salary {
       method: "mpesa_phone",
       archived: false,
       payoutPhoneConfirmed: true,
+      accountEnding: null,
     },
     category: { id: "22222222-2222-4222-8222-222222222222", name: "Salaries" },
     amountKes: "5000000",

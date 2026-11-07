@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -25,6 +25,7 @@ import { getSpendingOverview } from "../../services/overview/overview.js";
 import { insertBill, insertPayee } from "../helpers/bills.js";
 import { sendJson } from "../helpers/claims.js";
 import { addMember, createUser } from "../helpers/db.js";
+import { nameUser } from "../helpers/exports.js";
 import { makeFakePaycrest } from "../helpers/fakes.js";
 import {
   createIsolationFixture,
@@ -37,6 +38,7 @@ import {
 } from "../helpers/overview.js";
 import { USDC } from "../helpers/payouts.js";
 import { addEmployeePayee, insertSalary } from "../helpers/payroll.js";
+import { insertRecurringItem } from "../helpers/recurring.js";
 import { makeTestRuntime } from "../helpers/runtime.js";
 
 let runtime: AppRuntime;
@@ -452,6 +454,148 @@ describe("what the overview shows as outstanding and due", () => {
       claims: outstanding.claims.map((row) => row.id),
       noReceipt: outstanding.noReceipt.map((row) => row.id),
     }).toEqual({ claims: [waiting.id], noReceipt: [missing.id] });
+  });
+
+  it("says who spent what, when and on what, and lists petty cash without the eTIMS invoice it needs", async () => {
+    // #given
+    const f = await seedOverviewCompany(db);
+    await nameUser(db, f.employee.user, "Amina Wanjiru");
+    const float = await insertFloat(f, f.employee.membershipId);
+    const waiting = await f.insertExpense({
+      kind: "claim",
+      status: "submitted",
+      merchant: "Java House",
+      spentOn: "2026-11-01",
+      description: "Client lunch",
+    });
+    const withReceipt = (values: Parameters<typeof f.insertExpense>[0]) =>
+      f
+        .insertExpense({ kind: "float", floatId: float.id, ...values })
+        .then(async (expense) => {
+          await runInScope(db, f.tenant, (tx) =>
+            tx.insert(receiptFiles).values({
+              organizationId: f.company.organizationId,
+              expenseId: expense.id,
+              uploadedBy: f.employee.user.id,
+              kind: "sms_text",
+              smsText: "Receipt evidence",
+              sha256: createHash("sha256").update(expense.id).digest("hex"),
+              contentType: "text/plain",
+              byteSize: 16,
+            }),
+          );
+          return expense;
+        });
+    const noInvoice = await withReceipt({ merchant: "Naivas Sarit" });
+    await withReceipt({ etimsStatus: "not_required" });
+    await withReceipt({
+      etimsStatus: "attached",
+      etimsInvoiceNumber: "0040812345",
+    });
+    await withReceipt({ source: "import" });
+
+    // #when
+    const { outstanding } = spendingOverviewSchema.parse(await overviewOf(f));
+
+    // #then
+    expect({
+      claims: outstanding.claims,
+      noEtims: outstanding.noEtims.map((row) => [row.id, row.name]),
+      noReceipt: outstanding.noReceipt,
+    }).toEqual({
+      claims: [
+        {
+          id: waiting.id,
+          name: "Java House",
+          amountKes: "1000",
+          floatId: null,
+          spentOn: "2026-11-01",
+          personName: "Amina Wanjiru",
+          categoryName: "Office",
+          description: "Client lunch",
+        },
+      ],
+      noEtims: [[noInvoice.id, "Naivas Sarit"]],
+      noReceipt: [],
+    });
+  });
+
+  it("describes what's due next: a bill's note and how often it repeats, a run's people, a salary to come", async () => {
+    // #given
+    const f = await seedOverviewCompany(db);
+    const bill = { payeeId: f.supplierId, categoryId: f.categoryId };
+    const water = await insertRecurringItem(db, f.company, {
+      ...bill,
+      scheduleDay: 15,
+      nextDueOn: "2026-12-15",
+    });
+    const waterBill = await insertBill(db, f.company, {
+      ...bill,
+      recurringItemId: water,
+      amountKes: 3_850n,
+      dueOn: "2026-11-15",
+      notes: "Water bill",
+    });
+    const paye = await insertBill(db, f.company, {
+      ...bill,
+      amountKes: 212_400n,
+      dueOn: "2026-11-09",
+      notes: "PAYE for October",
+    });
+    const run = await insertPayrollRun(f, "2026-11-20");
+    const colleague = await addEmployeePayee(db, f.company, "Brian");
+    for (const person of [f.employee, colleague]) {
+      await insertBill(db, f.company, {
+        payeeId: person.payeeId,
+        categoryId: f.categoryId,
+        overviewHeading: "salaries",
+        payrollRunId: run.id,
+        amountKes: 30_000n,
+        dueOn: "2026-11-20",
+      });
+    }
+    const salary = await insertSalary(db, f.company, {
+      payeeId: f.employee.payeeId,
+      categoryId: f.categoryId,
+      amountKes: 60_000n,
+    });
+
+    // #when
+    const { cash } = spendingOverviewSchema.parse(await overviewOf(f));
+
+    // #then
+    expect(
+      cash.obligations.map(({ kind, id, notes, schedule, people }) => ({
+        kind,
+        id,
+        notes,
+        schedule,
+        people,
+      })),
+    ).toEqual([
+      {
+        kind: "bill",
+        id: paye,
+        notes: "PAYE for October",
+        schedule: null,
+        people: null,
+      },
+      {
+        kind: "bill",
+        id: waterBill,
+        notes: "Water bill",
+        schedule: "monthly",
+        people: null,
+      },
+      { kind: "payroll", id: run.id, notes: null, schedule: null, people: 2 },
+      {
+        kind: "forecast",
+        id: salary,
+        notes: null,
+        schedule: "monthly",
+        people: null,
+      },
+    ]);
   });
 });
 

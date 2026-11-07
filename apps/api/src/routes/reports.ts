@@ -9,6 +9,7 @@ import {
   reportFilename,
   reportFormatSchema,
   reportMonthSchema,
+  reportSpendingQuerySchema,
 } from "@expendi-business/shared";
 
 import type { DbScope } from "../db/scope.js";
@@ -16,6 +17,7 @@ import type { TenantVariables } from "../middleware/tenant.js";
 import type { AppRuntime } from "../runtime.js";
 import { BadRequest, isClientError } from "../errors.js";
 import { readBody } from "../http/body.js";
+import { readQuery } from "../http/query.js";
 import {
   clientErrorResponse,
   failureResponse,
@@ -34,6 +36,8 @@ import {
   EXPORT_CONTENT_TYPES,
   renderExport,
 } from "../services/export/render.js";
+import { reportMonthSummary } from "../services/export/summary.js";
+import { getReportSpending } from "../services/overview/spending-by-month.js";
 
 type CompanyScope = DbScope & { readonly organizationId: string };
 
@@ -58,10 +62,23 @@ function freshExportFile(scope: CompanyScope, month: string, file: ExportFile) {
  * generate; employees never. `/:month/:format` builds any month's export
  * file or eTIMS report on the spot as a download: a pure read, so
  * accountants, who can't generate a stored export, get every month too.
+ * `/spending` is money out by month for the charts, and
+ * `/:month/summary` what a month's files hold.
  */
 export function createReportRoutes(runtime: AppRuntime) {
   return new Hono<{ Variables: TenantVariables }>()
     .use(requireAdminOrReader())
+    .get("/spending", (c) =>
+      runEffect(
+        runtime,
+        c,
+        readQuery(c.req.query(), reportSpendingQuerySchema).pipe(
+          Effect.flatMap((options) =>
+            getReportSpending(c.get("tenant"), options),
+          ),
+        ),
+      ),
+    )
     .get("/exports", (c) => runEffect(runtime, c, listExports(c.get("tenant"))))
     .post("/exports", (c) => {
       c.header("Cache-Control", "no-store");
@@ -87,6 +104,21 @@ export function createReportRoutes(runtime: AppRuntime) {
         runtime,
         c,
         exportFileUrl(c.get("tenant"), c.req.param("exportId"), file.data),
+      );
+    })
+    .get("/:month/summary", (c) => {
+      const month = reportMonthSchema.safeParse(c.req.param("month"));
+      if (!month.success) {
+        return clientErrorResponse(
+          c,
+          new BadRequest({ message: "Choose a month in YYYY-MM format" }),
+        );
+      }
+      c.header("Cache-Control", "private, no-store");
+      return runEffect(
+        runtime,
+        c,
+        reportMonthSummary(c.get("tenant"), month.data),
       );
     })
     .get("/:month/:format", async (c) => {

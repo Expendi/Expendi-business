@@ -460,3 +460,20 @@ export const claimsPageSchema = z.object({
 });
 
 export type ClaimsPage = z.infer<typeof claimsPageSchema>;
+
+const claimTotalsSchema = z.object({
+  count: z.number().int().nonnegative(),
+  /** KES cents, as a decimal string. */
+  totalKes: z.string().regex(/^\d+$/),
+});
+
+/**
+ * `GET …/claims/summary`: every claim waiting for approval and every one
+ * whose payment failed, not just a page. Employees count only their own.
+ */
+export const claimsSummarySchema = z.object({
+  waiting: claimTotalsSchema,
+  payoutFailed: claimTotalsSchema,
+});
+
+export type ClaimsSummary = z.infer<typeof claimsSummarySchema>;

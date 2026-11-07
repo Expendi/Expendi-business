@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import {
   attachBillFilesRequestSchema,
+  billsSummaryQuerySchema,
   billUploadRequestSchema,
   cancelBillRequestSchema,
   createBillRequestSchema,
@@ -26,6 +27,7 @@ import { runEffect } from "../http/respond.js";
 import { requireAdminOrReader, requireRole } from "../middleware/tenant.js";
 import {
   attachBillInvoices,
+  billsSummary,
   cancelBill,
   createBill,
   getBill,
@@ -78,10 +80,11 @@ const PREPARATION_FAILURES = {
     ),
 } as const;
 
-function parseQuery(
+function parseQuery<Schema extends z.ZodType>(
+  schema: Schema,
   query: Record<string, string>,
-): Effect.Effect<z.output<typeof listBillsQuerySchema>, BadRequest> {
-  const parsed = listBillsQuerySchema.safeParse(query);
+): Effect.Effect<z.output<Schema>, BadRequest> {
+  const parsed = schema.safeParse(query);
   return parsed.success
     ? Effect.succeed(parsed.data)
     : Effect.fail(
@@ -105,8 +108,17 @@ export function createBillRoutes(
       runEffect(
         runtime,
         c,
-        parseQuery(c.req.query()).pipe(
+        parseQuery(listBillsQuerySchema, c.req.query()).pipe(
           Effect.flatMap((filters) => listBills(c.get("tenant"), filters)),
+        ),
+      ),
+    )
+    .get("/summary", (c) =>
+      runEffect(
+        runtime,
+        c,
+        parseQuery(billsSummaryQuerySchema, c.req.query()).pipe(
+          Effect.flatMap((filters) => billsSummary(c.get("tenant"), filters)),
         ),
       ),
     )

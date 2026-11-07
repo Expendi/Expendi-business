@@ -26,6 +26,7 @@ import {
   listPayeeBanks,
   listPayees,
   requestPayeeDetailsChange,
+  restorePayee,
   updatePayee,
 } from "../services/payees/payees.js";
 
@@ -75,7 +76,8 @@ function parseQuery(
  * read-only: payees hold bank and M-Pesa details (spec §4, §6.19). Adding
  * payment details or
  * changing them returns a passkey challenge, confirmed at
- * `/changes/:challengeId/confirm`.
+ * `/changes/:challengeId/confirm`. Archiving and restoring need no passkey:
+ * a restored payee keeps the details it had.
  */
 export function createPayeeRoutes(
   runtime: AppRuntime,
@@ -162,6 +164,15 @@ export function createPayeeRoutes(
         c,
         payeeIdFrom(c.req.param("payeeId")).pipe(
           Effect.flatMap((payeeId) => archivePayee(c.get("tenant"), payeeId)),
+        ),
+      ),
+    )
+    .post("/:payeeId/restore", (c) =>
+      runEffect(
+        runtime,
+        c,
+        payeeIdFrom(c.req.param("payeeId")).pipe(
+          Effect.flatMap((payeeId) => restorePayee(c.get("tenant"), payeeId)),
         ),
       ),
     );

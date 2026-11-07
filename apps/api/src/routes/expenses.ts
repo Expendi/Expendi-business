@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   COMPANY_READER_ROLES,
   expenseListQuerySchema,
+  expenseSummaryQuerySchema,
 } from "@expendi-business/shared";
 
 import type { TenantVariables } from "../middleware/tenant.js";
@@ -12,7 +13,11 @@ import type { AppRuntime } from "../runtime.js";
 import { BadRequest, NotFound } from "../errors.js";
 import { runEffect } from "../http/respond.js";
 import { requireRole } from "../middleware/tenant.js";
-import { getExpense, listExpenses } from "../services/expenses/all-expenses.js";
+import {
+  expensesSummary,
+  getExpense,
+  listExpenses,
+} from "../services/expenses/all-expenses.js";
 
 const uuid = z.uuid();
 
@@ -22,10 +27,11 @@ function expenseIdFrom(raw: string): Effect.Effect<string, NotFound> {
     : Effect.fail(new NotFound({ message: "Expense not found" }));
 }
 
-function parseQuery(
+function parseQuery<Schema extends z.ZodType>(
+  schema: Schema,
   query: Record<string, string>,
-): Effect.Effect<z.output<typeof expenseListQuerySchema>, BadRequest> {
-  const parsed = expenseListQuerySchema.safeParse(query);
+): Effect.Effect<z.output<Schema>, BadRequest> {
+  const parsed = schema.safeParse(query);
   return parsed.success
     ? Effect.succeed(parsed.data)
     : Effect.fail(
@@ -38,8 +44,9 @@ function parseQuery(
 /**
  * Mounted at `/organizations/:organizationId/expenses`: every claim, petty
  * cash purchase and company spending record, read-only, for the web
- * dashboard (spec §6.14). Admins and accountants only; employees see their
- * own claims and floats through those routes.
+ * dashboard (spec §6.14), and `/summary`, their totals. Admins and
+ * accountants only; employees see their own claims and floats through
+ * those routes.
  */
 export function createExpenseRoutes(
   runtime: AppRuntime,
@@ -50,8 +57,19 @@ export function createExpenseRoutes(
       runEffect(
         runtime,
         c,
-        parseQuery(c.req.query()).pipe(
+        parseQuery(expenseListQuerySchema, c.req.query()).pipe(
           Effect.flatMap((filters) => listExpenses(c.get("tenant"), filters)),
+        ),
+      ),
+    )
+    .get("/summary", (c) =>
+      runEffect(
+        runtime,
+        c,
+        parseQuery(expenseSummaryQuerySchema, c.req.query()).pipe(
+          Effect.flatMap((filters) =>
+            expensesSummary(c.get("tenant"), filters),
+          ),
         ),
       ),
     )

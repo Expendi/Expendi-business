@@ -11,9 +11,11 @@ import type { DatabaseService } from "../../db/client.js";
 import type { Transaction } from "../../db/scope.js";
 import type { BadRequest, DatabaseError } from "../../errors.js";
 import type { Tenant } from "../../middleware/tenant.js";
+import type { Cursor } from "../staff/paging.js";
 import { memberships, users } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { decodeCursor, encodeCursor, isoUtc, UUID } from "../staff/paging.js";
+import { entityKey, entityLabels } from "./entity-labels.js";
 
 /**
  * A company's own activity (spec §6.13, §6.14): its audit entries, for its
@@ -21,7 +23,15 @@ import { decodeCursor, encodeCursor, isoUtc, UUID } from "../staff/paging.js";
  * `company_activity_log` definer function returns only the entries of the
  * company in the transaction's scope, and none unless the scope's role
  * reads the whole company.
+ *
+ * The function filters by action and date only. A person or record filter
+ * is applied here, reading the log a batch at a time: a page stops after
+ * `MAX_SCANS` batches with what it found so far, and its cursor carries on
+ * from the last entry read.
  */
+
+const SCAN_ROWS = 200;
+const MAX_SCANS = 10;
 
 interface ActivityRow extends Record<string, unknown> {
   readonly id: string;
@@ -79,25 +89,142 @@ function memberNames(
   );
 }
 
+const userIdOf = (row: ActivityRow): string | null =>
+  row.actor_type === "user" && UUID.test(row.actor_id)
+    ? row.actor_id.toLowerCase()
+    : null;
+
+/** Approvals record the passkey approval each payment was part of. */
+function approvalIdOf(after: ActivityEntry["after"]): string | null {
+  if (after === null || typeof after !== "object" || Array.isArray(after)) {
+    return null;
+  }
+  const { approvalId } = after;
+  return typeof approvalId === "string" && UUID.test(approvalId)
+    ? approvalId.toLowerCase()
+    : null;
+}
+
 function toEntry(
   row: ActivityRow,
   names: ReadonlyMap<string, string>,
+  labels: ReadonlyMap<string, string>,
 ): ActivityEntry {
+  const userId = userIdOf(row);
   return {
     id: row.id,
     occurredAt: row.occurred_at_utc,
     actor: {
       type: row.actor_type,
-      name:
-        row.actor_type === "user"
-          ? (names.get(row.actor_id.toLowerCase()) ?? null)
-          : null,
+      id: userId,
+      name: userId === null ? null : (names.get(userId) ?? null),
     },
     action: row.action,
-    entity: { type: row.entity_type, id: row.entity_id },
+    entity: {
+      type: row.entity_type,
+      id: row.entity_id,
+      label:
+        row.entity_id === null
+          ? null
+          : (labels.get(entityKey(row.entity_type, row.entity_id)) ?? null),
+    },
+    approvalId: approvalIdOf(row.after),
     before: row.before,
     after: row.after,
   };
+}
+
+function matchesPersonAndRecord(
+  row: ActivityRow,
+  filters: ActivityFilters,
+): boolean {
+  const { actor, entityType, entityId } = filters;
+  if (actor === "system" || actor === "staff") {
+    if (row.actor_type !== actor) return false;
+  } else if (actor !== undefined && userIdOf(row) !== actor.toLowerCase()) {
+    return false;
+  }
+  if (entityType !== undefined && row.entity_type !== entityType) return false;
+  return (
+    entityId === undefined ||
+    row.entity_id?.toLowerCase() === entityId.toLowerCase()
+  );
+}
+
+function readLog(
+  tx: Transaction,
+  filters: ActivityFilters,
+  after: Cursor | null,
+  maxRows: number,
+): Effect.Effect<ActivityRow[], DatabaseError> {
+  return query(() =>
+    tx.execute<ActivityRow>(sql`
+      SELECT entry.*,
+             ${isoUtc(sql`entry.occurred_at`)} AS occurred_at_utc
+      FROM company_activity_log(
+        ${filters.actionPrefix ?? null}::text,
+        ${filters.from ?? null}::date,
+        ${filters.to ?? null}::date,
+        ${after?.at ?? null}::timestamptz,
+        ${after?.id ?? null}::uuid,
+        ${maxRows}::integer
+      ) AS entry`),
+  ).pipe(Effect.map(({ rows }) => rows));
+}
+
+const cursorOf = (row: ActivityRow): Cursor => ({
+  at: row.occurred_at_utc,
+  id: row.id,
+});
+
+interface FoundPage {
+  readonly rows: ActivityRow[];
+  readonly next: Cursor | null;
+}
+
+/** One page straight from the log: `limit + 1` rows tell if there's more. */
+function readPage(
+  tx: Transaction,
+  filters: ActivityFilters,
+  cursor: Cursor | null,
+): Effect.Effect<FoundPage, DatabaseError> {
+  return readLog(tx, filters, cursor, filters.limit + 1).pipe(
+    Effect.map((rows) => {
+      const page = rows.slice(0, filters.limit);
+      const last = page.at(-1);
+      return {
+        rows: page,
+        next: rows.length > filters.limit && last ? cursorOf(last) : null,
+      };
+    }),
+  );
+}
+
+/** A page of the entries that match the person or record filter. */
+function scanPage(
+  tx: Transaction,
+  filters: ActivityFilters,
+  cursor: Cursor | null,
+): Effect.Effect<FoundPage, DatabaseError> {
+  return Effect.gen(function* () {
+    const found: ActivityRow[] = [];
+    let at = cursor;
+    for (let scan = 0; scan < MAX_SCANS; scan += 1) {
+      const rows = yield* readLog(tx, filters, at, SCAN_ROWS);
+      for (const row of rows) {
+        at = cursorOf(row);
+        if (!matchesPersonAndRecord(row, filters)) continue;
+        found.push(row);
+        if (found.length > filters.limit) {
+          const page = found.slice(0, filters.limit);
+          const last = page.at(-1);
+          return { rows: page, next: last ? cursorOf(last) : null };
+        }
+      }
+      if (rows.length < SCAN_ROWS) return { rows: found, next: null };
+    }
+    return { rows: found, next: at };
+  });
 }
 
 /** One page of the company's activity matching `filters`, newest first. */
@@ -111,30 +238,22 @@ export function companyActivity(
 > {
   return Effect.gen(function* () {
     const cursor = filters.cursor ? yield* decodeCursor(filters.cursor) : null;
+    const filtered =
+      filters.actor !== undefined || filters.entityType !== undefined;
     return yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
-        const { rows } = yield* query(() =>
-          tx.execute<ActivityRow>(sql`
-            SELECT entry.*,
-                   ${isoUtc(sql`entry.occurred_at`)} AS occurred_at_utc
-            FROM company_activity_log(
-              ${filters.actionPrefix ?? null}::text,
-              ${filters.from ?? null}::date,
-              ${filters.to ?? null}::date,
-              ${cursor?.at ?? null}::timestamptz,
-              ${cursor?.id ?? null}::uuid,
-              ${filters.limit + 1}::integer
-            ) AS entry`),
+        const { rows, next } = filtered
+          ? yield* scanPage(tx, filters, cursor)
+          : yield* readPage(tx, filters, cursor);
+        const names = yield* memberNames(tx, tenant.organizationId, rows);
+        const labels = yield* entityLabels(
+          tx,
+          tenant.organizationId,
+          rows.map((row) => ({ type: row.entity_type, id: row.entity_id })),
         );
-        const page = rows.slice(0, filters.limit);
-        const last = page.at(-1);
-        const names = yield* memberNames(tx, tenant.organizationId, page);
         return {
-          entries: page.map((row) => toEntry(row, names)),
-          nextCursor:
-            rows.length > filters.limit && last
-              ? encodeCursor({ at: last.occurred_at_utc, id: last.id })
-              : null,
+          entries: rows.map((row) => toEntry(row, names, labels)),
+          nextCursor: next ? encodeCursor(next) : null,
         };
       }),
     );

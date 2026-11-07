@@ -79,6 +79,12 @@ export const inviteMemberResponseSchema = z.object({
    * the email didn't go out; null when the API has none configured.
    */
   installUrl: z.url().nullable(),
+  /**
+   * The link the invite email carries, for the admin to copy when it didn't
+   * go out: the web dashboard's for an accountant, otherwise the app's
+   * install link. Null when there is none to share.
+   */
+  inviteLink: z.url().nullable(),
 });
 
 export type InviteMemberResponse = z.infer<typeof inviteMemberResponseSchema>;

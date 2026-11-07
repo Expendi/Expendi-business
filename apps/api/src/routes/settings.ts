@@ -20,6 +20,7 @@ import {
   getPayrollMargin,
   requestPayrollMarginChange,
 } from "../services/payroll/margin.js";
+import { companyZohoStatus } from "../services/zoho/company-status.js";
 
 const confirmSchema = z.object({
   change: payrollMarginChangeSchema,
@@ -44,13 +45,17 @@ function challengeIdFrom(raw: string): Effect.Effect<string, Forbidden> {
  * Mounted at `/organizations/:organizationId/settings`. Admins, and
  * accountants read-only (spec §4). The payroll cap's margin (spec §7.4)
  * changes with the admin's passkey, confirmed at
- * `/payroll-margin/:challengeId/confirm`.
+ * `/payroll-margin/:challengeId/confirm`. `/zoho` shows the Zoho Books
+ * connection, which only Expendi staff change (spec §6.17).
  */
 export function createSettingsRoutes(
   runtime: AppRuntime,
 ): Hono<{ Variables: TenantVariables }> {
   return new Hono<{ Variables: TenantVariables }>()
     .use(requireAdminOrReader())
+    .get("/zoho", (c) =>
+      runEffect(runtime, c, companyZohoStatus(c.get("tenant"))),
+    )
     .get("/payroll-margin", (c) =>
       runEffect(runtime, c, getPayrollMargin(c.get("tenant"))),
     )

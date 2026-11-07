@@ -239,6 +239,23 @@ export const payeeSchema = z.object({
    */
   secondConfirmationUntil: z.iso.datetime().nullable(),
   archived: z.boolean(),
+  /**
+   * Employee payees only: the person, with `inTeam` false once they've
+   * left the company. Null for other payees. Always sent; optional only
+   * for clients built before it.
+   */
+  member: z
+    .object({
+      name: z.string().nullable(),
+      email: z.string(),
+      inTeam: z.boolean(),
+    })
+    .nullish(),
+  /**
+   * How many bills the payee has had, salaries aside, whatever their
+   * status. Always sent; optional only for clients built before it.
+   */
+  billCount: z.number().int().nonnegative().optional(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

@@ -8,6 +8,8 @@ import {
   exportFileUrlSchema,
   exportListSchema,
   generatedExportSchema,
+  reportMonthSummarySchema,
+  reportSpendingSchema,
 } from "@expendi-business/shared";
 
 import type { App } from "../../app.js";
@@ -37,6 +39,7 @@ import {
   OUTSTANDING_COLUMNS,
   renderExport,
 } from "../../services/export/render.js";
+import { getSpendingOverview } from "../../services/overview/overview.js";
 import { insertBill, insertPayee } from "../helpers/bills.js";
 import { addCategory, sendJson } from "../helpers/claims.js";
 import {
@@ -546,7 +549,7 @@ describe("the export's files", () => {
       ]),
     ).toEqual([
       [
-        "Claim",
+        "Reimbursement",
         "Petty cash",
         "Java House",
         "1500.00",
@@ -705,6 +708,404 @@ describe("the export's files", () => {
     expect(kesDecimal(9_007_199_254_740_993_123n)).toBe("90071992547409931.23");
     expect(kesDecimal(5n)).toBe("0.05");
     expect(csv).toBe('\uFEFF"\'@SUM(A1)","\'-2","a,""b"""\r\n');
+  });
+});
+
+describe("a month's figures", () => {
+  async function dataOf(response: Response): Promise<unknown> {
+    if (response.status !== 200) {
+      throw new Error(`answered ${response.status}: ${await response.text()}`);
+    }
+    return ((await response.json()) as { data: unknown }).data;
+  }
+
+  it("says what each of the month's files holds, read as the files are made", async () => {
+    // #given October's money out, receipts, bills owed and a float issued
+    const seeded = await company();
+    const {
+      company: target,
+      employeeMembershipId,
+      officeId,
+      rentId,
+      seed,
+    } = seeded;
+    const lunch = await seed.expense({
+      kind: "claim",
+      overviewHeading: "petty_cash",
+      categoryId: officeId,
+      merchant: "Java House",
+      amountKes: 150_000n,
+      spentOn: "2026-10-03",
+      status: "paid",
+      paidAt: new Date("2026-10-04T08:00:00Z"),
+      approvedBy: target.admin.id,
+      etimsInvoiceNumber: "INV-1",
+      etimsStatus: "attached",
+    });
+    await seed.receipt({ expenseId: lunch.id });
+    await seed.receipt(
+      { expenseId: lunch.id },
+      { contentType: "image/png", bytes: strToU8("png") },
+    );
+    const taxi = await seed.expense({
+      categoryId: officeId,
+      merchant: "Taxi",
+      amountKes: 49_950n,
+      spentOn: "2026-10-03",
+    });
+    await seed.receipt(
+      { expenseId: taxi.id },
+      { sms: "SLK4H7Q2XY Confirmed. Ksh499.50 paid to TAXI." },
+    );
+    await seed.expense({
+      categoryId: officeId,
+      merchant: "Stationery",
+      amountKes: 20_000n,
+      spentOn: "2026-10-20",
+      etimsStatus: "not_required",
+    });
+    const payeeId = await insertPayee(db, target, { name: "Kenya Power" });
+    const power = await seed.paidBill({
+      payeeId,
+      categoryId: rentId,
+      amountKes: 250_000n,
+      paidOn: "2026-10-10",
+    });
+    await seed.receipt(
+      { billId: power.billId },
+      { contentType: "application/pdf", bytes: strToU8("%PDF-1.4") },
+    );
+    const float = await seed.openFloat(employeeMembershipId);
+    await seed.floatPayment(
+      float.id,
+      "issue",
+      500_000n,
+      new Date("2026-10-02T08:00:00Z"),
+    );
+    const owed = (values: Partial<NewBill>) =>
+      insertBill(db, target, {
+        payeeId,
+        categoryId: rentId,
+        createdAt: new Date("2026-09-01T00:00:00Z"),
+        ...values,
+      });
+    await owed({ dueOn: "2026-10-20", status: "overdue", amountKes: 30_000n });
+    await owed({
+      dueOn: "2026-10-25",
+      status: "overdue",
+      variable: true,
+      amountKes: null,
+    });
+    await owed({
+      dueOn: "2026-10-31",
+      status: "due",
+      currency: "usd",
+      amountKes: null,
+      amountUsdc: 45_000_000n,
+    });
+    const rendered = await runtime.runPromise(
+      renderExport(asAdmin(target), "2026-10"),
+    );
+
+    // #when
+    const summary = reportMonthSummarySchema.parse(
+      await dataOf(
+        await sendJson(
+          app,
+          reportsPath(target, "/2026-10/summary"),
+          target.admin,
+        ),
+      ),
+    );
+
+    // #then
+    expect(summary.moneyOut).toEqual({
+      rows: 4,
+      importedRows: 0,
+      totalKes: "469950",
+      preview: [
+        {
+          date: "2026-10-03",
+          kind: "claim",
+          name: "Jane Wanjiku",
+          amountKes: "150000",
+        },
+        {
+          date: "2026-10-03",
+          kind: "company",
+          name: "Taxi",
+          amountKes: "49950",
+        },
+        {
+          date: "2026-10-10",
+          kind: "bill",
+          name: "Kenya Power",
+          amountKes: "250000",
+        },
+        {
+          date: "2026-10-20",
+          kind: "company",
+          name: "Stationery",
+          amountKes: "20000",
+        },
+      ],
+    });
+    expect(summary.outstanding).toEqual({
+      rows: 3,
+      totalKes: "30000",
+      totalUsdc: "45000000",
+      overdue: 2,
+      withoutAmount: 1,
+      preview: [
+        {
+          dueOn: "2026-10-20",
+          payee: "Kenya Power",
+          overdue: true,
+          amountKes: "30000",
+          amountUsdc: null,
+        },
+        {
+          dueOn: "2026-10-25",
+          payee: "Kenya Power",
+          overdue: true,
+          amountKes: null,
+          amountUsdc: null,
+        },
+        {
+          dueOn: "2026-10-31",
+          payee: "Kenya Power",
+          overdue: false,
+          amountKes: null,
+          amountUsdc: "45000000",
+        },
+      ],
+    });
+    expect(summary.floatTransfers).toEqual({
+      rows: 1,
+      preview: [
+        {
+          date: "2026-10-02",
+          type: "issue",
+          person: "Peter Otieno",
+          amountKes: "500000",
+        },
+      ],
+    });
+    expect({
+      ...summary.receipts,
+      names: [...summary.receipts.names].sort(),
+    }).toEqual({
+      files: 4,
+      names: Object.keys(unzip(rendered.receipts)).sort(),
+      expensesWithout: 1,
+      withoutPreview: [
+        { date: "2026-10-20", merchant: "Stationery", amountKes: "20000" },
+      ],
+    });
+    expect({
+      ...summary.etims,
+      preview: summary.etims.preview
+        .map(({ merchant, status }) => `${merchant}: ${status}`)
+        .sort(),
+    }).toEqual({
+      rows: 3,
+      attached: 1,
+      none: 1,
+      notRequired: 1,
+      preview: [
+        "Java House: attached",
+        "Stationery: not_required",
+        "Taxi: none",
+      ],
+    });
+  });
+
+  it("shows an accountant a month's figures, refuses an employee, and checks the month", async () => {
+    // #given
+    const { company: target, employee } = await company();
+    const accountant = await createUser(db);
+    await addMember(db, target, accountant, { role: "accountant" });
+
+    const requests = [
+      [accountant, "/2026-10/summary"],
+      [employee, "/2026-10/summary"],
+      [target.admin, "/2026-13/summary"],
+      [accountant, "/spending"],
+      [employee, "/spending"],
+      [target.admin, "/spending?months=7"],
+      [target.admin, "/spending?month=2026-1"],
+    ] as const;
+
+    // #when
+    const answers = await Promise.all(
+      requests.map(
+        async ([user, rest]) =>
+          (await sendJson(app, reportsPath(target, rest), user)).status,
+      ),
+    );
+
+    // #then
+    expect(answers).toEqual([200, 403, 400, 200, 403, 400, 400]);
+  });
+
+  it("adds up money out by month exactly as the spending overview does", async () => {
+    // #given payments in September and October, and one in March outside the range
+    const {
+      company: target,
+      employeeMembershipId,
+      officeId,
+      rentId,
+      seed,
+    } = await company();
+    const payeeId = await insertPayee(db, target, { name: "Kenya Power" });
+    await seed.paidBill(
+      {
+        payeeId,
+        categoryId: rentId,
+        amountKes: 250_000n,
+        paidOn: "2026-10-10",
+      },
+      [{ amountKes: 250_000n, paidAt: new Date("2026-10-10T09:00:00Z") }],
+    );
+    await seed.paidBill(
+      {
+        payeeId,
+        categoryId: rentId,
+        amountKes: 240_000n,
+        paidOn: "2026-09-10",
+        overviewHeading: "subscriptions",
+      },
+      [{ amountKes: 240_000n, paidAt: new Date("2026-09-10T09:00:00Z") }],
+    );
+    const claim = await seed.expense({
+      kind: "claim",
+      membershipId: employeeMembershipId,
+      overviewHeading: "petty_cash",
+      categoryId: officeId,
+      merchant: "Java House",
+      amountKes: 150_000n,
+      spentOn: "2026-10-03",
+      status: "paid",
+      paidAt: new Date("2026-10-04T08:00:00Z"),
+    });
+    await seed.payout(claim.id, {
+      subjectType: "claim",
+      amountKes: 150_000n,
+      paidAt: new Date("2026-10-04T08:00:00Z"),
+    });
+    await seed.expense({
+      categoryId: officeId,
+      merchant: "Stationery",
+      amountKes: 20_000n,
+      spentOn: "2026-10-20",
+    });
+    await seed.expense({
+      categoryId: officeId,
+      merchant: "Chairs",
+      amountKes: 90_000n,
+      spentOn: "2026-03-20",
+    });
+    const tenant = {
+      organizationId: target.organizationId,
+      userId: target.admin.id,
+      membershipId: target.adminMembershipId,
+      role: "admin" as const,
+    };
+    const overview = (month: string) =>
+      runtime.runPromise(getSpendingOverview(tenant, month));
+
+    // #when
+    const spending = reportSpendingSchema.parse(
+      await dataOf(
+        await sendJson(
+          app,
+          reportsPath(target, "/spending?month=2026-10&months=6"),
+          target.admin,
+        ),
+      ),
+    );
+    const [october, september] = await Promise.all([
+      overview("2026-10"),
+      overview("2026-09"),
+    ]);
+
+    // #then
+    expect(spending.months.map((month) => month.month)).toEqual([
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09",
+      "2026-10",
+    ]);
+    const byMonth = new Map(
+      spending.months.map((month) => [month.month, month]),
+    );
+    const headingsOf = (view: typeof october) =>
+      Object.fromEntries(view.headings.map((row) => [row.id, row.currentKes]));
+    expect([byMonth.get("2026-10"), byMonth.get("2026-09")]).toEqual([
+      {
+        month: "2026-10",
+        totalKes: october.currentKes,
+        payments: 3,
+        headings: headingsOf(october),
+      },
+      {
+        month: "2026-09",
+        totalKes: september.currentKes,
+        payments: 1,
+        headings: headingsOf(september),
+      },
+    ]);
+    expect(october.currentKes).toBe("420000");
+    expect(byMonth.get("2026-04")?.totalKes).toBe("0");
+    expect(
+      spending.categories.map(({ name, months }) => ({
+        name,
+        totals: months.map((month) => month.totalKes),
+      })),
+    ).toEqual([
+      { name: "Office", totals: ["0", "0", "0", "0", "0", "0", "170000"] },
+      { name: "Rent", totals: ["0", "0", "0", "0", "0", "240000", "250000"] },
+    ]);
+    expect(
+      spending.largestPayments.map(({ name, amountKes, kind, personName }) => ({
+        name,
+        amountKes,
+        kind,
+        personName,
+      })),
+    ).toEqual([
+      {
+        name: "Java House",
+        amountKes: "150000",
+        kind: "claim",
+        personName: "Peter Otieno",
+      },
+      {
+        name: "Stationery",
+        amountKes: "20000",
+        kind: "company",
+        personName: null,
+      },
+      {
+        name: "Kenya Power",
+        amountKes: "250000",
+        kind: "bill",
+        personName: null,
+      },
+    ]);
+  });
+
+  it("keeps each company's spending to itself", async () => {
+    const fixture = await createIsolationFixture(db);
+    await expectRouteIsolation(app, fixture, (organizationId) => ({
+      path: `/organizations/${organizationId}/reports/spending`,
+    }));
+    await expectRouteIsolation(app, fixture, (organizationId) => ({
+      path: `/organizations/${organizationId}/reports/2026-10/summary`,
+    }));
   });
 });
 

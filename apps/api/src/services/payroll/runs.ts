@@ -29,7 +29,11 @@ import { BadRequest, Conflict, NotFound } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { nairobiDate, scheduledStatus } from "../bills/status.js";
 import { refreshRunTotal } from "./drafts.js";
-import { checkCategory, findSalaryPayee } from "./salaries.js";
+import {
+  checkCategory,
+  findSalaryPayee,
+  payeeAccountEnding,
+} from "./salaries.js";
 
 /**
  * Payroll runs (spec §6.21), for admins only (spec §4), down to row-level
@@ -52,6 +56,7 @@ export interface PayrollPayeeView {
   readonly method: PayeeMethod | null;
   readonly archived: boolean;
   readonly payoutPhoneConfirmed: boolean | null;
+  readonly accountEnding: string | null;
 }
 
 export interface PayrollPaymentView {
@@ -77,6 +82,10 @@ export interface PayrollRunView {
   readonly capKes: bigint;
   readonly people: number;
   readonly leftOut: number;
+  /** Payments not left out whose amount was changed for this run. */
+  readonly adjusted: number;
+  /** One-off payments not left out. */
+  readonly oneOffs: number;
   /** How many payments are paid, being paid and failed (spec §6.21). */
   readonly progress: {
     readonly paid: number;
@@ -120,6 +129,8 @@ const runColumns = {
   run: payrollRuns,
   people: sql<number>`(SELECT count(*)::int FROM bills b WHERE b.payroll_run_id = payroll_runs.id AND b.status <> 'cancelled')`,
   leftOut: sql<number>`(SELECT count(*)::int FROM bills b WHERE b.payroll_run_id = payroll_runs.id AND b.status = 'cancelled')`,
+  adjusted: sql<number>`(SELECT count(*)::int FROM bills b WHERE b.payroll_run_id = payroll_runs.id AND b.status <> 'cancelled' AND b.adjustment_reason IS NOT NULL)`,
+  oneOffs: sql<number>`(SELECT count(*)::int FROM bills b WHERE b.payroll_run_id = payroll_runs.id AND b.status <> 'cancelled' AND b.recurring_item_id IS NULL)`,
   paid: sql<number>`(SELECT count(*)::int FROM bills b WHERE b.payroll_run_id = payroll_runs.id AND b.status = 'paid')`,
   paying: sql<number>`(SELECT count(*)::int FROM bills b WHERE b.payroll_run_id = payroll_runs.id AND b.status = 'paying')`,
   failed: sql<number>`(SELECT count(*)::int FROM bills b WHERE b.payroll_run_id = payroll_runs.id AND b.status = 'payout_failed')`,
@@ -129,6 +140,8 @@ function toRunView(row: {
   readonly run: PayrollRun;
   readonly people: number;
   readonly leftOut: number;
+  readonly adjusted: number;
+  readonly oneOffs: number;
   readonly paid: number;
   readonly paying: number;
   readonly failed: number;
@@ -143,6 +156,8 @@ function toRunView(row: {
     capKes: run.capKes,
     people: row.people,
     leftOut: row.leftOut,
+    adjusted: row.adjusted,
+    oneOffs: row.oneOffs,
     progress: { paid: row.paid, paying: row.paying, failed: row.failed },
     createdAt: run.createdAt,
     approvedAt: run.approvedAt,
@@ -175,6 +190,7 @@ const paymentColumns = {
   payoutPhoneConfirmed: sql<
     boolean | null
   >`CASE WHEN ${payees.membershipId} IS NULL THEN NULL ELSE ${users.phone} IS NOT NULL END`,
+  accountEnding: payeeAccountEnding,
   categoryName: categories.name,
 };
 
@@ -185,6 +201,7 @@ interface SelectedPayment {
   readonly payeeMethod: PayeeMethod | null;
   readonly payeeArchived: boolean;
   readonly payoutPhoneConfirmed: boolean | null;
+  readonly accountEnding: string | null;
   readonly categoryName: string;
 }
 
@@ -204,6 +221,7 @@ function toPaymentView(row: SelectedPayment): PayrollPaymentView {
       method: row.payeeMethod,
       archived: row.payeeArchived,
       payoutPhoneConfirmed: row.payoutPhoneConfirmed,
+      accountEnding: row.accountEnding,
     },
     category: { id: bill.categoryId, name: row.categoryName },
     amountKes: bill.amountKes,
