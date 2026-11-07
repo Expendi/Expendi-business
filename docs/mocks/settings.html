@@ -1,0 +1,1427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expendi Settings Mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400..600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+:root {
+  --brand-50: #fff4f0;
+  --brand-100: #ffe7de;
+  --brand-500: #ff7e5f;
+  --brand-600: #f0613e;
+  --brand-700: #cc4528;
+  --brand-800: #a63620;
+  --gray-25: #fcfcfd;
+  --gray-50: #f9fafb;
+  --gray-100: #f2f4f7;
+  --gray-200: #e4e7ec;
+  --gray-300: #d0d5dd;
+  --gray-400: #98a2b3;
+  --gray-500: #667085;
+  --gray-600: #475467;
+  --gray-700: #344054;
+  --gray-900: #101828;
+  --error-50: #fef3f2;
+  --error-700: #b42318;
+  --warn-50: #fffaeb;
+  --warn-600: #dc6803;
+  --warn-700: #b54708;
+  --success-50: #ecfdf3;
+  --success-700: #067647;
+  --blue-50: #eff8ff;
+  --blue-500: #2e90fa;
+  --blue-700: #175cd3;
+  --amber-500: #f79009;
+  --green-500: #17b26a;
+  --red-500: #f04438;
+
+  --bg: var(--gray-50);
+  --surface: #ffffff;
+  --text: var(--gray-900);
+  --text-2: var(--gray-600);
+  --text-3: var(--gray-500);
+  --border: var(--gray-200);
+  --hairline: var(--gray-100);
+  /* Translucent so it stays visible on white, gray and coral row tints. */
+  --row-divider: rgba(16, 24, 40, .08);
+  --control-border: var(--gray-300);
+
+  /* Shape rule: controls and business marks 8px, panels 14px, pills and people full. */
+  --r-control: 8px;
+  --r-panel: 14px;
+  --r-full: 999px;
+  --shadow-panel: 0 1px 2px rgba(16, 24, 40, .04), 0 12px 32px -18px rgba(16, 24, 40, .16);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+
+  /* Type weights by role (docs/design-system.md, Confident). */
+  --w-display: 400; --w-heading: 400; --w-title: 600; --w-name: 600; --w-amount: 500; --w-ui: 500; --w-strong: 600; --w-button: 600; --w-figure: 600;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; font-family: Outfit, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 20px; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+h1, h2, h3, p, dl, dd, ol, ul, figure { margin: 0; }
+.num { font-variant-numeric: tabular-nums; }
+.ic { width: 16px; height: 16px; flex: none; display: block; stroke-width: 1.75; }
+:focus-visible { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.ccy { font-size: .72em; font-weight: var(--w-ui); letter-spacing: .04em; color: var(--text-3); }
+.money { white-space: nowrap; }
+[hidden] { display: none !important; }
+
+/* Shell */
+.app { display: flex; min-height: 100dvh; }
+.sidebar { position: sticky; top: 0; height: 100dvh; width: 248px; flex: none; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.sb-top { padding: 16px 12px 8px; display: flex; flex-direction: column; gap: 10px; }
+.company { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; background: none; border-radius: var(--r-control); text-align: left; }
+.company:hover { background: var(--gray-50); }
+.company img { width: 32px; height: 32px; border-radius: var(--r-control); }
+.company-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.company-name { font-weight: var(--w-name); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.company-role { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.company .ic { color: var(--gray-400); }
+.search { display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-control); background: var(--gray-50); color: var(--text-3); }
+.search span { flex: 1; text-align: left; }
+kbd { font: inherit; font-size: 11px; line-height: 16px; color: var(--text-3); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; background: var(--surface); }
+.sb-nav { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
+.sb-group { margin-top: 16px; }
+.sb-label { padding: 0 8px 4px; font-size: 12px; line-height: 16px; color: var(--gray-400); font-weight: var(--w-ui); }
+.sb-link { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 8px; border-radius: var(--r-control); color: var(--gray-700); text-decoration: none; transition: background-color .15s ease; }
+.sb-link:hover { background: var(--gray-50); }
+.sb-link .ic { color: var(--gray-400); }
+.sb-link.is-active { background: var(--brand-50); color: var(--brand-800); font-weight: var(--w-ui); }
+.sb-link.is-active .ic { color: var(--brand-700); }
+.count { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-full); background: var(--brand-100); color: var(--brand-800); font-size: 12px; font-weight: var(--w-strong); display: inline-flex; align-items: center; justify-content: center; }
+.sb-user { display: flex; align-items: center; gap: 10px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
+.sb-user .who { min-width: 0; }
+.sb-user .who p:first-child { font-weight: var(--w-name); }
+.sb-user .who p:last-child { font-size: 12px; line-height: 16px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.main-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar { display: none; }
+.main { width: 100%; max-width: 1320px; margin: 0 auto; padding: 24px 32px 72px; }
+
+/* Atoms */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); box-shadow: var(--shadow-panel); }
+.person { width: 32px; height: 32px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-full); background: var(--gray-100); color: var(--gray-700); font-size: 12px; font-weight: var(--w-strong); letter-spacing: .02em; }
+.pill { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px 0 6px; border-radius: var(--r-full); font-size: 12px; font-weight: var(--w-ui); white-space: nowrap; flex: none; }
+.pill.plain { padding-left: 8px; }
+.pill .ic { width: 13px; height: 13px; }
+.pill-neutral { background: var(--gray-100); color: var(--gray-700); }
+.pill-warn { background: var(--warn-50); color: var(--warn-700); }
+.pill-error { background: var(--error-50); color: var(--error-700); }
+.pill-success { background: var(--success-50); color: var(--success-700); }
+/* Status: a filled tint means it needs attention or money is moving; an outline means it's only a record. Always a text label, never colour alone. */
+.status { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--r-full); font-size: 12px; font-weight: var(--w-ui); white-space: nowrap; flex: none; }
+.status.is-waiting { background: var(--warn-50); color: var(--warn-700); }
+.status.is-moving { background: var(--blue-50); color: var(--blue-700); }
+.status.is-paid { background: var(--success-50); color: var(--success-700); }
+.status.is-failed { background: var(--error-50); color: var(--error-700); }
+.status.is-rejected { background: var(--gray-100); color: var(--gray-700); }
+.status.is-quiet { background: var(--surface); border-color: var(--border); color: var(--text-2); }
+@keyframes beat { 0%, 100% { box-shadow: 0 0 0 0 rgba(46, 144, 250, .5); } 60% { box-shadow: 0 0 0 4px rgba(46, 144, 250, 0); } }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--r-control); border: 1px solid transparent; font-size: 14px; font-weight: var(--w-button); white-space: nowrap; text-decoration: none; transition: background-color .15s ease, border-color .15s ease, transform .15s var(--ease-out); }
+.btn .ic { width: 16px; height: 16px; }
+.btn-primary { background: var(--brand-500); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--brand-600); }
+.btn-outline { background: var(--surface); border-color: var(--control-border); color: var(--gray-700); }
+.btn-outline:hover:not(:disabled) { background: var(--gray-50); }
+.btn-ghost { background: none; color: var(--gray-600); }
+.btn-ghost:hover:not(:disabled) { background: var(--gray-100); color: var(--gray-900); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.icon-btn { width: 36px; height: 36px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 0; background: none; border-radius: var(--r-control); color: var(--gray-500); }
+.icon-btn:hover:not(:disabled) { background: var(--gray-100); color: var(--gray-700); }
+.icon-btn:disabled { opacity: .35; cursor: not-allowed; }
+.text-link { padding: 0; border: 0; background: none; border-radius: 4px; color: var(--brand-800); font-weight: var(--w-ui); text-decoration: underline; text-decoration-color: var(--brand-100); text-underline-offset: 3px; }
+.text-link:hover { text-decoration-color: currentColor; }
+.callout { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--r-control); font-size: 14px; line-height: 20px; }
+.callout > .ic { margin-top: 2px; }
+.callout-title { font-weight: var(--w-ui); }
+.callout ul { margin: 4px 0 0; padding-left: 18px; }
+.callout-warn { background: var(--warn-50); color: var(--warn-700); }
+.callout-error { background: var(--error-50); color: var(--error-700); }
+.callout-neutral { background: var(--gray-100); color: var(--gray-700); }
+.skel { border-radius: var(--r-control); background: var(--gray-100); }
+
+/* Mock-only strip */
+.mock-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 12px; margin-bottom: 20px; border: 1px dashed var(--control-border); border-radius: var(--r-control); font-size: 12px; line-height: 16px; color: var(--text-3); }
+.mock-strip strong { font-weight: 500; color: var(--text-2); }
+.mock-strip label { display: inline-flex; align-items: center; gap: 6px; }
+.mock-strip select { height: 28px; padding: 0 6px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--surface); font-size: 12px; }
+
+/* Page */
+.page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px; }
+.page-title { font-size: 24px; line-height: 32px; font-weight: var(--w-heading); letter-spacing: -0.02em; }
+.page-sub { margin-top: 4px; color: var(--text-2); max-width: 70ch; }
+
+.results { margin-top: 16px; overflow: clip; }
+.results-body { transition: opacity .2s ease; }
+.results-body.is-refreshing { opacity: .5; }
+
+/* Kind tabs across the top of the table card */
+.kind-tabs { display: flex; gap: 4px; padding: 0 12px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.kind-tabs::-webkit-scrollbar { display: none; }
+.kind-tab { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 8px; border: 0; background: none; color: var(--text-2); font-size: 14px; font-weight: var(--w-ui); white-space: nowrap; transition: color .15s ease; }
+.kind-tab:hover { color: var(--text); }
+.kind-tab[aria-selected="true"] { color: var(--text); }
+.kind-tab[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--gray-900); }
+.kind-count { min-width: 22px; height: 20px; padding: 0 6px; border-radius: var(--r-full); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: var(--gray-100); color: var(--gray-600); transition: background-color .15s ease, color .15s ease; }
+.kind-tab[aria-selected="true"] .kind-count { background: var(--gray-900); color: #fff; }
+
+/* Filter chips: dashed when empty, solid coral with a value and remove button when set */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--gray-25); }
+.toolbar-label { display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-3); }
+.toolbar-label .ic { width: 14px; height: 14px; }
+.fchip { display: inline-flex; align-items: stretch; height: 32px; border-radius: var(--r-full); font-size: 14px; min-width: 0; }
+.fchip-main { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 0 12px; border: 1px dashed var(--gray-300); border-radius: var(--r-full); background: var(--surface); color: var(--gray-700); font-weight: var(--w-ui); transition: border-color .15s ease, background-color .15s ease, color .15s ease; }
+.fchip-main .ic { width: 14px; height: 14px; color: var(--gray-500); }
+.fchip-main:hover:not(:disabled) { border-style: solid; border-color: var(--gray-400); color: var(--text); }
+.fchip-main[aria-expanded="true"] { border-style: solid; border-color: var(--gray-900); color: var(--text); }
+.fchip-main:disabled { opacity: .5; cursor: not-allowed; }
+.fchip.is-set .fchip-main { border: 1px solid var(--brand-100); border-right: 0; border-radius: var(--r-full) 0 0 var(--r-full); background: var(--brand-50); color: var(--brand-800); padding-right: 6px; }
+.fchip.is-set .fchip-main .ic { color: var(--brand-700); }
+.fchip.is-set .fchip-main:hover { background: var(--brand-100); }
+.fchip.is-set .fchip-main[aria-expanded="true"] { border-color: var(--brand-700); }
+.fchip-key { color: var(--brand-700); font-weight: 400; }
+.fchip-value { font-weight: var(--w-name); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fchip-clear { display: inline-flex; align-items: center; justify-content: center; width: 30px; padding: 0 2px 0 0; border: 1px solid var(--brand-100); border-left: 0; border-radius: 0 var(--r-full) var(--r-full) 0; background: var(--brand-50); color: var(--brand-700); }
+.fchip-clear:hover { background: var(--brand-100); color: var(--brand-800); }
+.fchip-clear .ic { width: 14px; height: 14px; }
+.toolbar .clear-all { margin-left: auto; font-size: 14px; }
+.filter-error { display: flex; gap: 6px; align-items: center; padding: 8px 16px; font-size: 12px; line-height: 16px; color: var(--error-700); background: var(--error-50); border-bottom: 1px solid var(--border); }
+.filter-error .ic { width: 14px; height: 14px; }
+
+/* Filter menus */
+.menu { position: fixed; z-index: 45; width: 264px; max-height: 340px; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); box-shadow: 0 16px 40px -12px rgba(16, 24, 40, .28); overflow: hidden; }
+.menu-search { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--hairline); color: var(--text-3); }
+.menu-search input { flex: 1; min-width: 0; border: 0; outline: none; background: none; font-size: 14px; color: var(--text); }
+.menu-search:focus-within { box-shadow: inset 0 -2px 0 var(--brand-700); }
+.menu-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; }
+.menu-list:focus { outline: none; }
+.menu-option { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 8px; border-radius: var(--r-control); color: var(--gray-700); cursor: pointer; }
+.menu-option.is-active { background: var(--brand-50); color: var(--brand-800); }
+.menu-option[aria-selected="true"] { color: var(--text); font-weight: var(--w-ui); }
+.menu-option .person { width: 24px; height: 24px; font-size: 11px; }
+.menu-option .opt-icon { width: 24px; display: inline-flex; justify-content: center; color: var(--text-3); }
+.menu-option .check { margin-left: auto; color: var(--brand-700); }
+.menu-option:first-child { color: var(--text-2); }
+.menu-empty { padding: 10px 8px; color: var(--text-3); }
+@media (prefers-reduced-motion: no-preference) { .menu { animation: pop .14s var(--ease-out); } }
+@keyframes pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+.stats { margin-top: 16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.stat { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; padding: 16px; text-align: left; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); }
+.stat-label { display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-2); }
+.stat-icon { width: 24px; height: 24px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-control); }
+.stat-icon .ic { width: 14px; height: 14px; }
+.stat-icon.is-total { background: var(--gray-100); color: var(--gray-600); }
+.stat-icon.is-attention { background: var(--warn-50); color: var(--warn-700); }
+.stat-icon.is-clear { background: var(--success-50); color: var(--success-700); }
+.stat-value { margin-top: 6px; font-size: 24px; line-height: 32px; font-weight: var(--w-figure); letter-spacing: -0.02em; }
+.stat-sub { font-size: 12px; line-height: 16px; color: var(--text-3); }
+@media (max-width: 1100px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .stat { padding: 14px; } }
+.table-wrap { overflow-x: auto; }
+table.data { width: 100%; border-collapse: separate; border-spacing: 0; }
+table.data thead th { padding: 10px 16px; text-align: left; font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-3); background: var(--gray-25); border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.data th.right, table.data td.right { text-align: right; }
+table.data tbody td { padding: 12px 16px; border-bottom: 1px solid var(--row-divider); vertical-align: top; }
+table.data tbody tr.row { cursor: pointer; transition: background-color .15s ease; }
+table.data tbody tr.row:hover { background: var(--gray-25); }
+table.data tbody tr.row.is-open { background: var(--gray-50); box-shadow: inset 3px 0 0 var(--gray-900); }
+.cell-date { white-space: nowrap; color: var(--text-2); }
+.merchant { display: block; padding: 0; border: 0; background: none; text-align: left; font-size: 16px; line-height: 24px; font-weight: var(--w-name); color: var(--text); border-radius: 4px; }
+.merchant:hover { text-decoration: underline; text-decoration-color: var(--gray-300); text-underline-offset: 3px; }
+.meta { display: block; color: var(--text-3); }
+.flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.flags:empty { display: none; }
+.person-cell { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.amount { font-size: 16px; line-height: 24px; font-weight: var(--w-amount); white-space: nowrap; }
+.etims { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.etims .ic { width: 14px; height: 14px; }
+.etims.is-attached { color: var(--gray-700); }
+.etims.is-attached .ic { color: var(--success-700); }
+.etims.is-missing { color: var(--warn-700); }
+.etims.is-na { color: var(--text-3); }
+.results-foot { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-3); font-size: 12px; }
+.empty, .load-error { padding: 56px 24px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; color: var(--text-2); }
+.empty .ic, .load-error .ic { width: 28px; height: 28px; color: var(--text-3); }
+.load-error .ic { color: var(--error-700); }
+.empty strong, .load-error strong { color: var(--text); font-weight: var(--w-title); font-size: 16px; line-height: 24px; }
+.cards { display: none; list-style: none; padding: 0; }
+.cards li { border-bottom: 1px solid var(--row-divider); }
+.card-btn { width: 100%; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 14px 16px; border: 0; background: none; text-align: left; }
+.card-name { display: block; font-size: 16px; line-height: 24px; font-weight: var(--w-name); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-sub { display: block; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-month { padding: 14px 16px 6px; font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-3); border-bottom: 1px solid var(--row-divider); }
+.skel-row td { padding: 16px; }
+
+/* Side panel */
+.sheet-layer { position: fixed; inset: 0; z-index: 50; }
+.sheet-scrim { position: absolute; inset: 0; background: rgba(16, 24, 40, .24); }
+.sheet { position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 100%); display: flex; flex-direction: column; background: var(--surface); box-shadow: -16px 0 48px -16px rgba(16, 24, 40, .2); }
+.sheet:focus { outline: none; }
+.sheet-head { display: flex; gap: 8px; align-items: flex-start; padding: 20px 16px 18px 24px; border-bottom: 1px solid var(--border); }
+.sheet-head-main { flex: 1; min-width: 0; }
+.eyebrow { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.sheet-title { margin-top: 2px; font-size: 18px; line-height: 26px; font-weight: var(--w-title); overflow-wrap: anywhere; }
+.sheet-amount { margin-top: 2px; font-size: 24px; line-height: 32px; font-weight: var(--w-heading); letter-spacing: -0.02em; }
+.sheet-head .status { margin-top: 8px; }
+.stepper { display: flex; gap: 2px; }
+.sheet-body { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.sheet-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--border); color: var(--text-3); font-size: 12px; }
+.sheet-foot .spacer { flex: 1; }
+.details { display: flex; flex-direction: column; }
+.details div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 12px; padding: 9px 0; border-top: 1px solid var(--hairline); }
+.details div:first-child { border-top: 0; padding-top: 0; }
+.details dt { color: var(--text-3); }
+.details dd { overflow-wrap: anywhere; }
+.details .sub { display: block; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.description { color: var(--gray-700); white-space: pre-wrap; }
+.section-label { font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-3); }
+.receipts { display: flex; flex-direction: column; gap: 12px; }
+.viewer { border: 1px solid var(--border); border-radius: var(--r-control); background: var(--gray-50); overflow: hidden; }
+.viewer-stage { min-height: 280px; padding: 20px; display: flex; align-items: center; justify-content: center; }
+.viewer-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--surface); font-size: 12px; line-height: 16px; color: var(--text-3); }
+.viewer-bar .text-link { font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+.viewer-bar .text-link .ic { width: 12px; height: 12px; }
+.paper { width: 100%; max-width: 280px; padding: 18px 18px 14px; background: #fff; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 8px 24px -12px rgba(16, 24, 40, .25); font-size: 12px; line-height: 18px; transform: rotate(-0.6deg); }
+.paper.is-pdf { transform: none; border-radius: 2px; max-width: 300px; }
+.paper-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 13px; }
+.paper-head span:last-child { color: var(--text-3); font-weight: 500; letter-spacing: .06em; font-size: 11px; }
+.paper-sub { color: var(--text-3); margin-bottom: 10px; }
+.paper-line { display: flex; justify-content: space-between; gap: 8px; color: var(--text-2); }
+.paper-total { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--gray-300); font-weight: 600; }
+.sms { width: 100%; max-width: 320px; margin: 0; padding: 14px 16px; border-radius: 16px 16px 16px 4px; background: var(--surface); border: 1px solid var(--border); white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 14px; line-height: 20px; }
+.no-receipt { min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; border: 1px dashed var(--control-border); border-radius: var(--r-control); color: var(--text-2); text-align: center; }
+.no-receipt .ic { width: 24px; height: 24px; color: var(--text-3); }
+
+.toast { position: fixed; left: 50%; bottom: 24px; z-index: 70; max-width: calc(100% - 32px); display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--r-panel); background: var(--gray-900); color: #fff; font-size: 14px; box-shadow: 0 16px 40px -16px rgba(16, 24, 40, .5); opacity: 0; transform: translate(-50%, 12px); pointer-events: none; transition: opacity .2s ease, transform .3s var(--ease-out); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast .ic { color: var(--brand-500); }
+.scrim { position: fixed; inset: 0; z-index: 39; background: rgba(16, 24, 40, .24); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .reveal { animation: rise .5s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 60ms); }
+  .btn:active:not(:disabled) { transform: scale(.98); }
+  .sheet-scrim { animation: fade .2s ease; }
+  .sheet { animation: slide .32s var(--ease-out); }
+  .skel { animation: pulse 1.4s ease-in-out infinite; }
+  .sheet-body.is-stepping { animation: fade .2s ease; }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes slide { from { transform: translateX(24px); opacity: 0; } }
+@keyframes pulse { 50% { opacity: .55; } }
+
+@media (max-width: 900px) {
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 40; transform: translateX(-100%); transition: transform .25s var(--ease-out); }
+  .sidebar.is-open { transform: none; }
+  .topbar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .topbar img { width: 28px; height: 28px; border-radius: var(--r-control); }
+  .topbar .company-name { font-size: 16px; }
+  .main { padding: 20px 24px 56px; }
+  .table-wrap { display: none; }
+  .cards { display: block; }
+}
+@media (max-width: 600px) {
+  .main { padding: 16px 16px 48px; }
+  .toolbar { padding: 12px; }
+  .toolbar-label { display: none; }
+  .toolbar .clear-all { margin-left: 0; }
+  .fchip-value { max-width: 120px; }
+  .details div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .sheet-head, .sheet-body, .sheet-foot { padding-left: 16px; padding-right: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* Table head: tabs on the left, filters on the right. Expenses has too many filters for one row, so it stays stacked. */
+.results { container-type: inline-size; }
+.results-head { display: flex; align-items: stretch; gap: 8px 32px; padding: 0 16px 0 12px; border-bottom: 1px solid var(--border); }
+.results-head .kind-tabs { flex: none; padding: 0; border-bottom: 0; }
+.results-head .kind-tab { height: auto; min-height: 56px; }
+.results-head .toolbar { flex: 1 1 auto; justify-content: flex-end; min-width: 0; padding: 12px 0; border-bottom: 0; background: none; }
+.results-head .toolbar-label { display: none; }
+.results-head .toolbar .clear-all { order: -1; margin-left: 0; margin-right: 4px; }
+.results-head:not(.is-stacked) .toolbar { flex-wrap: nowrap; }
+.results-head.is-stacked { flex-direction: column; gap: 0; padding: 0; }
+.results-head.is-stacked .kind-tabs { padding: 0 12px; border-bottom: 1px solid var(--border); }
+.results-head.is-stacked .kind-tab { min-height: 48px; }
+.results-head.is-stacked .toolbar { justify-content: flex-start; padding: 12px 16px; background: var(--gray-25); }
+.results-head.is-stacked .toolbar .clear-all { order: 0; margin-left: auto; margin-right: 0; }
+.results-head.is-stacked .toolbar-label { display: inline-flex; }
+.fchip-main { white-space: nowrap; }
+@container (max-width: 900px) { table.data .col-etims { display: none; } }
+@container (max-width: 720px) { .results .table-wrap { display: none; } .results .cards { display: block; } }
+@media (max-width: 600px) { .results-head .toolbar { padding: 12px; } .results-head .toolbar .clear-all { margin-left: 0; } }
+
+/* Sortable column headers */
+.th-sort { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; color: inherit; border-radius: 4px; cursor: pointer; }
+.th-sort .ic { width: 12px; height: 12px; color: var(--gray-400); transition: color .15s ease; }
+.th-sort:hover, .th-sort.is-active { color: var(--text); }
+.th-sort:hover .ic { color: var(--gray-600); }
+.th-sort.is-active .ic { color: var(--gray-900); }
+
+/* Second line of a row: muted text, then small inline markers, so rows stay two lines tall */
+table.data .meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* The main column takes the spare width and truncates its second line instead of widening the table */
+table.data td.cell-main { width: 100%; max-width: 0; }
+.meta-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta-text:empty { display: none; }
+.mini { display: inline-flex; align-items: center; gap: 4px; flex: none; font-size: 12px; line-height: 16px; color: var(--text-3); white-space: nowrap; }
+.mini .ic { width: 14px; height: 14px; color: var(--gray-400); }
+.mini.is-warn, .mini.is-warn .ic { color: var(--warn-700); }
+.flags .mini { margin-left: 2px; }
+.menu-option .status { font-size: 12px; }
+
+/* Bills */
+.head-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn-lg { height: 44px; }
+input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; flex: none; display: inline-grid; place-content: center; border: 1px solid var(--gray-500); border-radius: 4px; background: var(--surface); cursor: pointer; transition: background-color .15s ease, border-color .15s ease; }
+input[type="checkbox"]::before { content: ""; width: 12px; height: 12px; transform: scale(0); transition: transform .12s var(--ease-out); background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5'/%3E%3C/svg%3E") center / contain no-repeat; }
+input[type="checkbox"]:hover:not(:disabled) { border-color: var(--gray-700); }
+input[type="checkbox"]:checked { background: var(--brand-700); border-color: var(--brand-700); }
+input[type="checkbox"]:checked::before { transform: scale(1); }
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+input[type="checkbox"]:disabled { cursor: not-allowed; background: var(--gray-100); border-color: var(--gray-300); }
+input[type="checkbox"]:checked:disabled { background: var(--gray-400); border-color: var(--gray-400); }
+@media (prefers-reduced-motion: reduce) { input[type="checkbox"], input[type="checkbox"]::before { transition: none; } }
+.status.is-overdue { background: var(--error-50); color: var(--error-700); }
+.stat-icon.is-danger { background: var(--error-50); color: var(--error-700); }
+.money-sum { white-space: nowrap; }
+.stat-extra { font-size: 14px; line-height: 20px; color: var(--text-2); }
+@container (max-width: 960px) { table.data .col-method { display: none; } }
+.stat-value .money-sum .ccy { font-size: .6em; }
+table.data th.check-cell, table.data td.check-cell { width: 48px; padding-right: 0; }
+table.data td.check-cell { padding-top: 18px; }
+table.data tbody tr.row.is-selected { background: var(--brand-50); }
+table.data .group-row th { padding: 20px 16px 8px; text-align: left; font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-2); border-bottom: 1px solid var(--row-divider); }
+.group-head { display: flex; align-items: center; gap: 8px; }
+.group-count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-full); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: var(--gray-100); color: var(--gray-700); }
+.group-total { margin-left: auto; font-weight: 400; color: var(--text-3); }
+.payee-cell { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.payee-main { min-width: 0; }
+.payee-mark { width: 32px; height: 32px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: var(--r-control); background: var(--surface); color: var(--gray-700); font-size: 12px; font-weight: var(--w-strong); letter-spacing: .02em; }
+.payee-mark.sm { width: 24px; height: 24px; font-size: 11px; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.tags:empty { display: none; }
+.tag { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px 0 6px; border: 1px solid var(--border); border-radius: var(--r-full); font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.tag .ic { width: 12px; height: 12px; color: var(--gray-500); }
+.due-hint { display: block; margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.due-hint.is-late { color: var(--error-700); font-weight: var(--w-ui); }
+.due-hint.is-today { color: var(--warn-700); font-weight: var(--w-ui); }
+td.method { color: var(--text-2); white-space: nowrap; }
+td.method.is-unset { color: var(--text-3); }
+.amount-wrap { display: inline-flex; flex-direction: column; align-items: flex-end; }
+.sheet-amount .amount-wrap { align-items: flex-start; }
+.amount-sub { font-size: 12px; line-height: 16px; color: var(--text-3); white-space: nowrap; }
+.to-enter { color: var(--text-3); }
+.cards li { display: flex; align-items: flex-start; }
+.cards li.is-selected { background: var(--brand-50); }
+.card-check { flex: none; width: 34px; padding: 20px 0 0 16px; box-sizing: border-box; }
+
+.selection-bar { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -8px 24px -16px rgba(16, 24, 40, .2); }
+.selection-bar .what { flex: 1 1 220px; min-width: 0; }
+.selection-bar .what strong { font-weight: var(--w-name); }
+.selection-bar .links { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 2px; font-size: 12px; line-height: 16px; }
+.selection-bar .links:empty { display: none; }
+
+.banners { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.banners:empty { display: none; }
+.banner { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); }
+.banner > .ic { width: 20px; height: 20px; margin-top: 1px; color: var(--gray-500); }
+.banner.is-success > .ic { color: var(--success-700); }
+.banner.is-warn > .ic { color: var(--warn-600); }
+.banner-main { flex: 1 1 280px; min-width: 0; }
+.banner-title { font-weight: var(--w-title); }
+.banner-main p + p { margin-top: 2px; color: var(--text-2); }
+.banner-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.sheet-amount { margin-top: 2px; font-size: 24px; line-height: 32px; font-weight: var(--w-heading); letter-spacing: -0.02em; }
+.sheet-amount .amount-sub { font-size: 12px; letter-spacing: 0; }
+.sheet-amount .to-enter { font-size: 16px; }
+.sheet-foot { color: var(--text-2); }
+.foot-primary { display: flex; flex-wrap: wrap; gap: 8px; }
+.foot-secondary { display: flex; flex-wrap: wrap; gap: 2px; margin-left: auto; }
+.btn-ghost.danger { color: var(--error-700); }
+.btn-ghost.danger:hover:not(:disabled) { background: var(--error-50); color: var(--error-700); }
+.read-only { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-3); }
+.read-only.wide { flex-basis: 100%; font-size: 12px; }
+.read-only .ic { width: 14px; height: 14px; }
+.position { margin-left: auto; font-size: 12px; color: var(--text-3); }
+.note { display: flex; gap: 8px; align-items: flex-start; color: var(--text-2); }
+.note .ic { margin-top: 2px; color: var(--text-3); }
+.previews { display: flex; flex-direction: column; gap: 8px; }
+.preview { border: 1px solid var(--border); border-radius: var(--r-control); }
+.preview summary { list-style: none; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto 16px; gap: 12px; align-items: center; padding: 10px 12px; cursor: pointer; border-radius: var(--r-control); }
+.preview summary::-webkit-details-marker { display: none; }
+.preview .chev { color: var(--text-3); transition: transform .2s var(--ease-out); }
+.preview[open] .chev { transform: rotate(180deg); }
+.preview .p-name { display: block; font-weight: var(--w-name); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview .p-sub { display: block; font-size: 12px; line-height: 16px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview .p-amount { font-weight: var(--w-amount); white-space: nowrap; text-align: right; }
+.preview .details { padding: 0 12px 12px 56px; }
+.preview .details div { grid-template-columns: 11rem minmax(0, 1fr); }
+.preview .details div:first-child { padding-top: 9px; border-top: 1px solid var(--hairline); }
+.totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; padding: 14px 16px; border-radius: var(--r-control); background: var(--gray-50); }
+.totals dt { font-size: 12px; line-height: 16px; color: var(--text-3); font-weight: var(--w-ui); }
+.totals dd { margin-top: 4px; font-size: 16px; line-height: 24px; font-weight: var(--w-amount); }
+.changed { background: var(--warn-50); border-radius: 4px; padding: 0 4px; margin: 0 -4px; }
+
+.form { display: flex; flex-direction: column; gap: 18px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.field-label { font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-2); }
+.field-help { display: block; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.field-error { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--error-700); }
+.field-error .ic { width: 14px; height: 14px; }
+.input, .textarea, .select select { width: 100%; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--control-border); border-radius: var(--r-control); background: var(--surface); font-size: 14px; color: var(--text); }
+.textarea { height: auto; min-height: 72px; padding: 10px 12px; resize: vertical; }
+.input::placeholder, .textarea::placeholder { color: var(--text-3); }
+.input[aria-invalid="true"], .textarea[aria-invalid="true"], .select select[aria-invalid="true"] { border-color: var(--error-700); }
+.select { position: relative; display: flex; }
+.select select { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer; }
+.select > .ic { position: absolute; right: 12px; top: 14px; pointer-events: none; color: var(--gray-500); }
+.row-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.check-field { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.check-field input { margin-top: 1px; }
+.check-title { display: block; font-size: 14px; color: var(--text); font-weight: var(--w-ui); }
+.drop { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; padding: 12px; border: 1px dashed var(--control-border); border-radius: var(--r-control); background: var(--gray-50); color: var(--text-2); cursor: pointer; text-align: center; }
+.drop:hover { border-color: var(--gray-400); color: var(--text); }
+.field:focus-within .drop { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+.drop.is-disabled { opacity: .5; cursor: not-allowed; }
+.files { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.files:empty { display: none; }
+.files li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-control); font-size: 14px; }
+.files li .ic { width: 14px; height: 14px; color: var(--gray-500); }
+.files li .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uploaded-img { max-width: 100%; max-height: 300px; border-radius: 4px; }
+.uploaded-pdf { width: 100%; height: 320px; border: 0; background: #fff; }
+@media (max-width: 600px) {
+  .row-2, .totals { grid-template-columns: minmax(0, 1fr); }
+  .preview .details { padding-left: 12px; }
+  .preview .details div { grid-template-columns: minmax(0, 1fr); }
+  .head-actions { width: 100%; }
+  .head-actions .btn { flex: 1; }
+  .foot-secondary { margin-left: 0; }
+}
+
+/* Settings: a section list beside panels of label/value rows; every change opens in the side sheet */
+.settings-wrap { margin-top: 24px; container-type: inline-size; }
+.settings { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }
+.sections { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 2px; }
+.section-link { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: var(--r-control); color: var(--gray-700); text-decoration: none; white-space: nowrap; transition: background-color .15s ease, color .15s ease; }
+.section-link .ic { color: var(--gray-400); }
+.section-link:hover { background: var(--gray-100); }
+.section-link[aria-current="true"] { background: var(--brand-50); color: var(--brand-800); font-weight: var(--w-ui); }
+.section-link[aria-current="true"] .ic { color: var(--brand-700); }
+.section-flag { margin-left: auto; display: inline-flex; }
+.section-link .section-flag .ic { width: 14px; height: 14px; color: var(--warn-600); }
+.set-panels { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.set-panel { scroll-margin-top: 24px; overflow: clip; container-type: inline-size; }
+.set-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 24px; padding: 20px 20px 16px; }
+.set-head-main { flex: 1 1 320px; min-width: 0; }
+.set-title { width: fit-content; font-size: 18px; line-height: 26px; font-weight: var(--w-title); border-radius: 4px; }
+.set-sub { margin-top: 4px; color: var(--text-2); max-width: 70ch; }
+.set-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.kv { border-top: 1px solid var(--border); }
+.kv > div { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 2px 16px; padding: 14px 20px; }
+.kv > div + div { border-top: 1px solid var(--hairline); }
+.kv dt { color: var(--text-3); }
+.kv dd { min-width: 0; overflow-wrap: anywhere; }
+.kv dd > .status { margin: -2px 0; }
+.set-foot { display: flex; gap: 8px; align-items: flex-start; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--gray-25); color: var(--text-2); }
+.set-foot > .ic { margin-top: 2px; color: var(--text-3); }
+.set-outcome { padding: 0 20px 16px; }
+.set-outcome .callout .btn { margin-top: 10px; }
+.set-list { list-style: none; padding: 0; margin: 0; }
+.set-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 12px 10px 20px; }
+.set-row + .set-row { border-top: 1px solid var(--row-divider); }
+.set-row.is-clickable { cursor: pointer; transition: background-color .15s ease; }
+.set-row.is-clickable:hover { background: var(--gray-25); }
+.set-row.is-open, .set-row.is-open:hover { background: var(--gray-50); box-shadow: inset 3px 0 0 var(--gray-900); }
+.set-row .payee-mark .ic { color: var(--gray-600); }
+.row-main { flex: 1; min-width: 0; }
+.row-name { display: block; font-weight: var(--w-name); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.row-inline .row-name { min-width: 0; }
+.row-inline .tag { padding-left: 8px; }
+.set-list.is-compact .set-row { min-height: 52px; padding-top: 8px; padding-bottom: 8px; }
+.row-meta { display: block; font-size: 12px; line-height: 16px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-row { flex: none; height: 32px; padding: 0 10px; }
+.row-error { margin: 12px 20px 0; }
+.set-empty { margin: 16px 20px 20px; padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; border: 1px dashed var(--control-border); border-radius: var(--r-control); color: var(--text-2); text-align: center; }
+.set-panel .load-error { padding: 32px 20px; border-top: 1px solid var(--border); }
+.set-skel { border-top: 1px solid var(--border); }
+.set-skel > div { display: flex; flex-direction: column; gap: 8px; padding: 16px 20px; }
+.set-skel > div + div { border-top: 1px solid var(--hairline); }
+@container (max-width: 520px) {
+  .kv > div { grid-template-columns: minmax(0, 1fr); }
+  .set-head, .kv > div, .set-foot { padding-left: 16px; padding-right: 16px; }
+  .set-row { padding-left: 16px; }
+}
+/* Narrow: the section list becomes a row of links that stays in reach */
+@container (max-width: 760px) {
+  .settings { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .sections { top: 0; z-index: 20; flex-direction: row; gap: 4px; padding: 8px 0; overflow-x: auto; scrollbar-width: none; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .sections::-webkit-scrollbar { display: none; }
+  .section-link { flex: none; }
+  .set-panel { scroll-margin-top: 72px; }
+}
+@media (max-width: 900px) {
+  .settings { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .sections { top: 56px; z-index: 20; flex-direction: row; gap: 4px; padding: 8px 0; overflow-x: auto; scrollbar-width: none; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .sections::-webkit-scrollbar { display: none; }
+  .section-link { flex: none; }
+  .set-panel { scroll-margin-top: 128px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <div class="sb-top">
+      <button class="company" type="button" data-mock="Switch company">
+        <img src="../../apps/web/public/expendi-mark.png" alt="">
+        <span class="company-text"><span class="company-name">Mwangaza Logistics</span><span class="company-role" id="role-label">Admin</span></span>
+        <i data-icon="chevrons"></i>
+      </button>
+      <button class="search" type="button" data-mock="Search"><i data-icon="search"></i><span>Search</span><kbd>⌘K</kbd></button>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-group">
+        <p class="sb-label">Workspace</p>
+        <a class="sb-link" href="overview.html"><i data-icon="dashboard"></i>Overview</a>
+        <a class="sb-link" href="wallet.html"><i data-icon="wallet"></i>Accounts</a>
+      </div>
+      <div class="sb-group">
+        <p class="sb-label">Spend &amp; pay</p>
+        <a class="sb-link" href="approvals.html"><i data-icon="approve"></i>Approvals<span class="count num">6</span></a>
+        <a class="sb-link" href="expenses.html"><i data-icon="receipt"></i>Expenses<span class="count num">2</span></a>
+        <a class="sb-link" href="bills.html"><i data-icon="file"></i>Bills<span class="count num">5</span></a>
+        <a class="sb-link" href="payroll.html"><i data-icon="banknote"></i>Payroll<span class="count num">1</span></a>
+      </div>
+      <div class="sb-group">
+        <p class="sb-label">Manage</p>
+        <a class="sb-link" href="payees.html"><i data-icon="building"></i>Payees</a>
+        <a class="sb-link" href="team.html"><i data-icon="users"></i>Team</a>
+        <a class="sb-link is-active" href="settings.html" aria-current="page"><i data-icon="settings"></i>Settings</a>
+      </div>
+      <div class="sb-group">
+        <p class="sb-label">Insights</p>
+        <a class="sb-link" href="reports.html"><i data-icon="chart"></i>Reports</a>
+        <a class="sb-link" href="activity.html"><i data-icon="activity"></i>Activity</a>
+      </div>
+    </nav>
+    <div class="sb-user"><span class="person" aria-hidden="true">WK</span><div class="who"><p>Wanjiru Kamau</p><p>wanjiru@mwangaza.co.ke</p></div></div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <button class="icon-btn" type="button" id="menu-btn" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false"><i data-icon="menu"></i></button>
+      <img src="../../apps/web/public/expendi-mark.png" alt="">
+      <span class="company-name">Mwangaza Logistics</span>
+    </header>
+
+    <main class="main">
+      <div class="mock-strip" role="group" aria-label="Mock controls">
+        <strong>Mock controls</strong>
+        <label>View as
+          <select id="mock-role">
+            <option value="admin">Admin</option>
+            <option value="no-passkey">Admin without a passkey</option>
+            <option value="accountant">Accountant</option>
+          </select>
+        </label>
+        <label>Scenario
+          <select id="mock-scenario">
+            <option value="normal">Everything works</option>
+            <option value="passkey-cancel">Passkey prompt cancelled</option>
+            <option value="passkey-login">Sign-in too old for a passkey</option>
+            <option value="passkey-failed">Browser couldn't make the passkey</option>
+            <option value="passkey-unsupported">Browser has no passkeys</option>
+            <option value="save-fails">Changes don't save</option>
+            <option value="zoho-reconnect">Zoho Books needs reconnecting</option>
+            <option value="empty">No categories or accounts yet</option>
+            <option value="error">Settings can't load</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="page-head reveal">
+        <div>
+          <h1 class="page-title">Settings</h1>
+          <p class="page-sub" id="page-sub"></p>
+        </div>
+      </div>
+
+      <div class="settings-wrap reveal" style="--i:1">
+        <div class="settings">
+          <nav class="sections" id="sections" aria-label="Settings sections"></nav>
+          <div class="set-panels" id="set-panels"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="sheet-layer" id="sheet-layer" hidden>
+  <div class="sheet-scrim" data-close></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" tabindex="-1"></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const LUCIDE_NAMES = {
+  "dashboard": "LayoutDashboard", "wallet": "Wallet", "approve": "CircleCheck", "check-circle": "CircleCheck",
+  "receipt": "ReceiptText", "file": "FileText", "repeat": "Repeat", "banknote": "Banknote", "building": "Building2",
+  "users": "Users", "settings": "Settings", "chart": "ChartColumn", "activity": "Activity", "search": "Search",
+  "chevrons": "ChevronsUpDown", "chevron-down": "ChevronDown", "check": "Check", "x": "X",
+  "alert": "TriangleAlert", "circle-alert": "CircleAlert", "info": "Info", "menu": "Menu",
+  "tag": "Tag", "key": "KeyRound", "plus": "Plus", "pencil": "Pencil", "lock": "Lock",
+  "landmark": "Landmark", "credit-card": "CreditCard", "smartphone": "Smartphone",
+  "archive": "Archive", "archive-restore": "ArchiveRestore", "book": "BookOpen",
+};
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (selector) => document.querySelector(selector);
+const later = (fn, ms) => setTimeout(fn, reduceMotion ? Math.min(ms, 200) : ms);
+
+function icon(name) {
+  const node = window.lucide?.[LUCIDE_NAMES[name]];
+  if (!node) return document.createElement("span");
+  const svg = window.lucide.createElement(node);
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "ic");
+  svg.removeAttribute("width");
+  svg.removeAttribute("height");
+  return svg;
+}
+function h(tag, props, ...children) {
+  const el = document.createElement(tag);
+  for (const [key, value] of Object.entries(props ?? {})) {
+    if (value == null || value === false) continue;
+    if (key === "class") el.className = value;
+    else if (key === "text") el.textContent = value;
+    else if (key.startsWith("on")) el.addEventListener(key.slice(2), value);
+    else el.setAttribute(key, value === true ? "" : value);
+  }
+  for (const child of children.flat()) if (child != null && child !== false) el.append(child);
+  return el;
+}
+document.querySelectorAll("i[data-icon]").forEach((el) => el.replaceWith(icon(el.dataset.icon)));
+
+const toastEl = $("#toast");
+let toastTimer;
+function toast(message) {
+  toastEl.replaceChildren(icon("check"), h("span", { text: message }));
+  toastEl.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("show"), 3200);
+}
+document.addEventListener("click", (event) => {
+  const trigger = event.target.closest("[data-mock]");
+  if (!trigger) return;
+  event.preventDefault();
+  toast(`${trigger.dataset.mock} isn't part of this mock.`);
+});
+
+/* Labels, as the app words them */
+const COMPANY = { name: "Mwangaza Logistics", kraPin: "P051234567X" };
+const ETIMS = { exempt: "No invoice expected" };
+const KIND_LABELS = { bank: "Bank account", card: "Card", mobile_money: "Mobile money", cash: "Cash", other: "Other" };
+const KIND_ICONS = { bank: "landmark", card: "credit-card", mobile_money: "smartphone", cash: "banknote", other: "wallet" };
+const CATEGORY_MAX = 60;
+const ACCOUNT_MAX = 80;
+const NETWORK_ERROR = "Couldn't reach Expendi Business. Check your connection and try again.";
+const SIGN_IN_AGAIN = "Sign in again, then set up your approval passkey within 10 minutes.";
+const PASSKEY_ERRORS = {
+  "passkey-failed": "Your browser couldn't create a passkey. Try again, or choose “use a phone or tablet” to make it on your phone.",
+  "passkey-unsupported": "This browser can't create passkeys. Use a recent Chrome, Safari, Edge or Firefox, or set it up in the app.",
+};
+
+/* Sample data */
+function sampleCategories() {
+  return [
+    { id: "air-travel", name: "Air travel", exempt: true },
+    { id: "airtime", name: "Airtime & internet" },
+    { id: "bank-charges", name: "Bank charges", exempt: true },
+    { id: "equipment", name: "Equipment" },
+    { id: "fuel", name: "Fuel & transport" },
+    { id: "insurance", name: "Insurance" },
+    { id: "meals", name: "Meals & entertainment" },
+    { id: "office", name: "Office & supplies" },
+    { id: "rent", name: "Rent & utilities" },
+    { id: "repairs", name: "Repairs & maintenance" },
+    { id: "salaries", name: "Salaries", exempt: true },
+    { id: "security", name: "Security" },
+    { id: "software", name: "Software" },
+    { id: "suppliers", name: "Suppliers" },
+    { id: "taxes", name: "Taxes", exempt: true },
+    { id: "conference", name: "Conference travel", archived: true },
+    { id: "printing", name: "Printing", archived: true },
+  ];
+}
+function sampleAccounts() {
+  return [
+    { id: "kcb", name: "KCB current account ••7781", kind: "bank" },
+    { id: "equity", name: "Equity Bank ••4521", kind: "bank" },
+    { id: "till", name: "Company M-Pesa till", kind: "mobile_money" },
+    { id: "coop", name: "Co-op Bank ••0932", kind: "bank", archived: true },
+  ];
+}
+const ZOHO = { org: "Mwangaza Logistics Ltd", connectedAt: "12 Oct 2026, 15:40", paidThrough: "Expendi Wallet" };
+
+const SECTIONS = [
+  { id: "company", label: "Company", iconName: "building" },
+  { id: "passkey", label: "Approval passkey", iconName: "key", adminOnly: true },
+  { id: "categories", label: "Categories", iconName: "tag" },
+  { id: "accounts", label: "Paid-from accounts", iconName: "landmark" },
+  { id: "zoho", label: "Zoho Books", iconName: "book" },
+];
+
+const state = { role: "admin", scenario: "normal", categories: [], accounts: [], passkey: null, zoho: null, load: {}, tab: {}, enrol: {}, rowError: null };
+const urlState = { section: null, category: null, account: null };
+let saving = false;
+const canAct = () => state.role !== "accountant";
+const visibleSections = () => SECTIONS.filter((s) => !s.adminOnly || canAct());
+const byName = (a, b) => a.name.localeCompare(b.name);
+const tidy = (text) => text.trim().replace(/\s+/g, " ");
+const sameName = (a, b) => tidy(a).toLowerCase() === tidy(b).toLowerCase();
+const statusBadge = (label, tone) => h("span", { class: `status is-${tone}`, text: label });
+
+function readUrl() {
+  const params = new URLSearchParams(location.search);
+  return { section: params.get("section"), category: params.get("category"), account: params.get("account") };
+}
+function writeUrl() {
+  const params = new URLSearchParams();
+  for (const [name, value] of Object.entries(urlState)) if (value) params.set(name, value);
+  const query = params.toString();
+  history.replaceState(null, "", query ? `?${query}` : location.pathname);
+}
+function keepFocus(render) {
+  const key = document.activeElement?.closest?.("[data-focus-key]")?.dataset.focusKey;
+  render();
+  if (key) document.querySelector(`[data-focus-key="${key}"]`)?.focus();
+}
+
+/* Section list: jumps to a panel and follows the scroll */
+let current = "company";
+let pinned = null;
+function sectionFlag(id) {
+  if (id === "passkey" && state.load.passkey === "ready" && !state.passkey.enrolled) return "Not set up yet";
+  if (id === "zoho" && state.load.zoho === "ready" && state.zoho?.status === "needs_reconnect") return "Needs reconnecting";
+  return null;
+}
+function renderNav() {
+  if (!visibleSections().some((s) => s.id === current)) current = "company";
+  $("#sections").replaceChildren(...visibleSections().map((s) => {
+    const flag = sectionFlag(s.id);
+    return h("a", { class: "section-link", href: `#${s.id}`, "data-section": s.id, "data-focus-key": `nav-${s.id}`, "aria-current": s.id === current ? "true" : null,
+      onclick: (event) => { event.preventDefault(); goTo(s.id); } },
+      icon(s.iconName), h("span", { text: s.label }),
+      flag ? h("span", { class: "section-flag", title: flag }, icon("alert"), h("span", { class: "sr-only", text: `, ${flag.toLowerCase()}` })) : null);
+  }));
+}
+function markCurrent(id) {
+  if (!id) return;
+  current = id;
+  const nav = $("#sections");
+  let active = null;
+  nav.querySelectorAll(".section-link").forEach((link) => {
+    const on = link.dataset.section === id;
+    if (on) { link.setAttribute("aria-current", "true"); active = link; } else link.removeAttribute("aria-current");
+  });
+  if (active && nav.scrollWidth > nav.clientWidth) {
+    const link = active.getBoundingClientRect();
+    const box = nav.getBoundingClientRect();
+    if (link.left < box.left || link.right > box.right) nav.scrollLeft += link.left - box.left - 16;
+  }
+}
+function goTo(id, { smooth = true, focus = true } = {}) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  pinned = id;
+  markCurrent(id);
+  urlState.section = id;
+  writeUrl();
+  el.scrollIntoView({ behavior: smooth && !reduceMotion ? "smooth" : "auto", block: "start" });
+  if (focus) el.querySelector(".set-title")?.focus({ preventScroll: true });
+}
+function sectionInView() {
+  const ids = visibleSections().map((s) => s.id);
+  const nav = $("#sections");
+  const line = getComputedStyle(nav).flexDirection === "row" ? nav.getBoundingClientRect().bottom + 48 : 120;
+  let found = ids[0];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el && el.getBoundingClientRect().top <= line) found = id;
+  }
+  if (innerHeight + scrollY >= document.documentElement.scrollHeight - 2) found = ids.at(-1);
+  return found;
+}
+addEventListener("scroll", () => { if (!pinned) markCurrent(sectionInView()); }, { passive: true });
+for (const type of ["wheel", "touchstart"]) addEventListener(type, () => { pinned = null; }, { passive: true });
+addEventListener("keydown", (event) => { if (["PageDown", "PageUp", "ArrowDown", "ArrowUp", "Home", "End", " "].includes(event.key)) pinned = null; });
+
+/* Panel parts */
+const bar = (style) => h("div", { class: "skel", style });
+function skeleton(lines) {
+  return h("div", { class: "set-skel", "aria-hidden": "true" }, Array.from({ length: lines }, (_, i) => h("div", {},
+    bar(`width:${[24, 18, 28, 20][i % 4]}%;height:12px`), bar(`width:${[46, 38, 54, 42][i % 4]}%;height:14px`))));
+}
+function loadError(id, title) {
+  return h("div", { class: "load-error", role: "alert" }, icon("circle-alert"), h("strong", { text: title }), h("p", { text: NETWORK_ERROR }),
+    h("button", { class: "btn btn-outline", type: "button", text: "Try again", "data-focus-key": `retry-${id}`, onclick: () => reload(id) }));
+}
+function reload(id) {
+  state.load[id] = "loading";
+  renderSection(id);
+  document.getElementById(`${id}-title`)?.focus({ preventScroll: true });
+  later(() => {
+    state.load[id] = "ready";
+    renderSection(id);
+    renderNav();
+    document.getElementById(`${id}-title`)?.focus({ preventScroll: true });
+  }, 600);
+}
+function kv(rows) {
+  return h("dl", { class: "kv" }, rows.filter(Boolean).map(([label, value]) => h("div", {}, h("dt", { text: label }), h("dd", {}, value))));
+}
+function panel(id, head, body, busy) {
+  return h("section", { class: "panel set-panel", id, "aria-labelledby": `${id}-title`, "aria-busy": busy ? "true" : null },
+    h("div", { class: "set-head" },
+      h("div", { class: "set-head-main" },
+        h("h2", { class: "set-title", id: `${id}-title`, tabindex: "-1", text: head.title }),
+        head.sub ? h("p", { class: "set-sub", text: head.sub }) : null),
+      head.actions ? h("div", { class: "set-actions" }, head.actions) : null),
+    body);
+}
+function tabs(section, label, items) {
+  const selected = state.tab[section];
+  return h("div", { class: "kind-tabs", role: "tablist", "aria-label": label }, items.map(([value, text, count]) => h("button", {
+    class: "kind-tab", type: "button", role: "tab", id: `${section}-tab-${value}`, "aria-selected": String(selected === value), "aria-controls": `${section}-list`,
+    tabindex: selected === value ? "0" : "-1", "data-value": value, "data-focus-key": `${section}-tab-${value}`,
+    onclick: () => {
+      if (state.tab[section] === value) return;
+      state.tab[section] = value;
+      state.rowError = null;
+      keepFocus(() => renderSection(section));
+    },
+    onkeydown: (event) => {
+      const all = [...event.currentTarget.parentElement.querySelectorAll(".kind-tab")];
+      const at = all.indexOf(event.currentTarget);
+      const next = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: all.length - 1 }[event.key];
+      if (next === undefined || !all[next]) return;
+      event.preventDefault();
+      all[next].focus();
+      all[next].click();
+    },
+  }, text, h("span", { class: "kind-count num", text: String(count) }))));
+}
+function emptyBlock(text, action) {
+  return h("div", { class: "set-empty" }, h("p", { text }), action);
+}
+function rowError(section) {
+  if (state.rowError?.section !== section) return null;
+  return h("div", { class: "callout callout-error row-error", role: "alert" }, icon("circle-alert"), h("p", { text: state.rowError.text }));
+}
+const contactExpendi = (text) => h("button", { class: "text-link", type: "button", "data-mock": "Contacting Expendi", text });
+
+/* Company: read-only, as in the app */
+function companyPanel() {
+  const st = state.load.company;
+  const body = st === "loading" ? skeleton(3)
+    : st === "error" ? loadError("company", "Company details didn't load")
+    : [kv([
+        ["Name", COMPANY.name],
+        ["KRA PIN", h("span", { class: "num", text: COMPANY.kraPin })],
+        ["Your role", canAct() ? "Admin" : "Accountant"],
+      ]),
+      h("p", { class: "set-foot" }, icon("lock"), h("span", { text: "Set when the company signed up. They can't be changed here." }))];
+  return panel("company", { title: "Company" }, body, st === "loading");
+}
+
+/* Approval passkey: admins only. One per admin; set up here or in the app, replaced through Expendi. */
+function passkeyOutcome() {
+  const outcome = state.enrol.outcome;
+  if (!outcome) return null;
+  if (outcome === "cancelled") return h("div", { class: "set-outcome", role: "status" }, h("p", { class: "note" }, icon("info"), "Cancelled. No passkey was set up."));
+  if (outcome === "login") {
+    return h("div", { class: "set-outcome" }, h("div", { class: "callout callout-warn", role: "alert" }, icon("alert"),
+      h("div", {}, h("p", { text: SIGN_IN_AGAIN }), h("button", { class: "btn btn-outline", type: "button", "data-mock": "Signing in again", text: "Sign in again" }))));
+  }
+  return h("div", { class: "set-outcome" }, h("div", { class: "callout callout-error", role: "alert" }, icon("circle-alert"), h("p", { text: PASSKEY_ERRORS[outcome] })));
+}
+function passkeyPanel() {
+  const st = state.load.passkey;
+  const p = state.passkey;
+  const busy = state.enrol.busy;
+  const setUp = st === "ready" && !p.enrolled
+    ? h("button", { class: "btn btn-primary", type: "button", disabled: busy, "data-focus-key": "enrol", onclick: enrol }, busy ? "Waiting for your browser…" : [icon("key"), "Set up approval passkey"])
+    : null;
+  let body;
+  if (st === "loading") body = skeleton(3);
+  else if (st === "error") body = loadError("passkey", "Couldn't check your approval passkey");
+  else if (p.enrolled) {
+    body = [kv([
+      ["Status", statusBadge("Set up", "paid")],
+      ["Since", h("span", { class: "num", text: p.since })],
+      ["What it confirms", "Payments, withdrawals and allowlist changes, in the app and here."],
+      ["From this computer", "To use the one on your phone, choose “use a phone or tablet” when your browser asks."],
+    ]), h("p", { class: "set-foot" }, icon("info"), h("span", {}, "To replace it, ", contactExpendi("contact Expendi"), "."))];
+  } else {
+    body = [passkeyOutcome(), kv([
+      ["Status", statusBadge("Not set up yet", "waiting")],
+      ["What it's for", "Paying, withdrawing and changing allowed addresses need your approval passkey. You get one, used in the app and here."],
+      ["Where to keep it", "Create it on a device you'll keep with you: in your browser's prompt, choose “use a phone or tablet” to keep it on your phone."],
+      ["Before you start", "You need to have signed in within the last 10 minutes, and every admin is emailed when it's set up."],
+    ])];
+  }
+  return panel("passkey", { title: "Your approval passkey", actions: setUp }, body, st === "loading");
+}
+function enrol() {
+  state.enrol = { busy: true, outcome: null };
+  keepFocus(() => renderSection("passkey"));
+  $('[data-focus-key="enrol"]')?.focus();
+  later(() => {
+    const scenario = state.scenario;
+    state.enrol.busy = false;
+    if (scenario === "passkey-cancel") state.enrol.outcome = "cancelled";
+    else if (scenario === "passkey-login") state.enrol.outcome = "login";
+    else if (PASSKEY_ERRORS[scenario]) state.enrol.outcome = scenario;
+    else state.passkey = { enrolled: true, since: "6 Nov 2026, 10:24" };
+    renderSection("passkey");
+    renderNav();
+    if (state.passkey.enrolled) {
+      $("#passkey-title").focus({ preventScroll: true });
+      toast("Approval passkey set up.");
+    } else $('[data-focus-key="enrol"]')?.focus();
+  }, 1400);
+}
+
+/* Categories: admins add, rename, mark eTIMS-exempt, archive and restore; accountants read */
+const CATEGORIES_SUB = "A category marked “no invoice expected” (e.g. air tickets, bank charges) records new spending in it as not needing an eTIMS invoice. An archived category can't be picked for new spending; what already has it keeps it.";
+function categoriesPanel() {
+  const st = state.load.categories;
+  const active = state.categories.filter((c) => !c.archived).sort(byName);
+  const archived = state.categories.filter((c) => c.archived).sort(byName);
+  const add = canAct() && st === "ready"
+    ? h("button", { class: "btn btn-outline", type: "button", "aria-haspopup": "dialog", "data-focus-key": "add-category", onclick: () => openCategoryForm(null, "add-category") }, icon("plus"), "Add category")
+    : null;
+  let body;
+  if (st === "loading") body = skeleton(5);
+  else if (st === "error") body = loadError("categories", "Categories didn't load");
+  else {
+    const showArchived = state.tab.categories === "archived";
+    const list = showArchived ? archived : active;
+    const empty = showArchived ? "No archived categories."
+      : canAct() ? "No categories yet. Add one so people can record spending." : "No categories yet.";
+    body = [
+      tabs("categories", "Categories", [["active", "In use", active.length], ["archived", "Archived", archived.length]]),
+      rowError("categories"),
+      h("div", { id: "categories-list", role: "tabpanel", "aria-labelledby": `categories-tab-${state.tab.categories}` },
+        list.length ? h("ul", { class: "set-list is-compact" }, list.map(categoryRow))
+          : emptyBlock(empty, !showArchived && canAct()
+            ? h("button", { class: "btn btn-primary", type: "button", "aria-haspopup": "dialog", "data-focus-key": "add-category-empty", onclick: () => openCategoryForm(null, "add-category-empty") }, icon("plus"), "Add category")
+            : null)),
+    ];
+  }
+  return panel("categories", { title: "Categories", sub: CATEGORIES_SUB, actions: add }, body, st === "loading");
+}
+function categoryRow(c) {
+  const editable = canAct() && !c.archived;
+  let action = null;
+  if (editable) {
+    action = h("button", { class: "btn btn-ghost btn-row", type: "button", "aria-label": `Edit ${c.name}`, "aria-haspopup": "dialog", "data-focus-key": `edit-category-${c.id}`, onclick: () => openCategoryForm(c) }, icon("pencil"), "Edit");
+  } else if (canAct()) {
+    action = h("button", { class: "btn btn-ghost btn-row", type: "button", "aria-label": `Restore ${c.name}`, disabled: c.restoring, "data-focus-key": `restore-${c.id}`, onclick: () => restoreCategory(c) },
+      c.restoring ? "Restoring…" : [icon("archive-restore"), "Restore"]);
+  }
+  return h("li", { class: `set-row${editable ? " is-clickable" : ""}`, "data-id": c.id,
+    onclick: editable ? (event) => { if (!event.target.closest("button")) openCategoryForm(c); } : null },
+    h("span", { class: "row-main row-inline" }, h("span", { class: "row-name", text: c.name }), c.exempt ? h("span", { class: "tag", text: ETIMS.exempt }) : null),
+    action);
+}
+function restoreCategory(c) {
+  c.restoring = true;
+  state.rowError = null;
+  renderSection("categories");
+  later(() => {
+    c.restoring = false;
+    if (state.scenario === "save-fails") state.rowError = { section: "categories", text: `${c.name} wasn't restored. ${NETWORK_ERROR}` };
+    else c.archived = false;
+    renderSection("categories");
+    const next = document.querySelector('#categories-list [data-focus-key^="restore-"]') ?? $('[data-focus-key="categories-tab-archived"]');
+    next?.focus();
+    if (!c.archived) toast("Category restored.");
+  }, 500);
+}
+
+/* Paid-from accounts: the accounts company spending was paid from outside Expendi. Archived ones stay on old spending. */
+function accountsPanel() {
+  const st = state.load.accounts;
+  const active = state.accounts.filter((a) => !a.archived).sort(byName);
+  const archived = state.accounts.filter((a) => a.archived).sort(byName);
+  const add = canAct() && st === "ready"
+    ? h("button", { class: "btn btn-outline", type: "button", "aria-haspopup": "dialog", "data-focus-key": "add-account", onclick: () => openAccountForm(null, "add-account") }, icon("plus"), "Add an account")
+    : null;
+  let body;
+  if (st === "loading") body = skeleton(3);
+  else if (st === "error") body = loadError("accounts", "Paid-from accounts didn't load");
+  else {
+    const showArchived = state.tab.accounts === "archived";
+    const list = showArchived ? archived : active;
+    body = [
+      tabs("accounts", "Paid-from accounts", [["active", "In use", active.length], ["archived", "Archived", archived.length]]),
+      rowError("accounts"),
+      h("div", { id: "accounts-list", role: "tabpanel", "aria-labelledby": `accounts-tab-${state.tab.accounts}` },
+        list.length ? h("ul", { class: "set-list" }, list.map(accountRow))
+          : emptyBlock(showArchived ? "No archived accounts." : "No accounts yet.", !showArchived && canAct()
+            ? h("button", { class: "btn btn-primary", type: "button", "aria-haspopup": "dialog", "data-focus-key": "add-account-empty", onclick: () => openAccountForm(null, "add-account-empty") }, icon("plus"), "Add an account")
+            : null)),
+    ];
+  }
+  return panel("accounts", { title: "Paid-from accounts", sub: "Company spending says which of these it was paid from, e.g. the bank account or the founder’s card.", actions: add }, body, st === "loading");
+}
+function accountRow(a) {
+  const editable = canAct() && !a.archived;
+  return h("li", { class: `set-row${editable ? " is-clickable" : ""}`, "data-id": a.id,
+    onclick: editable ? (event) => { if (!event.target.closest("button")) openAccountForm(a); } : null },
+    h("span", { class: "payee-mark", "aria-hidden": "true" }, icon(KIND_ICONS[a.kind])),
+    h("span", { class: "row-main" }, h("span", { class: "row-name", text: a.name }), h("span", { class: "row-meta", text: KIND_LABELS[a.kind] })),
+    editable ? h("button", { class: "btn btn-ghost btn-row", type: "button", "aria-label": `Edit ${a.name}`, "aria-haspopup": "dialog", "data-focus-key": `edit-account-${a.id}`, onclick: () => openAccountForm(a) }, icon("pencil"), "Edit") : null);
+}
+
+/* Zoho Books: read-only status. Expendi staff connect it and map the accounts with the accountant. */
+function zohoPanel() {
+  const st = state.load.zoho;
+  const z = state.zoho;
+  let body;
+  if (st === "loading") body = skeleton(3);
+  else if (st === "error") body = loadError("zoho", "Zoho Books status didn't load");
+  else if (!z) body = emptyBlock("Not connected yet. Expendi connects Zoho Books with your accountant during setup.", contactExpendi("Contact Expendi"));
+  else {
+    const paused = z.status === "needs_reconnect";
+    body = [
+      paused ? h("div", { class: "set-outcome" }, h("div", { class: "callout callout-warn", role: "status" }, icon("alert"), h("div", {},
+        h("p", { class: "callout-title", text: "Syncing is paused" }),
+        h("p", {}, "Zoho Books stopped accepting Expendi's access. Spending paid in the meantime syncs after reconnecting. ", contactExpendi("Ask Expendi for a new connect link"), ".")))) : null,
+      kv([
+        ["Status", paused ? statusBadge("Needs reconnecting", "failed") : statusBadge("Connected", "paid")],
+        ["Zoho organization", z.org],
+        ["Connected", h("span", { class: "num", text: z.connectedAt })],
+        ["Paid Through", z.paidThrough],
+        ["What goes to Zoho", "Each paid reimbursement, bill and piece of petty cash or company spending as its own expense, with its receipt. Each payroll run as one expense."],
+      ]),
+      h("p", { class: "set-foot" }, icon("info"), h("span", {}, "Expendi set this up with your accountant, including which Zoho account each category and paid-from account posts to. To change it, ", contactExpendi("contact Expendi"), ".")),
+    ];
+  }
+  return panel("zoho", { title: "Zoho Books", sub: "Paid spending goes straight into the company's Zoho Books, one way." }, body, st === "loading");
+}
+
+const BUILDERS = { company: companyPanel, passkey: passkeyPanel, categories: categoriesPanel, accounts: accountsPanel, zoho: zohoPanel };
+function renderSection(id) {
+  const old = document.getElementById(id);
+  if (old) old.replaceWith(BUILDERS[id]());
+}
+function renderAll() {
+  $("#page-sub").textContent = canAct()
+    ? "The company's details, your approval passkey, the categories people pick when they record spending, and the accounts company spending is paid from."
+    : "The company's details, the categories people pick when they record spending, and the accounts company spending is paid from. Only admins change them.";
+  $("#role-label").textContent = canAct() ? "Admin" : "Accountant";
+  renderNav();
+  $("#set-panels").replaceChildren(...visibleSections().map((s) => BUILDERS[s.id]()));
+}
+
+/* Side sheet: every change is a short form */
+const layer = $("#sheet-layer");
+const sheet = $("#sheet");
+let returnFocus = null;
+let returnKey = null;
+let fallbackFocus = null;
+function showSheet(nodes) {
+  if (layer.hidden) returnFocus = document.activeElement;
+  layer.hidden = false;
+  sheet.replaceChildren(...nodes);
+}
+function openForm(nodes) {
+  showSheet(nodes);
+  (sheet.querySelector(".input") ?? sheet).focus();
+}
+function showStep(nodes) {
+  sheet.replaceChildren(...nodes);
+  (sheet.querySelector(".input") ?? sheet).focus();
+}
+function markOpenRow(section, id) {
+  document.querySelectorAll(".set-row.is-open").forEach((row) => row.classList.remove("is-open"));
+  if (id) document.querySelector(`#${section} .set-row[data-id="${id}"]`)?.classList.add("is-open");
+}
+function closeSheet() {
+  if (saving || layer.hidden) return;
+  layer.hidden = true;
+  markOpenRow();
+  urlState.category = null;
+  urlState.account = null;
+  writeUrl();
+  const byKey = returnKey ? document.querySelector(`[data-focus-key="${returnKey}"]`) : null;
+  const target = byKey ?? (returnFocus?.isConnected && returnFocus !== document.body ? returnFocus : null) ?? fallbackFocus;
+  target?.focus({ preventScroll: !byKey });
+  returnKey = null;
+  fallbackFocus = null;
+}
+layer.addEventListener("click", (event) => { if (event.target.matches("[data-close]")) closeSheet(); });
+document.addEventListener("keydown", (event) => {
+  if (layer.hidden) return;
+  if (event.key === "Escape") return closeSheet();
+  if (event.key !== "Tab") return;
+  const focusable = [...sheet.querySelectorAll("button:not(:disabled), a[href], input:not(:disabled), select, textarea")].filter((el) => el.offsetParent !== null);
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === sheet)) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+});
+const closeButton = () => h("button", { class: "icon-btn", type: "button", "aria-label": "Close", onclick: closeSheet }, icon("x"));
+function sheetHead(eyebrow, title) {
+  return h("div", { class: "sheet-head" }, h("div", { class: "sheet-head-main" }, h("p", { class: "eyebrow", text: eyebrow }), h("h2", { class: "sheet-title", id: "sheet-title", text: title })),
+    h("div", { class: "stepper" }, closeButton()));
+}
+
+/* Form helpers: label above, help and error below */
+function fieldError() { return h("p", { class: "field-error", role: "alert", hidden: true }, icon("circle-alert"), h("span")); }
+function setError(input, error, message) {
+  error.lastChild.textContent = message;
+  error.hidden = !message;
+  if (message) input.setAttribute("aria-invalid", "true"); else input.removeAttribute("aria-invalid");
+}
+function selectBox(select) { return h("span", { class: "select" }, select, icon("chevron-down")); }
+function formError() { return h("div", { class: "callout callout-error", role: "alert", hidden: true }, icon("circle-alert"), h("p")); }
+function startSaving(button, text) {
+  saving = true;
+  button.disabled = true;
+  button.textContent = text;
+}
+/* "Changes don't save": the request fails and the sheet stays open with the app's network message. */
+function failSaving(button, label, box) {
+  saving = false;
+  button.disabled = false;
+  button.textContent = label;
+  box.lastChild.textContent = NETWORK_ERROR;
+  box.hidden = false;
+}
+function nameProblem(value, max, nameIt, list, existing, what) {
+  if (!value) return nameIt;
+  if (value.length > max) return `Keep the name to ${max} characters or fewer.`;
+  if (list.some((x) => x !== existing && sameName(x.name, value))) return `There's already ${what} called ${value}.`;
+  return "";
+}
+function editFoot(submit, onArchive) {
+  return h("div", { class: "sheet-foot" },
+    h("div", { class: "foot-primary" }, submit, h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Cancel", onclick: closeSheet })),
+    onArchive ? h("div", { class: "foot-secondary" }, h("button", { class: "btn btn-ghost", type: "button", onclick: onArchive }, icon("archive"), "Archive")) : null);
+}
+
+function openCategoryForm(c, openerKey = null) {
+  returnKey = c ? `edit-category-${c.id}` : openerKey;
+  if (c) { Object.assign(urlState, { section: "categories", category: c.id, account: null }); writeUrl(); markOpenRow("categories", c.id); }
+  openForm(categoryForm(c));
+}
+function categoryForm(existing) {
+  const name = h("input", { class: "input", id: "c-name", maxlength: String(CATEGORY_MAX), autocomplete: "off", placeholder: "e.g. Courier" });
+  const nameError = fieldError();
+  const exempt = h("input", { type: "checkbox", id: "c-exempt" });
+  const failed = formError();
+  if (existing) { name.value = existing.name; exempt.checked = Boolean(existing.exempt); }
+  const label = existing ? "Save" : "Add category";
+  const submit = h("button", { class: "btn btn-primary btn-lg", type: "submit", form: "category-form", text: label });
+  const snapshot = () => JSON.stringify([tidy(name.value), exempt.checked]);
+  const initial = snapshot();
+  const refresh = () => { if (existing) submit.disabled = snapshot() === initial; };
+  name.addEventListener("input", () => { setError(name, nameError, ""); refresh(); });
+  exempt.addEventListener("change", refresh);
+  refresh();
+  const form = h("form", { class: "form", id: "category-form", "aria-label": existing ? `Edit ${existing.name}` : "Add a category", novalidate: true },
+    failed,
+    h("div", { class: "field" }, h("label", { class: "field-label", for: "c-name", text: existing ? "Name" : "New category" }), name, nameError),
+    h("label", { class: "check-field", for: "c-exempt" }, exempt, h("span", {},
+      h("span", { class: "check-title", text: "No eTIMS invoice expected" }),
+      h("span", { class: "field-help", text: existing
+        ? "e.g. air tickets, bank charges. Changing this applies to new spending; what's already recorded keeps its eTIMS status."
+        : "e.g. air tickets, bank charges. New spending in it is recorded as not needing an eTIMS invoice." }))));
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const value = tidy(name.value);
+    const problem = nameProblem(value, CATEGORY_MAX, "Name the category, e.g. Transport.", state.categories, existing, "a category");
+    setError(name, nameError, problem);
+    if (problem) { name.focus(); return; }
+    failed.hidden = true;
+    startSaving(submit, existing ? "Saving…" : "Adding…");
+    later(() => {
+      if (state.scenario === "save-fails") return failSaving(submit, label, failed);
+      saving = false;
+      if (existing) Object.assign(existing, { name: value, exempt: exempt.checked });
+      else { state.categories.push({ id: `new-${Date.now()}`, name: value, exempt: exempt.checked }); state.tab.categories = "active"; }
+      renderSection("categories");
+      fallbackFocus = $('[data-focus-key="add-category"]') ?? $("#categories-title");
+      closeSheet();
+      toast(existing ? "Changes saved." : "Category added.");
+    }, 500);
+  });
+  return [sheetHead(existing ? existing.name : "Categories", existing ? "Edit category" : "Add a category"),
+    h("div", { class: "sheet-body" }, form),
+    editFoot(submit, existing ? () => showStep(archiveCategoryStep(existing)) : null)];
+}
+function archiveCategoryStep(c) {
+  const failed = formError();
+  const go = h("button", { class: "btn btn-primary btn-lg", type: "button", text: "Archive" });
+  go.addEventListener("click", () => {
+    failed.hidden = true;
+    startSaving(go, "Archiving…");
+    later(() => {
+      if (state.scenario === "save-fails") return failSaving(go, "Archive", failed);
+      saving = false;
+      c.archived = true;
+      renderSection("categories");
+      returnKey = null;
+      fallbackFocus = $("#categories-title");
+      closeSheet();
+      toast("Category archived.");
+    }, 500);
+  });
+  return [sheetHead(c.name, "Archive this category?"),
+    h("div", { class: "sheet-body" }, failed,
+      h("div", { class: "callout callout-neutral" }, icon("archive"), h("p", { text: `${c.name} can't be picked for new spending. What already has it keeps it, and you can restore it later.` }))),
+    h("div", { class: "sheet-foot" }, go, h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Keep it", onclick: () => showStep(categoryForm(c)) }))];
+}
+
+function openAccountForm(a, openerKey = null) {
+  returnKey = a ? `edit-account-${a.id}` : openerKey;
+  if (a) { Object.assign(urlState, { section: "accounts", account: a.id, category: null }); writeUrl(); markOpenRow("accounts", a.id); }
+  openForm(accountForm(a));
+}
+function accountForm(existing) {
+  const name = h("input", { class: "input", id: "a-name", maxlength: String(ACCOUNT_MAX), autocomplete: "off", placeholder: "KCB current account" });
+  const nameError = fieldError();
+  const kind = h("select", { id: "a-kind" }, Object.entries(KIND_LABELS).map(([value, text]) => h("option", { value, text })));
+  const failed = formError();
+  if (existing) { name.value = existing.name; kind.value = existing.kind; }
+  const label = existing ? "Save" : "Add account";
+  const submit = h("button", { class: "btn btn-primary btn-lg", type: "submit", form: "account-form", text: label });
+  const snapshot = () => JSON.stringify([tidy(name.value), kind.value]);
+  const initial = snapshot();
+  const refresh = () => { if (existing) submit.disabled = snapshot() === initial; };
+  name.addEventListener("input", () => { setError(name, nameError, ""); refresh(); });
+  kind.addEventListener("change", refresh);
+  refresh();
+  const form = h("form", { class: "form", id: "account-form", "aria-label": existing ? `Edit ${existing.name}` : "Add an account", novalidate: true },
+    failed,
+    h("div", { class: "field" }, h("label", { class: "field-label", for: "a-name", text: "Account name" }), name, nameError),
+    h("div", { class: "field" }, h("label", { class: "field-label", for: "a-kind", text: "Kind" }), selectBox(kind),
+      h("p", { class: "field-help", text: "So your accountant can match it to the right account in Zoho Books." })));
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const value = tidy(name.value);
+    const problem = nameProblem(value, ACCOUNT_MAX, "Name the account, e.g. KCB current account.", state.accounts, existing, "an account");
+    setError(name, nameError, problem);
+    if (problem) { name.focus(); return; }
+    failed.hidden = true;
+    startSaving(submit, existing ? "Saving…" : "Adding…");
+    later(() => {
+      if (state.scenario === "save-fails") return failSaving(submit, label, failed);
+      saving = false;
+      if (existing) Object.assign(existing, { name: value, kind: kind.value });
+      else { state.accounts.push({ id: `new-${Date.now()}`, name: value, kind: kind.value }); state.tab.accounts = "active"; }
+      renderSection("accounts");
+      fallbackFocus = $('[data-focus-key="add-account"]') ?? $("#accounts-title");
+      closeSheet();
+      toast(existing ? "Changes saved." : "Account added.");
+    }, 500);
+  });
+  return [sheetHead(existing ? existing.name : "Paid-from accounts", existing ? "Edit account" : "Add an account"),
+    h("div", { class: "sheet-body" }, form),
+    editFoot(submit, existing ? () => showStep(archiveAccountStep(existing)) : null)];
+}
+function archiveAccountStep(a) {
+  const failed = formError();
+  const go = h("button", { class: "btn btn-primary btn-lg", type: "button", text: "Archive" });
+  go.addEventListener("click", () => {
+    failed.hidden = true;
+    startSaving(go, "Archiving…");
+    later(() => {
+      if (state.scenario === "save-fails") return failSaving(go, "Archive", failed);
+      saving = false;
+      a.archived = true;
+      renderSection("accounts");
+      returnKey = null;
+      fallbackFocus = $("#accounts-title");
+      closeSheet();
+      toast("Account archived.");
+    }, 500);
+  });
+  return [sheetHead(a.name, "Archive this account?"),
+    h("div", { class: "sheet-body" }, failed,
+      h("div", { class: "callout callout-neutral" }, icon("archive"), h("p", { text: `${a.name} can’t be picked for new spending. Spending already recorded keeps it.` }))),
+    h("div", { class: "sheet-foot" }, go, h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Keep it", onclick: () => showStep(accountForm(a)) }))];
+}
+
+/* Page */
+function reset() {
+  const fromUrl = readUrl();
+  state.role = $("#mock-role").value;
+  state.scenario = $("#mock-scenario").value;
+  const empty = state.scenario === "empty";
+  state.categories = empty ? [] : sampleCategories();
+  state.accounts = empty ? [] : sampleAccounts();
+  state.passkey = state.role === "no-passkey" ? { enrolled: false } : { enrolled: true, since: "14 Oct 2026, 09:12" };
+  state.zoho = empty ? null : { ...ZOHO, status: state.scenario === "zoho-reconnect" ? "needs_reconnect" : "active" };
+  state.enrol = { busy: false, outcome: null };
+  state.tab = { categories: "active", accounts: "active" };
+  state.rowError = null;
+  saving = false;
+  layer.hidden = true;
+  Object.assign(urlState, fromUrl);
+  for (const s of SECTIONS) state.load[s.id] = "loading";
+  renderAll();
+  later(() => {
+    for (const s of SECTIONS) state.load[s.id] = state.scenario === "error" ? "error" : "ready";
+    renderAll();
+    if (state.scenario === "error") return;
+    const visible = visibleSections().some((s) => s.id === fromUrl.section);
+    if (fromUrl.section && visible) goTo(fromUrl.section, { smooth: false, focus: false });
+    if (!canAct()) { urlState.category = null; urlState.account = null; writeUrl(); return; }
+    const category = state.categories.find((c) => c.id === fromUrl.category && !c.archived);
+    const account = state.accounts.find((a) => a.id === fromUrl.account && !a.archived);
+    if (category) { goTo("categories", { smooth: false, focus: false }); openCategoryForm(category); }
+    else if (account) { goTo("accounts", { smooth: false, focus: false }); openAccountForm(account); }
+    else { urlState.category = null; urlState.account = null; writeUrl(); }
+  }, 600);
+}
+$("#mock-role").addEventListener("change", reset);
+$("#mock-scenario").addEventListener("change", reset);
+
+/* Mobile navigation */
+const sidebar = $("#sidebar");
+const scrim = $("#scrim");
+const menuBtn = $("#menu-btn");
+function setNav(isOpenNow) {
+  sidebar.classList.toggle("is-open", isOpenNow);
+  scrim.hidden = !isOpenNow;
+  menuBtn.setAttribute("aria-expanded", String(isOpenNow));
+  if (isOpenNow) sidebar.querySelector(".sb-link")?.focus();
+}
+menuBtn.addEventListener("click", () => setNav(true));
+scrim.addEventListener("click", () => setNav(false));
+document.addEventListener("keydown", (event) => { if (event.key === "Escape" && sidebar.classList.contains("is-open")) { setNav(false); menuBtn.focus(); } });
+
+reset();
+</script>
+</body>
+</html>

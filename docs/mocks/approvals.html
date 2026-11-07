@@ -1,0 +1,1096 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expendi Approvals Mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400..600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+:root {
+  --brand-50: #fff4f0;
+  --brand-100: #ffe7de;
+  --brand-500: #ff7e5f;
+  --brand-600: #f0613e;
+  --brand-700: #cc4528;
+  --brand-800: #a63620;
+  --gray-25: #fcfcfd;
+  --gray-50: #f9fafb;
+  --gray-100: #f2f4f7;
+  --gray-200: #e4e7ec;
+  --gray-300: #d0d5dd;
+  --gray-400: #98a2b3;
+  --gray-500: #667085;
+  --gray-600: #475467;
+  --gray-700: #344054;
+  --gray-900: #101828;
+  --error-50: #fef3f2;
+  --error-700: #b42318;
+  --warn-50: #fffaeb;
+  --warn-600: #dc6803;
+  --warn-700: #b54708;
+  --success-50: #ecfdf3;
+  --success-700: #067647;
+  --blue-50: #eff8ff;
+  --blue-500: #2e90fa;
+  --blue-700: #175cd3;
+  --amber-500: #f79009;
+  --green-500: #17b26a;
+  --red-500: #f04438;
+
+  --bg: var(--gray-50);
+  --surface: #ffffff;
+  --text: var(--gray-900);
+  --text-2: var(--gray-600);
+  --text-3: var(--gray-500);
+  --border: var(--gray-200);
+  --hairline: var(--gray-100);
+  /* Translucent so it stays visible on white, gray and coral row tints. */
+  --row-divider: rgba(16, 24, 40, .08);
+  --control-border: var(--gray-300);
+
+  /* Shape rule: controls and business marks 8px, panels 14px, pills and people full. */
+  --r-control: 8px;
+  --r-panel: 14px;
+  --r-full: 999px;
+  --shadow-panel: 0 1px 2px rgba(16, 24, 40, .04), 0 12px 32px -18px rgba(16, 24, 40, .16);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+
+  /* Type weights by role (docs/design-system.md, Confident). */
+  --w-display: 400; --w-heading: 400; --w-title: 600; --w-name: 600; --w-amount: 500; --w-ui: 500; --w-strong: 600; --w-button: 600;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; font-family: Outfit, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 20px;
+  color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased;
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+h1, h2, h3, p, dl, dd, ol, ul, figure { margin: 0; }
+.num { font-variant-numeric: tabular-nums; }
+.ic { width: 16px; height: 16px; flex: none; display: block; stroke-width: 1.75; }
+:focus-visible { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.ccy { font-size: .72em; font-weight: var(--w-ui); letter-spacing: .04em; color: var(--text-3); }
+.money { white-space: nowrap; }
+[hidden] { display: none !important; }
+
+/* Shell */
+.app { display: flex; min-height: 100dvh; }
+.sidebar { position: sticky; top: 0; height: 100dvh; width: 248px; flex: none; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.sb-top { padding: 16px 12px 8px; display: flex; flex-direction: column; gap: 10px; }
+.company { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; background: none; border-radius: var(--r-control); text-align: left; }
+.company:hover { background: var(--gray-50); }
+.company img { width: 32px; height: 32px; border-radius: var(--r-control); }
+.company-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.company-name { font-weight: var(--w-name); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.company-role { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.company .ic { color: var(--gray-400); }
+.search { display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-control); background: var(--gray-50); color: var(--text-3); }
+.search span { flex: 1; text-align: left; }
+kbd { font: inherit; font-size: 11px; line-height: 16px; color: var(--text-3); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; background: var(--surface); }
+.sb-nav { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
+.sb-group { margin-top: 16px; }
+.sb-label { padding: 0 8px 4px; font-size: 12px; line-height: 16px; color: var(--gray-400); font-weight: var(--w-ui); }
+.sb-link { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 8px; border-radius: var(--r-control); color: var(--gray-700); text-decoration: none; transition: background-color .15s ease; }
+.sb-link:hover { background: var(--gray-50); }
+.sb-link .ic { color: var(--gray-400); }
+.sb-link.is-active { background: var(--brand-50); color: var(--brand-800); font-weight: var(--w-ui); }
+.sb-link.is-active .ic { color: var(--brand-700); }
+.count { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-full); background: var(--brand-100); color: var(--brand-800); font-size: 12px; font-weight: var(--w-strong); display: inline-flex; align-items: center; justify-content: center; }
+.sb-user { display: flex; align-items: center; gap: 10px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
+.sb-user .who { min-width: 0; }
+.sb-user .who p:first-child { font-weight: var(--w-name); }
+.sb-user .who p:last-child { font-size: 12px; line-height: 16px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.main-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar { display: none; }
+.main { width: 100%; max-width: 1320px; margin: 0 auto; padding: 24px 32px 72px; }
+
+/* Atoms */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); box-shadow: var(--shadow-panel); }
+.panel-flat { box-shadow: none; }
+.person, .business { width: 36px; height: 36px; flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: var(--w-strong); letter-spacing: .02em; color: var(--gray-700); }
+.person { border-radius: var(--r-full); background: var(--gray-100); }
+.pill { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px 0 6px; border-radius: var(--r-full); font-size: 12px; font-weight: var(--w-ui); white-space: nowrap; flex: none; }
+.pill .ic { width: 13px; height: 13px; }
+.pill-neutral { background: var(--gray-100); color: var(--gray-700); }
+.pill-warn { background: var(--warn-50); color: var(--warn-700); }
+.pill-error { background: var(--error-50); color: var(--error-700); }
+.pill-success { background: var(--success-50); color: var(--success-700); }
+/* Status: a filled tint means it needs attention or money is moving; an outline means it's only a record. Always a text label, never colour alone. */
+.status { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--r-full); font-size: 12px; font-weight: var(--w-ui); white-space: nowrap; flex: none; }
+.status.is-waiting { background: var(--warn-50); color: var(--warn-700); }
+.status.is-moving { background: var(--blue-50); color: var(--blue-700); }
+.status.is-paid { background: var(--success-50); color: var(--success-700); }
+.status.is-failed { background: var(--error-50); color: var(--error-700); }
+.status.is-rejected { background: var(--gray-100); color: var(--gray-700); }
+.status.is-quiet { background: var(--surface); border-color: var(--border); color: var(--text-2); }
+@keyframes beat { 0%, 100% { box-shadow: 0 0 0 0 rgba(46, 144, 250, .5); } 60% { box-shadow: 0 0 0 4px rgba(46, 144, 250, 0); } }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--r-control); border: 1px solid transparent; font-size: 14px; font-weight: var(--w-button); white-space: nowrap; text-decoration: none; transition: background-color .15s ease, border-color .15s ease, transform .15s var(--ease-out); }
+.btn .ic { width: 16px; height: 16px; }
+.btn-primary { background: var(--brand-500); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--brand-600); }
+.btn-primary .ccy { color: #fff; }
+.btn-outline { background: var(--surface); border-color: var(--control-border); color: var(--gray-700); }
+.btn-outline:hover:not(:disabled) { background: var(--gray-50); }
+.btn-ghost { background: none; color: var(--gray-600); }
+.btn-ghost:hover:not(:disabled) { background: var(--gray-100); color: var(--gray-900); }
+.btn-lg { height: 44px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.icon-btn { width: 36px; height: 36px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 0; background: none; border-radius: var(--r-control); color: var(--gray-500); }
+.icon-btn:hover { background: var(--gray-100); color: var(--gray-700); }
+.text-link { padding: 0; border: 0; background: none; border-radius: 4px; color: var(--brand-800); font-weight: var(--w-ui); text-decoration: underline; text-decoration-color: var(--brand-100); text-underline-offset: 3px; }
+.text-link:hover { text-decoration-color: currentColor; }
+.callout { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--r-control); font-size: 14px; line-height: 20px; }
+.callout > .ic { margin-top: 2px; }
+.callout-title { font-weight: var(--w-ui); }
+.callout ul { margin: 4px 0 0; padding-left: 18px; }
+.callout ul li + li { margin-top: 2px; }
+.callout-warn { background: var(--warn-50); color: var(--warn-700); }
+.callout-error { background: var(--error-50); color: var(--error-700); }
+.callout-neutral { background: var(--gray-100); color: var(--gray-700); }
+.callout-success { background: var(--success-50); color: var(--success-700); }
+.skel { border-radius: var(--r-control); background: var(--gray-100); }
+input[type="checkbox"] { width: 18px; height: 18px; margin: 0; accent-color: var(--brand-700); cursor: pointer; }
+input[type="checkbox"]:disabled { cursor: not-allowed; }
+
+/* Mock-only strip */
+.mock-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 12px; margin-bottom: 20px; border: 1px dashed var(--control-border); border-radius: var(--r-control); font-size: 12px; line-height: 16px; color: var(--text-3); }
+.mock-strip strong { font-weight: 500; color: var(--text-2); }
+.mock-strip label { display: inline-flex; align-items: center; gap: 6px; }
+.mock-strip select { height: 28px; padding: 0 6px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--surface); font-size: 12px; }
+
+/* Page */
+.page-title { font-size: 24px; line-height: 32px; font-weight: var(--w-heading); letter-spacing: -0.02em; }
+.page-sub { margin-top: 4px; color: var(--text-2); max-width: 70ch; }
+.tabs { margin-top: 20px; display: flex; gap: 24px; border-bottom: 1px solid var(--border); }
+.tab { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0; border: 0; background: none; color: var(--text-2); font-size: 14px; font-weight: var(--w-ui); }
+.tab[aria-selected="true"] { color: var(--text); }
+.tab[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 1px; background: var(--gray-900); }
+.tab-count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-full); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: var(--gray-100); color: var(--gray-700); }
+.tab-count.is-error { background: var(--error-50); color: var(--error-700); }
+.banners { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.banners:empty { display: none; }
+.banner { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; }
+.banner .ic { width: 20px; height: 20px; margin-top: 1px; }
+.banner-main { flex: 1; min-width: 0; }
+.banner-title { font-weight: var(--w-title); }
+.banner p + p { margin-top: 2px; color: var(--text-2); }
+.banner.is-success .ic { color: var(--success-700); }
+.banner.is-warn .ic { color: var(--warn-600); }
+
+.layout { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.layout.is-empty { grid-template-columns: minmax(0, 1fr); }
+
+/* Queue */
+.queue { overflow: hidden; display: flex; flex-direction: column; }
+.queue-head { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 10px 16px; border-bottom: 1px solid var(--hairline); }
+.queue-head .hint { flex: 1; color: var(--text-2); }
+.queue-head .sum { color: var(--text-3); font-size: 12px; line-height: 16px; white-space: nowrap; }
+.select-all { display: inline-flex; align-items: center; gap: 10px; color: var(--text-2); cursor: pointer; }
+.claims { list-style: none; padding: 0; }
+.claim { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: stretch; border-bottom: 1px solid var(--row-divider); transition: background-color .15s ease; }
+.claim.no-check { grid-template-columns: minmax(0, 1fr); }
+.claim:hover { background: var(--gray-25); }
+.claim.is-active { background: var(--gray-50); box-shadow: inset 3px 0 0 var(--gray-900); }
+.claim.is-selected { background: var(--brand-50); }
+.claim.is-selected.is-active { box-shadow: inset 3px 0 0 var(--brand-700); }
+.check { display: flex; align-items: flex-start; justify-content: center; padding-top: 22px; padding-left: 8px; cursor: pointer; }
+.claim-btn { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 14px 16px 14px 8px; border: 0; background: none; text-align: left; width: 100%; }
+.no-check .claim-btn { padding-left: 16px; }
+.claim-main { min-width: 0; }
+.claim-name { display: block; font-size: 16px; line-height: 24px; font-weight: var(--w-name); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.claim-sub { display: block; font-size: 14px; line-height: 20px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.claim-flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.claim-flags:empty { display: none; }
+.claim-amount { font-size: 16px; line-height: 24px; font-weight: var(--w-amount); white-space: nowrap; }
+.queue-foot { padding: 12px 16px; border-bottom: 1px solid var(--hairline); }
+.queue-empty, .queue-error { padding: 48px 24px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; color: var(--text-2); }
+.queue-empty .ic, .queue-error .ic { width: 28px; height: 28px; }
+.queue-empty .ic { color: var(--success-700); }
+.queue-error .ic { color: var(--error-700); }
+.queue-empty strong, .queue-error strong { color: var(--text); font-weight: var(--w-title); font-size: 16px; line-height: 24px; }
+.skel-row { display: grid; grid-template-columns: 36px 1fr 72px; gap: 12px; padding: 16px; border-bottom: 1px solid var(--hairline); }
+
+.selection-bar { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -8px 24px -16px rgba(16, 24, 40, .2); }
+.selection-bar .what { flex: 1 1 160px; min-width: 0; }
+.selection-bar .what strong { font-weight: var(--w-name); }
+.selection-bar .clear { margin-top: 2px; font-size: 12px; line-height: 16px; }
+.selection-bar .limit { flex-basis: 100%; font-size: 12px; line-height: 16px; color: var(--text-3); }
+
+/* Detail pane */
+.pane { position: sticky; top: 16px; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; overflow: hidden; }
+.pane-scroll { flex: 1; overflow-y: auto; padding: 20px 24px; }
+.pane-head { display: flex; align-items: flex-start; gap: 12px; }
+.pane-head-main { flex: 1; min-width: 0; }
+.pane-merchant { font-size: 18px; line-height: 26px; font-weight: var(--w-title); overflow-wrap: anywhere; }
+.pane-who { color: var(--text-2); }
+.pane-amount { text-align: right; }
+.pane-amount .big { font-size: 24px; line-height: 32px; font-weight: var(--w-heading); letter-spacing: -0.02em; white-space: nowrap; }
+.pane-amount .status { margin-top: 4px; display: flex; justify-content: flex-end; }
+.pane-grid { margin-top: 20px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 24px; align-items: start; }
+.pane-info { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.description { color: var(--gray-700); white-space: pre-wrap; }
+.details { display: flex; flex-direction: column; }
+.details div { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: 12px; padding: 9px 0; border-top: 1px solid var(--hairline); }
+.details div:first-child { border-top: 0; padding-top: 0; }
+.details dt { color: var(--text-3); }
+.details dd { overflow-wrap: anywhere; }
+.details .sub { display: block; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.pane-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--border); background: var(--surface); }
+.pane-actions .spacer { flex: 1; }
+.pane-select { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); cursor: pointer; }
+.read-only { display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 14px; }
+
+.receipts { display: flex; flex-direction: column; gap: 16px; }
+.viewer { border: 1px solid var(--border); border-radius: var(--r-control); background: var(--gray-50); overflow: hidden; }
+.viewer-stage { min-height: 340px; padding: 20px; display: flex; align-items: center; justify-content: center; }
+.viewer-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--surface); font-size: 12px; line-height: 16px; color: var(--text-3); }
+.viewer-bar .text-link { font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+.viewer-bar .text-link .ic { width: 12px; height: 12px; }
+.paper { width: 100%; max-width: 280px; padding: 18px 18px 14px; background: #fff; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 8px 24px -12px rgba(16, 24, 40, .25); font-size: 12px; line-height: 18px; transform: rotate(-0.6deg); }
+.paper.is-pdf { transform: none; border-radius: 2px; max-width: 300px; }
+.paper.is-screen { transform: none; border-radius: 16px; max-width: 240px; padding: 20px 16px; }
+.paper-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 13px; }
+.paper-head span:last-child { color: var(--text-3); font-weight: 500; letter-spacing: .06em; font-size: 11px; }
+.paper-sub { color: var(--text-3); margin-bottom: 10px; }
+.paper-line { display: flex; justify-content: space-between; gap: 8px; color: var(--text-2); }
+.paper-total { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--gray-300); font-weight: 600; }
+.sms { width: 100%; max-width: 320px; padding: 14px 16px; border-radius: 16px 16px 16px 4px; background: var(--surface); border: 1px solid var(--border); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 20px; }
+.no-receipt { min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; border: 1px dashed var(--control-border); border-radius: var(--r-control); color: var(--text-2); text-align: center; }
+.no-receipt .ic { width: 24px; height: 24px; color: var(--text-3); }
+
+.reject-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.reject-form label { font-size: 14px; color: var(--text); }
+.reject-form textarea { width: 100%; min-height: 88px; padding: 10px 12px; resize: vertical; border: 1px solid var(--control-border); border-radius: var(--r-control); background: var(--surface); }
+.reject-form textarea[aria-invalid="true"] { border-color: var(--error-700); }
+.reject-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.field-error { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--error-700); }
+.field-error .ic { width: 14px; height: 14px; }
+.reject-buttons { display: flex; gap: 8px; }
+
+/* Review sheet */
+.sheet-layer { position: fixed; inset: 0; z-index: 50; }
+.sheet-scrim { position: absolute; inset: 0; background: rgba(16, 24, 40, .24); }
+.sheet { position: absolute; top: 0; right: 0; bottom: 0; width: min(520px, 100%); display: flex; flex-direction: column; background: var(--surface); box-shadow: -16px 0 48px -16px rgba(16, 24, 40, .2); }
+.sheet:focus { outline: none; }
+.sheet-head { display: flex; gap: 12px; align-items: flex-start; padding: 20px 20px 18px 24px; border-bottom: 1px solid var(--border); }
+.sheet-head-main { flex: 1; min-width: 0; }
+.eyebrow { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.sheet-title { margin-top: 2px; font-size: 18px; line-height: 26px; font-weight: var(--w-title); }
+.sheet-body { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.sheet-body.is-detail { padding: 0; }
+.sheet-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--border); }
+.note { display: flex; gap: 8px; align-items: flex-start; color: var(--text-2); }
+.note .ic { margin-top: 2px; color: var(--text-3); }
+.previews { display: flex; flex-direction: column; gap: 8px; }
+.preview { border: 1px solid var(--border); border-radius: var(--r-control); }
+.preview summary { list-style: none; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto 16px; gap: 12px; align-items: center; padding: 10px 12px; cursor: pointer; border-radius: var(--r-control); }
+.preview summary::-webkit-details-marker { display: none; }
+.preview summary .person { width: 32px; height: 32px; font-size: 12px; }
+.preview summary .chev { color: var(--text-3); transition: transform .2s var(--ease-out); }
+.preview[open] summary .chev { transform: rotate(180deg); }
+.preview .p-name { font-weight: var(--w-name); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview .p-sub { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.preview .p-amount { font-weight: var(--w-amount); white-space: nowrap; text-align: right; }
+.preview .details { padding: 4px 12px 12px 56px; }
+.preview .details div { grid-template-columns: 10rem minmax(0, 1fr); }
+.preview .details div:first-child { padding-top: 9px; border-top: 1px solid var(--hairline); }
+.totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 14px 16px; border-radius: var(--r-control); background: var(--gray-50); }
+.totals dt { font-size: 12px; line-height: 16px; color: var(--text-3); font-weight: var(--w-ui); }
+.totals dd { margin-top: 4px; font-size: 16px; line-height: 24px; font-weight: var(--w-amount); }
+.changed { background: var(--warn-50); border-radius: 4px; padding: 0 4px; margin: 0 -4px; }
+
+.toast { position: fixed; left: 50%; bottom: 24px; z-index: 70; max-width: calc(100% - 32px); display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--r-panel); background: var(--gray-900); color: #fff; font-size: 14px; box-shadow: 0 16px 40px -16px rgba(16, 24, 40, .5); opacity: 0; transform: translate(-50%, 12px); pointer-events: none; transition: opacity .2s ease, transform .3s var(--ease-out); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast .ic { color: var(--brand-500); }
+.scrim { position: fixed; inset: 0; z-index: 39; background: rgba(16, 24, 40, .24); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .reveal { animation: rise .5s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 60ms); }
+  .btn:active:not(:disabled) { transform: scale(.98); }
+  .sheet-scrim { animation: fade .2s ease; }
+  .sheet { animation: slide .32s var(--ease-out); }
+  .skel { animation: pulse 1.4s ease-in-out infinite; }
+  .pane-fade { animation: fade .25s ease; }
+  .claim.is-leaving { opacity: 0; transform: translateX(12px); transition: opacity .2s ease, transform .2s var(--ease-out); }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes slide { from { transform: translateX(24px); opacity: 0; } }
+@keyframes pulse { 50% { opacity: .55; } }
+
+@media (max-width: 1180px) {
+  .pane-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 1023px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .layout > .pane { display: none; }
+}
+@media (max-width: 900px) {
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 40; transform: translateX(-100%); transition: transform .25s var(--ease-out); }
+  .sidebar.is-open { transform: none; }
+  .topbar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .topbar img { width: 28px; height: 28px; border-radius: var(--r-control); }
+  .topbar .company-name { font-size: 16px; }
+  .main { padding: 20px 24px 56px; }
+}
+@media (max-width: 600px) {
+  .main { padding: 16px 16px 48px; }
+  .totals { grid-template-columns: minmax(0, 1fr); }
+  .details div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .preview .details { padding-left: 12px; }
+  .preview .details div { grid-template-columns: minmax(0, 1fr); }
+  .sheet-head, .sheet-body, .sheet-foot { padding-left: 16px; padding-right: 16px; }
+  .pane-scroll, .pane-actions { padding-left: 16px; padding-right: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <div class="sb-top">
+      <button class="company" type="button" data-mock="Switch company">
+        <img src="../../apps/web/public/expendi-mark.png" alt="">
+        <span class="company-text"><span class="company-name">Mwangaza Logistics</span><span class="company-role" id="role-label">Admin</span></span>
+        <i data-icon="chevrons"></i>
+      </button>
+      <button class="search" type="button" data-mock="Search"><i data-icon="search"></i><span>Search</span><kbd>⌘K</kbd></button>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-group">
+        <p class="sb-label">Workspace</p>
+        <a class="sb-link" href="overview.html"><i data-icon="dashboard"></i>Overview</a>
+        <a class="sb-link" href="wallet.html"><i data-icon="wallet"></i>Accounts</a>
+      </div>
+      <div class="sb-group">
+        <p class="sb-label">Spend &amp; pay</p>
+        <a class="sb-link is-active" href="approvals.html" aria-current="page"><i data-icon="approve"></i>Approvals<span class="count num" id="nav-count"></span></a>
+        <a class="sb-link" href="expenses.html"><i data-icon="receipt"></i>Expenses<span class="count num">2</span></a>
+        <a class="sb-link" href="bills.html"><i data-icon="file"></i>Bills<span class="count num">5</span></a>
+        <a class="sb-link" href="payroll.html"><i data-icon="banknote"></i>Payroll<span class="count num">1</span></a>
+      </div>
+      <div class="sb-group">
+        <p class="sb-label">Manage</p>
+        <a class="sb-link" href="payees.html"><i data-icon="building"></i>Payees</a>
+        <a class="sb-link" href="team.html"><i data-icon="users"></i>Team</a>
+        <a class="sb-link" href="settings.html"><i data-icon="settings"></i>Settings</a>
+      </div>
+      <div class="sb-group">
+        <p class="sb-label">Insights</p>
+        <a class="sb-link" href="reports.html"><i data-icon="chart"></i>Reports</a>
+        <a class="sb-link" href="activity.html"><i data-icon="activity"></i>Activity</a>
+      </div>
+    </nav>
+    <div class="sb-user"><span class="person" aria-hidden="true">WK</span><div class="who"><p>Wanjiru Kamau</p><p>wanjiru@mwangaza.co.ke</p></div></div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <button class="icon-btn" type="button" id="menu-btn" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false"><i data-icon="menu"></i></button>
+      <img src="../../apps/web/public/expendi-mark.png" alt="">
+      <span class="company-name">Mwangaza Logistics</span>
+    </header>
+
+    <main class="main">
+      <div class="mock-strip" role="group" aria-label="Mock controls">
+        <strong>Mock controls</strong>
+        <label>View as
+          <select id="mock-role">
+            <option value="admin">Admin</option>
+            <option value="no-passkey">Admin without a passkey</option>
+            <option value="accountant">Accountant</option>
+          </select>
+        </label>
+        <label>Scenario
+          <select id="mock-scenario">
+            <option value="normal">Everything goes through</option>
+            <option value="one-fails">One payment fails</option>
+            <option value="review">A payment needs checking</option>
+            <option value="short">Wallet too low</option>
+            <option value="cost">Cost changes before the passkey</option>
+            <option value="cancel">Passkey cancelled</option>
+            <option value="long">Busy month (23 reimbursements)</option>
+            <option value="empty">Nothing to approve</option>
+            <option value="error">Reimbursements can't load</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="reveal">
+        <h1 class="page-title">Approvals</h1>
+        <p class="page-sub" id="page-sub"></p>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Queues" id="tabs"></div>
+      <div class="banners" id="banners"></div>
+      <div class="layout" id="layout">
+        <section class="panel queue reveal" style="--i:1" id="queue" aria-label="Reimbursements"></section>
+        <section class="panel pane reveal" style="--i:2" id="pane" aria-label="Reimbursement details" aria-live="polite"></section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="sheet-layer" id="sheet-layer" hidden>
+  <div class="sheet-scrim" data-close></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" tabindex="-1"></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const LUCIDE_NAMES = {
+  "dashboard": "LayoutDashboard", "wallet": "Wallet", "approve": "CircleCheck", "check-circle": "CircleCheck",
+  "receipt": "ReceiptText", "file": "FileText", "repeat": "Repeat", "banknote": "Banknote", "building": "Building2",
+  "users": "Users", "settings": "Settings", "chart": "ChartColumn", "activity": "Activity", "search": "Search",
+  "chevrons": "ChevronsUpDown", "chevron-down": "ChevronDown", "check": "Check", "x": "X", "alert": "TriangleAlert",
+  "circle-alert": "CircleAlert", "info": "Info", "menu": "Menu", "key": "KeyRound", "lock": "Lock", "external": "ExternalLink",
+  "copy": "Copy", "eye": "Eye", "rotate": "RotateCcw", "clock": "Clock", "image-off": "ImageOff", "message": "MessageSquareText",
+};
+const SVG_NS = "http://www.w3.org/2000/svg";
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (selector) => document.querySelector(selector);
+const later = (fn, ms) => setTimeout(fn, reduceMotion ? Math.min(ms, 250) : ms);
+
+function icon(name) {
+  const node = window.lucide?.[LUCIDE_NAMES[name]];
+  if (!node) return document.createElement("span");
+  const svg = window.lucide.createElement(node);
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "ic");
+  svg.removeAttribute("width");
+  svg.removeAttribute("height");
+  return svg;
+}
+function h(tag, props, ...children) {
+  const el = document.createElement(tag);
+  for (const [key, value] of Object.entries(props ?? {})) {
+    if (value == null || value === false) continue;
+    if (key === "class") el.className = value;
+    else if (key === "text") el.textContent = value;
+    else if (key.startsWith("on")) el.addEventListener(key.slice(2), value);
+    else el.setAttribute(key, value === true ? "" : value);
+  }
+  for (const child of children.flat()) if (child != null && child !== false) el.append(child);
+  return el;
+}
+document.querySelectorAll("i[data-icon]").forEach((el) => el.replaceWith(icon(el.dataset.icon)));
+
+/* Money and dates */
+const MAX_CLAIMS = 20;
+const PAGE_SIZE = 20;
+const REASON_MIN = 5;
+const REASON_MAX = 500;
+const kesText = (cents) => (cents / 100).toLocaleString("en-KE", { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 });
+const kes = (cents) => h("span", { class: "money num" }, h("span", { class: "ccy", text: "KES" }), " ", kesText(cents));
+const usdcText = (n) => n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usdc = (n) => h("span", { class: "money num" }, usdcText(n), " ", h("span", { class: "ccy", text: "USDC" }));
+const dateText = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const firstName = (name) => name.split(" ")[0];
+
+/* Toast and mock-only links */
+const toastEl = $("#toast");
+let toastTimer;
+function toast(message) {
+  toastEl.replaceChildren(icon("check"), h("span", { text: message }));
+  toastEl.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("show"), 3200);
+}
+document.addEventListener("click", (event) => {
+  const trigger = event.target.closest("[data-mock]");
+  if (!trigger) return;
+  event.preventDefault();
+  toast(`${trigger.dataset.mock} isn't part of this mock.`);
+});
+
+/* Sample claims */
+function baseClaims() {
+  return [
+    { id: "c1", merchant: "Java House Westlands", name: "Brian Otieno", email: "brian@mwangaza.co.ke", phone4: "2448", spentOn: "2026-11-04", category: "Meals & entertainment", amount: 320000,
+      description: "Lunch with the Twiga Foods procurement team.", mpesa: "SK41H7QZ2P", etims: "attached", invoice: "0040812345",
+      receipts: [{ kind: "photo", paper: { heading: "Java House Westlands", label: "RECEIPT", sub: "4 Nov 2026, 13:42", lines: [["2 × Chicken wrap", 1900], ["2 × Fresh juice", 700], ["Service", 600]] } }], warnings: [] },
+    { id: "c2", merchant: "Matatu fares", name: "Faith Wambui", email: "faith@mwangaza.co.ke", phone4: "6109", spentOn: "2026-11-05", category: "Fuel & transport", amount: 145000,
+      description: "Site visits to the Embakasi warehouse: CBD to Industrial Area, on to Embakasi, and back.", mpesa: null, etims: "not_required", receipts: [], warnings: [] },
+    { id: "c3", merchant: "Rubis Westlands", name: "Kevin Mwangi", email: "kevin@mwangaza.co.ke", phone4: "0482", spentOn: "2026-11-02", category: "Fuel & transport", amount: 500000,
+      description: "Fuel for the delivery van KDM 412T.", mpesa: "SK29J4LMN7", etims: "none",
+      receipts: [{ kind: "sms_text", text: "SK29J4LMN7 Confirmed. Ksh5,000.00 paid to RUBIS WESTLANDS on 2/11/26 at 7:42 AM. New M-PESA balance is Ksh3,214.50. Transaction cost, Ksh0.00." }],
+      warnings: [{ code: "near_duplicate", amount: 500000, spentOn: "2026-10-30" }] },
+    { id: "c4", merchant: "Text Book Centre Sarit", name: "Grace Achieng", email: "grace@mwangaza.co.ke", phone4: "7310", spentOn: "2026-11-03", category: "Office & supplies", amount: 273950,
+      description: "Printer toner and two box files.", mpesa: "SK37P2DD8W", etims: "attached", invoice: "0040834512",
+      receipts: [{ kind: "pdf", paper: { heading: "Text Book Centre Ltd", label: "TAX INVOICE", sub: "TBC-SAR-88214, 3 Nov 2026", lines: [["HP 305 toner", 2189.5], ["Box file × 2", 550]] } }], warnings: [] },
+    { id: "c5", merchant: "Shell Mombasa Road", name: "Daniel Kiprop", email: "daniel@mwangaza.co.ke", phone4: "9905", spentOn: "2026-08-12", category: "Fuel & transport", amount: 680000,
+      description: "Fuel for the Mombasa delivery run.", mpesa: "SH81QW3E5R", etims: "none",
+      receipts: [{ kind: "photo", paper: { heading: "Shell Mombasa Road", label: "FUEL SALE", sub: "12 Aug 2026, 06:15", lines: [["Diesel 37.8 L", 6800]] } }],
+      warnings: [{ code: "older_than_60_days", spentOn: "2026-08-12", ageDays: 83 }] },
+    { id: "c6", merchant: "Uber", name: "Amina Hassan", email: "amina@mwangaza.co.ke", phone4: "3321", spentOn: "2026-11-05", category: "Fuel & transport", amount: 128000,
+      description: "Client meeting at Upper Hill.", mpesa: null, etims: "not_required", blocked: "phone",
+      receipts: [{ kind: "screenshot", paper: { heading: "Uber", label: "TRIP", sub: "5 Nov 2026, 10:05", lines: [["Westlands to Upper Hill", 1280]] } }], warnings: [] },
+  ];
+}
+function failedClaims() {
+  return [
+    { id: "f1", merchant: "Naivas Kilimani", name: "Peter Njoroge", email: "peter@mwangaza.co.ke", phone4: "5512", spentOn: "2026-10-30", category: "Office & supplies", amount: 395000,
+      description: "Cleaning supplies for the office.", mpesa: "SK10M3NB7T", etims: "attached", invoice: "0040819937",
+      receipts: [{ kind: "photo", paper: { heading: "Naivas Kilimani", label: "RECEIPT", sub: "30 Oct 2026, 17:20", lines: [["Cleaning supplies", 3950]] } }], warnings: [],
+      failure: "The M-Pesa number didn't accept the payment." },
+  ];
+}
+function busyMonthClaims() {
+  const people = [["Brian Otieno", "2448"], ["Faith Wambui", "6109"], ["Kevin Mwangi", "0482"], ["Grace Achieng", "7310"], ["Daniel Kiprop", "9905"], ["Peter Njoroge", "5512"]];
+  const spends = [["Total Energies Ngong Rd", "Fuel & transport", 450000], ["Artcaffe Westgate", "Meals & entertainment", 236000], ["Safaricom airtime", "Airtime & internet", 100000],
+    ["Bolt", "Fuel & transport", 64000], ["Carrefour Junction", "Office & supplies", 187500], ["JKIA parking", "Fuel & transport", 30000]];
+  return Array.from({ length: 17 }, (_, i) => {
+    const [name, phone4] = people[i % people.length];
+    const [merchant, category, amount] = spends[i % spends.length];
+    const day = String(20 + (i % 10)).padStart(2, "0");
+    return { id: `b${i}`, merchant, name, email: `${firstName(name).toLowerCase()}@mwangaza.co.ke`, phone4, spentOn: `2026-10-${day}`, category, amount,
+      description: "", mpesa: `SJ${(48213 + i * 37).toString(36).toUpperCase()}Q`, etims: "none",
+      receipts: [{ kind: "photo", paper: { heading: merchant, label: "RECEIPT", sub: `${Number(day)} Oct 2026`, lines: [["Total", amount / 100]] } }], warnings: [] };
+  });
+}
+
+/* State */
+const state = { role: "admin", scenario: "normal", tab: "waiting", waiting: [], failed: [], shown: PAGE_SIZE, activeId: null, selected: [], loading: true, loadError: false,
+  banners: [], rejecting: null, busy: false, costChanged: false };
+const initials = (name) => name.split(" ").map((s) => s[0]).join("");
+const canAct = () => state.role !== "accountant";
+const canPay = () => state.role === "admin";
+const blockedReason = (c) => c.blocked === "phone" ? "Can't be paid until they confirm their M-Pesa number in the app." : c.blocked === "name" ? "Can't be paid until they add their name in the app." : null;
+const queueItems = () => (state.tab === "waiting" ? state.waiting.slice(0, state.shown) : state.failed);
+const findClaim = (id) => state.waiting.find((c) => c.id === id) ?? state.failed.find((c) => c.id === id);
+
+function reset() {
+  state.role = $("#mock-role").value;
+  state.scenario = $("#mock-scenario").value;
+  state.tab = "waiting";
+  state.waiting = state.scenario === "empty" ? [] : [...baseClaims(), ...(state.scenario === "long" ? busyMonthClaims() : [])];
+  state.failed = state.scenario === "empty" ? [] : failedClaims();
+  state.shown = PAGE_SIZE;
+  state.selected = [];
+  state.banners = [];
+  state.rejecting = null;
+  state.busy = false;
+  state.costChanged = false;
+  state.activeId = state.waiting[0]?.id ?? null;
+  state.loading = true;
+  state.loadError = false;
+  $("#role-label").textContent = state.role === "accountant" ? "Accountant" : "Admin";
+  renderAll();
+  later(() => {
+    state.loading = false;
+    state.loadError = state.scenario === "error";
+    renderAll();
+  }, 600);
+}
+$("#mock-role").addEventListener("change", reset);
+$("#mock-scenario").addEventListener("change", reset);
+
+/* Rendering */
+function renderAll() {
+  renderHeader();
+  renderTabs();
+  renderBanners();
+  renderQueue();
+  renderPane();
+  $("#nav-count").textContent = String(state.waiting.length);
+  $("#nav-count").hidden = state.waiting.length === 0;
+}
+
+function renderHeader() {
+  $("#page-sub").textContent = canAct()
+    ? `Check each receipt, then approve and pay up to ${MAX_CLAIMS} reimbursements with one passkey. Each one is paid on its own.`
+    : "Reimbursements waiting for an admin, and payments that failed. Only admins approve and pay.";
+}
+
+function renderTabs() {
+  const tabs = [{ id: "waiting", label: "Waiting for approval", count: state.waiting.length }];
+  if (state.failed.length > 0) tabs.push({ id: "failed", label: "Payment failed", count: state.failed.length, error: true });
+  if (!tabs.some((t) => t.id === state.tab)) state.tab = "waiting";
+  $("#tabs").replaceChildren(...tabs.map((t) => h("button", {
+    class: "tab", type: "button", role: "tab", "aria-selected": String(state.tab === t.id), id: `tab-${t.id}`, "aria-controls": "queue",
+    onclick: () => { if (state.tab === t.id) return; state.tab = t.id; state.activeId = queueItems()[0]?.id ?? null; state.rejecting = null; renderAll(); },
+  }, t.label, state.loading ? null : h("span", { class: `tab-count num${t.error ? " is-error" : ""}`, text: String(t.count) }))));
+}
+
+function renderBanners() {
+  const nodes = [];
+  if (state.role === "no-passkey") {
+    nodes.push(h("div", { class: "panel panel-flat banner", role: "note" }, icon("key"),
+      h("div", { class: "banner-main" },
+        h("p", { class: "banner-title", text: "Set up your approval passkey first" }),
+        h("p", { text: "Paying needs your approval passkey. Set it up in the Expendi Business app; then confirm here with “use a phone or tablet” in your browser's passkey prompt." }))));
+  }
+  for (const b of state.banners) {
+    nodes.push(h("div", { class: `panel panel-flat banner is-${b.tone}`, role: "status" }, icon(b.tone === "success" ? "check-circle" : "alert"),
+      h("div", { class: "banner-main" }, h("p", { class: "banner-title", text: b.title }), h("p", { text: b.body }), b.reason ? h("p", { text: b.reason }) : null),
+      h("button", { class: "btn btn-outline", type: "button", text: "Done", onclick: () => { state.banners = state.banners.filter((x) => x !== b); renderBanners(); } })));
+  }
+  $("#banners").replaceChildren(...nodes);
+}
+
+function warningBadges(c) {
+  const labels = { near_duplicate: "Possible duplicate", older_than_60_days: "Over 60 days old" };
+  return [...new Set(c.warnings.map((w) => w.code))].map((code) => h("span", { class: "pill pill-warn" }, icon("alert"), labels[code]));
+}
+function claimFlags(c) {
+  const flags = warningBadges(c);
+  if (state.tab === "failed") flags.unshift(h("span", { class: "status is-failed", text: "Payment failed" }));
+  if (blockedReason(c)) flags.push(h("span", { class: "pill pill-neutral" }, icon("lock"), "Can't be paid yet"));
+  if (c.receipts.length === 0) flags.push(h("span", { class: "pill pill-neutral" }, "No receipt"));
+  return flags;
+}
+
+function selectable(c) {
+  return canPay() && state.tab === "waiting" && !blockedReason(c) && !state.busy;
+}
+function toggle(id) {
+  if (state.selected.includes(id)) state.selected = state.selected.filter((x) => x !== id);
+  else if (state.selected.length < MAX_CLAIMS) state.selected = [...state.selected, id];
+  renderQueue();
+  renderPane();
+}
+
+function renderQueue() {
+  const queue = $("#queue");
+  const layout = $("#layout");
+  layout.classList.remove("is-empty");
+  $("#pane").hidden = false;
+  if (state.loading) {
+    queue.replaceChildren(h("div", { class: "queue-head" }, h("div", { class: "skel", style: "width:40%;height:14px" })),
+      ...Array.from({ length: 5 }, () => h("div", { class: "skel-row", "aria-hidden": "true" }, h("div", { class: "skel", style: "width:36px;height:36px;border-radius:999px" }),
+        h("div", {}, h("div", { class: "skel", style: "width:70%;height:14px" }), h("div", { class: "skel", style: "width:50%;height:12px;margin-top:8px" })),
+        h("div", { class: "skel", style: "height:14px" }))));
+    queue.setAttribute("aria-busy", "true");
+    return;
+  }
+  queue.removeAttribute("aria-busy");
+  if (state.loadError) {
+    layout.classList.add("is-empty");
+    $("#pane").hidden = true;
+    queue.replaceChildren(h("div", { class: "queue-error", role: "alert" }, icon("circle-alert"),
+      h("strong", { text: "The reimbursements didn't load" }), h("p", { text: "Check your connection, then try again." }),
+      h("button", { class: "btn btn-outline", type: "button", text: "Try again", onclick: () => { $("#mock-scenario").value = "normal"; reset(); } })));
+    return;
+  }
+  const items = queueItems();
+  if (items.length === 0) {
+    layout.classList.add("is-empty");
+    $("#pane").hidden = true;
+    queue.replaceChildren(h("div", { class: "queue-empty" }, icon("check-circle"), h("strong", { text: "Nothing to approve" }), h("p", { text: "New reimbursements show up here." })));
+    return;
+  }
+
+  const payable = state.waiting.slice(0, state.shown).filter((c) => !blockedReason(c));
+  const totalCents = items.reduce((s, c) => s + c.amount, 0);
+  const head = h("div", { class: "queue-head" });
+  if (canPay() && state.tab === "waiting") {
+    const all = h("input", { type: "checkbox", "aria-label": "Select every reimbursement that can be paid, up to 20", disabled: state.busy || payable.length === 0 });
+    const chosen = payable.filter((c) => state.selected.includes(c.id)).length;
+    all.checked = chosen > 0 && chosen === Math.min(payable.length, MAX_CLAIMS);
+    all.indeterminate = chosen > 0 && !all.checked;
+    all.addEventListener("change", () => {
+      state.selected = all.checked ? payable.slice(0, MAX_CLAIMS).map((c) => c.id) : [];
+      renderQueue();
+      renderPane();
+    });
+    head.append(h("label", { class: "select-all" }, all, h("span", { text: "Select all" })), h("span", { class: "hint" }));
+  } else {
+    head.append(h("span", { class: "hint", text: state.tab === "failed" ? "Paid but didn't arrive. Retry each one." : `${items.length} ${items.length === 1 ? "claim" : "claims"} waiting` }));
+  }
+  head.append(h("span", { class: "sum num" }, `${items.length} · `, h("span", { class: "ccy", text: "KES" }), ` ${kesText(totalCents)}`));
+
+  const list = h("ul", { class: "claims", "aria-label": state.tab === "waiting" ? "Waiting for approval" : "Payment failed" }, items.map((c) => {
+    const checked = state.selected.includes(c.id);
+    const showCheck = canPay() && state.tab === "waiting";
+    const box = showCheck ? h("label", { class: "check", title: blockedReason(c) ?? (!checked && state.selected.length >= MAX_CLAIMS ? "One passkey approves up to 20 reimbursements." : null) },
+      h("input", { type: "checkbox", "aria-label": `Select ${c.merchant}, ${c.name}`, checked, disabled: !selectable(c) || (!checked && state.selected.length >= MAX_CLAIMS), onchange: () => toggle(c.id) })) : null;
+    return h("li", { class: `claim${showCheck ? "" : " no-check"}${c.id === state.activeId ? " is-active" : ""}${checked ? " is-selected" : ""}`, "data-id": c.id },
+      box,
+      h("button", { class: "claim-btn", type: "button", "aria-current": c.id === state.activeId ? "true" : null, onclick: () => focusClaim(c.id, true), onkeydown: rowKeys },
+        h("span", { class: "person", "aria-hidden": "true", text: initials(c.name) }),
+        h("span", { class: "claim-main" },
+          h("span", { class: "claim-name", text: c.merchant }),
+          h("span", { class: "claim-sub", text: `${c.name} · ${dateText(c.spentOn)}` }),
+          h("span", { class: "claim-flags" }, claimFlags(c))),
+        h("span", { class: "claim-amount" }, kes(c.amount))));
+  }));
+
+  const nodes = [head, list];
+  if (state.tab === "waiting" && state.waiting.length > state.shown) {
+    nodes.push(h("div", { class: "queue-foot" }, h("button", { class: "btn btn-outline", type: "button", text: "Load more", onclick: (e) => {
+      e.currentTarget.disabled = true;
+      e.currentTarget.textContent = "Loading…";
+      later(() => { state.shown += PAGE_SIZE; renderQueue(); }, 500);
+    } })));
+  }
+  if (canPay() && state.tab === "waiting") nodes.push(selectionBar());
+  queue.replaceChildren(...nodes);
+}
+
+function selectionBar() {
+  const chosen = state.selected.map(findClaim).filter(Boolean);
+  const total = chosen.reduce((s, c) => s + c.amount, 0);
+  const approve = h("button", { class: "btn btn-primary btn-lg", type: "button", disabled: chosen.length === 0 || state.busy },
+    chosen.length > 0 ? `Approve & pay ${chosen.length}` : "Approve & pay");
+  approve.addEventListener("click", () => prepare({ kind: "approve", ids: chosen.map((c) => c.id) }, approve));
+  return h("div", { class: "selection-bar", "aria-live": "polite" },
+    h("div", { class: "what" },
+      h("p", {}, chosen.length === 0 ? "Select reimbursements to approve and pay." : [h("strong", { class: "num", text: `${chosen.length} selected` }), " · ", kes(total), " to pay back"]),
+      chosen.length > 0 ? h("button", { class: "text-link clear", type: "button", text: "Clear selection", onclick: () => { state.selected = []; renderQueue(); renderPane(); } }) : null),
+    approve,
+    chosen.length >= MAX_CLAIMS ? h("p", { class: "limit", text: "20 selected, the most one passkey approves. Pay these, then select the rest." }) : null);
+}
+
+function rowKeys(event) {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  event.preventDefault();
+  const buttons = [...document.querySelectorAll("#queue .claim-btn")];
+  const at = buttons.indexOf(event.currentTarget);
+  const next = buttons[at + (event.key === "ArrowDown" ? 1 : -1)];
+  if (!next) return;
+  next.focus();
+  focusClaim(next.closest(".claim").dataset.id, false);
+}
+
+function focusClaim(id, fromClick) {
+  state.activeId = id;
+  state.rejecting = null;
+  document.querySelectorAll("#queue .claim").forEach((li) => {
+    li.classList.toggle("is-active", li.dataset.id === id);
+    li.querySelector(".claim-btn").setAttribute("aria-current", li.dataset.id === id ? "true" : "false");
+  });
+  if (matchMedia("(max-width: 1023px)").matches && fromClick) {
+    openSheet(() => detailSheet(findClaim(id)));
+    return;
+  }
+  renderPane(true);
+}
+
+/* Claim detail (pane on desktop, side panel on narrow screens) */
+function receiptViewer(c) {
+  if (c.receipts.length === 0) {
+    return h("div", { class: "no-receipt" }, icon("image-off"), h("p", { text: "No receipt attached." }));
+  }
+  return h("div", { class: "receipts" }, c.receipts.map((r) => {
+    const caption = { photo: "Photo", screenshot: "Screenshot", pdf: "PDF", sms_text: "M-Pesa SMS" }[r.kind];
+    let stage;
+    if (r.kind === "sms_text") stage = h("pre", { class: "sms", style: "font-family:inherit;margin:0" }, r.text);
+    else {
+      const total = r.paper.lines.reduce((s, [, a]) => s + a, 0);
+      stage = h("div", { class: `paper${r.kind === "pdf" ? " is-pdf" : r.kind === "screenshot" ? " is-screen" : ""}`, role: "img", "aria-label": `Receipt ${caption.toLowerCase()}: ${r.paper.heading}, total KES ${total.toLocaleString("en-KE")}` },
+        h("div", { class: "paper-head" }, h("span", { text: r.paper.heading }), h("span", { text: r.paper.label })),
+        h("p", { class: "paper-sub", text: r.paper.sub }),
+        r.paper.lines.map(([label, amount]) => h("div", { class: "paper-line num" }, h("span", { text: label }), h("span", { text: amount.toLocaleString("en-KE", { minimumFractionDigits: amount % 1 ? 2 : 0 }) }))),
+        h("div", { class: "paper-total num" }, h("span", { text: "Total" }), h("span", { text: `KES ${total.toLocaleString("en-KE", { minimumFractionDigits: total % 1 ? 2 : 0 })}` })));
+    }
+    return h("figure", { class: "viewer" }, h("div", { class: "viewer-stage" }, stage),
+      h("figcaption", { class: "viewer-bar" }, h("span", { text: caption }),
+        r.kind === "sms_text" ? null : h("button", { class: "text-link", type: "button", "data-mock": "Opening the receipt file" }, "Open", icon("external"))));
+  }));
+}
+
+function claimInfo(c) {
+  const blocked = blockedReason(c);
+  const etimsLabel = { attached: "Attached", not_required: "Not required", none: "None" }[c.etims];
+  const warnings = c.warnings.map((w) => w.code === "near_duplicate"
+    ? `The same person submitted KES ${kesText(w.amount)} on ${dateText(w.spentOn)} too.`
+    : `Paid on ${dateText(w.spentOn)}, ${w.ageDays} days before it was recorded.`);
+  return h("div", { class: "pane-info" },
+    c.failure ? h("div", { class: "callout callout-error" }, icon("circle-alert"), h("div", {}, h("p", { class: "callout-title", text: "Payment failed" }), h("p", { text: c.failure }))) : null,
+    warnings.length ? h("div", { class: "callout callout-warn" }, icon("alert"), h("div", {}, h("p", { class: "callout-title", text: "Check before approving" }), h("ul", {}, warnings.map((t) => h("li", { text: t }))))) : null,
+    blocked ? h("div", { class: "callout callout-neutral" }, icon("lock"), h("p", { text: blocked })) : null,
+    c.description ? h("p", { class: "description", text: c.description }) : null,
+    h("dl", { class: "details" },
+      h("div", {}, h("dt", { text: "Spent on" }), h("dd", { class: "num", text: dateText(c.spentOn) })),
+      h("div", {}, h("dt", { text: "Category" }), h("dd", { text: c.category })),
+      h("div", {}, h("dt", { text: "M-Pesa code" }), h("dd", { class: "num", text: c.mpesa ?? "None" })),
+      h("div", {}, h("dt", { text: "eTIMS" }), h("dd", {}, etimsLabel, c.invoice ? h("span", { class: "sub num", text: `Invoice ${c.invoice}` }) : null))));
+}
+
+function rejectForm(c, onDone) {
+  const text = h("textarea", { id: `reason-${c.id}`, maxlength: String(REASON_MAX), rows: "3", "aria-describedby": `reason-${c.id}-meta` });
+  const counter = h("span", { class: "num", text: `0/${REASON_MAX}` });
+  const error = h("p", { class: "field-error", role: "alert", hidden: true }, icon("circle-alert"), h("span"));
+  const submit = h("button", { class: "btn btn-primary", type: "submit", text: "Reject reimbursement" });
+  const cancel = h("button", { class: "btn btn-outline", type: "button", text: "Cancel", onclick: () => { state.rejecting = null; onDone(false); } });
+  text.addEventListener("input", () => { counter.textContent = `${text.value.length}/${REASON_MAX}`; error.hidden = true; text.removeAttribute("aria-invalid"); });
+  const form = h("form", { class: "reject-form", "aria-label": `Reject ${c.merchant}` },
+    h("label", { for: `reason-${c.id}`, text: "Why are you rejecting it? They'll see this." }), text,
+    h("div", { class: "reject-meta", id: `reason-${c.id}-meta` }, h("span", { text: `${firstName(c.name)} gets this in the app.` }), counter),
+    error, h("div", { class: "reject-buttons" }, submit, cancel));
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const reason = text.value.trim();
+    if (reason.length < REASON_MIN) {
+      error.lastChild.textContent = "Say why in a few words, so they know what to fix.";
+      error.hidden = false;
+      text.setAttribute("aria-invalid", "true");
+      text.focus();
+      return;
+    }
+    submit.disabled = true;
+    cancel.disabled = true;
+    submit.textContent = "Rejecting…";
+    later(() => {
+      state.rejecting = null;
+      removeClaims([c.id], "waiting");
+      toast(`Rejected. ${firstName(c.name)} will see why.`);
+      onDone(true);
+    }, 700);
+  });
+  later(() => text.focus(), 50);
+  return form;
+}
+
+function paneActions(c, context) {
+  const bar = h("div", { class: "pane-actions" });
+  if (!canAct()) {
+    bar.append(h("p", { class: "read-only" }, icon("eye"), "View only. Admins approve and pay."));
+    return bar;
+  }
+  if (state.rejecting === c.id) {
+    bar.append(rejectForm(c, () => context.refresh()));
+    return bar;
+  }
+  if (state.tab === "failed" || c.failure) {
+    if (canPay()) {
+      const retry = h("button", { class: "btn btn-primary btn-lg", type: "button", disabled: state.busy }, icon("rotate"), "Retry payment");
+      retry.addEventListener("click", () => prepare({ kind: "retry", ids: [c.id] }, retry));
+      bar.append(retry);
+    } else bar.append(h("p", { class: "read-only" }, icon("key"), "Retrying needs your approval passkey."));
+    return bar;
+  }
+  const blocked = blockedReason(c);
+  if (canPay()) {
+    const approve = h("button", { class: "btn btn-primary btn-lg", type: "button", disabled: Boolean(blocked) || state.busy }, icon("check"), "Approve & pay");
+    approve.addEventListener("click", () => prepare({ kind: "approve", ids: [c.id] }, approve));
+    bar.append(approve);
+  }
+  bar.append(h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Reject", disabled: state.busy, onclick: () => { state.rejecting = c.id; context.refresh(); } }));
+  if (canPay() && !blocked) {
+    const checked = state.selected.includes(c.id);
+    const box = h("input", { type: "checkbox", checked, disabled: state.busy || (!checked && state.selected.length >= MAX_CLAIMS), onchange: () => { toggle(c.id); context.refresh(); } });
+    bar.append(h("span", { class: "spacer" }), h("label", { class: "pane-select" }, box, "Add to selection"));
+  }
+  return bar;
+}
+
+function detailBody(c) {
+  return [
+    h("div", { class: "pane-head" },
+      h("span", { class: "person", "aria-hidden": "true", text: initials(c.name) }),
+      h("div", { class: "pane-head-main" }, h("h2", { class: "pane-merchant", id: "pane-title", text: c.merchant }), h("p", { class: "pane-who" }, `${c.name} · `, h("span", { text: c.email }))),
+      h("div", { class: "pane-amount" }, h("p", { class: "big" }, kes(c.amount)), h("div", { class: "status" }, state.tab === "failed" ? h("span", { class: "status is-failed", text: "Payment failed" }) : h("span", { class: "status is-waiting", text: "Waiting for approval" })))),
+    h("div", { class: "pane-grid" }, claimInfo(c), receiptViewer(c)),
+  ];
+}
+
+function renderPane(fade = false) {
+  const pane = $("#pane");
+  if (state.loading) {
+    pane.replaceChildren(h("div", { class: "pane-scroll", "aria-busy": "true" },
+      h("div", { class: "skel", style: "width:45%;height:20px" }), h("div", { class: "skel", style: "width:30%;height:14px;margin-top:8px" }),
+      h("div", { class: "skel", style: "height:340px;margin-top:24px" })));
+    return;
+  }
+  const c = findClaim(state.activeId) ?? queueItems()[0];
+  if (!c) return;
+  state.activeId = c.id;
+  const context = { refresh: () => renderPane() };
+  pane.replaceChildren(h("div", { class: `pane-scroll${fade ? " pane-fade" : ""}` }, detailBody(c)), paneActions(c, context));
+}
+
+/* Side panels */
+const layer = $("#sheet-layer");
+const sheet = $("#sheet");
+let returnFocus = null;
+function openSheet(build) {
+  returnFocus = document.activeElement;
+  layer.hidden = false;
+  sheet.replaceChildren(...build());
+  sheet.focus();
+}
+function setSheet(nodes) { sheet.replaceChildren(...nodes); }
+function closeSheet() {
+  layer.hidden = true;
+  if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+}
+layer.addEventListener("click", (event) => { if (event.target.matches("[data-close]") && !state.paying) closeSheet(); });
+document.addEventListener("keydown", (event) => {
+  if (layer.hidden) return;
+  if (event.key === "Escape" && !state.paying) return closeSheet();
+  if (event.key !== "Tab") return;
+  const focusable = [...sheet.querySelectorAll("button:not(:disabled), input, textarea, summary")];
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === sheet)) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+});
+const closeButton = () => h("button", { class: "icon-btn", type: "button", "aria-label": "Close", onclick: () => { if (!state.paying) closeSheet(); } }, icon("x"));
+function sheetHead(eyebrow, title) {
+  return h("div", { class: "sheet-head" }, h("div", { class: "sheet-head-main" }, h("p", { class: "eyebrow", text: eyebrow }), h("h2", { class: "sheet-title", id: "sheet-title", text: title })), closeButton());
+}
+
+function detailSheet(c) {
+  const context = { refresh: () => setSheet(detailSheet(findClaim(c.id) ?? c)) };
+  if (!findClaim(c.id)) { closeSheet(); return []; }
+  const body = h("div", { class: "sheet-body is-detail" }, h("div", { class: "pane-scroll" }, detailBody(c)));
+  return [sheetHead(state.tab === "failed" ? "Payment failed" : "Claim", c.merchant), body, paneActions(c, { refresh: () => { if (findClaim(c.id)) context.refresh(); else closeSheet(); } })];
+}
+
+/* Approve & pay */
+const RATE = 129;
+const WALLET = { normal: 16420.8, short: 18.4 };
+function preview(c, rate) {
+  const receivesCents = Math.ceil(c.amount / 100) * 100;
+  const usdcAmount = Math.round((receivesCents / 100 / rate) * 100) / 100;
+  const fee = Math.max(0.1, Math.ceil(usdcAmount * 0.01 * 100) / 100);
+  return { c, receivesCents, rounded: receivesCents !== c.amount, usdc: usdcAmount, fee, total: Math.round((usdcAmount + fee) * 100) / 100 };
+}
+function prepare(request, button) {
+  const original = [...button.childNodes];
+  button.disabled = true;
+  button.replaceChildren("Working out the cost…");
+  state.busy = true;
+  later(() => {
+    state.busy = false;
+    button.disabled = false;
+    button.replaceChildren(...original);
+    state.costChanged = false;
+    openSheet(() => review(request, RATE));
+  }, 700);
+}
+
+function review(request, rate, notice = null) {
+  const claims = request.ids.map(findClaim).filter(Boolean);
+  const previews = claims.map((c) => preview(c, rate));
+  const receives = previews.reduce((s, p) => s + p.receivesCents, 0);
+  const maxDebit = Math.round(previews.reduce((s, p) => s + p.total, 0) * 100) / 100;
+  const available = state.scenario === "short" ? WALLET.short : WALLET.normal;
+  const topUpCents = maxDebit > available ? Math.ceil((maxDebit - available) * rate) * 100 : null;
+  const isRetry = request.kind === "retry";
+  const changed = rate !== RATE;
+  const mark = (node) => (changed ? h("span", { class: "changed" }, node) : node);
+
+  const pay = h("button", { class: "btn btn-primary btn-lg", type: "button", disabled: topUpCents !== null }, icon("key"), "Pay with passkey");
+  const cancel = h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Cancel", onclick: closeSheet });
+  pay.addEventListener("click", () => confirmPayment(request, rate, previews, pay, cancel));
+
+  return [
+    sheetHead(isRetry ? "Payment failed" : "Approvals", isRetry ? "Retry the payment" : `Approve & pay ${claims.length} ${claims.length === 1 ? "reimbursement" : "reimbursements"}`),
+    h("div", { class: "sheet-body" },
+      notice,
+      h("div", { class: "previews" }, previews.map((p) => h("details", { class: "preview", open: previews.length <= 3 },
+        h("summary", {},
+          h("span", { class: "person", "aria-hidden": "true", text: initials(p.c.name) }),
+          h("span", { style: "min-width:0" }, h("span", { class: "p-name", text: p.c.name, style: "display:block" }), h("span", { class: "p-sub", text: p.c.merchant, style: "display:block" })),
+          h("span", { class: "p-amount" }, kes(p.receivesCents)),
+          h("span", { class: "chev" }, icon("chevron-down"))),
+        h("dl", { class: "details" },
+          h("div", {}, h("dt", { text: "They receive" }), h("dd", {}, kes(p.receivesCents))),
+          p.rounded ? h("div", {}, h("dt", { text: "Claimed" }), h("dd", {}, kes(p.c.amount), ", rounded up to a whole shilling for M-Pesa")) : null,
+          h("div", {}, h("dt", { text: "Paid to" }), h("dd", { class: "num", text: `${p.c.name}, M-Pesa ending ${p.c.phone4}` })),
+          h("div", {}, h("dt", { text: "USDC" }), h("dd", {}, mark(usdc(p.usdc)))),
+          h("div", {}, h("dt", { text: "Paycrest fee, at most" }), h("dd", {}, mark(usdc(p.fee)))),
+          h("div", {}, h("dt", { text: "Total, at most" }), h("dd", {}, mark(usdc(p.total)))))))),
+      h("dl", { class: "totals" },
+        h("div", {}, h("dt", { text: "They receive, in total" }), h("dd", {}, kes(receives))),
+        h("div", {}, h("dt", { text: "Total, at most" }), h("dd", {}, mark(usdc(maxDebit)))),
+        h("div", {}, h("dt", { text: "In the wallet" }), h("dd", {}, usdc(available)))),
+      h("p", { class: "note" }, icon("info"), "Paycrest states its exact fee when each payment is made. What isn't used stays in the wallet. Each one is paid on its own."),
+      topUpCents !== null
+        ? h("div", { class: "callout callout-warn" }, icon("alert"), h("div", {},
+            h("p", { class: "callout-title" }, "Top up ", kes(topUpCents)),
+            h("p", {}, "The wallet doesn't hold enough USDC for this. Add funds, then review it again. ", h("a", { class: "text-link", href: "wallet.html", text: "Go to Accounts" }))))
+        : h("p", { class: "note" }, icon("key"), "Your browser asks for your approval passkey. To use the one on your phone, choose “use a phone or tablet”."),
+      h("p", { class: "note", id: "pay-outcome", hidden: true })),
+    h("div", { class: "sheet-foot" }, pay, cancel),
+  ];
+}
+
+function confirmPayment(request, rate, previews, pay, cancel) {
+  state.paying = true;
+  pay.disabled = true;
+  cancel.disabled = true;
+  pay.replaceChildren("Waiting for your passkey…");
+  later(() => {
+    state.paying = false;
+    if (state.scenario === "cancel") {
+      pay.disabled = false;
+      cancel.disabled = false;
+      pay.replaceChildren(icon("key"), "Pay with passkey");
+      const outcome = $("#pay-outcome");
+      outcome.replaceChildren(icon("info"), "Cancelled. Nothing was sent.");
+      outcome.hidden = false;
+      return;
+    }
+    if (state.scenario === "cost" && !state.costChanged) {
+      state.costChanged = true;
+      setSheet(review(request, 131.4, h("div", { class: "callout callout-warn", role: "alert" }, icon("alert"),
+        h("p", { text: "The cost changed since you reviewed it. Nothing was sent. Review it again." }))));
+      return;
+    }
+    finishPayment(request, previews);
+  }, 1400);
+}
+
+function finishPayment(request, previews) {
+  const ids = previews.map((p) => p.c.id);
+  const isRetry = request.kind === "retry";
+  let banner;
+  if (state.scenario === "one-fails" && !isRetry) {
+    const failedClaim = previews[0].c;
+    const reason = "The M-Pesa number didn't accept the payment.";
+    banner = { tone: "warn", title: "A payment failed", body: "No money reached M-Pesa for it, and the USDC stays in or returns to the wallet. You can retry it under Payment failed.", reason };
+    removeClaims(ids, "waiting");
+    state.failed = [{ ...failedClaim, failure: reason }, ...state.failed];
+  } else if (state.scenario === "review") {
+    banner = { tone: "warn", title: "Expendi is checking a payment", body: "Its outcome isn't clear yet. Don't pay it again: Expendi will settle it." };
+    removeClaims(ids, isRetry ? "failed" : "waiting");
+  } else {
+    banner = { tone: "success", title: "Payments sent", body: previews.length === 1 ? "It usually reaches M-Pesa within a minute or two." : "They usually reach M-Pesa within a minute or two." };
+    removeClaims(ids, isRetry ? "failed" : "waiting");
+  }
+  state.banners = [banner];
+  closeSheet();
+  renderAll();
+  $("#banners .banner:last-child button")?.focus({ preventScroll: false });
+}
+
+function removeClaims(ids, from) {
+  state[from] = state[from].filter((c) => !ids.includes(c.id));
+  state.selected = state.selected.filter((id) => !ids.includes(id));
+  if (!findClaim(state.activeId) || !queueItems().some((c) => c.id === state.activeId)) {
+    if (state.tab === "failed" && state.failed.length === 0) state.tab = "waiting";
+    state.activeId = queueItems()[0]?.id ?? null;
+  }
+  renderAll();
+}
+
+/* Mobile navigation */
+const sidebar = $("#sidebar");
+const scrim = $("#scrim");
+const menuBtn = $("#menu-btn");
+function setNav(open) {
+  sidebar.classList.toggle("is-open", open);
+  scrim.hidden = !open;
+  menuBtn.setAttribute("aria-expanded", String(open));
+  if (open) sidebar.querySelector(".sb-link")?.focus();
+}
+menuBtn.addEventListener("click", () => setNav(true));
+scrim.addEventListener("click", () => setNav(false));
+document.addEventListener("keydown", (event) => { if (event.key === "Escape" && sidebar.classList.contains("is-open")) { setNav(false); menuBtn.focus(); } });
+
+reset();
+</script>
+</body>
+</html>
