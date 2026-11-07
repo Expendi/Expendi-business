@@ -1,26 +1,40 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { MenuIcon } from "lucide-react";
+import Image from "next/image";
 
-import { Separator } from "~/components/ui/separator";
-import { SidebarTrigger } from "~/components/ui/sidebar";
-import { NAV_ITEMS } from "~/config/navigation";
+import { IconButton } from "~/components/data/actions";
 
-export function SiteHeader() {
-  const pathname = usePathname();
-  const current = NAV_ITEMS.find(
-    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
-  );
+/** The phone and tablet top bar: the menu button, the mark and the company. Hidden from 900px. */
+export function SiteHeader({
+  companyName,
+  navOpen,
+  onOpenNav,
+}: {
+  companyName: string;
+  navOpen: boolean;
+  onOpenNav: () => void;
+}) {
   return (
-    <header className="flex h-16 min-w-0 shrink-0 items-center gap-2 border-b bg-card px-4 sm:px-6 lg:px-8">
-      <SidebarTrigger />
-      <Separator
-        orientation="vertical"
-        className="mx-2 data-[orientation=vertical]:h-4"
+    <header className="sticky top-0 z-30 flex h-14 min-w-0 shrink-0 items-center gap-2.5 border-b border-gray-200 bg-surface px-3 min-[900px]:hidden">
+      <IconButton
+        label="Open navigation"
+        aria-expanded={navOpen}
+        aria-haspopup="dialog"
+        onClick={onOpenNav}
+      >
+        <MenuIcon aria-hidden="true" />
+      </IconButton>
+      <Image
+        src="/expendi-mark.png"
+        alt=""
+        width={28}
+        height={28}
+        className="size-7 shrink-0 rounded-control"
       />
-      <p className="truncate text-sm font-medium">
-        {current?.title ?? "Expendi Business"}
-      </p>
+      <span className="min-w-0 truncate text-base font-(--w-name) text-gray-900">
+        {companyName}
+      </span>
     </header>
   );
 }

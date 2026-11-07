@@ -13,6 +13,7 @@ import {
   REMINDER_DAYS_DEFAULT,
 } from "@expendi-business/shared";
 
+import type { StatusTone } from "~/components/data/status-badge";
 import {
   currencyOfPayee,
   parseTyped,
@@ -43,11 +44,11 @@ export interface RecurringDraft {
 
 export const STATE_LABELS: Record<
   RecurringItemState,
-  { label: string; tone: "neutral" | "success" | "warning" }
+  { label: string; tone: StatusTone }
 > = {
-  active: { label: "Active", tone: "success" },
-  paused: { label: "Paused", tone: "warning" },
-  ended: { label: "Ended", tone: "neutral" },
+  active: { label: "Active", tone: "paid" },
+  paused: { label: "Paused", tone: "waiting" },
+  ended: { label: "Ended", tone: "rejected" },
 };
 
 /** ISO weekday of a `YYYY-MM-DD` date, 1 for Monday to 7 for Sunday. */
@@ -171,4 +172,84 @@ export function scheduleInWords(
   item: Pick<RecurringItem, "schedule" | "scheduleDay" | "startsOn">,
 ): string {
   return describeSchedule(item.schedule, item.scheduleDay, item.startsOn);
+}
+
+const STATE_ORDER: Readonly<Record<RecurringItemState, number>> = {
+  active: 0,
+  paused: 1,
+  ended: 2,
+};
+
+/** Active, then paused, then ended; within each, the soonest due first, then by payee. */
+export function sortRecurringItems(
+  items: readonly RecurringItem[],
+): RecurringItem[] {
+  const dueKey = (item: RecurringItem) => nextDueDate(item) ?? "9999-12-31";
+  return [...items].sort(
+    (a, b) =>
+      STATE_ORDER[a.state] - STATE_ORDER[b.state] ||
+      dueKey(a).localeCompare(dueKey(b)) ||
+      a.payee.name.localeCompare(b.payee.name),
+  );
+}
+
+export function reminderInWords(days: number): string {
+  if (days === 0) return "On the due date";
+  return `${String(days)} ${days === 1 ? "day" : "days"} before it’s due`;
+}
+
+const DAY_MS = 86_400_000;
+const MONTHS_APART: Readonly<
+  Record<Exclude<RecurringSchedule, "weekly">, number>
+> = { monthly: 1, quarterly: 3, yearly: 12 };
+
+function toUtc(isoDate: string): Date {
+  const [year = 0, month = 1, day = 1] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+const toIso = (date: Date): string => date.toISOString().slice(0, 10);
+
+function monthNumber(isoDate: string): number {
+  const date = toUtc(isoDate);
+  return date.getUTCFullYear() * 12 + date.getUTCMonth();
+}
+
+function dayOfMonth(month: number, day: number): string {
+  const year = Math.floor(month / 12);
+  const monthOfYear = month % 12;
+  const lastDay = new Date(Date.UTC(year, monthOfYear + 1, 0)).getUTCDate();
+  return toIso(new Date(Date.UTC(year, monthOfYear, Math.min(day, lastDay))));
+}
+
+/**
+ * The first bill's due date, as the API works it out
+ * (`apps/api/src/services/recurring/schedule.ts`): the first day the
+ * schedule falls on from `startsOn`; null when that's past `endsOn`.
+ */
+export function firstDueOn({
+  schedule,
+  scheduleDay,
+  startsOn,
+  endsOn,
+}: {
+  schedule: RecurringSchedule;
+  scheduleDay: number;
+  startsOn: string;
+  endsOn: string | null;
+}): string | null {
+  let due: string;
+  if (schedule === "weekly") {
+    const start = toUtc(startsOn);
+    const ahead = (scheduleDay - isoWeekday(startsOn) + 7) % 7;
+    due = toIso(new Date(start.getTime() + ahead * DAY_MS));
+  } else {
+    const first = monthNumber(startsOn);
+    const inStartMonth = dayOfMonth(first, scheduleDay);
+    due =
+      inStartMonth >= startsOn
+        ? inStartMonth
+        : dayOfMonth(first + MONTHS_APART[schedule], scheduleDay);
+  }
+  return endsOn !== null && endsOn !== "" && due > endsOn ? null : due;
 }

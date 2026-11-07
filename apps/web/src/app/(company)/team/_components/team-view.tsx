@@ -1,54 +1,118 @@
 "use client";
 
-import type { FormEvent, JSX } from "react";
+import type { JSX } from "react";
+import { cn } from "cn";
+import {
+  CircleCheckIcon,
+  FilterXIcon,
+  MailIcon,
+  SmartphoneIcon,
+  TriangleAlertIcon,
+  UserIcon,
+  UserPlusIcon,
+  UserRoundIcon,
+  UsersIcon,
+} from "lucide-react";
 import { useState } from "react";
 
-import type {
-  AssignableRole,
-  InviteMemberResponse,
-  Member,
-  MembershipRole,
-} from "@expendi-business/shared";
-import {
-  ASSIGNABLE_ROLES,
-  inviteMemberRequestSchema,
-  MEMBER_NAME_MAX_LENGTH,
-  MEMBERSHIP_ROLES,
-  WEB_DASHBOARD_URL,
-} from "@expendi-business/shared";
+import type { InviteMemberResponse, Member } from "@expendi-business/shared";
+import { MEMBERSHIP_ROLES } from "@expendi-business/shared";
 
+import type { TeamSortKey, TeamView as View } from "./team-display";
+import type { KindTab } from "~/components/data/kind-tabs";
+import type { SortState } from "~/components/data/table";
+import { Banners } from "~/components/data/banner";
+import { FilterChip } from "~/components/data/filter-chip";
+import { KindTabs } from "~/components/data/kind-tabs";
+import { PageHeader } from "~/components/data/page-header";
 import {
-  alertClass,
-  cellClass,
-  headCellClass,
-  inputClass,
-  primaryButton,
-  secondaryButton,
-  tableClass,
-  textButton,
-} from "~/components/styles";
+  ResultsBody,
+  ResultsHead,
+  ResultsPanel,
+} from "~/components/data/results";
+import {
+  StatCard,
+  StatCards,
+  StatCardSkeleton,
+} from "~/components/data/stat-cards";
+import { EmptyState, ErrorState, Skel } from "~/components/data/states";
+import {
+  DataRow,
+  DataTable,
+  EntityMark,
+  Mini,
+  nextSort,
+  PhoneCard,
+  PhoneCards,
+  RowMeta,
+  RowTitle,
+  SortHeader,
+  Td,
+  Th,
+} from "~/components/data/table";
+import { useDeepLinkParams } from "~/components/data/use-deep-link-param";
+import { Button } from "~/components/ui/button";
 import { ROLE_LABELS } from "~/config/roles";
 import { useDashboard } from "~/contexts/dashboard-context";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiDateTime } from "~/lib/nairobi-time";
 import {
-  useChangeMemberRole,
-  useInviteMember,
-  useMembers,
-  useRemoveMember,
-} from "./team-api";
+  InviteBanner,
+  InviteSheet,
+  MemberSheet,
+  MemberStatusBadge,
+} from "./member-sheet";
+import { useMembers, useMyMembershipId } from "./team-api";
+import {
+  DEFAULT_TEAM_SORT,
+  matchesFilters,
+  nameOf,
+  PAYOUT_LABELS,
+  PAYOUT_STATES,
+  payoutOf,
+  readTeamFilters,
+  sortMembers,
+  TEAM_VIEWS,
+  teamStats,
+} from "./team-display";
 
-/** What each role can do (spec §4), as the app words it. */
-const ROLE_DESCRIPTIONS: Record<MembershipRole, string> = {
-  admin: "Approves and pays claims, and manages the wallet and team.",
-  employee: "Submits their own claims in the app and gets paid to M-Pesa.",
-  accountant:
-    "View-only access to this dashboard, plus monthly exports by email.",
+type TeamParam = "view" | "memberRole" | "mpesa" | "memberId";
+
+const ROLE_OPTIONS = MEMBERSHIP_ROLES.map((role) => ({
+  value: role,
+  label: ROLE_LABELS[role],
+}));
+
+const PAYOUT_OPTIONS = PAYOUT_STATES.map((state) => ({
+  value: state,
+  label: PAYOUT_LABELS[state],
+}));
+
+const EMPTY: Record<View, { title: string; text: string }> = {
+  all: {
+    title: "No one here yet",
+    text: "Invite admins, employees and accountants.",
+  },
+  active: {
+    title: "No one active yet",
+    text: "People show here once they first sign in.",
+  },
+  invited: {
+    title: "No open invites",
+    text: "People you invite show here until they first sign in.",
+  },
+};
+
+const CAPTIONS: Record<View, string> = {
+  all: "Everyone in the company",
+  active: "Active people",
+  invited: "Open invites",
 };
 
 /**
  * The company's people (spec §6.2, §6.14): admins invite, change roles and
- * remove, accountants included; accountants see the list.
+ * remove, accountants included; accountants see the list. The tab, the
+ * filters and the open person live in the URL.
  */
 export function TeamView(): JSX.Element {
   const { company, canAct } = useDashboard();
@@ -69,402 +133,433 @@ function CompanyTeam({
   canAct: boolean;
 }): JSX.Element {
   const members = useMembers(organizationId);
+  const myId = useMyMembershipId(organizationId);
+  const [param, setParams] = useDeepLinkParams<TeamParam>();
+  const filters = readTeamFilters(param);
+  const openId = param("memberId");
+  const [sort, setSort] = useState<SortState<TeamSortKey>>(DEFAULT_TEAM_SORT);
+  const [inviting, setInviting] = useState(false);
+  const [invited, setInvited] = useState<InviteMemberResponse | null>(null);
 
-  return (
-    <section className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Team</h1>
-        <p className="mt-1 text-sm text-stone-600">
-          {canAct
-            ? "Invite admins, employees and accountants. Removing someone ends their access; their unpaid claims can still be paid."
-            : "Everyone in the company and their role. Only admins change the team."}
-        </p>
-      </div>
-
-      {canAct ? <InviteForm organizationId={organizationId} /> : null}
-
-      {members.isPending ? (
-        <p className="text-sm text-stone-500">Loading the team…</p>
-      ) : members.isError ? (
-        <div className="text-sm text-error-700" role="alert">
-          <p>{describeApiError(members.error)}</p>
-          <button
-            type="button"
-            onClick={() => void members.refetch()}
-            className={`mt-2 ${secondaryButton}`}
-          >
-            Try again
-          </button>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-          <table className={tableClass}>
-            <thead className="bg-stone-100 text-stone-600">
-              <tr>
-                <th scope="col" className={headCellClass}>
-                  Person
-                </th>
-                <th scope="col" className={headCellClass}>
-                  Role
-                </th>
-                <th scope="col" className={headCellClass}>
-                  Status
-                </th>
-                <th scope="col" className={headCellClass}>
-                  M-Pesa number
-                </th>
-                {canAct ? (
-                  <th scope="col" className={headCellClass}>
-                    <span className="sr-only">Actions</span>
-                  </th>
-                ) : null}
-              </tr>
-            </thead>
-            <tbody>
-              {members.data.map((member) => (
-                <MemberRow
-                  key={member.id}
-                  organizationId={organizationId}
-                  member={member}
-                  canAct={canAct}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+  const everyone = members.data ?? [];
+  const rows = sortMembers(
+    everyone.filter((member) => matchesFilters(member, filters)),
+    sort,
   );
-}
+  const ids = rows.map((member) => member.id);
+  const openIndex = openId ? ids.indexOf(openId) : -1;
+  const openMember = everyone.find((member) => member.id === openId);
+  const anyChip = filters.role !== null || filters.mpesa !== null;
+  const justMe = everyone.length === 1 && everyone[0]?.id === myId && !anyChip;
+  const open = (id: string) => setParams({ memberId: id });
+  const clearChips = () => setParams({ memberRole: null, mpesa: null });
+  const onSort = (key: TeamSortKey) => setSort(nextSort(sort, key, "asc"));
 
-function InviteForm({
-  organizationId,
-}: {
-  organizationId: string;
-}): JSX.Element {
-  const invite = useInviteMember(organizationId);
-  const [error, setError] = useState<string | null>(null);
-  const [role, setRole] = useState<MembershipRole>("employee");
+  const inTabs = everyone.filter((member) =>
+    matchesFilters(member, filters, true),
+  );
+  const tabs: readonly KindTab<View>[] = TEAM_VIEWS.map((tab) => ({
+    ...tab,
+    count: members.isSuccess
+      ? tab.value === "all"
+        ? inTabs.length
+        : inTabs.filter((member) => member.status === tab.value).length
+      : undefined,
+  }));
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const values = new FormData(form);
-    const parsed = inviteMemberRequestSchema.safeParse({
-      email: values.get("email"),
-      fullName: values.get("fullName"),
-      role,
-    });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Check the details.");
-      return;
-    }
-    setError(null);
-    invite.mutate(parsed.data, {
-      onSuccess: () => {
-        form.reset();
-        setRole("employee");
-      },
-    });
+  function openInvite() {
+    setParams({ memberId: null });
+    setInviting(true);
   }
 
+  const inviteButton = (
+    <Button size="md" aria-haspopup="dialog" onClick={openInvite}>
+      <UserPlusIcon aria-hidden="true" />
+      Invite someone
+    </Button>
+  );
+
   return (
-    <section aria-labelledby="invite-heading" className="space-y-3">
-      <h2 id="invite-heading" className="text-base font-semibold">
-        Invite someone
-      </h2>
-      <form
-        onSubmit={onSubmit}
-        aria-label="Invite someone"
-        className="grid max-w-4xl gap-4 rounded-lg border border-stone-200 bg-white p-4 sm:grid-cols-3"
-      >
-        <label className="text-sm">
-          Email
-          <input
-            name="email"
-            type="email"
-            autoComplete="off"
-            className={inputClass}
-          />
-        </label>
-        <label className="text-sm">
-          Full name
-          <input
-            name="fullName"
-            maxLength={MEMBER_NAME_MAX_LENGTH}
-            autoComplete="off"
-            className={inputClass}
-          />
-        </label>
-        <label className="text-sm">
-          Role
-          <select
-            name="role"
-            value={role}
-            onChange={(event) => {
-              const next = MEMBERSHIP_ROLES.find(
-                (candidate) => candidate === event.target.value,
-              );
-              if (next) setRole(next);
-            }}
-            className={inputClass}
-          >
-            {MEMBERSHIP_ROLES.map((option) => (
-              <option key={option} value={option}>
-                {ROLE_LABELS[option]}
-              </option>
-            ))}
-          </select>
-          <span className="mt-1 block text-stone-600">
-            {ROLE_DESCRIPTIONS[role]}
-          </span>
-        </label>
-        {error ? (
-          <p className={`${alertClass} sm:col-span-3`} role="alert">
-            {error}
-          </p>
+    <section>
+      <PageHeader
+        title="Team"
+        subtitle={
+          canAct
+            ? "Invite admins, employees and accountants. Removing someone ends their access; their unpaid reimbursements can still be paid."
+            : "Everyone in the company and their role. Only admins change the team."
+        }
+        actions={canAct && !members.isError ? inviteButton : null}
+      />
+
+      <Banners>
+        {invited ? (
+          <InviteBanner result={invited} onDone={() => setInvited(null)} />
         ) : null}
-        {invite.isError ? (
-          <p className={`${alertClass} sm:col-span-3`} role="alert">
-            {describeApiError(invite.error)}
-          </p>
-        ) : null}
-        <div className="sm:col-span-3">
-          <button
-            type="submit"
-            disabled={invite.isPending}
-            className={primaryButton}
-          >
-            {invite.isPending ? "Inviting…" : "Send invite"}
-          </button>
-        </div>
-      </form>
-      {invite.data ? <InviteSent result={invite.data} /> : null}
+      </Banners>
+
+      {members.isError ? null : (
+        <StatCards columns={3}>
+          {members.isSuccess ? (
+            <TeamStatCards members={members.data} />
+          ) : (
+            <>
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+            </>
+          )}
+        </StatCards>
+      )}
+
+      <ResultsPanel label="Team">
+        <ResultsHead
+          tabs={
+            <KindTabs
+              label="Team"
+              tabs={tabs}
+              value={filters.view}
+              onChange={(view) =>
+                setParams({ view: view === "all" ? null : view })
+              }
+              controls="team-results"
+            />
+          }
+          chips={
+            <>
+              <FilterChip
+                label="Role"
+                icon={UserIcon}
+                options={ROLE_OPTIONS}
+                value={filters.role}
+                onChange={(memberRole) => setParams({ memberRole })}
+                anyLabel="Any role"
+              />
+              <FilterChip
+                label="M-Pesa number"
+                icon={SmartphoneIcon}
+                options={PAYOUT_OPTIONS}
+                value={filters.mpesa}
+                onChange={(mpesa) => setParams({ mpesa })}
+                anyLabel="Any"
+              />
+            </>
+          }
+          onClearAll={anyChip ? clearChips : undefined}
+        />
+        <ResultsBody id="team-results" busy={members.isPending}>
+          {members.isPending ? (
+            <TeamSkeleton />
+          ) : members.isError ? (
+            <ErrorState
+              title="The team didn't load"
+              onRetry={() => void members.refetch()}
+            >
+              {describeApiError(members.error)}
+            </ErrorState>
+          ) : rows.length === 0 ? (
+            anyChip ? (
+              <EmptyState
+                icon={FilterXIcon}
+                title="No one matches these filters"
+                action={
+                  <Button variant="outline" size="md" onClick={clearChips}>
+                    Clear all
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={filters.view === "invited" ? MailIcon : UsersIcon}
+                title={EMPTY[filters.view].title}
+                action={canAct ? inviteButton : null}
+              >
+                {EMPTY[filters.view].text}
+              </EmptyState>
+            )
+          ) : (
+            <>
+              <DataTable caption={CAPTIONS[filters.view]}>
+                <thead>
+                  <tr>
+                    <SortHeader
+                      label="Person"
+                      sortKey="name"
+                      sort={sort}
+                      onSort={onSort}
+                    />
+                    <SortHeader
+                      label="Role"
+                      sortKey="role"
+                      sort={sort}
+                      onSort={onSort}
+                    />
+                    <Th>M-Pesa number</Th>
+                    <SortHeader
+                      label="Status"
+                      sortKey="status"
+                      sort={sort}
+                      onSort={onSort}
+                    />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((member) => (
+                    <MemberRow
+                      key={member.id}
+                      member={member}
+                      isMe={member.id === myId}
+                      open={member.id === openId}
+                      onOpen={() => open(member.id)}
+                    />
+                  ))}
+                </tbody>
+              </DataTable>
+              <PhoneCards label="Team">
+                {rows.map((member) => (
+                  <PhoneCard
+                    key={member.id}
+                    mark={<EntityMark name={nameOf(member)} kind="person" />}
+                    title={member.name ?? "No name yet"}
+                    sub={member.email}
+                    flags={
+                      <>
+                        <Mini
+                          icon={UserIcon}
+                          label={`Role: ${ROLE_LABELS[member.role]}`}
+                        >
+                          {ROLE_LABELS[member.role]}
+                        </Mini>
+                        <PayoutMini member={member} />
+                        {member.id === myId ? <YouMini /> : null}
+                      </>
+                    }
+                    aside={<MemberStatusBadge member={member} />}
+                    onOpen={() => open(member.id)}
+                  />
+                ))}
+              </PhoneCards>
+              {justMe ? (
+                <div className="border-t border-row-divider">
+                  <EmptyState
+                    icon={UserPlusIcon}
+                    title="Just you so far"
+                    action={canAct ? inviteButton : null}
+                  >
+                    {canAct
+                      ? "Invite admins, employees and accountants. Each gets an email with a link to join."
+                      : "Only admins change the team."}
+                  </EmptyState>
+                </div>
+              ) : null}
+            </>
+          )}
+        </ResultsBody>
+      </ResultsPanel>
+
+      <MemberSheet
+        organizationId={organizationId}
+        member={openMember}
+        canAct={canAct}
+        isMe={openMember?.id === myId}
+        stepper={{
+          index: openIndex,
+          total: ids.length,
+          onStep: (delta) => {
+            const next = ids[openIndex + delta];
+            if (next) open(next);
+          },
+          previousLabel: "Previous person",
+          nextLabel: "Next person",
+        }}
+        onClose={() => setParams({ memberId: null })}
+      />
+      {canAct ? (
+        <InviteSheet
+          organizationId={organizationId}
+          open={inviting}
+          onClose={() => setInviting(false)}
+          onInvited={(result) => {
+            setInvited(result);
+            setInviting(false);
+            setParams({ view: null, memberRole: null, mpesa: null });
+          }}
+        />
+      ) : null}
     </section>
   );
 }
 
-/** Where an invite points: the app for staff, this dashboard for accountants. */
-function inviteLink(result: InviteMemberResponse): string | null {
-  return result.member.role === "accountant"
-    ? WEB_DASHBOARD_URL
-    : result.installUrl;
-}
-
-function InviteSent({ result }: { result: InviteMemberResponse }): JSX.Element {
-  const link = inviteLink(result);
-  const who = result.member.name ?? result.member.email;
+function TeamStatCards({ members }: { members: Member[] }): JSX.Element {
+  const stats = teamStats(members, new Date());
   return (
-    <div
-      role="status"
-      className={`max-w-4xl rounded-lg border p-4 text-sm ${result.emailSent ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}
-    >
-      {result.emailSent ? (
-        <p>
-          Invite sent to {who} at {result.member.email}.
-        </p>
-      ) : (
-        <>
-          <p>
-            {who} is invited, but the email didn&apos;t go out.
-            {link ? " Send them this link yourself:" : ""}
-          </p>
-          {link ? <p className="mt-1 font-mono break-all">{link}</p> : null}
-        </>
-      )}
-    </div>
+    <>
+      <StatCard
+        icon={UsersIcon}
+        tone="total"
+        label="Active"
+        value={stats.active}
+        sub={stats.breakdown}
+      />
+      <StatCard
+        icon={stats.invited > 0 ? MailIcon : CircleCheckIcon}
+        tone={stats.invited > 0 ? "attention" : "clear"}
+        label="Invited"
+        value={stats.invited}
+        sub={stats.oldestInvite ?? "No open invites"}
+      />
+      <StatCard
+        icon={stats.withoutPayout > 0 ? SmartphoneIcon : CircleCheckIcon}
+        tone={stats.withoutPayout > 0 ? "attention" : "clear"}
+        label="No M-Pesa number yet"
+        value={stats.withoutPayout}
+        sub={
+          stats.withoutPayout > 0
+            ? "Can't be paid until they confirm it"
+            : "Everyone can be paid"
+        }
+      />
+    </>
   );
 }
 
 function MemberRow({
-  organizationId,
   member,
-  canAct,
+  isMe,
+  open,
+  onOpen,
 }: {
-  organizationId: string;
   member: Member;
-  canAct: boolean;
+  isMe: boolean;
+  open: boolean;
+  onOpen: () => void;
 }): JSX.Element {
   return (
-    <tr className="border-t border-stone-200 align-top">
-      <td className={cellClass}>
-        <span className="font-medium">{member.name ?? "No name yet"}</span>
-        <span className="block text-xs text-stone-500">{member.email}</span>
-      </td>
-      <td className={cellClass}>
-        {canAct && member.role !== "accountant" ? (
-          <RoleChanger organizationId={organizationId} member={member} />
-        ) : (
-          ROLE_LABELS[member.role]
-        )}
-      </td>
-      <td className={cellClass}>
-        {member.status === "invited" ? (
-          <>
-            Invited
-            {member.invitedAt ? (
-              <span className="block text-xs text-stone-500">
-                {formatNairobiDateTime(member.invitedAt)}
-              </span>
-            ) : null}
-          </>
-        ) : (
-          "Active"
-        )}
-      </td>
-      <td className={cellClass}>
-        {member.role === "accountant"
-          ? "—"
-          : member.payoutPhoneConfirmed
-            ? "Confirmed"
-            : "Not yet"}
-      </td>
-      {canAct ? (
-        <td className={`${cellClass} text-right`}>
-          <MemberActions organizationId={organizationId} member={member} />
-        </td>
-      ) : null}
-    </tr>
-  );
-}
-
-function RoleChanger({
-  organizationId,
-  member,
-}: {
-  organizationId: string;
-  member: Member;
-}): JSX.Element {
-  const change = useChangeMemberRole(organizationId);
-  const current = ASSIGNABLE_ROLES.find((role) => role === member.role);
-  const [role, setRole] = useState<AssignableRole | undefined>(current);
-
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          aria-label={`Role for ${member.name ?? member.email}`}
-          value={role}
-          onChange={(event) =>
-            setRole(
-              ASSIGNABLE_ROLES.find(
-                (candidate) => candidate === event.target.value,
-              ),
-            )
-          }
-          disabled={change.isPending}
-          className={`${inputClass} mt-0 w-auto`}
-        >
-          {ASSIGNABLE_ROLES.map((option) => (
-            <option key={option} value={option}>
-              {ROLE_LABELS[option]}
-            </option>
-          ))}
-        </select>
-        {role && role !== current ? (
-          <button
-            type="button"
-            disabled={change.isPending}
-            onClick={() => change.mutate({ membershipId: member.id, role })}
-            className={secondaryButton}
-          >
-            {change.isPending ? "Saving…" : "Change role"}
-          </button>
-        ) : null}
-      </div>
-      {change.isError ? (
-        <p className="text-sm text-error-700" role="alert">
-          {describeApiError(change.error)}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function MemberActions({
-  organizationId,
-  member,
-}: {
-  organizationId: string;
-  member: Member;
-}): JSX.Element {
-  const remove = useRemoveMember(organizationId);
-  const resend = useInviteMember(organizationId);
-  const [confirming, setConfirming] = useState(false);
-  const who = member.name ?? member.email;
-
-  return (
-    <div className="flex flex-col items-end gap-2">
-      {member.status === "invited" && member.name ? (
-        <button
-          type="button"
-          disabled={resend.isPending}
-          onClick={() =>
-            resend.mutate({
-              email: member.email,
-              fullName: member.name ?? "",
-              role: member.role,
-            })
-          }
-          className={textButton}
-        >
-          {resend.isPending ? "Sending…" : "Resend invite"}
-        </button>
-      ) : null}
-      {resend.data ? (
-        <p className="text-sm text-stone-600" role="status">
-          {resend.data.emailSent
-            ? "Invite sent again."
-            : "The email didn't go out. Try again later."}
-        </p>
-      ) : null}
-      {resend.isError ? (
-        <p className="text-sm text-error-700" role="alert">
-          {describeApiError(resend.error)}
-        </p>
-      ) : null}
-
-      {confirming ? (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className="text-sm text-stone-700">
-            {member.status === "invited"
-              ? `Cancel ${who}'s invite?`
-              : `Remove ${who}?`}
+    <DataRow open={open} onOpen={onOpen}>
+      <Td kind="main">
+        <span className="flex min-w-0 items-start gap-3">
+          <EntityMark name={nameOf(member)} kind="person" />
+          <span className="min-w-0">
+            <RowTitle onOpen={onOpen}>
+              {member.name ?? (
+                <span className="text-gray-600">No name yet</span>
+              )}
+            </RowTitle>
+            <RowMeta text={member.email}>{isMe ? <YouMini /> : null}</RowMeta>
           </span>
-          <button
-            type="button"
-            disabled={remove.isPending}
-            onClick={() => remove.mutate(member.id)}
-            className={primaryButton}
-          >
-            {remove.isPending ? "Removing…" : "Remove"}
-          </button>
-          <button
-            type="button"
-            disabled={remove.isPending}
-            onClick={() => {
-              remove.reset();
-              setConfirming(false);
-            }}
-            className={secondaryButton}
-          >
-            Keep
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          className={textButton}
-        >
-          Remove
-        </button>
+        </span>
+      </Td>
+      <Td className="whitespace-nowrap text-gray-600">
+        {ROLE_LABELS[member.role]}
+      </Td>
+      <Td>
+        <PayoutCell member={member} />
+      </Td>
+      <Td>
+        <MemberStatusBadge member={member} />
+        {member.status === "invited" && member.invitedAt ? (
+          <span className="mt-1 block text-xs leading-4 whitespace-nowrap text-gray-500 tabular-nums">
+            Sent {formatNairobiDateTime(member.invitedAt)}
+          </span>
+        ) : null}
+      </Td>
+    </DataRow>
+  );
+}
+
+function PayoutCell({ member }: { member: Member }): JSX.Element {
+  const state = payoutOf(member);
+  const warn = state === "missing" && member.status === "active";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 whitespace-nowrap",
+        state === "confirmed"
+          ? "text-gray-700"
+          : warn
+            ? "text-warn-700"
+            : "text-gray-500",
       )}
-      {remove.isError ? (
-        <p className="text-sm text-error-700" role="alert">
-          {describeApiError(remove.error)}
-        </p>
+    >
+      {state === "confirmed" ? (
+        <CircleCheckIcon
+          aria-hidden="true"
+          className="size-3.5 text-success-700"
+        />
+      ) : warn ? (
+        <TriangleAlertIcon aria-hidden="true" className="size-3.5" />
       ) : null}
-    </div>
+      {PAYOUT_LABELS[state]}
+    </span>
+  );
+}
+
+function PayoutMini({ member }: { member: Member }): JSX.Element {
+  const state = payoutOf(member);
+  return (
+    <Mini
+      icon={SmartphoneIcon}
+      label={`M-Pesa number: ${PAYOUT_LABELS[state].toLowerCase()}`}
+      warn={state === "missing" && member.status === "active"}
+    >
+      {PAYOUT_LABELS[state]}
+    </Mini>
+  );
+}
+
+function YouMini(): JSX.Element {
+  return (
+    <Mini icon={UserRoundIcon} label="You">
+      You
+    </Mini>
+  );
+}
+
+const skeletonCell = "border-b border-row-divider px-4 py-3";
+
+function TeamSkeleton(): JSX.Element {
+  return (
+    <>
+      <DataTable caption="Loading the team…">
+        <tbody>
+          {Array.from({ length: 6 }, (_, row) => (
+            <tr key={row} aria-hidden="true">
+              <td className={cn(skeletonCell, "w-full max-w-0")}>
+                <span className="flex items-center gap-3">
+                  <Skel width={32} height={32} className="rounded-full" />
+                  <span className="flex-1">
+                    <Skel width="45%" height={14} />
+                    <Skel width="30%" height={12} style={{ marginTop: 8 }} />
+                  </span>
+                </span>
+              </td>
+              <td className={skeletonCell}>
+                <Skel width={72} height={14} />
+              </td>
+              <td className={skeletonCell}>
+                <Skel width={80} height={14} />
+              </td>
+              <td className={skeletonCell}>
+                <Skel width={64} height={20} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </DataTable>
+      <PhoneCards label="Loading the team">
+        {Array.from({ length: 4 }, (_, row) => (
+          <li
+            key={row}
+            aria-hidden="true"
+            className="flex items-center gap-3 border-b border-row-divider p-4"
+          >
+            <Skel width={32} height={32} className="rounded-full" />
+            <span className="flex-1">
+              <Skel width="55%" height={14} />
+              <Skel width="40%" height={12} style={{ marginTop: 8 }} />
+            </span>
+          </li>
+        ))}
+      </PhoneCards>
+    </>
   );
 }

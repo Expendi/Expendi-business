@@ -1,14 +1,30 @@
 "use client";
 
-import type { UseMutationResult } from "@tanstack/react-query";
+import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 import { usePrivy } from "@privy-io/react-auth";
-import { useMutation } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { z } from "zod";
 
-import type { GeneratedExport, ReportFormat } from "@expendi-business/shared";
+import type {
+  ExportFile,
+  ExportSummary,
+  GeneratedExport,
+  ReportFormat,
+  ReportMonthSummary,
+  ReportSpending,
+} from "@expendi-business/shared";
 import {
+  exportFileUrlSchema,
+  exportListSchema,
   generatedExportSchema,
   reportFilename,
+  reportMonthSummarySchema,
+  reportSpendingSchema,
 } from "@expendi-business/shared";
 
 import type { ApiClientOptions } from "~/lib/api";
@@ -21,6 +37,94 @@ import { useApi } from "~/lib/use-api";
  * admins and accountants, and, for admins, a stored export with 30-day
  * links to share (spec §6.11, §6.14).
  */
+
+export type SpendingRange = 6 | 12;
+
+export const reportKeys = {
+  all: (organizationId: string) => ["reports", organizationId] as const,
+  spending: (organizationId: string, month: string, months: SpendingRange) =>
+    ["reports", organizationId, "spending", month, months] as const,
+  summary: (organizationId: string, month: string) =>
+    ["reports", organizationId, "summary", month] as const,
+  exports: (organizationId: string) =>
+    ["reports", organizationId, "exports"] as const,
+};
+
+const reportsPath = (organizationId: string) =>
+  `/organizations/${organizationId}/reports` as const;
+
+/** Money out by month up to `month`, with the month before them first. */
+export function useReportSpending(
+  organizationId: string,
+  month: string,
+  months: SpendingRange,
+): UseQueryResult<ReportSpending> {
+  const api = useApi();
+  return useQuery({
+    queryKey: reportKeys.spending(organizationId, month, months),
+    queryFn: () =>
+      api.get(
+        `${reportsPath(organizationId)}/spending?month=${month}&months=${String(months)}`,
+        reportSpendingSchema,
+      ),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** What each of `month`'s files holds, with their first rows. */
+export function useReportSummary(
+  organizationId: string,
+  month: string,
+): UseQueryResult<ReportMonthSummary> {
+  const api = useApi();
+  return useQuery({
+    queryKey: reportKeys.summary(organizationId, month),
+    queryFn: () =>
+      api.get(
+        `${reportsPath(organizationId)}/${month}/summary`,
+        reportMonthSummarySchema,
+      ),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Exports made with links: the monthly emails and any an admin shared. */
+export function useSharedExports(
+  organizationId: string,
+): UseQueryResult<ExportSummary[]> {
+  const api = useApi();
+  return useQuery({
+    queryKey: reportKeys.exports(organizationId),
+    queryFn: () =>
+      api.get(`${reportsPath(organizationId)}/exports`, exportListSchema),
+  });
+}
+
+export interface ExportFileRequest {
+  readonly exported: ExportSummary;
+  readonly file: ExportFile;
+}
+
+/**
+ * Downloads one of a shared export's stored files through a short-lived
+ * link; resolves to the file's name.
+ */
+export function useExportFileDownload(
+  organizationId: string,
+): UseMutationResult<string, Error, ExportFileRequest> {
+  const api = useApi();
+  return useMutation({
+    mutationFn: async ({ exported, file }) => {
+      const { url } = await api.get(
+        `${reportsPath(organizationId)}/exports/${exported.id}/files/${file}`,
+        exportFileUrlSchema,
+      );
+      const filename = reportFilename(exported.month, file);
+      openDownload(url, filename);
+      return filename;
+    },
+  });
+}
 
 /** A receipts zip for a busy month takes a while to build. */
 const DOWNLOAD_TIMEOUT_MS = 120_000;
@@ -97,15 +201,20 @@ export async function fetchReportFile(
   }
 }
 
-/** Hands a downloaded file to the browser to save. */
-function saveFile({ filename, blob }: ReportFile): void {
-  const url = URL.createObjectURL(blob);
+function openDownload(href: string, filename: string): void {
   const anchor = document.createElement("a");
-  anchor.href = url;
+  anchor.href = href;
   anchor.download = filename;
+  anchor.rel = "noopener";
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
+}
+
+/** Hands a downloaded file to the browser to save. */
+function saveFile({ filename, blob }: ReportFile): void {
+  const url = URL.createObjectURL(blob);
+  openDownload(url, filename);
   // Revoking at once can cancel the save in some browsers.
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
@@ -141,6 +250,7 @@ export function useGenerateExport(
   organizationId: string,
 ): UseMutationResult<GeneratedExport, Error, string> {
   const api = useApi();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (month) =>
       api.post(
@@ -148,5 +258,9 @@ export function useGenerateExport(
         { month },
         generatedExportSchema,
       ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: reportKeys.exports(organizationId),
+      }),
   });
 }

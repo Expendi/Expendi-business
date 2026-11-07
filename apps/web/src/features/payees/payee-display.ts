@@ -4,7 +4,10 @@ import type {
   PayeeKind,
   PayeeMethod,
 } from "@expendi-business/shared";
-import { PAYEE_CHANGE_HOLD_HOURS } from "@expendi-business/shared";
+import {
+  PAYEE_CHANGE_HOLD_HOURS,
+  PAYEE_METHODS,
+} from "@expendi-business/shared";
 
 import type { DetailField } from "./payee-fields";
 import { detailValues, fieldLabel, methodFields } from "./payee-fields";
@@ -70,7 +73,8 @@ function confirmedNumber(payoutPhoneConfirmed: boolean | null): string {
     : "Their confirmed number";
 }
 
-function detailSummary(
+/** The method's main detail, e.g. "522522, account KP-1182"; null when it has none. */
+export function detailSummary(
   details: PayeeDetails,
   payoutPhoneConfirmed: boolean | null,
   bankName: string | null,
@@ -152,4 +156,61 @@ export function detailRows(
 export function matchesSearch(name: string, search: string): boolean {
   const query = search.trim().toLocaleLowerCase();
   return query === "" || name.toLocaleLowerCase().includes(query);
+}
+
+/** "Employee · brian@mwangaza.co.ke", or the kind alone. */
+export function payeeMetaLine(payee: Pick<Payee, "kind" | "member">): string {
+  return payee.kind === "employee" && payee.member
+    ? `${KIND_LABELS.employee} · ${payee.member.email}`
+    : KIND_LABELS[payee.kind];
+}
+
+/** People get a round mark; businesses a square one. */
+export function isPerson(payee: Pick<Payee, "kind">): boolean {
+  return payee.kind === "employee" || payee.kind === "personnel";
+}
+
+const NAIROBI_TIME = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Africa/Nairobi",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** An API timestamp's Nairobi wall-clock time, e.g. "16:40". */
+export function formatNairobiTime(isoDateTime: string): string {
+  return NAIROBI_TIME.format(new Date(isoDateTime));
+}
+
+export type PayeeSortKey = "name" | "method" | "changed";
+
+export const PAYEE_SORT_FIRST: Record<PayeeSortKey, "asc" | "desc"> = {
+  name: "asc",
+  method: "asc",
+  changed: "desc",
+};
+
+const methodRank = (payee: Pick<Payee, "details">): number =>
+  payee.details
+    ? PAYEE_METHODS.indexOf(payee.details.method)
+    : PAYEE_METHODS.length;
+
+const changedAt = (payee: Pick<Payee, "detailsChangedAt">): number =>
+  payee.detailsChangedAt ? Date.parse(payee.detailsChangedAt) : 0;
+
+/** A to Z unless a header says otherwise; ties go A to Z. */
+export function sortPayees<P extends Payee>(
+  payees: readonly P[],
+  sort: { readonly key: PayeeSortKey; readonly dir: "asc" | "desc" },
+): P[] {
+  return [...payees].sort((a, b) => {
+    const byName = a.name.localeCompare(b.name);
+    const primary =
+      sort.key === "method"
+        ? methodRank(a) - methodRank(b)
+        : sort.key === "changed"
+          ? changedAt(a) - changedAt(b)
+          : byName;
+    return (sort.dir === "asc" ? primary : -primary) || byName;
+  });
 }

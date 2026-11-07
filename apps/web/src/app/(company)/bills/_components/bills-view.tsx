@@ -1,88 +1,105 @@
 "use client";
 
+import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  CheckIcon,
+  CircleAlertIcon,
+  ClockIcon,
+  FileTextIcon,
+  KeyRoundIcon,
+  PlusIcon,
+  RepeatIcon,
+  TriangleAlertIcon,
+  UploadIcon,
+} from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
-  Bill,
+  BillDetail,
+  BillListView,
   BillPaymentResult,
-  PayeeChangeHold,
+  BillsSummary,
 } from "@expendi-business/shared";
 import {
   BILL_PAYMENT_MAX_BILLS,
   billPaymentSchema,
 } from "@expendi-business/shared";
 
+import type { LocalSheet, PaymentStep, SheetLink } from "./bills-sheet";
+import type { BillFilterParam, BillSortKey } from "~/features/bills/bill-list";
 import type { BillPaymentRequest } from "~/features/bills/bill-payment";
 import type { PreparedBillPayment } from "~/features/bills/bills-api";
-import type { BillListView } from "~/features/payment-keys";
-import { ApprovalPasskeyGate } from "~/components/approval-passkey-gate";
+import { Banner, Banners } from "~/components/data/banner";
+import { KesTotal } from "~/components/data/money";
+import { PageHeader } from "~/components/data/page-header";
 import {
-  alertClass,
-  cellClass,
-  headCellClass,
-  primaryButton,
-  secondaryButton,
-  tableClass,
-  textButton,
-} from "~/components/styles";
+  StatCard,
+  StatCards,
+  StatCardSkeleton,
+} from "~/components/data/stat-cards";
+import { nextSort } from "~/components/data/table";
+import { useDeepLinkParams } from "~/components/data/use-deep-link-param";
+import { Button } from "~/components/ui/button";
+import { useAuth } from "~/contexts/auth-context";
 import { useDashboard } from "~/contexts/dashboard-context";
-import { formatBillAmount } from "~/features/bills/bill-amount";
+import { nairobiIsoDate } from "~/features/bills/bill-dates";
 import {
-  groupOpenBills,
-  historyNewestFirst,
-} from "~/features/bills/bill-groups";
+  BILL_FILTER_PARAMS,
+  DEFAULT_BILL_SORT,
+  filtersFromParams,
+  firstSortDir,
+  historySettledFrom,
+  sortBills,
+  summaryParams,
+  viewFromParam,
+  viewOfStatus,
+} from "~/features/bills/bill-list";
 import {
   CostChangedError,
   describePaymentError,
   holdFrom,
-  isPayable,
   toggleSelection,
 } from "~/features/bills/bill-payment";
-import { BillAmount, BillStatusBadge } from "~/features/bills/bill-status";
 import {
+  useBill,
   useBills,
+  useBillsSummary,
   useInvalidateBills,
   useKesRate,
   usePayBills,
   usePrepareBillPayment,
 } from "~/features/bills/bills-api";
-import { HoldWarning } from "~/features/payment-ui";
+import { ACTIVE_PAYEES, usePayees } from "~/features/payees/payees-api";
 import { describeApiError } from "~/lib/api";
-import { formatIsoDate, formatNairobiDate } from "~/lib/dates";
-import { BillForm } from "./bill-form";
-import { BillPanel } from "./bill-panel";
-import {
-  BillPaymentResultNotice,
-  BillPaymentReview,
-} from "./bill-payment-review";
+import { approxKesTotal } from "~/lib/money";
+import { queryKeys } from "~/lib/query-keys";
+import { useApprovalPasskeyStatus } from "~/lib/use-approval";
+import { PaymentResultBanner } from "./bill-payment-review";
+import { BillsResults, canSelect } from "./bills-results";
+import { BillsSheet, NO_LOCAL_SHEET } from "./bills-sheet";
 
-const VIEWS: readonly { view: BillListView; label: string }[] = [
-  { view: "open", label: "To pay" },
-  { view: "history", label: "Paid & cancelled" },
-];
+type BillParam = "view" | BillFilterParam | "billId" | "recurring" | "new";
 
-type Panel =
-  { readonly kind: "bill"; readonly billId: string } | { readonly kind: "new" };
+const NEW_BILL: LocalSheet = { kind: "new-bill" };
 
-type PaymentStep =
-  | {
-      readonly step: "hold";
-      readonly request: BillPaymentRequest;
-      readonly hold: PayeeChangeHold;
-    }
-  | { readonly step: "review"; readonly prepared: PreparedBillPayment };
-
-/** Selected together for Pay all; a failed payment is retried on its own. */
-const canSelect = (bill: Bill): boolean =>
-  isPayable(bill) && bill.status !== "payout_failed";
+const NO_FILTER_PARAMS: Readonly<Record<BillFilterParam, null>> = {
+  status: null,
+  payee: null,
+  category: null,
+  heading: null,
+  method: null,
+  source: null,
+};
 
 /**
- * Bills (spec §6.14, §6.20): what's owed by status, and what was paid or
- * cancelled. Admins add and change bills, upload invoices (PDFs too), and
- * pay up to 20 at once with one passkey, each as its own payout.
- * Accountants see the same, with no actions.
+ * Bills (spec §6.14, §6.20): money still owed to suppliers, to pay, being
+ * paid, and the last six months' history, never salaries. Admins add and
+ * change bills, upload invoices (PDFs too), and pay up to 20 at once with
+ * one passkey, each as its own payout. Recurring payments live in the
+ * side sheet. Accountants see the same, with no actions.
  */
 export function BillsView(): JSX.Element {
   const { company, canAct } = useDashboard();
@@ -102,16 +119,82 @@ function CompanyBills({
   organizationId: string;
   canAct: boolean;
 }): JSX.Element {
-  const [view, setView] = useState<BillListView>("open");
-  const [panel, setPanel] = useState<Panel | null>(null);
+  const { api } = useAuth();
+  const [param, setParams] = useDeepLinkParams<BillParam>();
+  const view = viewFromParam(param("view"));
+  const filters = filtersFromParams(view, param);
+  const billId = param("billId");
+  const recurring = billId ? null : param("recurring");
+  const [today] = useState(() => nairobiIsoDate(new Date()));
+
+  const bills = useBills(organizationId, view, filters);
+  const summary = useBillsSummary(
+    organizationId,
+    summaryParams(filters, historySettledFrom(today)),
+  );
+  const rate = useKesRate(organizationId);
+  const passkey = useApprovalPasskeyStatus(canAct);
+  const canPay = canAct && passkey.data?.enrolled === true;
+  const needsPasskey = canAct && passkey.data?.enrolled === false;
+  const payees = usePayees(organizationId, ACTIVE_PAYEES);
+  const categories = useQuery({
+    queryKey: queryKeys.categories(organizationId),
+    queryFn: () => api.listCategories(organizationId),
+  });
+
+  const [sorts, setSorts] = useState<
+    Partial<Record<BillListView, { key: BillSortKey; dir: "asc" | "desc" }>>
+  >({});
+  const sort = sorts[view] ?? DEFAULT_BILL_SORT[view];
+  const rows = useMemo(
+    () => sortBills(bills.data ?? [], view, sort, rate),
+    [bills.data, view, sort, rate],
+  );
+
   const [selected, setSelected] = useState<string[]>([]);
+  const selectable = view === "open" && canPay;
+  const chosen = selectable
+    ? selected.filter((id) =>
+        rows.some((bill) => bill.id === id && canSelect(bill)),
+      )
+    : [];
+  const newParam = param("new");
+  const [local, setLocal] = useState<LocalSheet>(() =>
+    newParam !== null && canAct ? NEW_BILL : NO_LOCAL_SHEET,
+  );
+  const [newLinked, setNewLinked] = useState(newParam !== null);
+  if ((newParam !== null) !== newLinked) {
+    setNewLinked(newParam !== null);
+    if (newParam !== null && canAct) setLocal(NEW_BILL);
+  }
   const [payment, setPayment] = useState<PaymentStep | null>(null);
   const [result, setResult] = useState<BillPaymentResult | null>(null);
-  const bills = useBills(organizationId, view);
-  const rate = useKesRate(organizationId);
   const refresh = useInvalidateBills(organizationId);
   const prepare = usePrepareBillPayment(organizationId);
   const pay = usePayBills(organizationId);
+
+  useEffect(() => {
+    if (newParam !== null) setParams({ new: null });
+  }, [newParam, setParams]);
+
+  useLinkedBillTab(organizationId, billId, view, (tab) =>
+    setParams({ view: tab === "open" ? null : tab, status: null }),
+  );
+
+  function navigate(link: SheetLink, next: LocalSheet = NO_LOCAL_SHEET) {
+    setLocal(next);
+    setParams(link);
+  }
+
+  function closeSheet() {
+    if (pay.isPending) return;
+    if (payment) {
+      pay.reset();
+      prepare.reset();
+      setPayment(null);
+    }
+    navigate({ billId: null, recurring: null, new: null });
+  }
 
   function startPayment(request: BillPaymentRequest) {
     pay.reset();
@@ -136,6 +219,7 @@ function CompanyBills({
         setResult(outcome.result);
         setPayment(null);
         setSelected([]);
+        navigate({ billId: null, recurring: null, status: null });
       },
       onError: (error) => {
         const fresh =
@@ -160,494 +244,366 @@ function CompanyBills({
     });
   }
 
-  const openBills = view === "open" ? (bills.data ?? []) : [];
-  const selectedBills = openBills.filter((bill) => selected.includes(bill.id));
-  const busy = prepare.isPending || pay.isPending || payment !== null;
+  function showView(next: BillListView) {
+    if (next === view) return;
+    setSelected([]);
+    setParams({ view: next === "open" ? null : next, status: null });
+  }
+
   const holdShown = payment?.step === "hold";
-  const actionError =
+  const costChanged = pay.error instanceof CostChangedError;
+  const paymentError =
     prepare.isError && !holdShown
       ? describePaymentError(prepare.error)
-      : pay.isError
+      : pay.isError && !costChanged
         ? describePaymentError(pay.error)
         : null;
+  const preparing = prepare.isPending;
+  const busy = preparing || pay.isPending || payment !== null;
 
   return (
-    <section className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold">Bills</h1>
-          <p className="mt-1 text-sm text-stone-600">
-            {canAct
-              ? `Suppliers, rent, utilities, subscriptions and statutory payments. Pay up to ${String(BILL_PAYMENT_MAX_BILLS)} bills with one passkey; each is paid on its own.`
-              : "Suppliers, rent, utilities, subscriptions and statutory payments. Only admins add and pay bills."}
-          </p>
-        </div>
-        {canAct ? (
-          <div className="flex flex-wrap gap-2">
-            <Link href="/imports?kind=bill" className={secondaryButton}>
-              Import spreadsheet
-            </Link>
-            <button
-              type="button"
-              onClick={() => setPanel({ kind: "new" })}
-              className={primaryButton}
+    <div>
+      <PageHeader
+        title="Bills"
+        subtitle={
+          canAct
+            ? `Suppliers, rent, utilities, subscriptions and statutory payments. Pay up to ${String(BILL_PAYMENT_MAX_BILLS)} bills with one passkey; each is paid on its own.`
+            : "Suppliers, rent, utilities, subscriptions and statutory payments. Only admins add and pay bills."
+        }
+        actions={
+          <>
+            {canAct ? (
+              <Button variant="outline" size="md" asChild>
+                <Link href="/imports?kind=bill">
+                  <UploadIcon aria-hidden="true" />
+                  Import spreadsheet
+                </Link>
+              </Button>
+            ) : null}
+            <Button
+              variant="outline"
+              size="md"
+              aria-haspopup="dialog"
+              onClick={() => navigate({ billId: null, recurring: "all" })}
             >
-              New bill
-            </button>
-          </div>
-        ) : null}
-      </div>
+              <RepeatIcon aria-hidden="true" />
+              Recurring payments
+            </Button>
+            {canAct ? (
+              <Button
+                size="md"
+                aria-haspopup="dialog"
+                onClick={() =>
+                  navigate({ billId: null, recurring: null }, NEW_BILL)
+                }
+              >
+                <PlusIcon aria-hidden="true" />
+                New bill
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
-      {result ? (
-        <BillPaymentResultNotice
-          result={result}
-          onRetry={(billId) =>
-            startPayment({
-              billIds: [billId],
-              retry: true,
-              secondConfirmation: false,
-            })
-          }
-          onDismiss={() => setResult(null)}
-        />
-      ) : null}
-
-      {canAct && view === "open" ? (
-        <ApprovalPasskeyGate>
-          {payment?.step === "review" ? (
-            <BillPaymentReview
-              payment={payment.prepared.payment}
-              isRetry={payment.prepared.request.retry}
-              paying={pay.isPending}
-              onPay={() => onPay(payment.prepared)}
-              onCancel={() => {
-                pay.reset();
-                setPayment(null);
-              }}
-            />
-          ) : payment?.step === "hold" ? (
-            <HoldWarning
-              hold={payment.hold}
-              onConfirm={() =>
-                startPayment({ ...payment.request, secondConfirmation: true })
-              }
-              onCancel={() => {
-                prepare.reset();
-                setPayment(null);
-              }}
-            />
-          ) : (
-            <PayBar
-              bills={openBills}
-              selected={selectedBills}
-              preparing={prepare.isPending}
-              onSelect={setSelected}
-              onPay={() =>
-                startPayment({
-                  billIds: selectedBills.map((bill) => bill.id),
-                  retry: false,
-                  secondConfirmation: false,
-                })
-              }
-            />
-          )}
-        </ApprovalPasskeyGate>
-      ) : null}
-
-      {pay.data?.status === "cancelled" && payment ? (
-        <p className="text-sm text-stone-600">Cancelled. Nothing was sent.</p>
-      ) : null}
-      {actionError ? (
-        <p className={alertClass} role="alert">
-          {actionError}
-        </p>
-      ) : null}
-
-      <div role="tablist" aria-label="Bills" className="flex gap-2">
-        {VIEWS.map((option) => (
-          <button
-            key={option.view}
-            type="button"
-            role="tab"
-            aria-selected={view === option.view}
-            onClick={() => {
-              setView(option.view);
-              setSelected([]);
-            }}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === option.view ? "bg-stone-900 text-white" : "text-stone-700 hover:bg-stone-100"}`}
+      <Banners>
+        {needsPasskey ? (
+          <Banner
+            icon={KeyRoundIcon}
+            role="note"
+            title="Set up your approval passkey first"
           >
-            {option.label}
-          </button>
-        ))}
-      </div>
-
-      <div
-        className={`grid gap-6 ${panel ? "xl:grid-cols-2" : ""} xl:items-start`}
-      >
-        <div className="space-y-6">
-          {bills.isPending ? (
-            <p className="text-sm text-stone-500">Loading bills…</p>
-          ) : bills.isError ? (
-            <div className="text-sm text-error-700" role="alert">
-              <p>{describeApiError(bills.error)}</p>
-              <button
-                type="button"
-                onClick={() => void bills.refetch()}
-                className={`mt-2 ${secondaryButton}`}
+            Paying needs your approval passkey. Set it up in the Expendi
+            Business app; then confirm here with “use a phone or tablet” in your
+            browser&apos;s passkey prompt.
+          </Banner>
+        ) : null}
+        {canAct && passkey.isError ? (
+          <Banner
+            tone="warn"
+            role="alert"
+            title={describeApiError(passkey.error)}
+            actions={
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => void passkey.refetch()}
               >
                 Try again
-              </button>
-            </div>
-          ) : view === "open" ? (
-            <OpenBills
-              bills={bills.data}
-              rate={rate}
-              selectedId={panel?.kind === "bill" ? panel.billId : null}
-              selection={
-                canAct
-                  ? {
-                      selected,
-                      disabled: busy,
-                      onToggle: (billId) =>
-                        setSelected((current) =>
-                          toggleSelection(current, billId),
-                        ),
-                    }
-                  : null
-              }
-              onOpen={(billId) => setPanel({ kind: "bill", billId })}
-            />
-          ) : (
-            <BillHistory
-              bills={bills.data}
-              selectedId={panel?.kind === "bill" ? panel.billId : null}
-              onOpen={(billId) => setPanel({ kind: "bill", billId })}
-            />
-          )}
-        </div>
-        {panel ? (
-          <div className="xl:sticky xl:top-8">
-            {panel.kind === "new" ? (
-              <section
-                aria-label="New bill"
-                className="rounded-lg border border-stone-200 bg-white p-4"
-              >
-                <BillForm
-                  organizationId={organizationId}
-                  bill={null}
-                  onSaved={(bill) => {
-                    setView("open");
-                    setPanel({ kind: "bill", billId: bill.id });
-                  }}
-                  onCancel={() => setPanel(null)}
-                />
-              </section>
-            ) : (
-              <BillPanel
-                key={panel.billId}
-                organizationId={organizationId}
-                billId={panel.billId}
-                canAct={canAct}
-                rate={rate}
-                paymentBusy={busy}
-                onPay={(bill) =>
-                  startPayment({
-                    billIds: [bill.id],
-                    retry: bill.status === "payout_failed",
-                    secondConfirmation: false,
-                  })
-                }
-                onClose={() => setPanel(null)}
-              />
-            )}
-          </div>
+              </Button>
+            }
+          />
         ) : null}
-      </div>
-    </section>
-  );
-}
-
-/** Pay all: the selection, its total, and a shortcut to select every payable bill. */
-function PayBar({
-  bills,
-  selected,
-  preparing,
-  onSelect,
-  onPay,
-}: {
-  bills: readonly Bill[];
-  selected: readonly Bill[];
-  preparing: boolean;
-  onSelect: (billIds: string[]) => void;
-  onPay: () => void;
-}): JSX.Element {
-  const payable = bills.filter(canSelect);
-  const totals = selected
-    .map((bill) => formatBillAmount(bill))
-    .filter((amount): amount is string => amount !== null);
-  return (
-    <div className="flex flex-wrap items-center gap-4 rounded-lg border border-stone-200 bg-white p-4">
-      <p className="text-sm text-stone-700">
-        {selected.length === 0
-          ? "Select bills to pay together."
-          : `${String(selected.length)} selected · ${totals.join(" + ")}`}
-      </p>
-      <button
-        type="button"
-        disabled={selected.length === 0 || preparing}
-        onClick={onPay}
-        className={primaryButton}
-      >
-        {preparing
-          ? "Working out the cost…"
-          : selected.length > 1
-            ? `Pay all ${String(selected.length)}`
-            : "Pay"}
-      </button>
-      {payable.length > 0 && selected.length < payable.length ? (
-        <button
-          type="button"
-          onClick={() =>
-            onSelect(
-              payable.slice(0, BILL_PAYMENT_MAX_BILLS).map((bill) => bill.id),
-            )
-          }
-          className={textButton}
-        >
-          Select all payable
-          {payable.length > BILL_PAYMENT_MAX_BILLS
-            ? ` (first ${String(BILL_PAYMENT_MAX_BILLS)})`
-            : ""}
-        </button>
-      ) : null}
-      {selected.length > 0 ? (
-        <button
-          type="button"
-          onClick={() => onSelect([])}
-          className={textButton}
-        >
-          Clear selection
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-interface Selection {
-  readonly selected: readonly string[];
-  readonly disabled: boolean;
-  readonly onToggle: (billId: string) => void;
-}
-
-function BillName({
-  bill,
-  selected,
-  onOpen,
-}: {
-  bill: Bill;
-  selected: boolean;
-  onOpen: (billId: string) => void;
-}): JSX.Element {
-  const notes = [
-    bill.reference,
-    bill.category.name,
-    bill.recurringItemId ? "Recurring" : null,
-    bill.payrollRunId ? "Payroll" : null,
-    bill.fileCount > 0
-      ? `${String(bill.fileCount)} ${bill.fileCount === 1 ? "file" : "files"}`
-      : null,
-  ].filter((note): note is string => note !== null);
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => onOpen(bill.id)}
-        aria-pressed={selected}
-        className="text-left font-medium text-brand-700 underline-offset-4 hover:underline"
-      >
-        {bill.payee.name}
-      </button>
-      <span className="block text-xs text-stone-500">{notes.join(" · ")}</span>
-    </>
-  );
-}
-
-function OpenBills({
-  bills,
-  rate,
-  selectedId,
-  selection,
-  onOpen,
-}: {
-  bills: readonly Bill[];
-  rate: string | null;
-  selectedId: string | null;
-  selection: Selection | null;
-  onOpen: (billId: string) => void;
-}): JSX.Element {
-  const groups = groupOpenBills(bills);
-  if (groups.length === 0) {
-    return (
-      <p className="rounded-lg border border-dashed border-stone-300 bg-white p-6 text-sm text-stone-600">
-        Nothing to pay. New bills and recurring payments show up here.
-      </p>
-    );
-  }
-  return (
-    <>
-      {groups.map((group) => (
-        <section key={group.status} aria-label={group.title}>
-          <h2 className="mb-2 text-base font-semibold">{group.title}</h2>
-          <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-            <table className={tableClass}>
-              <thead className="bg-stone-100 text-stone-600">
-                <tr>
-                  {selection ? (
-                    <th scope="col" className={`${headCellClass} w-8`}>
-                      <span className="sr-only">Select</span>
-                    </th>
-                  ) : null}
-                  <th scope="col" className={headCellClass}>
-                    Due
-                  </th>
-                  <th scope="col" className={headCellClass}>
-                    Payee
-                  </th>
-                  <th scope="col" className={`${headCellClass} text-right`}>
-                    Amount
-                  </th>
-                  <th scope="col" className={headCellClass}>
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {group.bills.map((bill) => {
-                  const checked = selection
-                    ? selection.selected.includes(bill.id)
-                    : false;
-                  return (
-                    <tr
-                      key={bill.id}
-                      className={`border-t border-stone-200 align-top ${bill.id === selectedId ? "bg-brand-50" : ""}`}
-                    >
-                      {selection ? (
-                        <td className={cellClass}>
-                          {canSelect(bill) ? (
-                            <input
-                              type="checkbox"
-                              aria-label={`Select ${bill.payee.name}`}
-                              checked={checked}
-                              disabled={
-                                selection.disabled ||
-                                (!checked &&
-                                  selection.selected.length >=
-                                    BILL_PAYMENT_MAX_BILLS)
-                              }
-                              onChange={() => selection.onToggle(bill.id)}
-                            />
-                          ) : null}
-                        </td>
-                      ) : null}
-                      <td className={`${cellClass} whitespace-nowrap`}>
-                        {formatIsoDate(bill.dueOn)}
-                      </td>
-                      <td className={cellClass}>
-                        <BillName
-                          bill={bill}
-                          selected={bill.id === selectedId}
-                          onOpen={onOpen}
-                        />
-                      </td>
-                      <td
-                        className={`${cellClass} text-right whitespace-nowrap tabular-nums`}
-                      >
-                        <BillAmount bill={bill} rate={rate} />
-                      </td>
-                      <td className={cellClass}>
-                        <BillStatusBadge status={bill.status} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ))}
-    </>
-  );
-}
-
-function settledOn(bill: Bill): string {
-  if (bill.paidOn) return formatIsoDate(bill.paidOn);
-  if (bill.cancelledAt) return formatNairobiDate(bill.cancelledAt);
-  return formatIsoDate(bill.dueOn);
-}
-
-function BillHistory({
-  bills,
-  selectedId,
-  onOpen,
-}: {
-  bills: readonly Bill[];
-  selectedId: string | null;
-  onOpen: (billId: string) => void;
-}): JSX.Element {
-  if (bills.length === 0) {
-    return (
-      <p className="rounded-lg border border-dashed border-stone-300 bg-white p-6 text-sm text-stone-600">
-        No bills paid or cancelled in the last six months.
-      </p>
-    );
-  }
-  return (
-    <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
-      <table className={tableClass}>
-        <thead className="bg-stone-100 text-stone-600">
-          <tr>
-            <th scope="col" className={headCellClass}>
-              Settled
-            </th>
-            <th scope="col" className={headCellClass}>
-              Payee
-            </th>
-            <th scope="col" className={`${headCellClass} text-right`}>
-              Amount
-            </th>
-            <th scope="col" className={headCellClass}>
-              Status
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {historyNewestFirst(bills).map((bill) => (
-            <tr
-              key={bill.id}
-              className={`border-t border-stone-200 align-top ${bill.id === selectedId ? "bg-brand-50" : ""}`}
-            >
-              <td className={`${cellClass} whitespace-nowrap`}>
-                {settledOn(bill)}
-              </td>
-              <td className={cellClass}>
-                <BillName
-                  bill={bill}
-                  selected={bill.id === selectedId}
-                  onOpen={onOpen}
-                />
-              </td>
-              <td
-                className={`${cellClass} text-right whitespace-nowrap tabular-nums`}
+        {result ? (
+          <PaymentResultBanner
+            result={result}
+            showBeingPaid={view !== "paying"}
+            onRetry={(failedId) =>
+              startPayment({
+                billIds: [failedId],
+                retry: true,
+                secondConfirmation: false,
+              })
+            }
+            onSeeBeingPaid={() => showView("paying")}
+            onDismiss={() => setResult(null)}
+          />
+        ) : null}
+        {paymentError && payment === null ? (
+          <Banner
+            tone="warn"
+            role="alert"
+            title={paymentError}
+            actions={
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => {
+                  prepare.reset();
+                  pay.reset();
+                }}
               >
-                <BillAmount bill={bill} rate={null} />
-              </td>
-              <td className={cellClass}>
-                <BillStatusBadge status={bill.status} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                Done
+              </Button>
+            }
+          />
+        ) : null}
+      </Banners>
+
+      <BillStats
+        summary={summary.data}
+        loading={summary.isPending}
+        failed={summary.isError && summary.data === undefined}
+        rate={rate}
+      />
+
+      <BillsResults
+        view={view}
+        onView={showView}
+        counts={summary.data?.views}
+        filters={filters}
+        onFilter={(name, value) =>
+          setParams({ [BILL_FILTER_PARAMS[name]]: value })
+        }
+        onClearAll={() => setParams(NO_FILTER_PARAMS)}
+        payees={payees.data ?? []}
+        categories={categories.data ?? []}
+        rows={rows}
+        loading={bills.isPending}
+        failed={bills.isError}
+        refreshing={bills.isPlaceholderData}
+        onRetry={() => void bills.refetch()}
+        sort={sort}
+        onSort={(key) =>
+          setSorts((current) => ({
+            ...current,
+            [view]: nextSort(sort, key, firstSortDir(key, view)),
+          }))
+        }
+        rate={rate}
+        today={today}
+        openId={billId}
+        onOpen={(id) => navigate({ billId: id, recurring: null })}
+        selection={
+          selectable
+            ? {
+                selected: chosen,
+                busy,
+                preparing: preparing && payment === null && billId === null,
+                onToggle: (id) => setSelected(toggleSelection(chosen, id)),
+                onSelect: setSelected,
+                onPay: () =>
+                  startPayment({
+                    billIds: chosen,
+                    retry: false,
+                    secondConfirmation: false,
+                  }),
+              }
+            : null
+        }
+      />
+
+      <BillsSheet
+        organizationId={organizationId}
+        canAct={canAct}
+        canPay={canPay}
+        needsPasskey={needsPasskey}
+        rate={rate}
+        rows={rows}
+        billId={billId}
+        recurring={recurring}
+        local={local}
+        payment={{
+          step: payment,
+          preparing,
+          paying: pay.isPending,
+          costChanged,
+          cancelled: pay.data?.status === "cancelled" && payment !== null,
+          error: paymentError,
+          onPayBill: (bill) =>
+            startPayment({
+              billIds: [bill.id],
+              retry: bill.status === "payout_failed",
+              secondConfirmation: false,
+            }),
+          onConfirmHold: () => {
+            if (payment?.step === "hold") {
+              startPayment({ ...payment.request, secondConfirmation: true });
+            }
+          },
+          onPay: () => {
+            if (payment?.step === "review") onPay(payment.prepared);
+          },
+          onCancel: () => {
+            pay.reset();
+            prepare.reset();
+            setPayment(null);
+            navigate({ billId: null, recurring: null });
+          },
+        }}
+        onNavigate={navigate}
+        onLocal={setLocal}
+        onClose={closeSheet}
+        onBillCreated={(bill: BillDetail) =>
+          navigate({
+            ...NO_FILTER_PARAMS,
+            view: null,
+            recurring: null,
+            billId: bill.id,
+          })
+        }
+      />
     </div>
+  );
+}
+
+/**
+ * A bill opened from a link (`?billId=` on arrival) shows under its own
+ * tab: once its details load, the page moves to that tab if it isn't on it.
+ */
+function useLinkedBillTab(
+  organizationId: string,
+  billId: string | null,
+  view: BillListView,
+  onTab: (tab: BillListView) => void,
+): void {
+  const [linked] = useState(billId);
+  const detail = useBill(organizationId, linked ?? "", {
+    enabled: linked !== null,
+  });
+  const done = useRef(false);
+  const status = detail.data?.status;
+  useEffect(() => {
+    if (done.current || status === undefined) return;
+    done.current = true;
+    const tab = viewOfStatus(status);
+    if (tab !== view) onTab(tab);
+  }, [status, view, onTab]);
+}
+
+function CountCard({
+  label,
+  icon,
+  tone,
+  totals,
+  rate,
+}: {
+  label: string;
+  icon: LucideIcon;
+  tone: "attention" | "danger";
+  totals: BillsSummary["overdue"];
+  rate: string | null;
+}): JSX.Element {
+  const any = totals.count > 0;
+  return (
+    <StatCard
+      icon={any ? icon : CheckIcon}
+      tone={any ? tone : "clear"}
+      label={label}
+      value={totals.count}
+      sub={
+        any ? (
+          <KesTotal
+            total={approxKesTotal({
+              kes: totals.totalKes,
+              usd: totals.totalUsdc,
+              rate,
+            })}
+          />
+        ) : (
+          "All clear"
+        )
+      }
+    />
+  );
+}
+
+/** Company-wide numbers: what's to pay, overdue, due today and failed. */
+function BillStats({
+  summary,
+  loading,
+  failed,
+  rate,
+}: {
+  summary: BillsSummary | undefined;
+  loading: boolean;
+  failed: boolean;
+  rate: string | null;
+}): JSX.Element | null {
+  if (failed) return null;
+  if (loading || summary === undefined) {
+    return (
+      <StatCards>
+        <StatCardSkeleton />
+        <StatCardSkeleton />
+        <StatCardSkeleton />
+        <StatCardSkeleton />
+      </StatCards>
+    );
+  }
+  const { toPay } = summary;
+  const bills = `${String(toPay.count)} ${toPay.count === 1 ? "bill" : "bills"}`;
+  return (
+    <StatCards>
+      <StatCard
+        icon={FileTextIcon}
+        tone="total"
+        label="To pay"
+        value={
+          <KesTotal
+            total={approxKesTotal({
+              kes: toPay.totalKes,
+              usd: toPay.totalUsdc,
+              rate,
+            })}
+          />
+        }
+        sub={
+          toPay.withoutAmount > 0
+            ? `${bills} · ${String(toPay.withoutAmount)} without an amount`
+            : bills
+        }
+      />
+      <CountCard
+        label="Overdue"
+        icon={TriangleAlertIcon}
+        tone="danger"
+        totals={summary.overdue}
+        rate={rate}
+      />
+      <CountCard
+        label="Due today"
+        icon={ClockIcon}
+        tone="attention"
+        totals={summary.dueToday}
+        rate={rate}
+      />
+      <CountCard
+        label="Payment failed"
+        icon={CircleAlertIcon}
+        tone="danger"
+        totals={summary.payoutFailed}
+        rate={rate}
+      />
+    </StatCards>
   );
 }

@@ -1,13 +1,20 @@
 "use client";
 
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import type {
   Bill,
   BillDetail,
+  BillListView,
   BillPayment,
   BillPaymentResult,
+  BillsSummary,
   CancelBillRequest,
   CreateBillRequest,
   MarkBillPaidOutsideRequest,
@@ -17,12 +24,13 @@ import type {
 import {
   billDetailSchema,
   billsResponseSchema,
+  billsSummarySchema,
   paidFromAccountsResponseSchema,
   walletResponseSchema,
 } from "@expendi-business/shared";
 
+import type { BillFilters, BillSummaryParams } from "./bill-list";
 import type { BillPaymentRequest } from "./bill-payment";
-import type { BillListView } from "~/features/payment-keys";
 import type { ApiClient } from "~/lib/api";
 import type { ApprovalOutcome } from "~/lib/approval";
 import {
@@ -35,13 +43,8 @@ import { isChallengeFresh } from "~/lib/approval";
 import { queryKeys } from "~/lib/query-keys";
 import { useApi } from "~/lib/use-api";
 import { usePasskeyApproval } from "~/lib/use-approval";
-import {
-  HISTORY_BILL_STATUSES,
-  HISTORY_DAYS,
-  nairobiIsoDate,
-  OPEN_BILL_STATUSES,
-  shiftIsoDate,
-} from "./bill-groups";
+import { nairobiIsoDate } from "./bill-dates";
+import { listParams, toSearchParams } from "./bill-list";
 import {
   confirmBillPayment,
   CostChangedError,
@@ -54,17 +57,15 @@ import {
 const billsPath = (organizationId: string) =>
   `/organizations/${organizationId}/bills` as const;
 
-/** Open bills by due date; history is paid and cancelled bills due in the last six months. */
+/** One tab of bills, filtered, never with salaries; History goes back six months. */
 export function listBills(
   api: ApiClient,
   organizationId: string,
   view: BillListView,
+  filters: BillFilters,
   today: string,
 ): Promise<Bill[]> {
-  const query =
-    view === "open"
-      ? `status=${OPEN_BILL_STATUSES.join(",")}`
-      : `status=${HISTORY_BILL_STATUSES.join(",")}&dueFrom=${shiftIsoDate(today, -HISTORY_DAYS)}`;
+  const query = toSearchParams({ ...listParams(view, filters, today) });
   return api.get(`${billsPath(organizationId)}?${query}`, billsResponseSchema);
 }
 
@@ -89,27 +90,73 @@ export function attachBillFiles(
   );
 }
 
+export const billListKey = (
+  organizationId: string,
+  view: BillListView,
+  filters: BillFilters,
+  today: string,
+) =>
+  [
+    ...billKeys.all(organizationId),
+    "list",
+    listParams(view, filters, today),
+  ] as const;
+
+/**
+ * A tab's bills. While new filters load, the last list stays up, dimmed
+ * (`isPlaceholderData`).
+ */
 export function useBills(
   organizationId: string,
   view: BillListView,
+  filters: BillFilters,
 ): UseQueryResult<Bill[]> {
   const api = useApi();
+  const today = nairobiIsoDate(new Date());
   return useQuery({
-    queryKey: billKeys.list(organizationId, view),
+    queryKey: billListKey(organizationId, view, filters, today),
+    queryFn: () => listBills(api, organizationId, view, filters, today),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Shares the sidebar badge's query when no filter is set (`navCountKeys`). */
+export const billsSummaryKey = (
+  organizationId: string,
+  params: BillSummaryParams,
+) => [...billKeys.all(organizationId), "summary", params] as const;
+
+/**
+ * The tabs' counts under the filters, and the company-wide totals the stat
+ * cards show; salaries are never counted.
+ */
+export function useBillsSummary(
+  organizationId: string,
+  params: BillSummaryParams,
+): UseQueryResult<BillsSummary> {
+  const api = useApi();
+  return useQuery({
+    queryKey: billsSummaryKey(organizationId, params),
     queryFn: () =>
-      listBills(api, organizationId, view, nairobiIsoDate(new Date())),
+      api.get(
+        `${billsPath(organizationId)}/summary?${toSearchParams({ ...params })}`,
+        billsSummarySchema,
+      ),
+    placeholderData: keepPreviousData,
   });
 }
 
 export function useBill(
   organizationId: string,
   billId: string,
+  { enabled = true }: { enabled?: boolean } = {},
 ): UseQueryResult<BillDetail> {
   const api = useApi();
   return useQuery({
     queryKey: billKeys.detail(organizationId, billId),
     queryFn: () =>
       api.get(`${billsPath(organizationId)}/${billId}`, billDetailSchema),
+    enabled,
   });
 }
 

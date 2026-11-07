@@ -3,6 +3,7 @@
 import type { JSX, ReactNode } from "react";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 
 import { MissingConfig } from "~/components/missing-config";
 import { AuthProvider } from "~/contexts/auth-context";
@@ -32,7 +33,12 @@ function getQueryClient(): QueryClient {
 }
 
 export function Providers({ children }: { children: ReactNode }): JSX.Element {
+  const pathname = usePathname();
   const queryClient = getQueryClient();
+
+  if (process.env.NODE_ENV === "development" && pathname.startsWith("/dev/")) {
+    return <>{children}</>;
+  }
 
   if (!publicEnv.ok) {
     return <MissingConfig invalidKeys={publicEnv.invalidKeys} />;

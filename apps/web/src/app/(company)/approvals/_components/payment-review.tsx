@@ -1,151 +1,205 @@
 "use client";
 
-import type { JSX } from "react";
+import type { LucideIcon } from "lucide-react";
+import type { JSX, ReactNode } from "react";
+import { ChevronDownIcon, InfoIcon, KeyRoundIcon } from "lucide-react";
+import Link from "next/link";
 
-import type {
-  ClaimApproval,
-  ClaimPaymentResult,
-} from "@expendi-business/shared";
+import type { ClaimApproval } from "@expendi-business/shared";
 
-import { primaryButton, secondaryButton } from "~/components/styles";
-import { formatKesCents, formatUsdc } from "~/lib/money";
-import { describePaymentResult, previewRows } from "./payment";
+import type { PreviewValue } from "./payment";
+import { textLinkClass } from "~/components/data/actions";
+import {
+  Callout,
+  DetailItem,
+  DetailList,
+} from "~/components/data/detail-sheet";
+import { Money } from "~/components/data/money";
+import { EntityMark } from "~/components/data/table";
+import { PASSKEY_HINT } from "~/features/payment-ui";
+import { previewRows } from "./payment";
 
-/**
- * What the admin confirms with their passkey (spec §6.7 step 2): each
- * claim's payment and the total. A short wallet blocks paying ("Top up KES
- * X", step 4).
- */
-export function PaymentReview({
-  approval,
-  isRetry,
-  paying,
-  onPay,
-  onCancel,
+/** More previews than this start folded, so the totals stay in view. */
+const OPEN_PREVIEWS_UP_TO = 3;
+
+function Note({
+  icon: Icon,
+  children,
 }: {
-  approval: ClaimApproval;
-  isRetry: boolean;
-  paying: boolean;
-  onPay: () => void;
-  onCancel: () => void;
+  icon: LucideIcon;
+  children: ReactNode;
 }): JSX.Element {
-  const topUpKes = approval.wallet.topUpKes;
-  const count = approval.claims.length;
   return (
-    <section
-      aria-label="Review the payment"
-      className="rounded-lg border border-brand-500 bg-white p-4"
-    >
-      <h2 className="text-base font-semibold">
-        {isRetry
-          ? "Retry the payment"
-          : `Approve & pay ${String(count)} ${count === 1 ? "claim" : "claims"}`}
-      </h2>
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {approval.claims.map((preview) => (
-          <dl
-            key={preview.claimId}
-            className="space-y-1 rounded-md border border-stone-200 p-3 text-sm"
-          >
-            {previewRows(preview).map((row) => (
-              <div key={row.label} className="flex justify-between gap-3">
-                <dt className="text-stone-600">{row.label}</dt>
-                <dd className="text-right font-medium">{row.value}</dd>
-              </div>
-            ))}
-          </dl>
-        ))}
-      </div>
-      <dl className="mt-4 grid gap-3 rounded-md bg-stone-50 p-3 text-sm sm:grid-cols-3">
-        <div>
-          <dt className="text-stone-600">They receive, in total</dt>
-          <dd className="text-base font-semibold">
-            KES {formatKesCents(approval.totals.receivesKes)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-stone-600">Total, at most</dt>
-          <dd className="text-base font-semibold">
-            {formatUsdc(approval.totals.maxDebitUsdc)} USDC
-          </dd>
-        </div>
-        <div>
-          <dt className="text-stone-600">In the wallet</dt>
-          <dd className="text-base font-semibold">
-            {formatUsdc(approval.wallet.availableUsdc)} USDC
-          </dd>
-        </div>
-      </dl>
-      <p className="mt-3 text-sm text-stone-600">
-        Paycrest states its exact fee when each payment is made. What isn’t used
-        stays in the wallet. Each claim is paid on its own.
-      </p>
-      {topUpKes ? (
-        <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          <span className="font-semibold">
-            Top up KES {formatKesCents(topUpKes)}
-          </span>{" "}
-          The wallet doesn’t hold enough USDC for this. Add funds, then review
-          it again.
-        </p>
-      ) : (
-        <p className="mt-3 text-sm text-stone-600">
-          Your browser asks for your approval passkey. To use the one on your
-          phone, choose “use a phone or tablet”.
-        </p>
-      )}
-      <div className="mt-4 flex gap-3">
-        <button
-          type="button"
-          onClick={onPay}
-          disabled={topUpKes !== null || paying}
-          className={primaryButton}
-        >
-          {paying ? "Waiting for your passkey…" : "Pay with passkey"}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={paying}
-          className={secondaryButton}
-        >
-          Cancel
-        </button>
-      </div>
-    </section>
+    <p className="flex items-start gap-2 text-gray-600">
+      <Icon
+        aria-hidden="true"
+        className="mt-0.5 size-4 shrink-0 text-gray-500"
+      />
+      <span>{children}</span>
+    </p>
   );
 }
 
-export function PaymentResultNotice({
-  result,
-  onDismiss,
+function Changed({
+  changed,
+  children,
 }: {
-  result: ClaimPaymentResult;
-  onDismiss: () => void;
+  changed: boolean;
+  children: ReactNode;
 }): JSX.Element {
-  const summary = describePaymentResult(result);
-  const tone =
-    summary.outcome === "failed" || summary.outcome === "review"
-      ? "border-amber-300 bg-amber-50 text-amber-900"
-      : "border-emerald-200 bg-emerald-50 text-emerald-900";
+  return changed ? (
+    <span className="-mx-1 rounded-[4px] bg-warn-50 px-1">{children}</span>
+  ) : (
+    <>{children}</>
+  );
+}
+
+function PreviewAmount({
+  value,
+  changed,
+}: {
+  value: PreviewValue;
+  changed: boolean;
+}): JSX.Element {
+  if (value.kind === "text") return <>{value.text}</>;
+  if (value.kind === "usdc") {
+    return (
+      <Changed changed={changed}>
+        <Money amount={value.units} currency="USDC" />
+      </Changed>
+    );
+  }
   return (
-    <section
-      aria-label="Payment result"
-      role="status"
-      className={`rounded-lg border p-4 text-sm ${tone}`}
-    >
-      <p className="font-semibold">{summary.title}</p>
-      <p className="mt-1">{summary.body}</p>
-      {summary.failureReason ? (
-        <p className="mt-1">{summary.failureReason}</p>
+    <>
+      <Money amount={value.cents} currency="KES" />
+      {value.note ? `, ${value.note}` : null}
+    </>
+  );
+}
+
+/**
+ * What the admin confirms with their passkey (spec §6.7 step 2): each
+ * reimbursement's payment, the totals and the wallet. A short wallet
+ * blocks paying ("Top up KES X", step 4). `costChanged` marks the USDC
+ * figures a fresh quote moved.
+ */
+export function PaymentReview({
+  approval,
+  merchantOf,
+  costChanged,
+  cancelled,
+}: {
+  approval: ClaimApproval;
+  /** What each reimbursement was spent on, by its id. */
+  merchantOf: (claimId: string) => string | undefined;
+  costChanged: boolean;
+  cancelled: boolean;
+}): JSX.Element {
+  const topUpKes = approval.wallet.topUpKes;
+  return (
+    <>
+      {costChanged ? (
+        <div role="alert">
+          <Callout tone="warn">
+            <p>
+              The cost changed since you reviewed it. Nothing was sent. Review
+              it again.
+            </p>
+          </Callout>
+        </div>
       ) : null}
-      <button
-        type="button"
-        onClick={onDismiss}
-        className={`mt-3 ${secondaryButton}`}
-      >
-        Done
-      </button>
-    </section>
+      <div className="flex flex-col gap-2">
+        {approval.claims.map((preview) => (
+          <details
+            key={preview.claimId}
+            open={approval.claims.length <= OPEN_PREVIEWS_UP_TO}
+            className="group/preview rounded-control border border-gray-200"
+          >
+            <summary className="grid cursor-pointer list-none grid-cols-[32px_minmax(0,1fr)_auto_16px] items-center gap-3 rounded-control px-3 py-2.5 [&::-webkit-details-marker]:hidden">
+              <EntityMark name={preview.claimantName} kind="person" />
+              <span className="min-w-0">
+                <span className="block truncate font-(--w-name)">
+                  {preview.claimantName}
+                </span>
+                <span className="block truncate text-xs leading-4 text-gray-500">
+                  {merchantOf(preview.claimId)}
+                </span>
+              </span>
+              <span className="text-right font-(--w-amount) whitespace-nowrap">
+                <Money amount={preview.receivesKes} currency="KES" />
+              </span>
+              <ChevronDownIcon
+                aria-hidden="true"
+                className="size-4 text-gray-500 transition-transform duration-200 ease-out-expo group-open/preview:rotate-180"
+              />
+            </summary>
+            <div className="mr-3 mb-3 ml-14 border-t border-hairline pt-[9px] max-[600px]:ml-3">
+              <DetailList labelWidth="lg">
+                {previewRows(preview).map((row) => (
+                  <DetailItem key={row.label} label={row.label}>
+                    <PreviewAmount value={row.value} changed={costChanged} />
+                  </DetailItem>
+                ))}
+              </DetailList>
+            </div>
+          </details>
+        ))}
+      </div>
+      <dl className="grid grid-cols-3 gap-3 rounded-control bg-gray-50 px-4 py-3.5 max-[600px]:grid-cols-1">
+        <div>
+          <dt className="text-xs leading-4 font-(--w-ui) text-gray-500">
+            They receive, in total
+          </dt>
+          <dd className="mt-1 text-base leading-6 font-(--w-amount)">
+            <Money amount={approval.totals.receivesKes} currency="KES" />
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs leading-4 font-(--w-ui) text-gray-500">
+            Total, at most
+          </dt>
+          <dd className="mt-1 text-base leading-6 font-(--w-amount)">
+            <Changed changed={costChanged}>
+              <Money amount={approval.totals.maxDebitUsdc} currency="USDC" />
+            </Changed>
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs leading-4 font-(--w-ui) text-gray-500">
+            In the wallet
+          </dt>
+          <dd className="mt-1 text-base leading-6 font-(--w-amount)">
+            <Money amount={approval.wallet.availableUsdc} currency="USDC" />
+          </dd>
+        </div>
+      </dl>
+      <Note icon={InfoIcon}>
+        Paycrest states its exact fee when each payment is made. What isn’t used
+        stays in the wallet. Each one is paid on its own.
+      </Note>
+      {topUpKes ? (
+        <Callout
+          tone="warn"
+          title={
+            <>
+              Top up <Money amount={topUpKes} currency="KES" />
+            </>
+          }
+        >
+          <p>
+            The wallet doesn’t hold enough USDC for this. Add funds, then review
+            it again.{" "}
+            <Link href="/wallet" className={textLinkClass}>
+              Go to Accounts
+            </Link>
+          </p>
+        </Callout>
+      ) : (
+        <Note icon={KeyRoundIcon}>{PASSKEY_HINT}</Note>
+      )}
+      {cancelled ? (
+        <Note icon={InfoIcon}>Cancelled. Nothing was sent.</Note>
+      ) : null}
+    </>
   );
 }

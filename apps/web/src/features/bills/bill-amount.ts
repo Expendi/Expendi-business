@@ -70,18 +70,3 @@ export function currencyOfPayee(
     ? fallback
     : currencyForPayeeMethod(method);
 }
-
-const MICRO = 1_000_000n;
-const RATE = /^(0|[1-9]\d{0,14})(\.\d{1,6})?$/;
-
-/**
- * KES cents that `usdcUnits` convert to at Paycrest's `rate` (KES per
- * USDC), rounded down, as the API's `kesCentsFor` values a USD bill; null
- * if the rate isn't a decimal it can read.
- */
-export function kesCentsAtRate(usdcUnits: string, rate: string): string | null {
-  if (!RATE.test(rate)) return null;
-  const [whole = "0", fraction = ""] = rate.split(".");
-  const rateMicro = BigInt(whole) * MICRO + BigInt(fraction.padEnd(6, "0"));
-  return ((BigInt(usdcUnits) * rateMicro * 100n) / (MICRO * MICRO)).toString();
-}

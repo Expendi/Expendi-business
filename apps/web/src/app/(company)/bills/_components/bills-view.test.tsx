@@ -1,97 +1,101 @@
+import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import type { Bill, WalletResponse } from "@expendi-business/shared";
-
+import {
+  seedBills,
+  summarizeSampleBills,
+  WALLET,
+} from "~/app/dev/preview/_harness/fixtures/bills";
 import { DashboardProvider } from "~/contexts/dashboard-context";
+import {
+  historySettledFrom,
+  NO_BILL_FILTERS,
+} from "~/features/bills/bill-list";
+import { billListKey, billsSummaryKey } from "~/features/bills/bills-api";
 import { billKeys } from "~/features/payment-keys";
 import { queryKeys } from "~/lib/query-keys";
 import { BillsView } from "./bills-view";
 
+const navigation = vi.hoisted(() => ({ params: new URLSearchParams() }));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/bills",
+  useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => navigation.params,
+}));
 vi.mock("~/lib/use-api", () => ({ useApi: () => ({}) }));
+vi.mock("~/components/data/detail-sheet", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const { createElement } = await import("react");
+  return {
+    ...actual,
+    DetailSheet: (props: SheetProps) =>
+      props.open
+        ? createElement(
+            "section",
+            { "data-sheet": "" },
+            props.eyebrow,
+            createElement("h2", null, props.title),
+            props.headerExtra,
+            props.children,
+            props.footer,
+          )
+        : null,
+  };
+});
 vi.mock("~/contexts/auth-context", () => ({ useAuth: () => ({ api: {} }) }));
+
+/** The side sheet, drawn in place: Radix portals don't render on the server. */
+interface SheetProps {
+  open: boolean;
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  headerExtra?: ReactNode;
+  footer?: ReactNode;
+  children: ReactNode;
+}
 
 const ORG = "00000000-0000-4000-8000-0000000000aa";
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const TODAY = "2026-11-06";
 
-const kesBill: Bill = {
-  id: id(1),
-  status: "overdue",
-  payee: {
-    id: id(50),
-    name: "Kenya Power",
-    kind: "supplier",
-    method: "mpesa_paybill",
-    archived: false,
-  },
-  overviewHeading: "transactions",
-  category: { id: id(60), name: "Utilities" },
-  variable: false,
-  currency: "kes",
-  amountKes: "1250050",
-  amountUsdc: null,
-  reference: "INV-204",
-  notes: null,
-  dueOn: "2026-10-30",
-  recurringItemId: id(70),
-  payrollRunId: null,
-  adjustmentReason: null,
-  paidOn: null,
-  paidAt: null,
-  markedPaidBy: null,
-  paidOutsideNote: null,
-  cancelledReason: null,
-  cancelledAt: null,
-  cancelledBy: null,
-  payoutId: null,
-  fileCount: 1,
-  createdAt: "2026-10-20T09:00:00.000Z",
-  updatedAt: "2026-10-20T09:00:00.000Z",
-};
+beforeAll(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-11-06T09:00:00+03:00"));
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
 
-const usdBill: Bill = {
-  ...kesBill,
-  id: id(2),
-  status: "upcoming",
-  payee: {
-    id: id(51),
-    name: "Figma",
-    kind: "vendor",
-    method: "usdc",
-    archived: false,
-  },
-  overviewHeading: "subscriptions",
-  currency: "usd",
-  amountKes: null,
-  amountUsdc: "45000000",
-  reference: null,
-  dueOn: "2026-11-15",
-  recurringItemId: null,
-  fileCount: 0,
-};
-
-const wallet: WalletResponse = {
-  status: "active",
-  address: "0x1234567890abcdef1234567890abcdef12345678",
-  chain: "base",
-  usdcBalance: "500000000",
-  kesEquivalent: { kesCents: "6434000", rate: "128.68" },
-};
-
-function render(role: "admin" | "accountant"): string {
-  const queryClient = new QueryClient();
-  queryClient.setQueryData(billKeys.list(ORG, "open"), [kesBill, usdBill]);
-  queryClient.setQueryData(billKeys.kesRate(ORG), wallet);
-  queryClient.setQueryData(queryKeys.approvalPasskey, {
-    enrolled: true,
-    enrolledAt: "2026-10-01T09:00:00.000Z",
+function render(
+  role: "admin" | "accountant",
+  {
+    query = "",
+    enrolled = true,
+    seed = seedBills,
+  }: {
+    query?: string;
+    enrolled?: boolean;
+    seed?: (client: QueryClient) => void;
+  } = {},
+): string {
+  navigation.params = new URLSearchParams(query);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, retryOnMount: false } },
+  });
+  seed(client);
+  client.setQueryData(billKeys.kesRate(ORG), WALLET);
+  client.setQueryData(queryKeys.approvalPasskey, {
+    enrolled,
+    enrolledAt: enrolled ? "2026-10-01T09:00:00.000Z" : null,
   });
   return renderToStaticMarkup(
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={client}>
       <DashboardProvider
-        company={{ organizationId: ORG, name: "Acme Ltd", role }}
+        company={{ organizationId: ORG, name: "Mwangaza Logistics", role }}
       >
         <BillsView />
       </DashboardProvider>
@@ -99,53 +103,381 @@ function render(role: "admin" | "accountant"): string {
   );
 }
 
+const textOf = (html: string) =>
+  html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&#x27;/g, "'")
+    .replace(/\s+/g, " ");
+
+const checkboxes = (html: string) =>
+  (html.match(/type="checkbox"/g) ?? []).length;
+
+/** The table, before the phone cards repeat the same rows. */
+const tableOf = (html: string) =>
+  html.slice(0, html.indexOf('aria-label="Bills"><li'));
+
 describe("the bills page", () => {
-  it("shows an admin the bills by status, a USD bill with its KES equivalent, and Pay all", () => {
+  it("shows an admin what's owed: one KES total, the tabs with counts, the filters and the actions", () => {
     // #when
     const html = render("admin");
+    const text = textOf(html);
 
     // #then
     expect({
-      overdue: html.includes(">Overdue<"),
-      upcoming: html.includes(">Upcoming<"),
-      kes: html.includes("KES 12,500.50"),
-      usd: html.includes("USD 45.00"),
-      usdInKes: html.includes("≈ KES 5,790.60 today"),
-      reference: html.includes("INV-204 · Utilities · Recurring · 1 file"),
-      checkboxes: (html.match(/type="checkbox"/g) ?? []).length,
-      newBill: html.includes(">New bill<"),
-      selectAll: html.includes("Select all payable"),
+      importLink: html.includes('href="/imports?kind=bill"'),
+      recurring: text.includes("Recurring payments"),
+      newBill: text.includes("New bill"),
+      toPay: text.includes(
+        "To pay ≈ KES 339,792 13 bills · 1 without an amount",
+      ),
+      overdue: text.includes("Overdue 2 KES 80,500"),
+      dueToday: text.includes("Due today 2 ≈ KES 12,804"),
+      failed: text.includes("Payment failed 1 KES 4,100"),
+      tabs: ["To pay 13", "Being paid 1", "History 9"].every((tab) =>
+        text.includes(tab),
+      ),
+      chips: [
+        "Filter by status",
+        "Filter by payee",
+        "Filter by category",
+        "Filter by heading",
+        "Filter by paid by",
+        "Filter by source",
+      ].every((label) => html.includes(`aria-label="${label}"`)),
+      plusUsd: text.includes("+ USD"),
+      claim: /claim/i.test(text),
     }).toEqual({
-      overdue: true,
-      upcoming: true,
-      kes: true,
-      usd: true,
-      usdInKes: true,
-      reference: true,
-      checkboxes: 2,
+      importLink: true,
+      recurring: true,
       newBill: true,
-      selectAll: true,
+      toPay: true,
+      overdue: true,
+      dueToday: true,
+      failed: true,
+      tabs: true,
+      chips: true,
+      plusUsd: false,
+      claim: false,
     });
   });
 
-  it("shows an accountant the same bills read-only", () => {
+  it("lists To pay by urgency with due hints and markers, and checkboxes only on bills that can be paid together", () => {
+    // #when
+    const html = render("admin");
+    const text = textOf(html);
+    const table = tableOf(html);
+    const order = [
+      "Zuku",
+      "Securex Guards",
+      "Kilimani Properties",
+      "Figma",
+      "Safaricom",
+      "KRA",
+    ].map((name) => table.indexOf(`>${name}</button>`));
+
+    // #then
+    expect({
+      ordered: order.every(
+        (at, i) => at > 0 && (i === 0 || at > (order[i - 1] ?? 0)),
+      ),
+      hints: ["2 days late", "6 days late", "Today", "In 3 days"].every(
+        (hint) => text.includes(hint),
+      ),
+      meta: text.includes("INV-2026-1101 · Rent & utilities"),
+      recurringMarker: html.includes('title="Recurring"'),
+      fileMarker: html.includes('title="1 file"'),
+      usdInKes: text.includes("≈ KES 5,805 today"),
+      toEnter: text.includes("To enter"),
+      notSet: text.includes("Not set"),
+      checkboxes: checkboxes(html),
+      selectionBar: text.includes("Select bills to pay together."),
+      selectAll: text.includes("Select all payable"),
+      salaries: text.includes("Salaries"),
+    }).toEqual({
+      ordered: true,
+      hints: true,
+      meta: true,
+      recurringMarker: true,
+      fileMarker: true,
+      usdInKes: true,
+      toEnter: true,
+      notSet: true,
+      checkboxes: 18,
+      selectionBar: true,
+      selectAll: true,
+      salaries: false,
+    });
+  });
+
+  it("shows an accountant the same bills with no way to add or pay them", () => {
     // #when
     const html = render("accountant");
-    const buttons = [...html.matchAll(/<button[^>]*>([^<]*)</g)].map(
-      ([, label]) => label,
+    const text = textOf(html);
+
+    // #then
+    expect({
+      subtitle: text.includes("Only admins add and pay bills."),
+      importLink: html.includes("/imports"),
+      newBill: text.includes("New bill"),
+      recurring: text.includes("Recurring payments"),
+      checkboxes: checkboxes(html),
+      selectionBar: text.includes("Select bills to pay together."),
+      zuku: text.includes("Zuku"),
+    }).toEqual({
+      subtitle: true,
+      importLink: false,
+      newBill: false,
+      recurring: true,
+      checkboxes: 0,
+      selectionBar: false,
+      zuku: true,
+    });
+  });
+
+  it("asks an admin without an approval passkey to set one up before paying", () => {
+    // #when
+    const html = render("admin", { enrolled: false });
+    const text = textOf(html);
+
+    // #then
+    expect({
+      banner: text.includes("Set up your approval passkey first"),
+      checkboxes: checkboxes(html),
+      newBill: text.includes("New bill"),
+    }).toEqual({ banner: true, checkboxes: 0, newBill: true });
+  });
+
+  it("shows History newest first by the day each bill was settled", () => {
+    // #when
+    const html = render("admin", { query: "view=history" });
+    const text = textOf(html);
+    const table = tableOf(html);
+
+    // #then
+    expect({
+      settledColumn: text.includes("Settled"),
+      newestFirst:
+        table.indexOf(">Kenya Power</button>") <
+        table.indexOf(">Hotpoint Appliances</button>"),
+      paidOutside: text.includes("Paid outside Expendi"),
+      cancelled: text.includes("Cancelled"),
+      checkboxes: checkboxes(html),
+      hints: text.includes("days late"),
+    }).toEqual({
+      settledColumn: true,
+      newestFirst: true,
+      paidOutside: true,
+      cancelled: true,
+      checkboxes: 0,
+      hints: false,
+    });
+  });
+
+  it("leaves the status filter off Being paid", () => {
+    // #when
+    const html = render("admin", { query: "view=paying" });
+
+    // #then
+    expect({
+      status: html.includes('aria-label="Filter by status"'),
+      twiga: textOf(html).includes("Twiga Foods"),
+      checkboxes: checkboxes(html),
+    }).toEqual({ status: false, twiga: true, checkboxes: 0 });
+  });
+
+  it("says when no bill matches the filters, with Clear all", () => {
+    // #when
+    const html = render("admin", {
+      query: "source=one_off&heading=subscriptions",
+    });
+    const text = textOf(html);
+
+    // #then
+    expect({
+      empty: text.includes("No bills match these filters"),
+      clearAll: (text.match(/Clear all/g) ?? []).length,
+      sourceSet: html.includes('aria-label="Source: One-off. Change"'),
+    }).toEqual({ empty: true, clearAll: 2, sourceSet: true });
+  });
+
+  it("offers Try again when the bills don't load", () => {
+    // #given
+    const failing = (client: QueryClient) => {
+      client.setQueryData(
+        billsSummaryKey(ORG, { settledFrom: historySettledFrom(TODAY) }),
+        summarizeSampleBills({}),
+      );
+      const query = client.getQueryCache().build(client, {
+        queryKey: billListKey(ORG, "open", NO_BILL_FILTERS, TODAY),
+      });
+      query.setState({
+        ...query.state,
+        status: "error",
+        error: new Error("Couldn't reach Expendi Business."),
+        errorUpdatedAt: Date.now(),
+      });
+    };
+
+    // #when
+    const text = textOf(render("admin", { seed: failing }));
+
+    // #then
+    expect({
+      title: text.includes("Bills didn't load"),
+      retry: text.includes("Try again"),
+      stats: text.includes("339,792"),
+    }).toEqual({ title: true, retry: true, stats: true });
+  });
+});
+
+/** What the side sheet shows, as text. */
+const sheetOf = (html: string) => {
+  const at = html.indexOf("data-sheet");
+  return at < 0 ? null : textOf(html.slice(at));
+};
+
+describe("the bills page's side sheet", () => {
+  it("opens a linked bill with its schedule, files and every action an admin has", () => {
+    // #when
+    const sheet = sheetOf(render("admin", { query: `billId=${id(1)}` }));
+
+    // #then
+    expect(
+      [
+        "Recurring payment",
+        "Kilimani Properties",
+        "KES 48,500",
+        "Overdue",
+        "Monthly on the 1st See recurring payment",
+        "Reference INV-2026-1101",
+        "Rent plus service charge.",
+        "Invoice Open",
+        "Pay",
+        "Edit bill",
+        "Add invoice",
+        "Mark paid outside",
+        "Cancel bill",
+      ].filter((part) => !sheet?.includes(part)),
+    ).toEqual([]);
+  });
+
+  it("says why a failed payment failed and offers a retry, and asks for a variable bill's amount", () => {
+    // #when
+    const failed = sheetOf(render("admin", { query: `billId=${id(5)}` }));
+    const variable = sheetOf(render("admin", { query: `billId=${id(7)}` }));
+
+    // #then
+    expect({
+      reason: failed?.includes(
+        "Payment failed The paybill didn't accept the account number.",
+      ),
+      retry: failed?.includes("Retry payment"),
+      toEnter: variable?.includes("Enter the amount first."),
+      enter: variable?.includes("Enter the amount"),
+      pay: variable?.includes(" Pay "),
+      paidOutside: variable?.includes("Mark paid outside"),
+    }).toEqual({
+      reason: true,
+      retry: true,
+      toEnter: true,
+      enter: true,
+      pay: false,
+      paidOutside: false,
+    });
+  });
+
+  it("shows an accountant the bill read-only, with its place in the list", () => {
+    // #when
+    const sheet = sheetOf(render("accountant", { query: `billId=${id(1)}` }));
+
+    // #then
+    expect({
+      note: sheet?.includes("View only. Only admins add and pay bills."),
+      position: sheet?.includes("3 of 13"),
+      edit: sheet?.includes("Edit bill"),
+    }).toEqual({ note: true, position: true, edit: false });
+  });
+
+  it("lists the recurring payments, active first, with their next bill or none", () => {
+    // #when
+    const sheet = sheetOf(render("admin", { query: "recurring=all" }));
+
+    // #then
+    expect({
+      title: sheet?.includes(
+        "Recurring payments Set up once. Each one's next bill is always ready in To pay.",
+      ),
+      first: sheet?.includes(
+        "Securex Guards Monthly on the 31st, or the month’s last day · KES 32,000 31 Oct 2026 Overdue",
+      ),
+      weekly: sheet?.includes(
+        "Every Thursday · Variable 5 Nov 2026 Being paid",
+      ),
+      paused: sheet?.includes("Jubilee Health Paused"),
+      ended: sheet?.includes("Canva Ended"),
+      noMore: sheet?.includes("No more bills"),
+      salaries: sheet?.includes("Salar"),
+      add: sheet?.includes("New recurring payment"),
+    }).toEqual({
+      title: true,
+      first: true,
+      weekly: true,
+      paused: true,
+      ended: true,
+      noMore: true,
+      salaries: false,
+      add: true,
+    });
+  });
+
+  it("opens one recurring payment with its next bill, schedule and actions", () => {
+    // #when
+    const active = sheetOf(render("admin", { query: `recurring=${id(301)}` }));
+    const paused = sheetOf(render("admin", { query: `recurring=${id(311)}` }));
+    const viewOnly = sheetOf(
+      render("accountant", { query: `recurring=${id(301)}` }),
     );
 
     // #then
     expect({
-      kes: html.includes("KES 12,500.50"),
-      usdInKes: html.includes("≈ KES 5,790.60 today"),
-      checkbox: html.includes('type="checkbox"'),
-      buttons,
+      back: active?.includes("Back to recurring payments"),
+      nextBill: active?.includes(
+        "Next bill Due 1 Nov 2026 KES 48,500 Overdue Open bill",
+      ),
+      after: active?.includes("The bill after that Due 1 Dec 2026"),
+      reminder: active?.includes("5 days before it’s due"),
+      activeActions: ["Edit payment", "Pause", "End payment"].every((label) =>
+        active?.includes(label),
+      ),
+      resume: paused?.includes("Resume"),
+      viewOnly: viewOnly?.includes(
+        "View only. Only admins set up and change recurring payments.",
+      ),
+      viewOnlyEdit: viewOnly?.includes("Edit payment"),
     }).toEqual({
-      kes: true,
-      usdInKes: true,
-      checkbox: false,
-      buttons: ["To pay", "Paid &amp; cancelled", "Kenya Power", "Figma"],
+      back: true,
+      nextBill: true,
+      after: true,
+      reminder: true,
+      activeActions: true,
+      resume: true,
+      viewOnly: true,
+      viewOnlyEdit: false,
     });
+  });
+
+  it("opens the New bill form from ?new=1 for an admin only", () => {
+    // #when
+    const admin = sheetOf(render("admin", { query: "new=1" }));
+    const accountant = sheetOf(render("accountant", { query: "new=1" }));
+
+    // #then
+    expect({
+      form: ["New bill", "Pay to", "Variable amount", "Add bill"].every(
+        (part) => admin?.includes(part),
+      ),
+      accountant,
+    }).toEqual({ form: true, accountant: null });
   });
 });

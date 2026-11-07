@@ -2,6 +2,8 @@
 
 import type { JSX } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { ChevronDownIcon, KeyRoundIcon } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import type {
@@ -13,14 +15,23 @@ import { payrollRunPaymentSchema } from "@expendi-business/shared";
 
 import type { PreparedPayrollPayment } from "~/features/payroll/payroll-api";
 import type { PayrollPaymentRequest } from "~/features/payroll/payroll-payment";
-import { primaryButton, secondaryButton } from "~/components/styles";
+import { textLinkClass } from "~/components/data/actions";
+import { Banner } from "~/components/data/banner";
+import {
+  Callout,
+  DetailItem,
+  DetailList,
+} from "~/components/data/detail-sheet";
+import { Money } from "~/components/data/money";
+import { EntityMark } from "~/components/data/table";
+import { Button } from "~/components/ui/button";
 import {
   CostChangedError,
   describePaymentError,
   holdFrom,
 } from "~/features/bills/bill-payment";
 import { payrollKeys } from "~/features/payment-keys";
-import { PASSKEY_HINT, PreviewRows, TopUpNotice } from "~/features/payment-ui";
+import { PASSKEY_HINT, SheetNote } from "~/features/payment-ui";
 import {
   usePayPayroll,
   usePreparePayrollPayment,
@@ -31,7 +42,7 @@ import {
   personRows,
   progressInWords,
 } from "~/features/payroll/payroll-payment";
-import { formatKesCents, formatUsdc } from "~/lib/money";
+import { formatKes, formatUsdc } from "~/lib/money";
 
 /**
  * Approve & pay all, or one failed person's retry (spec §6.21): prepare
@@ -148,95 +159,137 @@ export function useRunPayment(organizationId: string): RunPayment {
   };
 }
 
-/** What the admin confirms with their passkey: each person and the run's cap. */
-export function PayrollPaymentReview({
+/**
+ * What the admin confirms with their passkey: each person (open when
+ * there are three or fewer), the run's cap and the wallet.
+ */
+export function PayrollReview({
   prepared,
-  paying,
-  onPay,
-  onCancel,
+  error,
+  cancelled,
 }: {
   prepared: PreparedPayrollPayment;
-  paying: boolean;
-  onPay: () => void;
-  onCancel: () => void;
+  /** e.g. the cost changed since the review; nothing was sent. */
+  error: string | null;
+  cancelled: boolean;
 }): JSX.Element {
-  const { payment, request } = prepared;
+  const { payment } = prepared;
   const topUpKes = payment.wallet.topUpKes;
-  const blocked = topUpKes !== null || !payment.cap.withinCap;
-  const count = payment.people.length;
+  const totals = [
+    ...capRows(payment),
+    {
+      label: "In the wallet",
+      value: `${formatUsdc(payment.wallet.availableUsdc)} USDC`,
+    },
+  ];
   return (
-    <section
-      aria-label="Review the payment"
-      className="rounded-lg border border-brand-500 bg-white p-4"
-    >
-      <h3 className="text-base font-semibold">
-        {request.retryBillId === null
-          ? `Approve & pay ${String(count)} ${count === 1 ? "person" : "people"}`
-          : "Retry this payment"}
-      </h3>
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <>
+      {error ? (
+        <div role="alert">
+          <Callout tone="warn">
+            <p>{error}</p>
+          </Callout>
+        </div>
+      ) : null}
+      <div className="flex flex-col gap-2">
         {payment.people.map((person) => (
-          <div
+          <details
             key={person.billId}
-            className="space-y-2 rounded-md border border-stone-200 p-3"
+            open={payment.people.length <= 3}
+            className="group rounded-control border border-gray-200"
           >
-            <p className="text-sm font-semibold">{person.payeeName}</p>
-            <PreviewRows rows={personRows(person)} />
-          </div>
+            <summary className="grid cursor-pointer list-none grid-cols-[32px_minmax(0,1fr)_auto_16px] items-center gap-3 rounded-control px-3 py-2.5 [&::-webkit-details-marker]:hidden">
+              <EntityMark name={person.payeeName} kind="person" />
+              <span className="min-w-0">
+                <span className="block truncate font-(--w-name)">
+                  {person.payeeName}
+                </span>
+                <span className="block truncate text-xs leading-4 text-gray-500">
+                  {person.paidTo.label}
+                </span>
+              </span>
+              <span className="text-right font-(--w-amount)">
+                <Money amount={person.receivesKes} currency="KES" />
+              </span>
+              <ChevronDownIcon
+                aria-hidden="true"
+                className="size-4 text-gray-500 transition-transform duration-200 group-open:rotate-180"
+              />
+            </summary>
+            <div className="border-t border-hairline px-3 pt-2 pb-3 pl-14 max-[600px]:pl-3">
+              <DetailList>
+                {personRows(person).map((row) => (
+                  <DetailItem key={row.label} label={row.label}>
+                    {row.value}
+                  </DetailItem>
+                ))}
+              </DetailList>
+            </div>
+          </details>
         ))}
       </div>
-      <div className="mt-4 space-y-1 rounded-md bg-stone-50 p-3">
-        <PreviewRows
-          rows={[
-            ...capRows(payment),
-            {
-              label: "In the wallet",
-              value: `${formatUsdc(payment.wallet.availableUsdc)} USDC`,
-            },
-          ]}
-        />
-      </div>
-      <p className="mt-3 text-sm text-stone-600">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-control bg-gray-50 px-4 py-3.5 max-[600px]:grid-cols-1">
+        {totals.map((row) => (
+          <div key={row.label}>
+            <dt className="text-xs leading-4 font-(--w-ui) text-gray-500">
+              {row.label}
+            </dt>
+            <dd className="mt-1 text-base leading-6 font-(--w-amount) tabular-nums">
+              {row.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <SheetNote>
         Each person is paid on their own: if one payment fails, the others still
         go through. Paycrest states its exact fee when each payment is made;
         what isn’t used stays in the wallet.
-      </p>
-      {!payment.cap.withinCap ? (
-        <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          This is over the run’s cap of KES {formatKesCents(payment.cap.capKes)}
-          , so it can’t be paid. Lower someone’s pay, leave someone out, or
-          raise the payroll margin.
-        </p>
-      ) : null}
-      {topUpKes ? (
-        <TopUpNotice topUpKes={topUpKes} what="this payroll" />
+      </SheetNote>
+      {payment.cap.withinCap ? null : (
+        <div role="alert">
+          <Callout tone="warn">
+            <p className="tabular-nums">
+              This is over the run’s cap of KES {formatKes(payment.cap.capKes)},
+              so it can’t be paid. Lower someone’s pay, leave someone out, or
+              raise the payroll margin.
+            </p>
+          </Callout>
+        </div>
+      )}
+      {topUpKes !== null ? (
+        <Callout
+          tone="warn"
+          title={
+            <>
+              Top up <Money amount={topUpKes} currency="KES" />
+            </>
+          }
+        >
+          <p>
+            The wallet doesn’t hold enough USDC for this payroll. Add funds,
+            then review it again.{" "}
+            <Link href="/wallet" className={textLinkClass}>
+              Go to Accounts
+            </Link>
+          </p>
+        </Callout>
       ) : payment.cap.withinCap ? (
-        <p className="mt-3 text-sm text-stone-600">{PASSKEY_HINT}</p>
+        <SheetNote icon={KeyRoundIcon}>{PASSKEY_HINT}</SheetNote>
       ) : null}
-      <div className="mt-4 flex gap-3">
-        <button
-          type="button"
-          onClick={onPay}
-          disabled={blocked || paying}
-          className={primaryButton}
-        >
-          {paying ? "Waiting for your passkey…" : "Pay with passkey"}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={paying}
-          className={secondaryButton}
-        >
-          Cancel
-        </button>
-      </div>
-    </section>
+      {cancelled ? <SheetNote>Cancelled. Nothing was sent.</SheetNote> : null}
+    </>
   );
 }
 
-/** Where the run stands once Approve & pay all returns. */
-export function PayrollResultNotice({
+/** Whether the review can go to the passkey: within the cap and funded. */
+export function canConfirm(prepared: PreparedPayrollPayment): boolean {
+  return (
+    prepared.payment.wallet.topUpKes === null && prepared.payment.cap.withinCap
+  );
+}
+
+/** Where the run stands once Approve & pay all, or a retry, returns. */
+export function PayrollResult({
   run,
   onDismiss,
 }: {
@@ -244,33 +297,25 @@ export function PayrollResultNotice({
   onDismiss: () => void;
 }): JSX.Element {
   const failed = failedPayments(run).length > 0;
-  const tone = failed
-    ? "border-amber-300 bg-amber-50 text-amber-900"
-    : "border-emerald-200 bg-emerald-50 text-emerald-900";
+  const progress = progressInWords(run);
   return (
-    <section
-      aria-label="Payment result"
+    <Banner
       role="status"
-      className={`rounded-lg border p-4 text-sm ${tone}`}
+      aria-label="Payment result"
+      tone={failed ? "warn" : "success"}
+      title={failed ? "Some payments failed" : "Payroll sent"}
+      actions={
+        <Button variant="outline" size="md" onClick={onDismiss}>
+          Done
+        </Button>
+      }
     >
-      <p className="font-semibold">
-        {failed ? "Some payments failed" : "Payroll sent"}
-      </p>
-      {progressInWords(run) ? (
-        <p className="mt-1">{progressInWords(run)}</p>
-      ) : null}
-      <p className="mt-1">
+      {progress ? <p className="tabular-nums">{progress}</p> : null}
+      <p>
         {failed
           ? "Nothing reached the people whose payment failed. Retry each of them below; nobody else is paid again."
           : "M-Pesa payments usually arrive within a minute or two; banks can take longer."}
       </p>
-      <button
-        type="button"
-        onClick={onDismiss}
-        className={`mt-3 ${secondaryButton}`}
-      >
-        Done
-      </button>
-    </section>
+    </Banner>
   );
 }

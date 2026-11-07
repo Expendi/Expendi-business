@@ -21,21 +21,33 @@ import { useApi } from "~/lib/use-api";
 const recurringPath = (organizationId: string) =>
   `/organizations/${organizationId}/recurring-items` as const;
 
-/** Active first, then paused, then ended. */
+export const recurringListKey = (organizationId: string) =>
+  [...recurringKeys.list(organizationId), { excludeSalaries: true }] as const;
+
+/**
+ * Every recurring payment but salaries, which live in Payroll. Fetched only
+ * while `enabled`, e.g. once the Bills page's sheet shows them.
+ */
 export function useRecurringItems(
   organizationId: string,
+  { enabled = true }: { enabled?: boolean } = {},
 ): UseQueryResult<RecurringItem[]> {
   const api = useApi();
   return useQuery({
-    queryKey: recurringKeys.list(organizationId),
+    queryKey: recurringListKey(organizationId),
     queryFn: () =>
-      api.get(recurringPath(organizationId), recurringItemsResponseSchema),
+      api.get(
+        `${recurringPath(organizationId)}?excludeSalaries=true`,
+        recurringItemsResponseSchema,
+      ),
+    enabled,
   });
 }
 
 export function useRecurringItem(
   organizationId: string,
   itemId: string,
+  { enabled = true }: { enabled?: boolean } = {},
 ): UseQueryResult<RecurringItem> {
   const api = useApi();
   return useQuery({
@@ -45,6 +57,7 @@ export function useRecurringItem(
         `${recurringPath(organizationId)}/${itemId}`,
         recurringItemSchema,
       ),
+    enabled,
   });
 }
 

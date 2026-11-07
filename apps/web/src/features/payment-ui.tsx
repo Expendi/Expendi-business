@@ -1,12 +1,21 @@
 "use client";
 
+import type { LucideIcon } from "lucide-react";
 import type { JSX, ReactNode } from "react";
+import { InfoIcon, KeyRoundIcon } from "lucide-react";
 import { useState } from "react";
 
 import type { PayeeChangeHold } from "@expendi-business/shared";
 
 import type { PreviewRow } from "~/features/bills/bill-payment";
+import { Callout } from "~/components/data/detail-sheet";
 import { primaryButton, secondaryButton } from "~/components/styles";
+import {
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  Field as FormFieldRoot,
+} from "~/components/ui/field";
 import { holdWarning } from "~/features/bills/bill-payment";
 import { formatKesCents } from "~/lib/money";
 
@@ -144,3 +153,111 @@ export function TopUpNotice({
 
 export const PASSKEY_HINT =
   "Your browser asks for your approval passkey. To use the one on your phone, choose “use a phone or tablet”.";
+
+/** A muted line with its icon inside a sheet, e.g. how a payment is timed. */
+export function SheetNote({
+  icon: Icon = InfoIcon,
+  children,
+}: {
+  icon?: LucideIcon;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <div className="flex items-start gap-2 text-gray-600">
+      <Icon
+        aria-hidden="true"
+        className="mt-0.5 size-4 shrink-0 text-gray-500"
+      />
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
+/** Where a money action would be, for an admin without an approval passkey. */
+export function PasskeySetupCallout(): JSX.Element {
+  return (
+    <Callout
+      tone="neutral"
+      icon={KeyRoundIcon}
+      title="Set up your approval passkey first"
+    >
+      <p>
+        Paying needs your approval passkey. Set it up in the Expendi Business
+        app; then confirm here with “use a phone or tablet” in your
+        browser&apos;s passkey prompt.
+      </p>
+    </Callout>
+  );
+}
+
+/** A sheet form's field: the label above, then help and the error below. */
+export function FormField({
+  id,
+  label,
+  help,
+  error,
+  className,
+  children,
+}: {
+  id?: string;
+  label: ReactNode;
+  help?: ReactNode;
+  error?: string | null;
+  className?: string;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <FormFieldRoot
+      data-invalid={error ? true : undefined}
+      className={className}
+    >
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      {children}
+      {help ? <FieldDescription>{help}</FieldDescription> : null}
+      {error ? <FieldError>{error}</FieldError> : null}
+    </FormFieldRoot>
+  );
+}
+
+/** A sheet's form: label above each field, 18px apart. */
+export function SheetForm({
+  id,
+  label,
+  onSubmit,
+  children,
+}: {
+  id: string;
+  label: string;
+  onSubmit: () => void;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <form
+      id={id}
+      aria-label={label}
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+      className="flex flex-col gap-[18px]"
+    >
+      {children}
+    </form>
+  );
+}
+
+/** Two fields side by side, one above the other on a phone. */
+export function FieldRow({ children }: { children: ReactNode }): JSX.Element {
+  return (
+    <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Whether the viewer can confirm money with a passkey: `none` for an
+ * accountant, `checking` while the status loads.
+ */
+export type PasskeyState = "none" | "checking" | "ready" | "missing";

@@ -10,7 +10,14 @@ import type {
   DetailFieldErrors,
   DetailValues,
 } from "~/features/payees/payee-fields";
-import { inputClass, linkClass, secondaryButton } from "~/components/styles";
+import { textLinkClass } from "~/components/data/actions";
+import { Callout } from "~/components/data/detail-sheet";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "~/components/ui/native-select";
 import {
   METHOD_DESCRIPTIONS,
   METHOD_LABELS,
@@ -25,6 +32,7 @@ import {
   useAllowlistedAddresses,
   usePayeeBanks,
 } from "~/features/payees/payees-api";
+import { FormField, SheetNote } from "~/features/payment-ui";
 import { describeApiError } from "~/lib/api";
 
 const PLACEHOLDERS: Partial<Record<DetailField, string>> = {
@@ -36,11 +44,16 @@ const PLACEHOLDERS: Partial<Record<DetailField, string>> = {
   accountName: "As the bank or M-Pesa shows it",
 };
 
-function FieldError({ message }: { message: string | undefined }) {
-  return message ? (
-    <span className="mt-1 block text-xs text-error-700">{message}</span>
-  ) : null;
-}
+const NUMERIC: readonly DetailField[] = [
+  "phone",
+  "tillNumber",
+  "paybillNumber",
+  "accountNumber",
+];
+
+/** The id of a details field, so a failed check can focus it. */
+export const detailFieldId = (field: DetailField | "method"): string =>
+  `payee-${field}`;
 
 /**
  * The payment method and its details (spec §6.19). Banks come from
@@ -66,40 +79,38 @@ export function PayeeDetailsFields({
   errors: DetailFieldErrors;
   disabled: boolean;
 }): JSX.Element {
-  const fields = detailFields(method, kind);
   return (
-    <div className="space-y-4">
-      <label className="block text-sm">
-        Paid by
-        <select
+    <>
+      <FormField
+        id={detailFieldId("method")}
+        label="Paid by"
+        help={METHOD_DESCRIPTIONS[method]}
+      >
+        <NativeSelect
+          id={detailFieldId("method")}
+          className="w-full"
           value={method}
+          disabled={disabled}
           onChange={(event) => {
             const next = methodsForKind(kind).find(
               (candidate) => candidate === event.target.value,
             );
             if (next) onMethodChange(next);
           }}
-          disabled={disabled}
-          className={inputClass}
         >
           {methodsForKind(kind).map((candidate) => (
-            <option key={candidate} value={candidate}>
+            <NativeSelectOption key={candidate} value={candidate}>
               {METHOD_LABELS[candidate]}
-            </option>
+            </NativeSelectOption>
           ))}
-        </select>
-        <span className="mt-1 block text-xs text-stone-500">
-          {METHOD_DESCRIPTIONS[method]}
-        </span>
-      </label>
+        </NativeSelect>
+      </FormField>
 
       {kind === "employee" && method === "mpesa_phone" ? (
-        <p className="text-sm text-stone-600">
-          Paid to the number they confirmed in the app.
-        </p>
+        <SheetNote>Paid to the number they confirmed in the app.</SheetNote>
       ) : null}
 
-      {fields.map((field) => {
+      {detailFields(method, kind).map((field) => {
         if (field === "bankCode") {
           return (
             <BankPicker
@@ -125,26 +136,35 @@ export function PayeeDetailsFields({
           );
         }
         return (
-          <label key={field} className="block text-sm">
-            {fieldLabel(method, field)}
-            <input
+          <FormField
+            key={field}
+            id={detailFieldId(field)}
+            label={fieldLabel(method, field)}
+            error={errors[field]}
+          >
+            <Input
+              id={detailFieldId(field)}
               type="text"
               value={values[field]}
               onChange={(event) => onValueChange(field, event.target.value)}
               placeholder={PLACEHOLDERS[field]}
               disabled={disabled}
               autoComplete="off"
-              className={inputClass}
+              aria-invalid={errors[field] ? true : undefined}
+              className={NUMERIC.includes(field) ? "tabular-nums" : undefined}
             />
-            <FieldError message={errors[field]} />
-          </label>
+          </FormField>
         );
       })}
 
       {errors.form ? (
-        <p className="text-sm text-error-700">{errors.form}</p>
+        <div role="alert">
+          <Callout tone="error">
+            <p>{errors.form}</p>
+          </Callout>
+        </div>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -163,43 +183,55 @@ function BankPicker({
   disabled: boolean;
 }): JSX.Element {
   const banks = usePayeeBanks(organizationId);
+  const id = detailFieldId("bankCode");
   if (banks.isError) {
     return (
-      <div className="text-sm text-error-700" role="alert">
-        <p>{describeApiError(banks.error)}</p>
-        <button
-          type="button"
-          onClick={() => void banks.refetch()}
-          className={`mt-2 ${secondaryButton}`}
-        >
-          Load the banks again
-        </button>
-      </div>
+      <FormField label="Bank">
+        <div role="alert">
+          <Callout
+            tone="error"
+            action={
+              <Button
+                variant="outline"
+                size="md"
+                disabled={banks.isFetching}
+                onClick={() => void banks.refetch()}
+              >
+                {banks.isFetching
+                  ? "Loading the banks…"
+                  : "Load the banks again"}
+              </Button>
+            }
+          >
+            <p>{describeApiError(banks.error)}</p>
+          </Callout>
+        </div>
+      </FormField>
     );
   }
   const sorted = [...(banks.data ?? [])].sort((a, b) =>
     a.name.localeCompare(b.name),
   );
   return (
-    <label className="block text-sm">
-      Bank
-      <select
+    <FormField id={id} label="Bank" error={error}>
+      <NativeSelect
+        id={id}
+        className="w-full"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled || banks.isPending}
-        className={inputClass}
+        aria-invalid={error ? true : undefined}
       >
-        <option value="">
+        <NativeSelectOption value="">
           {banks.isPending ? "Loading the banks…" : "Choose the bank"}
-        </option>
+        </NativeSelectOption>
         {sorted.map((bank) => (
-          <option key={bank.code} value={bank.code}>
+          <NativeSelectOption key={bank.code} value={bank.code}>
             {bank.name}
-          </option>
+          </NativeSelectOption>
         ))}
-      </select>
-      <FieldError message={error} />
-    </label>
+      </NativeSelect>
+    </FormField>
   );
 }
 
@@ -218,58 +250,73 @@ function AllowlistedAddressPicker({
   disabled: boolean;
 }): JSX.Element {
   const addresses = useAllowlistedAddresses(organizationId);
+  const id = detailFieldId("address");
   if (addresses.isError) {
     return (
-      <div className="text-sm text-error-700" role="alert">
-        <p>{describeApiError(addresses.error)}</p>
-        <button
-          type="button"
-          onClick={() => void addresses.refetch()}
-          className={`mt-2 ${secondaryButton}`}
-        >
-          Load the allowlist again
-        </button>
-      </div>
+      <FormField label="Base address">
+        <div role="alert">
+          <Callout
+            tone="error"
+            action={
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => void addresses.refetch()}
+              >
+                Load the allowlist again
+              </Button>
+            }
+          >
+            <p>{describeApiError(addresses.error)}</p>
+          </Callout>
+        </div>
+      </FormField>
     );
   }
   const options = addresses.data ?? [];
   const current = value.toLowerCase();
   return (
-    <div className="space-y-1 text-sm">
-      <label className="block">
-        Base address
-        <select
-          value={current}
-          onChange={(event) => onChange(event.target.value)}
-          disabled={disabled || addresses.isPending}
-          className={inputClass}
-        >
-          <option value="">
-            {addresses.isPending
-              ? "Loading the allowlist…"
-              : options.length === 0
-                ? "No addresses on the allowlist yet"
-                : "Choose an allowlisted address"}
-          </option>
-          {current !== "" &&
-          !options.some((option) => option.address === current) ? (
-            <option value={current}>{shortAddress(current)}</option>
-          ) : null}
-          {options.map((option) => (
-            <option key={option.id} value={option.address}>
-              {option.label} · {option.address}
-            </option>
-          ))}
-        </select>
-      </label>
-      <FieldError message={error} />
-      <p className="text-xs text-stone-500">
-        USDC payees are paid only to an address on the company’s allowlist.{" "}
-        <Link href="/wallet" className={linkClass}>
-          Add one under Wallet
-        </Link>
-        .
-      </p>
-    </div>
+    <FormField
+      id={id}
+      label="Base address"
+      error={error}
+      help={
+        <>
+          USDC payees are paid only to an address on the company’s allowlist.{" "}
+          <Link href="/wallet" className={textLinkClass}>
+            Add one under Accounts
+          </Link>
+          .
+        </>
+      }
+    >
+      <NativeSelect
+        id={id}
+        className="w-full"
+        value={current}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled || addresses.isPending}
+        aria-invalid={error ? true : undefined}
+      >
+        <NativeSelectOption value="">
+          {addresses.isPending
+            ? "Loading the allowlist…"
+            : options.length === 0
+              ? "No addresses on the allowlist yet"
+              : "Choose an allowlisted address"}
+        </NativeSelectOption>
+        {current !== "" &&
+        !options.some((option) => option.address === current) ? (
+          <NativeSelectOption value={current}>
+            {shortAddress(current)}
+          </NativeSelectOption>
+        ) : null}
+        {options.map((option) => (
+          <NativeSelectOption key={option.id} value={option.address}>
+            {option.label} · {option.address}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+    </FormField>
   );
 }

@@ -110,27 +110,37 @@ export function payeeChangeSteps(
   };
 }
 
+export const ARCHIVED_PAYEES: PayeeListFilters = {
+  kind: null,
+  method: null,
+  archived: true,
+};
+
 /** The company's payees, A to Z. */
 export function usePayees(
   organizationId: string,
   filters: PayeeListFilters,
+  { enabled = true }: { enabled?: boolean } = {},
 ): UseQueryResult<Payee[]> {
   const api = useApi();
   return useQuery({
     queryKey: payeeKeys.list(organizationId, filters),
     queryFn: () => listPayees(api, organizationId, filters),
+    enabled,
   });
 }
 
 export function usePayee(
   organizationId: string,
   payeeId: string,
+  { enabled = true }: { enabled?: boolean } = {},
 ): UseQueryResult<Payee> {
   const api = useApi();
   return useQuery({
     queryKey: payeeKeys.detail(organizationId, payeeId),
     queryFn: () =>
       api.get(`${payeesPath(organizationId)}/${payeeId}`, payeeSchema),
+    enabled,
   });
 }
 
@@ -242,6 +252,28 @@ export function useArchivePayee(
     mutationFn: () =>
       api.post(
         `${payeesPath(organizationId)}/${payeeId}/archive`,
+        undefined,
+        payeeSchema,
+      ),
+    onSuccess: storePayee,
+  });
+}
+
+/**
+ * Brings an archived payee back, paid to the same details as before, so
+ * no passkey. The API refuses (409) an employee who left the company or
+ * who already has another payee.
+ */
+export function useRestorePayee(
+  organizationId: string,
+  payeeId: string,
+): UseMutationResult<Payee, Error, void> {
+  const api = useApi();
+  const storePayee = useStorePayee(organizationId);
+  return useMutation({
+    mutationFn: () =>
+      api.post(
+        `${payeesPath(organizationId)}/${payeeId}/restore`,
         undefined,
         payeeSchema,
       ),
