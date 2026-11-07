@@ -18,7 +18,10 @@ React Native controls.
 
 ## Tokens
 
-- Brand/action fill: coral 500 `#ff7e5f`, with dark `#101828` labels for contrast.
+- Primary buttons: coral 500 `#ff7e5f` with white SemiBold (600) labels, coral 600
+  on hover. The founder chose this on 2026-11-06 knowing white on coral 500 is
+  2.50:1, below WCAG AA; coral 700 with white (4.72:1) is the accessible option.
+  Button labels never contain amounts.
 - Links and selected controls: coral 700 `#cc4528` / 800 `#a63620`.
 - Selected surface: coral 50 `#fff4f0`.
 - Workspace: gray 50 `#f9fafb`; cards and navigation: white.
@@ -35,8 +38,23 @@ dark-token definitions; the current product remains light by default.
 
 ## Geometry and typography
 
-- Outfit everywhere; tabular figures for amounts; 24/32px page headings,
-  18px section titles, 14/20px browser body, 16/24px native body.
+- Outfit everywhere; tabular figures for amounts. Native body text is 16/24px.
+- Browser type scale (size/line height, weight). Weight follows size: large
+  figures stay Regular and small anchors use SemiBold. 600 is the heaviest
+  weight in the product; no Bold or ExtraBold.
+  - Display 32/40px, 400: the Overview title and the wallet balance only.
+  - Heading 24/32px, 400: page and section headings. Stat card figures use the
+    same size at 600.
+  - Title 18/26px, 600: card, panel and side-panel titles.
+  - Row 16/24px: the name a row is about at 600, its amount at 500.
+  - Body 14/20px, 400; links, pills and group labels at 500; buttons at 600.
+  - Label 12/16px: field labels at 500, count badges at 600, captions and
+    legends at 400.
+  - Chart axes and date tiles may use 11px; nothing else goes below 12px.
+- Currency codes (KES, USDC) sit before the number at 0.72em, Medium, in the
+  muted text color; the number carries the weight.
+- Existing screens still use semibold page headings; move each one to this
+  scale the next time it changes.
 - 4px spacing scale. Browser page gutters: 16px phone, 24px tablet, 32px desktop.
   Content is capped at 1440px. Header: 64px; navigation rows: 44px.
 - Browser controls: 44px default, 36px compact (44px on coarse pointers),
@@ -82,14 +100,37 @@ to icons and navigation are defined in `apps/mobile/src/theme/colors.ts`.
 
 ## Browser navigation groups
 
-- Company app: **Workspace** (overview, wallet), **Spend & pay** (approvals,
-  expenses, bills, recurring, payroll), **Manage** (payees, team, settings),
-  **Insights** (reports, activity).
+- Company app: **Workspace** (Overview, Accounts), **Spend & pay** (Approvals,
+  Expenses, Bills, Payroll), **Manage** (Payees, Team, Settings), **Insights**
+  (Reports, Activity). Recurring payments open from the Bills page, not the
+  sidebar. Accounts keeps the `/wallet` route.
 - Operations app: **Operations** (companies, payouts), **Monitoring** (alerts,
   system health), **Administration** (controls, audit log, Zoho Books).
 
 Groups use shadcn `SidebarGroup` and `SidebarGroupLabel`, keep the current-page
 indicator, and scroll inside the sidebar on shorter screens.
+
+## Company data pages
+
+The approved mocks in `docs/mocks/` are the reference. The model follows Ramp:
+Bills are money still owed to suppliers (To pay, Being paid, History);
+Expenses are money already spent and never list spending linked to a bill;
+salaries appear only on Payroll. Visible text says "reimbursement", never "claim".
+
+- Stat cards show numbers only, at most four, and are never clickable.
+- Tabs with counts split a list by stage or kind. Filter chips (dashed, icon,
+  label, chevron) open listbox menus; the highlighted option is coral 50 with
+  coral 800 text and no border. Up to five chips share the tabs' row; more,
+  or not enough width, stacks them under the tabs.
+- Status badges are a colour tint plus text, with no dot.
+- Tables are one flat list with sortable headers and no group header rows.
+  Rows have two lines: the name at 600, then a muted meta line with small
+  markers. Rows that can't be selected have no checkbox. Under a 720px panel
+  the table becomes cards. There is no horizontal page scroll.
+- Totals that mix KES and USD show one "≈ KES" figure at today's rate; rows
+  keep their own currency.
+- Details open in the right side sheet, step with the arrow keys ("N of M")
+  and have a deep-link query parameter.
 
 ## Admin page patterns
 

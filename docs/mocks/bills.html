@@ -1,0 +1,2511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expendi Bills Mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400..600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+:root {
+  --brand-50: #fff4f0;
+  --brand-100: #ffe7de;
+  --brand-500: #ff7e5f;
+  --brand-600: #f0613e;
+  --brand-700: #cc4528;
+  --brand-800: #a63620;
+  --gray-25: #fcfcfd;
+  --gray-50: #f9fafb;
+  --gray-100: #f2f4f7;
+  --gray-200: #e4e7ec;
+  --gray-300: #d0d5dd;
+  --gray-400: #98a2b3;
+  --gray-500: #667085;
+  --gray-600: #475467;
+  --gray-700: #344054;
+  --gray-900: #101828;
+  --error-50: #fef3f2;
+  --error-700: #b42318;
+  --warn-50: #fffaeb;
+  --warn-600: #dc6803;
+  --warn-700: #b54708;
+  --success-50: #ecfdf3;
+  --success-700: #067647;
+  --blue-50: #eff8ff;
+  --blue-500: #2e90fa;
+  --blue-700: #175cd3;
+  --amber-500: #f79009;
+  --green-500: #17b26a;
+  --red-500: #f04438;
+
+  --bg: var(--gray-50);
+  --surface: #ffffff;
+  --text: var(--gray-900);
+  --text-2: var(--gray-600);
+  --text-3: var(--gray-500);
+  --border: var(--gray-200);
+  --hairline: var(--gray-100);
+  /* Translucent so it stays visible on white, gray and coral row tints. */
+  --row-divider: rgba(16, 24, 40, .08);
+  --control-border: var(--gray-300);
+
+  /* Shape rule: controls and business marks 8px, panels 14px, pills and people full. */
+  --r-control: 8px;
+  --r-panel: 14px;
+  --r-full: 999px;
+  --shadow-panel: 0 1px 2px rgba(16, 24, 40, .04), 0 12px 32px -18px rgba(16, 24, 40, .16);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+
+  /* Type weights by role (docs/design-system.md, Confident). */
+  --w-display: 400; --w-heading: 400; --w-title: 600; --w-name: 600; --w-amount: 500; --w-ui: 500; --w-strong: 600; --w-button: 600; --w-figure: 600;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; font-family: Outfit, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 20px; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+h1, h2, h3, p, dl, dd, ol, ul, figure { margin: 0; }
+.num { font-variant-numeric: tabular-nums; }
+.ic { width: 16px; height: 16px; flex: none; display: block; stroke-width: 1.75; }
+:focus-visible { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.ccy { font-size: .72em; font-weight: var(--w-ui); letter-spacing: .04em; color: var(--text-3); }
+.money { white-space: nowrap; }
+[hidden] { display: none !important; }
+
+/* Shell */
+.app { display: flex; min-height: 100dvh; }
+.sidebar { position: sticky; top: 0; height: 100dvh; width: 248px; flex: none; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.sb-top { padding: 16px 12px 8px; display: flex; flex-direction: column; gap: 10px; }
+.company { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; background: none; border-radius: var(--r-control); text-align: left; }
+.company:hover { background: var(--gray-50); }
+.company img { width: 32px; height: 32px; border-radius: var(--r-control); }
+.company-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.company-name { font-weight: var(--w-name); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.company-role { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.company .ic { color: var(--gray-400); }
+.search { display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-control); background: var(--gray-50); color: var(--text-3); }
+.search span { flex: 1; text-align: left; }
+kbd { font: inherit; font-size: 11px; line-height: 16px; color: var(--text-3); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; background: var(--surface); }
+.sb-nav { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
+.sb-group { margin-top: 16px; }
+.sb-label { padding: 0 8px 4px; font-size: 12px; line-height: 16px; color: var(--gray-400); font-weight: var(--w-ui); }
+.sb-link { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 8px; border-radius: var(--r-control); color: var(--gray-700); text-decoration: none; transition: background-color .15s ease; }
+.sb-link:hover { background: var(--gray-50); }
+.sb-link .ic { color: var(--gray-400); }
+.sb-link.is-active { background: var(--brand-50); color: var(--brand-800); font-weight: var(--w-ui); }
+.sb-link.is-active .ic { color: var(--brand-700); }
+.count { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-full); background: var(--brand-100); color: var(--brand-800); font-size: 12px; font-weight: var(--w-strong); display: inline-flex; align-items: center; justify-content: center; }
+.sb-user { display: flex; align-items: center; gap: 10px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
+.sb-user .who { min-width: 0; }
+.sb-user .who p:first-child { font-weight: var(--w-name); }
+.sb-user .who p:last-child { font-size: 12px; line-height: 16px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.main-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar { display: none; }
+.main { width: 100%; max-width: 1320px; margin: 0 auto; padding: 24px 32px 72px; }
+
+/* Atoms */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); box-shadow: var(--shadow-panel); }
+.person { width: 32px; height: 32px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-full); background: var(--gray-100); color: var(--gray-700); font-size: 12px; font-weight: var(--w-strong); letter-spacing: .02em; }
+.pill { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px 0 6px; border-radius: var(--r-full); font-size: 12px; font-weight: var(--w-ui); white-space: nowrap; flex: none; }
+.pill.plain { padding-left: 8px; }
+.pill .ic { width: 13px; height: 13px; }
+.pill-neutral { background: var(--gray-100); color: var(--gray-700); }
+.pill-warn { background: var(--warn-50); color: var(--warn-700); }
+.pill-error { background: var(--error-50); color: var(--error-700); }
+.pill-success { background: var(--success-50); color: var(--success-700); }
+/* Status: a filled tint means it needs attention or money is moving; an outline means it's only a record. Always a text label, never colour alone. */
+.status { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--r-full); font-size: 12px; font-weight: var(--w-ui); white-space: nowrap; flex: none; }
+.status.is-waiting { background: var(--warn-50); color: var(--warn-700); }
+.status.is-moving { background: var(--blue-50); color: var(--blue-700); }
+.status.is-paid { background: var(--success-50); color: var(--success-700); }
+.status.is-failed { background: var(--error-50); color: var(--error-700); }
+.status.is-rejected { background: var(--gray-100); color: var(--gray-700); }
+.status.is-quiet { background: var(--surface); border-color: var(--border); color: var(--text-2); }
+@keyframes beat { 0%, 100% { box-shadow: 0 0 0 0 rgba(46, 144, 250, .5); } 60% { box-shadow: 0 0 0 4px rgba(46, 144, 250, 0); } }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--r-control); border: 1px solid transparent; font-size: 14px; font-weight: var(--w-button); white-space: nowrap; text-decoration: none; transition: background-color .15s ease, border-color .15s ease, transform .15s var(--ease-out); }
+.btn .ic { width: 16px; height: 16px; }
+.btn-primary { background: var(--brand-500); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--brand-600); }
+.btn-outline { background: var(--surface); border-color: var(--control-border); color: var(--gray-700); }
+.btn-outline:hover:not(:disabled) { background: var(--gray-50); }
+.btn-ghost { background: none; color: var(--gray-600); }
+.btn-ghost:hover:not(:disabled) { background: var(--gray-100); color: var(--gray-900); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.icon-btn { width: 36px; height: 36px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 0; background: none; border-radius: var(--r-control); color: var(--gray-500); }
+.icon-btn:hover:not(:disabled) { background: var(--gray-100); color: var(--gray-700); }
+.icon-btn:disabled { opacity: .35; cursor: not-allowed; }
+.text-link { padding: 0; border: 0; background: none; border-radius: 4px; color: var(--brand-800); font-weight: var(--w-ui); text-decoration: underline; text-decoration-color: var(--brand-100); text-underline-offset: 3px; }
+.text-link:hover { text-decoration-color: currentColor; }
+.callout { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--r-control); font-size: 14px; line-height: 20px; }
+.callout > .ic { margin-top: 2px; }
+.callout-title { font-weight: var(--w-ui); }
+.callout ul { margin: 4px 0 0; padding-left: 18px; }
+.callout-warn { background: var(--warn-50); color: var(--warn-700); }
+.callout-error { background: var(--error-50); color: var(--error-700); }
+.callout-neutral { background: var(--gray-100); color: var(--gray-700); }
+.skel { border-radius: var(--r-control); background: var(--gray-100); }
+
+/* Mock-only strip */
+.mock-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 12px; margin-bottom: 20px; border: 1px dashed var(--control-border); border-radius: var(--r-control); font-size: 12px; line-height: 16px; color: var(--text-3); }
+.mock-strip strong { font-weight: 500; color: var(--text-2); }
+.mock-strip label { display: inline-flex; align-items: center; gap: 6px; }
+.mock-strip select { height: 28px; padding: 0 6px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--surface); font-size: 12px; }
+
+/* Page */
+.page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px; }
+.page-title { font-size: 24px; line-height: 32px; font-weight: var(--w-heading); letter-spacing: -0.02em; }
+.page-sub { margin-top: 4px; color: var(--text-2); max-width: 70ch; }
+
+.results { margin-top: 16px; overflow: clip; }
+.results-body { transition: opacity .2s ease; }
+.results-body.is-refreshing { opacity: .5; }
+
+/* Kind tabs across the top of the table card */
+.kind-tabs { display: flex; gap: 4px; padding: 0 12px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.kind-tabs::-webkit-scrollbar { display: none; }
+.kind-tab { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 8px; border: 0; background: none; color: var(--text-2); font-size: 14px; font-weight: var(--w-ui); white-space: nowrap; transition: color .15s ease; }
+.kind-tab:hover { color: var(--text); }
+.kind-tab[aria-selected="true"] { color: var(--text); }
+.kind-tab[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--gray-900); }
+.kind-count { min-width: 22px; height: 20px; padding: 0 6px; border-radius: var(--r-full); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: var(--gray-100); color: var(--gray-600); transition: background-color .15s ease, color .15s ease; }
+.kind-tab[aria-selected="true"] .kind-count { background: var(--gray-900); color: #fff; }
+
+/* Filter chips: dashed when empty, solid coral with a value and remove button when set */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--gray-25); }
+.toolbar-label { display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-3); }
+.toolbar-label .ic { width: 14px; height: 14px; }
+.fchip { display: inline-flex; align-items: stretch; height: 32px; border-radius: var(--r-full); font-size: 14px; min-width: 0; }
+.fchip-main { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 0 12px; border: 1px dashed var(--gray-300); border-radius: var(--r-full); background: var(--surface); color: var(--gray-700); font-weight: var(--w-ui); transition: border-color .15s ease, background-color .15s ease, color .15s ease; }
+.fchip-main .ic { width: 14px; height: 14px; color: var(--gray-500); }
+.fchip-main:hover:not(:disabled) { border-style: solid; border-color: var(--gray-400); color: var(--text); }
+.fchip-main[aria-expanded="true"] { border-style: solid; border-color: var(--gray-900); color: var(--text); }
+.fchip-main:disabled { opacity: .5; cursor: not-allowed; }
+.fchip.is-set .fchip-main { border: 1px solid var(--brand-100); border-right: 0; border-radius: var(--r-full) 0 0 var(--r-full); background: var(--brand-50); color: var(--brand-800); padding-right: 6px; }
+.fchip.is-set .fchip-main .ic { color: var(--brand-700); }
+.fchip.is-set .fchip-main:hover { background: var(--brand-100); }
+.fchip.is-set .fchip-main[aria-expanded="true"] { border-color: var(--brand-700); }
+.fchip-key { color: var(--brand-700); font-weight: 400; }
+.fchip-value { font-weight: var(--w-name); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fchip-clear { display: inline-flex; align-items: center; justify-content: center; width: 30px; padding: 0 2px 0 0; border: 1px solid var(--brand-100); border-left: 0; border-radius: 0 var(--r-full) var(--r-full) 0; background: var(--brand-50); color: var(--brand-700); }
+.fchip-clear:hover { background: var(--brand-100); color: var(--brand-800); }
+.fchip-clear .ic { width: 14px; height: 14px; }
+.toolbar .clear-all { margin-left: auto; font-size: 14px; }
+.filter-error { display: flex; gap: 6px; align-items: center; padding: 8px 16px; font-size: 12px; line-height: 16px; color: var(--error-700); background: var(--error-50); border-bottom: 1px solid var(--border); }
+.filter-error .ic { width: 14px; height: 14px; }
+
+/* Filter menus */
+.menu { position: fixed; z-index: 45; width: 264px; max-height: 340px; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); box-shadow: 0 16px 40px -12px rgba(16, 24, 40, .28); overflow: hidden; }
+.menu-search { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--hairline); color: var(--text-3); }
+.menu-search input { flex: 1; min-width: 0; border: 0; outline: none; background: none; font-size: 14px; color: var(--text); }
+.menu-search:focus-within { box-shadow: inset 0 -2px 0 var(--brand-700); }
+.menu-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; }
+.menu-list:focus { outline: none; }
+.menu-option { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 8px; border-radius: var(--r-control); color: var(--gray-700); cursor: pointer; }
+.menu-option.is-active { background: var(--brand-50); color: var(--brand-800); }
+.menu-option[aria-selected="true"] { color: var(--text); font-weight: var(--w-ui); }
+.menu-option .person { width: 24px; height: 24px; font-size: 11px; }
+.menu-option .opt-icon { width: 24px; display: inline-flex; justify-content: center; color: var(--text-3); }
+.menu-option .check { margin-left: auto; color: var(--brand-700); }
+.menu-option:first-child { color: var(--text-2); }
+.menu-empty { padding: 10px 8px; color: var(--text-3); }
+@media (prefers-reduced-motion: no-preference) { .menu { animation: pop .14s var(--ease-out); } }
+@keyframes pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+.stats { margin-top: 16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.stat { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; padding: 16px; text-align: left; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); }
+.stat-label { display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-2); }
+.stat-icon { width: 24px; height: 24px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-control); }
+.stat-icon .ic { width: 14px; height: 14px; }
+.stat-icon.is-total { background: var(--gray-100); color: var(--gray-600); }
+.stat-icon.is-attention { background: var(--warn-50); color: var(--warn-700); }
+.stat-icon.is-clear { background: var(--success-50); color: var(--success-700); }
+.stat-value { margin-top: 6px; font-size: 24px; line-height: 32px; font-weight: var(--w-figure); letter-spacing: -0.02em; }
+.stat-sub { font-size: 12px; line-height: 16px; color: var(--text-3); }
+@media (max-width: 1100px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .stat { padding: 14px; } }
+.table-wrap { overflow-x: auto; }
+table.data { width: 100%; border-collapse: separate; border-spacing: 0; }
+table.data thead th { padding: 10px 16px; text-align: left; font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-3); background: var(--gray-25); border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.data th.right, table.data td.right { text-align: right; }
+table.data tbody td { padding: 12px 16px; border-bottom: 1px solid var(--row-divider); vertical-align: top; }
+table.data tbody tr.row { cursor: pointer; transition: background-color .15s ease; }
+table.data tbody tr.row:hover { background: var(--gray-25); }
+table.data tbody tr.row.is-open { background: var(--gray-50); box-shadow: inset 3px 0 0 var(--gray-900); }
+.cell-date { white-space: nowrap; color: var(--text-2); }
+.merchant { display: block; padding: 0; border: 0; background: none; text-align: left; font-size: 16px; line-height: 24px; font-weight: var(--w-name); color: var(--text); border-radius: 4px; }
+.merchant:hover { text-decoration: underline; text-decoration-color: var(--gray-300); text-underline-offset: 3px; }
+.meta { display: block; color: var(--text-3); }
+.flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.flags:empty { display: none; }
+.person-cell { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.amount { font-size: 16px; line-height: 24px; font-weight: var(--w-amount); white-space: nowrap; }
+.etims { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.etims .ic { width: 14px; height: 14px; }
+.etims.is-attached { color: var(--gray-700); }
+.etims.is-attached .ic { color: var(--success-700); }
+.etims.is-missing { color: var(--warn-700); }
+.etims.is-na { color: var(--text-3); }
+.results-foot { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-3); font-size: 12px; }
+.empty, .load-error { padding: 56px 24px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; color: var(--text-2); }
+.empty .ic, .load-error .ic { width: 28px; height: 28px; color: var(--text-3); }
+.load-error .ic { color: var(--error-700); }
+.empty strong, .load-error strong { color: var(--text); font-weight: var(--w-title); font-size: 16px; line-height: 24px; }
+.cards { display: none; list-style: none; padding: 0; }
+.cards li { border-bottom: 1px solid var(--row-divider); }
+.card-btn { width: 100%; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 14px 16px; border: 0; background: none; text-align: left; }
+.card-name { display: block; font-size: 16px; line-height: 24px; font-weight: var(--w-name); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-sub { display: block; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-month { padding: 14px 16px 6px; font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-3); border-bottom: 1px solid var(--row-divider); }
+.skel-row td { padding: 16px; }
+
+/* Side panel */
+.sheet-layer { position: fixed; inset: 0; z-index: 50; }
+.sheet-scrim { position: absolute; inset: 0; background: rgba(16, 24, 40, .24); }
+.sheet { position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 100%); display: flex; flex-direction: column; background: var(--surface); box-shadow: -16px 0 48px -16px rgba(16, 24, 40, .2); }
+.sheet:focus { outline: none; }
+.sheet-head { display: flex; gap: 8px; align-items: flex-start; padding: 20px 16px 18px 24px; border-bottom: 1px solid var(--border); }
+.sheet-head-main { flex: 1; min-width: 0; }
+.eyebrow { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.sheet-title { margin-top: 2px; font-size: 18px; line-height: 26px; font-weight: var(--w-title); overflow-wrap: anywhere; }
+.sheet-amount { margin-top: 2px; font-size: 24px; line-height: 32px; font-weight: var(--w-heading); letter-spacing: -0.02em; }
+.sheet-head .status { margin-top: 8px; }
+.stepper { display: flex; gap: 2px; }
+.sheet-body { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.sheet-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--border); color: var(--text-3); font-size: 12px; }
+.sheet-foot .spacer { flex: 1; }
+.details { display: flex; flex-direction: column; }
+.details div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 12px; padding: 9px 0; border-top: 1px solid var(--hairline); }
+.details div:first-child { border-top: 0; padding-top: 0; }
+.details dt { color: var(--text-3); }
+.details dd { overflow-wrap: anywhere; }
+.details .sub { display: block; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.description { color: var(--gray-700); white-space: pre-wrap; }
+.section-label { font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-3); }
+.receipts { display: flex; flex-direction: column; gap: 12px; }
+.viewer { border: 1px solid var(--border); border-radius: var(--r-control); background: var(--gray-50); overflow: hidden; }
+.viewer-stage { min-height: 280px; padding: 20px; display: flex; align-items: center; justify-content: center; }
+.viewer-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--surface); font-size: 12px; line-height: 16px; color: var(--text-3); }
+.viewer-bar .text-link { font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+.viewer-bar .text-link .ic { width: 12px; height: 12px; }
+.paper { width: 100%; max-width: 280px; padding: 18px 18px 14px; background: #fff; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 8px 24px -12px rgba(16, 24, 40, .25); font-size: 12px; line-height: 18px; transform: rotate(-0.6deg); }
+.paper.is-pdf { transform: none; border-radius: 2px; max-width: 300px; }
+.paper-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 13px; }
+.paper-head span:last-child { color: var(--text-3); font-weight: 500; letter-spacing: .06em; font-size: 11px; }
+.paper-sub { color: var(--text-3); margin-bottom: 10px; }
+.paper-line { display: flex; justify-content: space-between; gap: 8px; color: var(--text-2); }
+.paper-total { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--gray-300); font-weight: 600; }
+.sms { width: 100%; max-width: 320px; margin: 0; padding: 14px 16px; border-radius: 16px 16px 16px 4px; background: var(--surface); border: 1px solid var(--border); white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 14px; line-height: 20px; }
+.no-receipt { min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; border: 1px dashed var(--control-border); border-radius: var(--r-control); color: var(--text-2); text-align: center; }
+.no-receipt .ic { width: 24px; height: 24px; color: var(--text-3); }
+
+.toast { position: fixed; left: 50%; bottom: 24px; z-index: 70; max-width: calc(100% - 32px); display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--r-panel); background: var(--gray-900); color: #fff; font-size: 14px; box-shadow: 0 16px 40px -16px rgba(16, 24, 40, .5); opacity: 0; transform: translate(-50%, 12px); pointer-events: none; transition: opacity .2s ease, transform .3s var(--ease-out); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast .ic { color: var(--brand-500); }
+.scrim { position: fixed; inset: 0; z-index: 39; background: rgba(16, 24, 40, .24); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .reveal { animation: rise .5s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 60ms); }
+  .btn:active:not(:disabled) { transform: scale(.98); }
+  .sheet-scrim { animation: fade .2s ease; }
+  .sheet { animation: slide .32s var(--ease-out); }
+  .skel { animation: pulse 1.4s ease-in-out infinite; }
+  .sheet-body.is-stepping { animation: fade .2s ease; }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes slide { from { transform: translateX(24px); opacity: 0; } }
+@keyframes pulse { 50% { opacity: .55; } }
+
+@media (max-width: 900px) {
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 40; transform: translateX(-100%); transition: transform .25s var(--ease-out); }
+  .sidebar.is-open { transform: none; }
+  .topbar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .topbar img { width: 28px; height: 28px; border-radius: var(--r-control); }
+  .topbar .company-name { font-size: 16px; }
+  .main { padding: 20px 24px 56px; }
+  .table-wrap { display: none; }
+  .cards { display: block; }
+}
+@media (max-width: 600px) {
+  .main { padding: 16px 16px 48px; }
+  .toolbar { padding: 12px; }
+  .toolbar-label { display: none; }
+  .toolbar .clear-all { margin-left: 0; }
+  .fchip-value { max-width: 120px; }
+  .details div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .sheet-head, .sheet-body, .sheet-foot { padding-left: 16px; padding-right: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* Table head: tabs on the left, filters on the right. Expenses has too many filters for one row, so it stays stacked. */
+.results { container-type: inline-size; }
+.results-head { display: flex; align-items: stretch; gap: 8px 32px; padding: 0 16px 0 12px; border-bottom: 1px solid var(--border); }
+.results-head .kind-tabs { flex: none; padding: 0; border-bottom: 0; }
+.results-head .kind-tab { height: auto; min-height: 56px; }
+.results-head .toolbar { flex: 1 1 auto; justify-content: flex-end; min-width: 0; padding: 12px 0; border-bottom: 0; background: none; }
+.results-head .toolbar-label { display: none; }
+.results-head .toolbar .clear-all { order: -1; margin-left: 0; margin-right: 4px; }
+.results-head:not(.is-stacked) .toolbar { flex-wrap: nowrap; }
+.results-head.is-stacked { flex-direction: column; gap: 0; padding: 0; }
+.results-head.is-stacked .kind-tabs { padding: 0 12px; border-bottom: 1px solid var(--border); }
+.results-head.is-stacked .kind-tab { min-height: 48px; }
+.results-head.is-stacked .toolbar { justify-content: flex-start; padding: 12px 16px; background: var(--gray-25); }
+.results-head.is-stacked .toolbar .clear-all { order: 0; margin-left: auto; margin-right: 0; }
+.results-head.is-stacked .toolbar-label { display: inline-flex; }
+.fchip-main { white-space: nowrap; }
+@container (max-width: 900px) { table.data .col-etims { display: none; } }
+@container (max-width: 720px) { .results .table-wrap { display: none; } .results .cards { display: block; } }
+@media (max-width: 600px) { .results-head .toolbar { padding: 12px; } .results-head .toolbar .clear-all { margin-left: 0; } }
+
+/* Sortable column headers */
+.th-sort { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; color: inherit; border-radius: 4px; cursor: pointer; }
+.th-sort .ic { width: 12px; height: 12px; color: var(--gray-400); transition: color .15s ease; }
+.th-sort:hover, .th-sort.is-active { color: var(--text); }
+.th-sort:hover .ic { color: var(--gray-600); }
+.th-sort.is-active .ic { color: var(--gray-900); }
+
+/* Second line of a row: muted text, then small inline markers, so rows stay two lines tall */
+table.data .meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* The main column takes the spare width and truncates its second line instead of widening the table */
+table.data td.cell-main { width: 100%; max-width: 0; }
+.meta-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta-text:empty { display: none; }
+.mini { display: inline-flex; align-items: center; gap: 4px; flex: none; font-size: 12px; line-height: 16px; color: var(--text-3); white-space: nowrap; }
+.mini .ic { width: 14px; height: 14px; color: var(--gray-400); }
+.mini.is-warn, .mini.is-warn .ic { color: var(--warn-700); }
+.flags .mini { margin-left: 2px; }
+.menu-option .status { font-size: 12px; }
+
+/* Bills */
+.head-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn-lg { height: 44px; }
+input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; flex: none; display: inline-grid; place-content: center; border: 1px solid var(--gray-500); border-radius: 4px; background: var(--surface); cursor: pointer; transition: background-color .15s ease, border-color .15s ease; }
+input[type="checkbox"]::before { content: ""; width: 12px; height: 12px; transform: scale(0); transition: transform .12s var(--ease-out); background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5'/%3E%3C/svg%3E") center / contain no-repeat; }
+input[type="checkbox"]:hover:not(:disabled) { border-color: var(--gray-700); }
+input[type="checkbox"]:checked { background: var(--brand-700); border-color: var(--brand-700); }
+input[type="checkbox"]:checked::before { transform: scale(1); }
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+input[type="checkbox"]:disabled { cursor: not-allowed; background: var(--gray-100); border-color: var(--gray-300); }
+input[type="checkbox"]:checked:disabled { background: var(--gray-400); border-color: var(--gray-400); }
+@media (prefers-reduced-motion: reduce) { input[type="checkbox"], input[type="checkbox"]::before { transition: none; } }
+.status.is-overdue { background: var(--error-50); color: var(--error-700); }
+.stat-icon.is-danger { background: var(--error-50); color: var(--error-700); }
+.money-sum { white-space: nowrap; }
+.stat-extra { font-size: 14px; line-height: 20px; color: var(--text-2); }
+.approx { color: var(--text-3); font-weight: var(--w-ui); }
+@container (max-width: 960px) { table.data .col-method { display: none; } }
+.stat-value .money-sum .ccy { font-size: .6em; }
+table.data th.check-cell, table.data td.check-cell { width: 48px; padding-right: 0; }
+table.data td.check-cell { padding-top: 18px; }
+table.data tbody tr.row.is-selected { background: var(--brand-50); }
+table.data .group-row th { padding: 20px 16px 8px; text-align: left; font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-2); border-bottom: 1px solid var(--row-divider); }
+.group-head { display: flex; align-items: center; gap: 8px; }
+.group-count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-full); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: var(--gray-100); color: var(--gray-700); }
+.group-total { margin-left: auto; font-weight: 400; color: var(--text-3); }
+.payee-cell { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.payee-main { min-width: 0; }
+.payee-mark { width: 32px; height: 32px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: var(--r-control); background: var(--surface); color: var(--gray-700); font-size: 12px; font-weight: var(--w-strong); letter-spacing: .02em; }
+.payee-mark.sm { width: 24px; height: 24px; font-size: 11px; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.tags:empty { display: none; }
+.tag { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px 0 6px; border: 1px solid var(--border); border-radius: var(--r-full); font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.tag .ic { width: 12px; height: 12px; color: var(--gray-500); }
+.due-hint { display: block; margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.due-hint.is-late { color: var(--error-700); font-weight: var(--w-ui); }
+.due-hint.is-today { color: var(--warn-700); font-weight: var(--w-ui); }
+td.method { color: var(--text-2); white-space: nowrap; }
+td.method.is-unset { color: var(--text-3); }
+.amount-wrap { display: inline-flex; flex-direction: column; align-items: flex-end; }
+.sheet-amount .amount-wrap { align-items: flex-start; }
+.amount-sub { font-size: 12px; line-height: 16px; color: var(--text-3); white-space: nowrap; }
+.to-enter { color: var(--text-3); }
+.cards li { display: flex; align-items: flex-start; }
+.cards li.is-selected { background: var(--brand-50); }
+.card-check { flex: none; width: 34px; padding: 20px 0 0 16px; box-sizing: border-box; }
+
+.selection-bar { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -8px 24px -16px rgba(16, 24, 40, .2); }
+.selection-bar .what { flex: 1 1 220px; min-width: 0; }
+.selection-bar .what strong { font-weight: var(--w-name); }
+.selection-bar .links { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 2px; font-size: 12px; line-height: 16px; }
+.selection-bar .links:empty { display: none; }
+
+.banners { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.banners:empty { display: none; }
+.banner { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); }
+.banner > .ic { width: 20px; height: 20px; margin-top: 1px; color: var(--gray-500); }
+.banner.is-success > .ic { color: var(--success-700); }
+.banner.is-warn > .ic { color: var(--warn-600); }
+.banner-main { flex: 1 1 280px; min-width: 0; }
+.banner-title { font-weight: var(--w-title); }
+.banner-main p + p { margin-top: 2px; color: var(--text-2); }
+.banner-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.sheet-amount { margin-top: 2px; font-size: 24px; line-height: 32px; font-weight: var(--w-heading); letter-spacing: -0.02em; }
+.sheet-amount .amount-sub { font-size: 12px; letter-spacing: 0; }
+.sheet-amount .to-enter { font-size: 16px; }
+.sheet-foot { color: var(--text-2); }
+.foot-primary { display: flex; flex-wrap: wrap; gap: 8px; }
+.foot-secondary { display: flex; flex-wrap: wrap; gap: 2px; margin-left: auto; }
+.btn-ghost.danger { color: var(--error-700); }
+.btn-ghost.danger:hover:not(:disabled) { background: var(--error-50); color: var(--error-700); }
+.read-only { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-3); }
+.read-only.wide { flex-basis: 100%; font-size: 12px; }
+.read-only .ic { width: 14px; height: 14px; }
+.position { margin-left: auto; font-size: 12px; color: var(--text-3); }
+.note { display: flex; gap: 8px; align-items: flex-start; color: var(--text-2); }
+.note .ic { margin-top: 2px; color: var(--text-3); }
+.previews { display: flex; flex-direction: column; gap: 8px; }
+.preview { border: 1px solid var(--border); border-radius: var(--r-control); }
+.preview summary { list-style: none; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto 16px; gap: 12px; align-items: center; padding: 10px 12px; cursor: pointer; border-radius: var(--r-control); }
+.preview summary::-webkit-details-marker { display: none; }
+.preview .chev { color: var(--text-3); transition: transform .2s var(--ease-out); }
+.preview[open] .chev { transform: rotate(180deg); }
+.preview .p-name { display: block; font-weight: var(--w-name); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview .p-sub { display: block; font-size: 12px; line-height: 16px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview .p-amount { font-weight: var(--w-amount); white-space: nowrap; text-align: right; }
+.preview .details { padding: 0 12px 12px 56px; }
+.preview .details div { grid-template-columns: 11rem minmax(0, 1fr); }
+.preview .details div:first-child { padding-top: 9px; border-top: 1px solid var(--hairline); }
+.totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; padding: 14px 16px; border-radius: var(--r-control); background: var(--gray-50); }
+.totals dt { font-size: 12px; line-height: 16px; color: var(--text-3); font-weight: var(--w-ui); }
+.totals dd { margin-top: 4px; font-size: 16px; line-height: 24px; font-weight: var(--w-amount); }
+.changed { background: var(--warn-50); border-radius: 4px; padding: 0 4px; margin: 0 -4px; }
+
+.form { display: flex; flex-direction: column; gap: 18px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.field-label { font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-2); }
+.field-help { display: block; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.field-error { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--error-700); }
+.field-error .ic { width: 14px; height: 14px; }
+.input, .textarea, .select select { width: 100%; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--control-border); border-radius: var(--r-control); background: var(--surface); font-size: 14px; color: var(--text); }
+.textarea { height: auto; min-height: 72px; padding: 10px 12px; resize: vertical; }
+.input::placeholder, .textarea::placeholder { color: var(--text-3); }
+.input[aria-invalid="true"], .textarea[aria-invalid="true"], .select select[aria-invalid="true"] { border-color: var(--error-700); }
+.select { position: relative; display: flex; }
+.select select { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer; }
+.select > .ic { position: absolute; right: 12px; top: 14px; pointer-events: none; color: var(--gray-500); }
+.row-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.check-field { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.check-field input { margin-top: 1px; }
+.check-title { display: block; font-size: 14px; color: var(--text); font-weight: var(--w-ui); }
+.drop { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; padding: 12px; border: 1px dashed var(--control-border); border-radius: var(--r-control); background: var(--gray-50); color: var(--text-2); cursor: pointer; text-align: center; }
+.drop:hover { border-color: var(--gray-400); color: var(--text); }
+.field:focus-within .drop { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+.drop.is-disabled { opacity: .5; cursor: not-allowed; }
+.files { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.files:empty { display: none; }
+.files li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-control); font-size: 14px; }
+.files li .ic { width: 14px; height: 14px; color: var(--gray-500); }
+.files li .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uploaded-img { max-width: 100%; max-height: 300px; border-radius: 4px; }
+.uploaded-pdf { width: 100%; height: 320px; border: 0; background: #fff; }
+@media (max-width: 600px) {
+  .row-2, .totals { grid-template-columns: minmax(0, 1fr); }
+  .preview .details { padding-left: 12px; }
+  .preview .details div { grid-template-columns: minmax(0, 1fr); }
+  .head-actions { width: 100%; }
+  .head-actions .btn { flex: 1; }
+  .foot-secondary { margin-left: 0; }
+}
+
+/* Recurring payments, in the side panel */
+.sheet-sub { margin-top: 2px; color: var(--text-2); }
+.back-link { display: inline-flex; align-items: center; gap: 2px; margin-left: -2px; padding: 0; border: 0; background: none; border-radius: 4px; font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-2); }
+.back-link:hover { color: var(--text); }
+.back-link .ic { width: 14px; height: 14px; }
+.sheet-body.is-flush { padding: 0; gap: 0; }
+.rec-list { list-style: none; padding: 0; }
+.rec-list li { border-bottom: 1px solid var(--row-divider); }
+.rec-row { width: 100%; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 14px 24px; border: 0; background: none; text-align: left; transition: background-color .15s ease; }
+button.rec-row:hover { background: var(--gray-25); }
+.rec-row:focus-visible { outline-offset: -2px; }
+.rec-main { min-width: 0; }
+.rec-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 16px; line-height: 24px; font-weight: var(--w-name); }
+.rec-meta { display: block; color: var(--text-3); }
+.rec-due { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; white-space: nowrap; color: var(--text-2); }
+.no-more { color: var(--text-3); }
+.next-bill { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; align-items: center; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--r-control); }
+.next-bill-due { font-size: 16px; line-height: 24px; font-weight: var(--w-name); }
+.next-bill-amount { font-size: 16px; line-height: 24px; font-weight: var(--w-amount); text-align: right; white-space: nowrap; }
+.next-bill-amount.is-missing { color: var(--warn-700); }
+.next-bill .status { justify-self: start; }
+.next-bill-open { display: inline-flex; align-items: center; gap: 2px; justify-self: end; white-space: nowrap; }
+.next-bill-open .ic { width: 14px; height: 14px; }
+.no-more-box { padding: 14px 16px; border: 1px dashed var(--control-border); border-radius: var(--r-control); color: var(--text-2); }
+.sheet-section { display: flex; flex-direction: column; gap: 8px; }
+.details .sub .text-link { margin-top: 2px; }
+.set-once { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-radius: var(--r-control); background: var(--gray-50); }
+.set-once .details div { grid-template-columns: 7rem minmax(0, 1fr); border-top-color: var(--gray-200); }
+.due-preview { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: var(--r-control); background: var(--gray-50); }
+.due-preview > .ic { margin-top: 2px; color: var(--text-3); }
+.due-preview strong { display: block; font-weight: var(--w-ui); }
+.due-preview .sub { display: block; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.async-state { display: flex; flex-direction: column; gap: 8px; }
+.loading-line { color: var(--text-3); }
+.callout .btn { margin-top: 8px; }
+@media (max-width: 600px) {
+  .rec-row { padding: 14px 16px; }
+  .set-once .details div { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <div class="sb-top">
+      <button class="company" type="button" data-mock="Switch company">
+        <img src="../../apps/web/public/expendi-mark.png" alt="">
+        <span class="company-text"><span class="company-name">Mwangaza Logistics</span><span class="company-role" id="role-label">Admin</span></span>
+        <i data-icon="chevrons"></i>
+      </button>
+      <button class="search" type="button" data-mock="Search"><i data-icon="search"></i><span>Search</span><kbd>⌘K</kbd></button>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-group">
+        <p class="sb-label">Workspace</p>
+        <a class="sb-link" href="overview.html"><i data-icon="dashboard"></i>Overview</a>
+        <a class="sb-link" href="wallet.html"><i data-icon="wallet"></i>Accounts</a>
+      </div>
+      <div class="sb-group">
+        <p class="sb-label">Spend &amp; pay</p>
+        <a class="sb-link" href="approvals.html"><i data-icon="approve"></i>Approvals<span class="count num">6</span></a>
+        <a class="sb-link" href="expenses.html"><i data-icon="receipt"></i>Expenses<span class="count num">2</span></a>
+        <a class="sb-link is-active" href="bills.html" aria-current="page"><i data-icon="file"></i>Bills<span class="count num" id="nav-count"></span></a>
+        <a class="sb-link" href="payroll.html"><i data-icon="banknote"></i>Payroll<span class="count num">1</span></a>
+      </div>
+      <div class="sb-group">
+        <p class="sb-label">Manage</p>
+        <a class="sb-link" href="payees.html"><i data-icon="building"></i>Payees</a>
+        <a class="sb-link" href="team.html"><i data-icon="users"></i>Team</a>
+        <a class="sb-link" href="settings.html"><i data-icon="settings"></i>Settings</a>
+      </div>
+      <div class="sb-group">
+        <p class="sb-label">Insights</p>
+        <a class="sb-link" href="reports.html"><i data-icon="chart"></i>Reports</a>
+        <a class="sb-link" href="activity.html"><i data-icon="activity"></i>Activity</a>
+      </div>
+    </nav>
+    <div class="sb-user"><span class="person" aria-hidden="true">WK</span><div class="who"><p>Wanjiru Kamau</p><p>wanjiru@mwangaza.co.ke</p></div></div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <button class="icon-btn" type="button" id="menu-btn" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false"><i data-icon="menu"></i></button>
+      <img src="../../apps/web/public/expendi-mark.png" alt="">
+      <span class="company-name">Mwangaza Logistics</span>
+    </header>
+
+    <main class="main">
+      <div class="mock-strip" role="group" aria-label="Mock controls">
+        <strong>Mock controls</strong>
+        <label>View as
+          <select id="mock-role">
+            <option value="admin">Admin</option>
+            <option value="no-passkey">Admin without a passkey</option>
+            <option value="accountant">Accountant</option>
+          </select>
+        </label>
+        <label>Scenario
+          <select id="mock-scenario">
+            <option value="normal">Everything goes through</option>
+            <option value="one-fails">One payment fails</option>
+            <option value="review">A payment needs checking</option>
+            <option value="short">Wallet too low</option>
+            <option value="cost">Cost changes before the passkey</option>
+            <option value="cancel">Passkey cancelled</option>
+            <option value="empty">Nothing to pay</option>
+            <option value="error">Bills can't load</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="page-head reveal">
+        <div>
+          <h1 class="page-title">Bills</h1>
+          <p class="page-sub" id="page-sub"></p>
+        </div>
+        <div class="head-actions" id="head-actions">
+          <button class="btn btn-outline" type="button" id="import-btn" data-mock="Import spreadsheet (the Imports page)"><i data-icon="upload"></i>Import spreadsheet</button>
+          <button class="btn btn-outline" type="button" id="recurring-btn" aria-haspopup="dialog"><i data-icon="repeat"></i>Recurring payments</button>
+          <button class="btn btn-primary" type="button" id="new-bill"><i data-icon="plus"></i>New bill</button>
+        </div>
+      </div>
+
+      <div class="banners" id="banners"></div>
+
+      <div class="stats reveal" style="--i:1" id="stats" role="group" aria-label="Summary"></div>
+
+      <section class="panel results reveal" style="--i:2" id="results" aria-label="Bills">
+        <div class="results-head">
+          <div class="kind-tabs" role="tablist" aria-label="Bills" id="view-tabs"></div>
+          <div class="toolbar" role="group" aria-label="Filters" id="toolbar"></div>
+        </div>
+        <div class="results-body" id="results-body"></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="sheet-layer" id="sheet-layer" hidden>
+  <div class="sheet-scrim" data-close></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" tabindex="-1"></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const LUCIDE_NAMES = {
+  "dashboard": "LayoutDashboard", "wallet": "Wallet", "approve": "CircleCheck", "check-circle": "CircleCheck",
+  "receipt": "ReceiptText", "file": "FileText", "repeat": "Repeat", "banknote": "Banknote", "building": "Building2",
+  "users": "Users", "settings": "Settings", "chart": "ChartColumn", "activity": "Activity", "search": "Search",
+  "chevrons": "ChevronsUpDown", "chevron-down": "ChevronDown", "chevron-up": "ChevronUp", "chevron-left": "ChevronLeft", "chevron-right": "ChevronRight", "check": "Check", "x": "X",
+  "alert": "TriangleAlert", "circle-alert": "CircleAlert", "info": "Info", "menu": "Menu", "external": "ExternalLink",
+  "upload": "Upload", "image-off": "ImageOff", "filter-x": "FilterX", "user": "User", "tag": "Tag", "calendar": "Calendar",
+  "sliders": "SlidersHorizontal", "key": "KeyRound", "rotate": "RotateCcw", "plus": "Plus", "pencil": "Pencil",
+  "paperclip": "Paperclip", "layers": "Layers", "clock": "Clock", "ban": "Ban", "shield": "ShieldAlert",
+  "arrow-up": "ArrowUp", "arrow-down": "ArrowDown", "arrow-up-down": "ArrowUpDown", "pause": "Pause", "play": "Play",
+};
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (selector) => document.querySelector(selector);
+const later = (fn, ms) => setTimeout(fn, reduceMotion ? Math.min(ms, 200) : ms);
+
+function icon(name) {
+  const node = window.lucide?.[LUCIDE_NAMES[name]];
+  if (!node) return document.createElement("span");
+  const svg = window.lucide.createElement(node);
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "ic");
+  svg.removeAttribute("width");
+  svg.removeAttribute("height");
+  return svg;
+}
+function h(tag, props, ...children) {
+  const el = document.createElement(tag);
+  for (const [key, value] of Object.entries(props ?? {})) {
+    if (value == null || value === false) continue;
+    if (key === "class") el.className = value;
+    else if (key === "text") el.textContent = value;
+    else if (key.startsWith("on")) el.addEventListener(key.slice(2), value);
+    else el.setAttribute(key, value === true ? "" : value);
+  }
+  for (const child of children.flat()) if (child != null && child !== false) el.append(child);
+  return el;
+}
+document.querySelectorAll("i[data-icon]").forEach((el) => el.replaceWith(icon(el.dataset.icon)));
+
+/* Money and dates. Amounts are cents; USD bills are paid in USDC. */
+const TODAY = "2026-11-06";
+const RATE = 129;
+const WALLET_USDC = { normal: 16420.8, short: 18.4 };
+const fmt = (cents) => (cents / 100).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtKes = (cents) => (cents / 100).toLocaleString("en-KE", { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 });
+const money = (cents, currency) => h("span", { class: "money num" }, h("span", { class: "ccy", text: currency }), " ", currency === "KES" ? fmtKes(cents) : fmt(cents));
+const usdc = (n) => h("span", { class: "money num" }, n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), " ", h("span", { class: "ccy", text: "USDC" }));
+const toDate = (iso) => new Date(`${iso}T00:00:00Z`);
+const dateText = (iso) => toDate(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const monthText = (ym) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+const daysBetween = (a, b) => Math.round((toDate(b) - toDate(a)) / 86400000);
+const addDays = (iso, n) => new Date(toDate(iso).getTime() + n * 86400000).toISOString().slice(0, 10);
+const isoOf = (y, m, d) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+const isIso = (text) => /^\d{4}-\d{2}-\d{2}$/.test(text);
+const markOf = (name) => {
+  const words = name.split(/\s+/);
+  return (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
+};
+
+const toastEl = $("#toast");
+let toastTimer;
+function toast(message) {
+  toastEl.replaceChildren(icon("check"), h("span", { text: message }));
+  toastEl.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("show"), 3200);
+}
+document.addEventListener("click", (event) => {
+  const trigger = event.target.closest("[data-mock]");
+  if (!trigger) return;
+  event.preventDefault();
+  toast(`${trigger.dataset.mock} isn't part of this mock.`);
+});
+
+/* Labels, as the app words them */
+const STATUS = {
+  upcoming: { label: "Upcoming", tone: "quiet" },
+  due: { label: "Due today", tone: "waiting" },
+  overdue: { label: "Overdue", tone: "overdue" },
+  paying: { label: "Being paid", tone: "moving" },
+  paid: { label: "Paid", tone: "paid" },
+  payout_failed: { label: "Payment failed", tone: "failed" },
+  paid_outside: { label: "Paid outside Expendi", tone: "paid" },
+  cancelled: { label: "Cancelled", tone: "rejected" },
+};
+const OPEN = ["overdue", "due", "payout_failed", "paying", "upcoming"];
+const UNPAID = ["upcoming", "due", "overdue", "payout_failed"];
+const METHOD_LABELS = { mpesa: "M-Pesa number", till: "M-Pesa Till", paybill: "M-Pesa Paybill", bank: "Bank account", usdc: "USDC wallet", outside: "Paid outside Expendi" };
+const HEADINGS = ["Transactions", "Subscriptions"];
+const ACCOUNTS = ["KCB current account ••7781", "Equity Bank ••4521", "Company M-Pesa till"];
+const CATEGORIES = ["Equipment", "Insurance", "Rent & utilities", "Repairs & maintenance", "Salaries", "Security", "Software", "Suppliers", "Taxes", "Airtime & internet"];
+
+/* Sample data */
+const PAYEES = {
+  kp: { name: "Kilimani Properties", kind: "Supplier", method: "paybill", dest: "Paybill 522522, account KP-1182" },
+  sg: { name: "Securex Guards", kind: "Supplier", method: "paybill", dest: "Paybill 880100, account MWZ-22" },
+  sf: { name: "Safaricom", kind: "Subscription vendor", method: "paybill", dest: "Paybill 150501, account 7720431" },
+  fg: { name: "Figma", kind: "Subscription vendor", method: "usdc", dest: "0x7f2e…b9c4" },
+  zk: { name: "Zuku", kind: "Subscription vendor", method: "paybill", dest: "Paybill 320320, account 118-2219" },
+  tf: { name: "Twiga Foods", kind: "Supplier", method: "paybill", dest: "Paybill 222111, account TF-0091" },
+  kra: { name: "KRA", kind: "Statutory body", method: "paybill", dest: "Paybill 572572, account PRN" },
+  nw: { name: "Nairobi Water", kind: "Supplier", method: "paybill", dest: "Paybill 444400, account NW-7789" },
+  bk: { name: "Bidco Kenya", kind: "Supplier", method: "bank", dest: "Bank account ending 4321", changedRecently: true },
+  kpl: { name: "Kenya Power", kind: "Supplier", method: "paybill", dest: "Paybill 888880, account 54012339" },
+  gw: { name: "Google Workspace", kind: "Subscription vendor", method: "usdc", dest: "0x3c91…a07e" },
+  jh: { name: "Jubilee Health", kind: "Supplier", method: "paybill", dest: "Paybill 511000, account JH-77812" },
+  hp: { name: "Hotpoint Appliances", kind: "Supplier", method: "outside", dest: null },
+  cm: { name: "CarMax Mechanics", kind: "Supplier", method: null, dest: null },
+  cv: { name: "Canva", kind: "Subscription vendor", method: "usdc", dest: "0x51aa…09d2" },
+};
+const k = (n) => Math.round(n * 100);
+const paper = (role, heading, label, sub, lines) => ({ role, paper: { heading, label, sub, lines } });
+function sampleBills() {
+  return [
+    { id: "kp-nov", payee: "kp", currency: "KES", amount: k(48500), dueOn: "2026-11-01", status: "overdue", heading: "Transactions", category: "Rent & utilities", reference: "INV-2026-1101", recurringId: "kp-rent",
+      notes: "Rent plus service charge.", files: [paper("invoice", "Kilimani Properties Ltd", "INVOICE", "INV-2026-1101, 28 Oct 2026", [["Office rent, November", 45000], ["Service charge", 3500]])] },
+    { id: "sg-oct", payee: "sg", currency: "KES", amount: k(32000), dueOn: "2026-10-31", status: "overdue", heading: "Transactions", category: "Security", reference: "SG-1031", recurringId: "sg-guards",
+      files: [paper("invoice", "Securex Guards Ltd", "INVOICE", "SG-1031, 25 Oct 2026", [["Night guard, October", 32000]])] },
+    { id: "sf-nov", payee: "sf", currency: "KES", amount: k(6999), dueOn: "2026-11-06", status: "due", heading: "Subscriptions", category: "Airtime & internet", recurringId: "sf-fibre", files: [] },
+    { id: "fg-nov", payee: "fg", currency: "USD", amount: k(45), dueOn: "2026-11-06", status: "due", heading: "Subscriptions", category: "Software", reference: "FIG-88213", recurringId: "fg-seats",
+      files: [paper("invoice", "Figma, Inc.", "INVOICE", "FIG-88213, 1 Nov 2026", [["Professional, 3 editors", 45]])] },
+    { id: "zk-nov", payee: "zk", currency: "KES", amount: k(4100), dueOn: "2026-11-04", status: "payout_failed", heading: "Subscriptions", category: "Airtime & internet", recurringId: "zk-tv",
+      failure: "The paybill didn't accept the account number.", files: [] },
+    { id: "tf-1105", payee: "tf", recurringId: "tf-weekly", variable: true, currency: "KES", amount: k(186000), dueOn: "2026-11-05", status: "paying", heading: "Transactions", category: "Suppliers", reference: "INV-4471",
+      files: [paper("invoice", "Twiga Foods Ltd", "INVOICE", "INV-4471, 30 Oct 2026", [["Maize flour, 120 bales", 186000]])] },
+    { id: "kra-oct", payee: "kra", currency: "KES", amount: null, variable: true, dueOn: "2026-11-09", status: "upcoming", heading: "Transactions", category: "Taxes", recurringId: "kra-paye",
+      notes: "PAYE for October. Enter the amount once payroll is final.", files: [] },
+    { id: "nw-nov", payee: "nw", currency: "KES", amount: k(3850), dueOn: "2026-11-15", status: "upcoming", heading: "Transactions", category: "Rent & utilities", recurringId: "nw-water", files: [] },
+    { id: "kpl-nov", payee: "kpl", recurringId: "kpl-power", variable: true, currency: "KES", amount: k(14250), dueOn: "2026-11-18", status: "upcoming", heading: "Transactions", category: "Rent & utilities", reference: "54012339", files: [] },
+    { id: "bk-1120", payee: "bk", currency: "KES", amount: k(120000), dueOn: "2026-11-20", status: "upcoming", heading: "Transactions", category: "Suppliers", reference: "BID-2210-55",
+      files: [paper("invoice", "Bidco Africa Ltd", "INVOICE", "BID-2210-55, 21 Oct 2026", [["Cooking oil, 40 jerrycans", 120000]])] },
+    { id: "cm-1122", payee: "cm", currency: "KES", amount: k(18500), dueOn: "2026-11-22", status: "upcoming", heading: "Transactions", category: "Repairs & maintenance", reference: "JOB-7712",
+      files: [paper("invoice", "CarMax Mechanics", "QUOTE", "JOB-7712, 2 Nov 2026", [["Van brake pads", 12500], ["Labour", 6000]])] },
+    { id: "hp-1125", payee: "hp", currency: "KES", amount: k(12000), dueOn: "2026-11-25", status: "upcoming", heading: "Transactions", category: "Equipment", notes: "Microwave for the kitchen. They only take cheques.", files: [] },
+    { id: "gw-dec", payee: "gw", currency: "USD", amount: k(72), dueOn: "2026-12-01", status: "upcoming", heading: "Subscriptions", category: "Software", recurringId: "gw-seats", files: [] },
+    { id: "jh-dec", payee: "jh", currency: "KES", amount: k(64500), dueOn: "2026-12-01", status: "upcoming", heading: "Transactions", category: "Insurance", reference: "JH-77812-DEC", recurringId: "jh-cover", files: [] },
+
+    { id: "h-kpl", payee: "kpl", currency: "KES", amount: k(14250), dueOn: "2026-11-04", status: "paid", paidOn: "2026-11-04", heading: "Transactions", category: "Rent & utilities",
+      files: [paper("proof", "Expendi", "PAYMENT", "Paid 4 Nov 2026, 14:03", [["Paybill 888880, 54012339", 14250]])] },
+    { id: "h-jh", payee: "jh", currency: "KES", amount: k(64500), dueOn: "2026-11-01", status: "paid", paidOn: "2026-11-01", heading: "Transactions", category: "Insurance", recurringId: "jh-cover", files: [] },
+    { id: "h-gw", payee: "gw", currency: "USD", amount: k(72), dueOn: "2026-11-01", status: "paid", paidOn: "2026-11-01", heading: "Subscriptions", category: "Software", recurringId: "gw-seats", files: [] },
+    { id: "h-cv", payee: "cv", currency: "USD", amount: k(15), dueOn: "2026-10-20", status: "cancelled", cancelledAt: "2026-10-18", cancelledBy: "Wanjiru Kamau",
+      cancelledReason: "Subscription cancelled; the team moved to Figma.", heading: "Subscriptions", category: "Software", recurringId: "cv-design", files: [] },
+    { id: "h-kp", payee: "kp", currency: "KES", amount: k(48500), dueOn: "2026-10-01", status: "paid", paidOn: "2026-10-15", heading: "Transactions", category: "Rent & utilities", reference: "INV-2026-1001", recurringId: "kp-rent",
+      files: [paper("invoice", "Kilimani Properties Ltd", "INVOICE", "INV-2026-1001, 1 Oct 2026", [["Office rent, October", 45000], ["Service charge", 3500]]),
+        paper("proof", "Expendi", "PAYMENT", "Paid 15 Oct 2026, 09:02", [["Paybill 522522, KP-1182", 48500]])] },
+    { id: "h-tf", payee: "tf", currency: "KES", amount: k(98000), dueOn: "2026-10-10", status: "paid", paidOn: "2026-10-10", heading: "Transactions", category: "Suppliers", files: [] },
+    { id: "h-nw", payee: "nw", currency: "KES", amount: k(3610), dueOn: "2026-10-15", status: "paid", paidOn: "2026-10-14", heading: "Transactions", category: "Rent & utilities", recurringId: "nw-water",
+      amountChangeReason: "The meter reading came in lower than the estimate.", files: [] },
+    { id: "h-sf", payee: "sf", currency: "KES", amount: k(6999), dueOn: "2026-10-06", status: "paid", paidOn: "2026-10-06", heading: "Subscriptions", category: "Airtime & internet", recurringId: "sf-fibre", files: [] },
+    { id: "h-hp", payee: "hp", currency: "KES", amount: k(54999), dueOn: "2026-09-12", status: "paid_outside", paidOn: "2026-09-12", paidFrom: "Equity Bank ••4521", paidNote: "Paid by cheque 001284.",
+      markedPaidBy: "Wanjiru Kamau", heading: "Transactions", category: "Equipment",
+      files: [paper("proof", "Equity Bank", "CHEQUE", "No. 001284, 12 Sep 2026", [["Hotpoint Appliances", 54999]])] },
+  ];
+}
+
+/* Recurring payments: schedules that always keep one bill to pay. Salaries live in Payroll, not here. */
+const STATES = { active: { label: "Active", tone: "paid" }, paused: { label: "Paused", tone: "waiting" }, ended: { label: "Ended", tone: "rejected" } };
+const PAY_VIA = { expendi: "Through Expendi", outside: "Outside Expendi" };
+const PAY_VIA_OPTIONS = { expendi: "Through Expendi: you pay each bill from the wallet", outside: "Outside Expendi: e.g. by card; you mark each bill paid" };
+const SCHEDULE_LABELS = { weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly, counted from the start date’s month", yearly: "Yearly, in the start date’s month" };
+const NET_ERROR = "Couldn't reach Expendi Business. Check your connection and try again.";
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const LONGEST_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+function sampleRecurring() {
+  const base = { variable: false, currency: "KES", endsOn: null, payVia: "expendi", reminder: 3, state: "active", heading: "Transactions" };
+  return [
+    { ...base, id: "kp-rent", payee: "kp", category: "Rent & utilities", amount: k(48500), schedule: "monthly", day: 1, startsOn: "2025-01-01", endsOn: "2027-12-31", reminder: 5 },
+    { ...base, id: "sg-guards", payee: "sg", category: "Security", amount: k(32000), schedule: "monthly", day: 31, startsOn: "2026-01-31" },
+    { ...base, id: "sf-fibre", payee: "sf", category: "Airtime & internet", heading: "Subscriptions", amount: k(6999), schedule: "monthly", day: 6, startsOn: "2025-08-06" },
+    { ...base, id: "fg-seats", payee: "fg", category: "Software", heading: "Subscriptions", currency: "USD", amount: k(45), schedule: "monthly", day: 6, startsOn: "2026-02-06", reminder: 7 },
+    { ...base, id: "zk-tv", payee: "zk", category: "Airtime & internet", heading: "Subscriptions", amount: k(4100), schedule: "monthly", day: 4, startsOn: "2025-11-04" },
+    { ...base, id: "kra-paye", payee: "kra", category: "Taxes", variable: true, amount: null, schedule: "monthly", day: 9, startsOn: "2025-02-09", reminder: 5 },
+    { ...base, id: "kpl-power", payee: "kpl", category: "Rent & utilities", variable: true, amount: null, schedule: "monthly", day: 18, startsOn: "2026-04-18" },
+    { ...base, id: "nw-water", payee: "nw", category: "Rent & utilities", amount: k(3850), schedule: "monthly", day: 15, startsOn: "2025-03-15", reminder: 0 },
+    { ...base, id: "gw-seats", payee: "gw", category: "Software", heading: "Subscriptions", currency: "USD", amount: k(72), schedule: "monthly", day: 1, startsOn: "2025-12-01", reminder: 1 },
+    { ...base, id: "tf-weekly", payee: "tf", category: "Suppliers", variable: true, amount: null, schedule: "weekly", day: 4, startsOn: "2026-06-04", reminder: 1 },
+    { ...base, id: "jh-cover", payee: "jh", category: "Insurance", amount: k(64500), schedule: "monthly", day: 1, startsOn: "2025-06-01", reminder: 5, state: "paused" },
+    { ...base, id: "cm-service", payee: "cm", category: "Repairs & maintenance", amount: k(18500), schedule: "quarterly", day: 15, startsOn: "2026-01-15", reminder: 7, state: "paused" },
+    { ...base, id: "cv-design", payee: "cv", category: "Software", heading: "Subscriptions", currency: "USD", amount: k(15), schedule: "monthly", day: 20, startsOn: "2025-04-20", endsOn: "2026-10-18", state: "ended" },
+    { ...base, id: "hp-warranty", payee: "hp", category: "Equipment", amount: k(4999), schedule: "yearly", day: 12, startsOn: "2024-09-12", endsOn: "2026-09-12", payVia: "outside", reminder: 7, state: "ended" },
+  ];
+}
+
+/* Schedules, as packages/shared describes them */
+function ordinal(day) {
+  const tens = day % 100;
+  if (tens >= 11 && tens <= 13) return `${day}th`;
+  return `${day}${["th", "st", "nd", "rd"][day % 10] ?? "th"}`;
+}
+function describeSchedule(schedule, day, startsOn) {
+  const lastDayNote = day > 28 ? ", or the month’s last day" : "";
+  const first = Number(startsOn.slice(5, 7)) - 1;
+  if (schedule === "weekly") return `Every ${WEEKDAYS[day - 1] ?? "week"}`;
+  if (schedule === "monthly") return `Monthly on the ${ordinal(day)}${lastDayNote}`;
+  if (schedule === "quarterly") {
+    const months = [0, 3, 6, 9].map((offset) => (first + offset) % 12).sort((a, b) => a - b).map((m) => MONTHS[m].slice(0, 3));
+    return `Quarterly on the ${ordinal(day)} of ${months.slice(0, 3).join(", ")} and ${months[3]}${lastDayNote}`;
+  }
+  if (first === 1 && day >= 29) return "Yearly on the last day of February";
+  return `Yearly on ${Math.min(day, LONGEST_MONTH[first])} ${MONTHS[first]}`;
+}
+const scheduleOf = (r) => describeSchedule(r.schedule, r.day, r.startsOn);
+const isoWeekday = (iso) => ((toDate(iso).getUTCDay() + 6) % 7) + 1;
+const lastDayOf = (y, m) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+function firstOnOrAfter(r, from) {
+  if (r.schedule === "weekly") return addDays(from, (r.day - isoWeekday(from) + 7) % 7);
+  const first = Number(r.startsOn.slice(5, 7)) - 1;
+  const months = r.schedule === "monthly" ? MONTHS.map((_, i) => i) : r.schedule === "quarterly" ? [0, 3, 6, 9].map((o) => (first + o) % 12) : [first];
+  let y = Number(from.slice(0, 4));
+  let m = Number(from.slice(5, 7)) - 1;
+  for (let i = 0; i < 26; i += 1) {
+    if (months.includes(m)) {
+      const iso = isoOf(y, m, Math.min(r.day, lastDayOf(y, m)));
+      if (iso >= from) return iso;
+    }
+    m += 1;
+    if (m === 12) { m = 0; y += 1; }
+  }
+  return null;
+}
+const withinEnd = (r, iso) => (iso && (!r.endsOn || iso <= r.endsOn) ? iso : null);
+const reminderInWords = (days) => (days === 0 ? "On the due date" : `${days} ${days === 1 ? "day" : "days"} before it’s due`);
+
+/* State: view, filters and the open bill live in the URL */
+const state = { role: "admin", scenario: "normal", bills: [], recurring: [], filters: {}, sort: {}, selected: [], loading: true, loadError: false, banners: [], paying: false, generation: 0, created: 0 };
+const FILTER_NAMES = ["view", "payee", "category", "heading", "method", "status", "source"];
+const canAct = () => state.role !== "accountant";
+const canPay = () => state.role === "admin";
+const view = () => state.filters.view ?? "open";
+const payeeOf = (b) => PAYEES[b.payee];
+const isOpen = (b) => OPEN.includes(b.status);
+const isRecurring = (b) => Boolean(b.recurringId);
+const recurringOf = (b) => state.recurring.find((r) => r.id === b.recurringId);
+const SOURCES = { recurring: "Recurring", "one-off": "One-off" };
+const sourceOf = (b) => (isRecurring(b) ? "recurring" : "one-off");
+/* Tabs follow the bill's stage, as in Ramp: to pay, being paid, then history. */
+const viewOf = (b) => (UNPAID.includes(b.status) ? "open" : b.status === "paying" ? "paying" : "history");
+
+function payable(b) {
+  const p = payeeOf(b);
+  return UNPAID.includes(b.status) && Boolean(p.method) && p.method !== "outside" && !p.archived
+    && (p.method === "usdc" ? "USD" : "KES") === b.currency && b.amount != null;
+}
+function unpayableReason(b) {
+  const p = payeeOf(b);
+  if (p.archived) return "The payee is archived.";
+  if (!p.method) return "Add the payee's payment details first.";
+  if (p.method === "outside") return "Paid outside Expendi: mark it paid.";
+  if ((p.method === "usdc" ? "USD" : "KES") !== b.currency) return "The payee's payment method changed: enter the amount again.";
+  if (b.amount == null) return "Enter the amount first.";
+  return null;
+}
+const settledOn = (b) => b.paidOn ?? b.cancelledAt ?? b.dueOn;
+const datedStatus = (dueOn) => (dueOn > TODAY ? "upcoming" : dueOn === TODAY ? "due" : "overdue");
+
+const PREDICATES = {
+  view: (b, v) => viewOf(b) === v,
+  payee: (b, v) => b.payee === v,
+  category: (b, v) => b.category === v,
+  heading: (b, v) => b.heading === v,
+  method: (b, v) => (payeeOf(b).method ?? "none") === v,
+  status: (b, v) => b.status === v,
+  source: (b, v) => sourceOf(b) === v,
+};
+function matchesExcept(b, skip) {
+  const f = { view: "open", ...state.filters };
+  return Object.entries(f).every(([name, value]) => skip.includes(name) || PREDICATES[name](b, value));
+}
+const filtered = () => state.bills.filter((b) => matchesExcept(b, []));
+/* One flat list. To pay sorts by urgency by default (then due date); Being paid by due date; History by settled date, newest first. */
+const URGENCY = { payout_failed: 0, overdue: 1, due: 2, upcoming: 3, paying: 4, paid: 5, paid_outside: 6, cancelled: 7 };
+const SORT_DEFAULTS = { open: { key: "status", dir: "asc" }, paying: { key: "date", dir: "asc" }, history: { key: "date", dir: "desc" } };
+const sortOf = () => state.sort[view()] ?? SORT_DEFAULTS[view()];
+const dateOf = (b) => (view() === "history" ? settledOn(b) : b.dueOn);
+const kesValue = (b) => (b.amount == null ? -1 : b.currency === "USD" ? b.amount * RATE : b.amount);
+function compareBills(a, b) {
+  const { key, dir } = sortOf();
+  const byDate = dateOf(a).localeCompare(dateOf(b));
+  const primary = key === "status" ? URGENCY[a.status] - URGENCY[b.status]
+    : key === "date" ? byDate
+    : key === "payee" ? payeeOf(a).name.localeCompare(payeeOf(b).name)
+    : kesValue(a) - kesValue(b);
+  return (dir === "asc" ? primary : -primary) || byDate || a.id.localeCompare(b.id);
+}
+const sortedVisible = () => filtered().sort(compareBills);
+function setSort(key) {
+  const current = sortOf();
+  const firstDir = { date: view() === "history" ? "desc" : "asc", payee: "asc", amount: "desc", status: "asc" }[key];
+  state.sort[view()] = current.key === key ? { key, dir: current.dir === "asc" ? "desc" : "asc" } : { key, dir: firstDir };
+  keepFocus(renderResults);
+}
+
+function readUrl() {
+  const params = new URLSearchParams(location.search);
+  const f = {};
+  for (const name of FILTER_NAMES) { const v = params.get(name); if (v) f[name] = v; }
+  if (f.view && !["paying", "history"].includes(f.view)) delete f.view;
+  if (f.payee && !PAYEES[f.payee]) delete f.payee;
+  if (f.category && !CATEGORIES.includes(f.category)) delete f.category;
+  if (f.heading && !HEADINGS.includes(f.heading)) delete f.heading;
+  if (f.method && !METHOD_LABELS[f.method] && f.method !== "none") delete f.method;
+  if (f.status && !STATUS[f.status]) delete f.status;
+  if (f.source && !SOURCES[f.source]) delete f.source;
+  const billId = params.get("billId");
+  return { filters: f, billId, recurring: billId ? null : params.get("recurring") };
+}
+/* A bill and the recurring panel never share the URL: whichever the panel shows wins. */
+function writeUrl() {
+  const params = new URLSearchParams();
+  for (const name of FILTER_NAMES) if (state.filters[name]) params.set(name, state.filters[name]);
+  if (openId) params.set("billId", openId);
+  else if (recurringView) params.set("recurring", recurringView);
+  const query = params.toString();
+  history.replaceState(null, "", query ? `?${query}` : location.pathname);
+}
+
+/* Amount cell: KES or USD, "To enter" when missing, today's KES for USD bills still to pay */
+function amountNode(b, big = false) {
+  if (b.amount == null) return h("span", { class: "to-enter", text: "To enter" });
+  const showKes = b.currency === "USD" && (UNPAID.includes(b.status) || b.status === "paying");
+  return h("span", { class: "amount-wrap" }, h("span", { class: big ? "" : "amount" }, money(b.amount, b.currency)),
+    showKes ? h("span", { class: "amount-sub num", text: `≈ KES ${fmtKes(Math.floor(b.amount * RATE))} today` }) : null);
+}
+function sumByCurrency(list) {
+  const kes = list.filter((b) => b.currency === "KES" && b.amount != null).reduce((s, b) => s + b.amount, 0);
+  const usd = list.filter((b) => b.currency === "USD" && b.amount != null).reduce((s, b) => s + b.amount, 0);
+  return { kes, usd };
+}
+/* One KES figure. USD bills are converted at today's rate, so a total that includes them is marked as approximate. */
+const approxKes = ({ kes, usd }) => kes + Math.floor(usd * RATE);
+const approxMark = ({ usd }) => (usd ? h("span", { class: "approx" }, "≈ ") : null);
+function sumNode(totals) {
+  return h("span", { class: "money-sum" }, approxMark(totals), money(approxKes(totals), "KES"));
+}
+const statusPill = (status) => h("span", { class: `status is-${STATUS[status].tone}`, text: STATUS[status].label });
+function dueHint(b) {
+  if (!UNPAID.includes(b.status)) return null;
+  const d = daysBetween(TODAY, b.dueOn);
+  if (d < 0) return h("span", { class: "due-hint is-late num", text: `${-d} ${d === -1 ? "day" : "days"} late` });
+  if (d === 0) return h("span", { class: "due-hint is-today", text: "Today" });
+  if (d <= 14) return h("span", { class: "due-hint num", text: `In ${d} ${d === 1 ? "day" : "days"}` });
+  return null;
+}
+/* Small inline markers after the reference line, so every row stays two lines tall */
+function tags(b) {
+  const out = [];
+  if (isRecurring(b)) out.push(h("span", { class: "mini", title: "Recurring" }, icon("repeat"), h("span", { class: "sr-only", text: "Recurring" })));
+  if (b.files.length) {
+    const label = `${b.files.length} ${b.files.length === 1 ? "file" : "files"}`;
+    out.push(h("span", { class: "mini num", title: label }, icon("paperclip"), String(b.files.length), h("span", { class: "sr-only", text: b.files.length === 1 ? " file" : " files" })));
+  }
+  return out;
+}
+const metaLine = (b) => [b.reference, b.category].filter(Boolean).join(" · ");
+
+/* Filter chips and menus (same pattern as Expenses) */
+const FILTER_DEFS = [
+  { name: "status", label: "Status", iconName: "clock", any: "Any status", hidden: () => view() === "paying",
+    options: () => (view() === "history" ? ["paid", "paid_outside", "cancelled"] : ["payout_failed", "overdue", "due", "upcoming"])
+      .map((value) => ({ value, label: STATUS[value].label, tone: STATUS[value].tone })) },
+  { name: "payee", label: "Payee", iconName: "building", any: "Every payee", search: "Search payees",
+    options: () => Object.entries(PAYEES).map(([id, p]) => ({ value: id, label: p.name, mark: markOf(p.name) })).sort((a, b) => a.label.localeCompare(b.label)) },
+  { name: "category", label: "Category", iconName: "tag", any: "All categories", options: () => CATEGORIES.map((c) => ({ value: c, label: c })) },
+  { name: "heading", label: "Heading", iconName: "layers", any: "Every heading", options: () => HEADINGS.map((x) => ({ value: x, label: x })) },
+  { name: "method", label: "Paid by", iconName: "wallet", any: "Any method",
+    options: () => [...Object.entries(METHOD_LABELS).map(([value, label]) => ({ value, label })), { value: "none", label: "Not set" }] },
+  { name: "source", label: "Source", iconName: "repeat", any: "Any source", options: () => Object.entries(SOURCES).map(([value, label]) => ({ value, label })) },
+];
+const valueLabel = (def, value) => def.options().find((o) => o.value === value)?.label ?? value;
+
+function keepFocus(render) {
+  const key = document.activeElement?.closest?.("[data-focus-key]")?.dataset.focusKey;
+  render();
+  if (key) document.querySelector(`[data-focus-key="${key}"]`)?.focus();
+}
+
+/* Tabs and filters share one row until the filters no longer fit beside the tabs */
+function fitHead() {
+  const head = document.querySelector(".results-head");
+  const bar = $("#toolbar");
+  head.classList.remove("is-stacked");
+  head.classList.toggle("is-stacked", bar.scrollWidth > bar.clientWidth + 1);
+}
+let headWidth = 0;
+new ResizeObserver(([entry]) => {
+  const width = Math.round(entry.contentRect.width);
+  if (width !== headWidth) { headWidth = width; fitHead(); }
+}).observe($("#results"));
+
+let menu = null;
+function onOutside(event) { if (menu && !menu.el.contains(event.target) && !menu.anchor.contains(event.target)) closeMenu(); }
+function onScroll(event) { if (menu && !menu.el.contains(event.target)) closeMenu(); }
+function closeMenu(returnFocus = false) {
+  if (!menu) return;
+  const { el, anchor } = menu;
+  menu = null;
+  el.remove();
+  anchor.setAttribute("aria-expanded", "false");
+  document.removeEventListener("mousedown", onOutside, true);
+  document.removeEventListener("scroll", onScroll, true);
+  if (returnFocus && anchor.isConnected) anchor.focus();
+}
+function openMenu(def, anchor) {
+  if (menu?.anchor === anchor) { closeMenu(true); return; }
+  closeMenu();
+  const current = state.filters[def.name] ?? "";
+  const all = [{ value: "", label: def.any }, ...def.options()];
+  const listId = `menu-${def.name}`;
+  const list = h("ul", { class: "menu-list", role: "listbox", id: listId, "aria-label": def.label, tabindex: "0" });
+  let shown = all;
+  let active = Math.max(0, all.findIndex((o) => o.value === current));
+  const setActive = (i) => {
+    active = i;
+    list.querySelectorAll(".menu-option").forEach((li, n) => li.classList.toggle("is-active", n === i));
+    list.setAttribute("aria-activedescendant", shown.length ? `${listId}-${i}` : "");
+    list.querySelector(".is-active")?.scrollIntoView({ block: "nearest" });
+  };
+  const choose = (value) => { closeMenu(true); setFilter(def.name, value); };
+  const paint = () => {
+    list.replaceChildren(...(shown.length ? shown.map((o, i) => h("li", {
+      class: "menu-option", role: "option", id: `${listId}-${i}`, "aria-selected": String(o.value === current), "data-value": o.value,
+      onmousedown: (e) => e.preventDefault(), onclick: () => choose(o.value), onmousemove: () => { if (active !== i) setActive(i); },
+    }, o.mark ? h("span", { class: "payee-mark sm", "aria-hidden": "true", text: o.mark }) : null, h("span", { class: o.tone ? `status is-${o.tone}` : null, text: o.label }),
+      o.value === current ? h("span", { class: "check" }, icon("check")) : null)) : [h("li", { class: "menu-empty", text: "No matches" })]));
+    setActive(Math.min(active, Math.max(0, shown.length - 1)));
+  };
+  const search = def.search ? h("input", { type: "search", placeholder: def.search, "aria-label": def.search, "aria-controls": listId, autocomplete: "off" }) : null;
+  search?.addEventListener("input", () => {
+    const q = search.value.trim().toLowerCase();
+    shown = all.filter((o) => !q || o.label.toLowerCase().includes(q));
+    active = 0;
+    paint();
+  });
+  const el = h("div", { class: "menu" }, search ? h("label", { class: "menu-search" }, icon("search"), search) : null, list);
+  el.addEventListener("keydown", (event) => {
+    const last = shown.length - 1;
+    const moves = { ArrowDown: Math.min(last, active + 1), ArrowUp: Math.max(0, active - 1), Home: 0, End: last };
+    if (event.key in moves && shown.length) { event.preventDefault(); setActive(moves[event.key]); }
+    else if (event.key === "Enter") { event.preventDefault(); if (shown[active]) choose(shown[active].value); }
+    else if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeMenu(true); }
+    else if (event.key === "Tab") closeMenu();
+  });
+  document.body.append(el);
+  const r = anchor.getBoundingClientRect();
+  const below = r.bottom + 6;
+  el.style.left = `${Math.max(8, Math.min(r.left, innerWidth - el.offsetWidth - 8))}px`;
+  el.style.top = `${below + el.offsetHeight > innerHeight - 8 ? Math.max(8, r.top - el.offsetHeight - 6) : below}px`;
+  anchor.setAttribute("aria-expanded", "true");
+  menu = { el, anchor };
+  paint();
+  (search ?? list).focus();
+  document.addEventListener("mousedown", onOutside, true);
+  document.addEventListener("scroll", onScroll, true);
+}
+
+function renderToolbar() {
+  closeMenu();
+  const f = state.filters;
+  const chips = FILTER_DEFS.filter((def) => !def.hidden?.()).map((def) => {
+    const value = f[def.name];
+    const main = h("button", {
+      class: "fchip-main", type: "button", "aria-haspopup": "listbox", "aria-expanded": "false",
+      "aria-label": value ? `${def.label}: ${valueLabel(def, value)}. Change` : `Filter by ${def.label.toLowerCase()}`,
+      "data-focus-key": `chip-${def.name}`, onclick: (event) => openMenu(def, event.currentTarget),
+    }, icon(def.iconName), value ? [h("span", { class: "fchip-key", text: `${def.label}:` }), h("span", { class: "fchip-value", text: valueLabel(def, value) })] : def.label,
+      value ? null : icon("chevron-down"));
+    return h("span", { class: `fchip${value ? " is-set" : ""}`, "data-name": def.name }, main,
+      value ? h("button", { class: "fchip-clear", type: "button", "aria-label": `Remove the ${def.label.toLowerCase()} filter`, "data-focus-key": `chip-${def.name}`, onclick: () => setFilter(def.name, "") }, icon("x")) : null);
+  });
+  const anySet = FILTER_NAMES.some((n) => n !== "view" && f[n]);
+  $("#toolbar").replaceChildren(h("span", { class: "toolbar-label", "aria-hidden": "true" }, icon("sliders"), "Filter"), ...chips,
+    ...(anySet ? [h("button", { class: "text-link clear-all", type: "button", text: "Clear all", onclick: clearAll })] : []));
+  fitHead();
+}
+
+function showView(value) {
+  if (view() === value) return;
+  state.selected = [];
+  delete state.filters.status;
+  setFilter("view", value === "open" ? "" : value);
+}
+function renderTabs() {
+  const base = state.bills.filter((b) => matchesExcept(b, ["view", "status"]));
+  const current = view();
+  const tabs = [["open", "To pay"], ["paying", "Being paid"], ["history", "History"]].map(([value, label]) => [value, label, base.filter((b) => viewOf(b) === value).length]);
+  $("#view-tabs").replaceChildren(...tabs.map(([value, label, count]) => h("button", {
+    class: "kind-tab", type: "button", role: "tab", "aria-selected": String(current === value), "aria-controls": "results-body",
+    tabindex: current === value ? "0" : "-1", "data-value": value, "data-focus-key": `tab-${value}`,
+    onclick: () => showView(value),
+    onkeydown: (event) => {
+      const tabs = [...document.querySelectorAll("#view-tabs .kind-tab")];
+      const at = tabs.indexOf(event.currentTarget);
+      const next = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: tabs.length - 1 }[event.key];
+      if (next === undefined || !tabs[next]) return;
+      event.preventDefault();
+      tabs[next].focus();
+      tabs[next].click();
+    },
+  }, label, state.loading ? null : h("span", { class: "kind-count num", text: String(count) }))));
+  fitHead();
+}
+
+/* Stat cards: company-wide numbers only. Filtering lives in the chips beside the tabs. */
+function renderStats() {
+  const host = $("#stats");
+  host.hidden = state.loadError;
+  if (state.loading) {
+    const bar = (style) => h("div", { class: "skel", style });
+    host.replaceChildren(...Array.from({ length: 4 }, () => h("div", { class: "stat", "aria-hidden": "true" },
+      bar("width:60%;height:12px"), bar("width:45%;height:28px;margin-top:10px"), bar("width:70%;height:12px;margin-top:6px"))));
+    return;
+  }
+  const base = state.bills.filter(isOpen);
+  const toPay = base.filter((b) => UNPAID.includes(b.status));
+  const missing = toPay.filter((b) => b.amount == null).length;
+  const totals = sumByCurrency(toPay);
+  const total = h("div", { class: "stat" },
+    h("span", { class: "stat-label" }, h("span", { class: "stat-icon is-total" }, icon("file")), "To pay"),
+    h("span", { class: "stat-value" }, approxMark(totals), money(approxKes(totals), "KES")),
+    h("span", { class: "stat-sub num", text: `${toPay.length} ${toPay.length === 1 ? "bill" : "bills"}${missing ? ` · ${missing} without an amount` : ""}` }));
+  const stat = (status, label, iconName, tone) => {
+    const list = base.filter((b) => b.status === status);
+    const n = list.length;
+    return h("div", { class: "stat" },
+      h("span", { class: "stat-label" }, h("span", { class: `stat-icon ${n ? tone : "is-clear"}` }, icon(n ? iconName : "check")), label),
+      h("span", { class: "stat-value num", text: String(n) }),
+      h("span", { class: "stat-sub num" }, n ? sumNode(sumByCurrency(list)) : "All clear"));
+  };
+  host.replaceChildren(total, stat("overdue", "Overdue", "alert", "is-danger"), stat("due", "Due today", "clock", "is-attention"), stat("payout_failed", "Payment failed", "circle-alert", "is-danger"));
+}
+
+/* Banners: passkey gate and payment results */
+function renderBanners() {
+  const nodes = [];
+  if (state.role === "no-passkey") {
+    nodes.push(h("div", { class: "banner", role: "note" }, icon("key"), h("div", { class: "banner-main" },
+      h("p", { class: "banner-title", text: "Set up your approval passkey first" }),
+      h("p", { text: "Paying needs your approval passkey. Set it up in the Expendi Business app; then confirm here with “use a phone or tablet” in your browser's passkey prompt." }))));
+  }
+  for (const b of state.banners) {
+    nodes.push(h("div", { class: `banner is-${b.tone}`, role: "status", "aria-label": "Payment result" }, icon(b.tone === "success" ? "check-circle" : "alert"),
+      h("div", { class: "banner-main" }, h("p", { class: "banner-title", text: b.title }), h("p", { text: b.body }), b.reason ? h("p", { text: b.reason }) : null),
+      h("div", { class: "banner-actions" },
+        b.retryId ? h("button", { class: "btn btn-primary", type: "button", onclick: (e) => prepare({ kind: "retry", ids: [b.retryId] }, e.currentTarget) }, icon("rotate"), "Retry the failed payment") : null,
+        b.tone === "success" && view() !== "paying" ? h("button", { class: "btn btn-outline", type: "button", text: "See Being paid", onclick: () => showView("paying") }) : null,
+        h("button", { class: "btn btn-outline", type: "button", text: "Done", onclick: () => { state.banners = state.banners.filter((x) => x !== b); renderBanners(); } }))));
+  }
+  $("#banners").replaceChildren(...nodes);
+}
+
+/* Table */
+/* Rows that can't be paid together get no checkbox; the row and its panel say why. */
+const eligible = (b) => canPay() && view() === "open" && payable(b) && b.status !== "payout_failed";
+const selectable = (b) => eligible(b) && !state.paying;
+function checkbox(b, place) {
+  if (!eligible(b)) return null;
+  const checked = state.selected.includes(b.id);
+  const atLimit = !checked && state.selected.length >= 20;
+  return h("input", { type: "checkbox", checked, disabled: state.paying || atLimit, title: atLimit ? "Pay up to 20 bills at a time." : null,
+    "aria-label": `Select ${payeeOf(b).name}`, "data-focus-key": `${place}-check-${b.id}`, onchange: () => toggle(b.id) });
+}
+function toggle(id) {
+  if (state.selected.includes(id)) state.selected = state.selected.filter((x) => x !== id);
+  else if (state.selected.length < 20) state.selected = [...state.selected, id];
+  keepFocus(renderResults);
+}
+
+const EMPTY = {
+  open: ["Nothing to pay", "New bills and recurring payments show up here."],
+  paying: ["Nothing being paid", "Bills you pay stay here until the payee receives the money."],
+  history: ["Nothing settled yet", "No bills paid or cancelled in the last six months."],
+};
+function renderResults() {
+  renderStats();
+  const body = $("#results-body");
+  $("#nav-count").textContent = String(state.bills.filter((b) => ["overdue", "due", "payout_failed"].includes(b.status)).length);
+  if (state.loading) {
+    body.setAttribute("aria-busy", "true");
+    const bar = (style) => h("div", { class: "skel", style });
+    body.replaceChildren(h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("tbody", {}, Array.from({ length: 6 }, () => h("tr", { class: "skel-row" },
+      h("td", {}, bar("width:80px;height:14px")), h("td", {}, bar("width:55%;height:14px"), bar("width:35%;height:12px;margin-top:8px")),
+      h("td", {}, bar("width:100px;height:14px")), h("td", {}, bar("width:90px;height:14px;margin-left:auto"))))))));
+    return;
+  }
+  body.removeAttribute("aria-busy");
+  if (state.loadError) {
+    body.replaceChildren(h("div", { class: "load-error", role: "alert" }, icon("circle-alert"), h("strong", { text: "Bills didn't load" }),
+      h("p", { text: "Couldn't reach Expendi Business. Check your connection and try again." }),
+      h("button", { class: "btn btn-outline", type: "button", text: "Try again", onclick: () => { $("#mock-scenario").value = "normal"; reset(); } })));
+    return;
+  }
+  const rows = sortedVisible();
+  const anyFilter = FILTER_NAMES.some((n) => n !== "view" && state.filters[n]);
+  if (rows.length === 0) {
+    body.replaceChildren(h("div", { class: "empty" }, icon(anyFilter ? "filter-x" : "check-circle"),
+      h("strong", { text: anyFilter ? "No bills match these filters" : EMPTY[view()][0] }),
+      h("p", { text: anyFilter ? "" : EMPTY[view()][1] }),
+      anyFilter ? h("button", { class: "btn btn-outline", type: "button", text: "Clear all", onclick: clearAll }) : null));
+    return;
+  }
+  const open = view() === "open";
+  const settled = view() === "history";
+  const withChecks = open && canPay();
+  const tbody = h("tbody");
+  const cards = h("ul", { class: "cards", "aria-label": "Bills" });
+  for (const b of rows) {
+    const p = payeeOf(b);
+    const openIt = () => openBill(b.id);
+    tbody.append(h("tr", { class: `row${b.id === openId ? " is-open" : ""}${state.selected.includes(b.id) ? " is-selected" : ""}`, "data-id": b.id,
+      onclick: (ev) => { if (!ev.target.closest("button, input, label")) openIt(); } },
+      withChecks ? h("td", { class: "check-cell" }, checkbox(b, "row")) : null,
+      h("td", { class: "cell-date num" }, dateText(dateOf(b)), settled ? null : dueHint(b)),
+      h("td", {}, h("span", { class: "payee-cell" }, h("span", { class: "payee-mark", "aria-hidden": "true", text: markOf(p.name) }),
+        h("span", { class: "payee-main" },
+          h("button", { class: "merchant", type: "button", "aria-haspopup": "dialog", "data-focus-key": `bill-${b.id}`, onclick: openIt, text: p.name }),
+          h("span", { class: "meta" }, h("span", { class: "meta-text", text: metaLine(b) }), tags(b))))),
+      h("td", { class: p.method ? "method col-method" : "method col-method is-unset", text: p.method ? METHOD_LABELS[p.method] : "Not set" }),
+      h("td", { class: "right" }, amountNode(b)),
+      h("td", {}, statusPill(b.status))));
+    cards.append(h("li", { class: state.selected.includes(b.id) ? "is-selected" : null },
+      withChecks ? h("span", { class: "card-check" }, checkbox(b, "card")) : null,
+      h("button", { class: "card-btn", type: "button", onclick: openIt },
+        h("span", { class: "payee-mark", "aria-hidden": "true", text: markOf(p.name) }),
+        h("span", { style: "min-width:0" },
+          h("span", { class: "card-name", text: p.name }),
+          h("span", { class: "card-sub num", text: `${settled ? "Settled" : "Due"} ${dateText(dateOf(b))}` }),
+          h("span", { class: "flags" }, statusPill(b.status), tags(b))),
+        amountNode(b))));
+  }
+  const s = sortOf();
+  const sortable = (key, label, cls) => {
+    const active = s.key === key;
+    return h("th", { scope: "col", class: cls ?? null, "aria-sort": active ? (s.dir === "asc" ? "ascending" : "descending") : "none" },
+      h("button", { class: `th-sort${active ? " is-active" : ""}`, type: "button", "data-focus-key": `sort-${key}`, onclick: () => setSort(key) },
+        label, icon(active ? (s.dir === "asc" ? "arrow-up" : "arrow-down") : "arrow-up-down")));
+  };
+  const head = h("thead", {}, h("tr", {},
+    withChecks ? h("th", { scope: "col", class: "check-cell" }, h("span", { class: "sr-only", text: "Select" })) : null,
+    sortable("date", settled ? "Settled" : "Due"), sortable("payee", "Payee"), h("th", { scope: "col", class: "col-method", text: "Paid by" }),
+    sortable("amount", "Amount", "right"), sortable("status", "Status")));
+  const nodes = [h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("caption", { class: "sr-only", text: { open: "Bills to pay", paying: "Bills being paid", history: "Bills paid or cancelled" }[view()] }), head, tbody)), cards];
+  if (withChecks) nodes.push(selectionBar(rows));
+  body.replaceChildren(...nodes);
+}
+
+function selectionBar(rows) {
+  const chosen = state.selected.map((id) => state.bills.find((b) => b.id === id)).filter(Boolean);
+  const payableRows = rows.filter((b) => selectable(b));
+  const remaining = payableRows.filter((b) => !state.selected.includes(b.id));
+  const pay = h("button", { class: "btn btn-primary btn-lg", type: "button", disabled: chosen.length === 0 || state.paying },
+    chosen.length > 1 ? `Pay all ${chosen.length}` : "Pay");
+  pay.addEventListener("click", () => prepare({ kind: "pay", ids: chosen.map((b) => b.id) }, pay));
+  return h("div", { class: "selection-bar", "aria-live": "polite" },
+    h("div", { class: "what" },
+      h("p", {}, chosen.length === 0 ? "Select bills to pay together." : [h("strong", { class: "num", text: `${chosen.length} selected` }), " · ", sumNode(sumByCurrency(chosen))]),
+      h("p", { class: "links" },
+        remaining.length && chosen.length < 20 ? h("button", { class: "text-link", type: "button", text: `Select all payable${payableRows.length > 20 ? " (first 20)" : ""}`,
+          onclick: () => { state.selected = payableRows.slice(0, 20).map((b) => b.id); renderResults(); } }) : null,
+        chosen.length ? h("button", { class: "text-link", type: "button", text: "Clear selection", onclick: () => { state.selected = []; renderResults(); } }) : null)),
+    pay);
+}
+
+/* Filters */
+function setFilter(name, value) {
+  if (value) state.filters[name] = value; else delete state.filters[name];
+  if (name === "status" && value) delete state.filters.view;
+  writeUrl();
+  keepFocus(() => { renderStats(); renderTabs(); renderToolbar(); });
+  const body = $("#results-body");
+  body.classList.add("is-refreshing");
+  later(() => { body.classList.remove("is-refreshing"); keepFocus(renderResults); }, 300);
+}
+function clearAll() {
+  const fromClearAll = document.activeElement?.classList.contains("clear-all");
+  const keepView = state.filters.view;
+  state.filters = keepView ? { view: keepView } : {};
+  writeUrl();
+  keepFocus(() => { renderTabs(); renderToolbar(); renderResults(); });
+  if (fromClearAll) document.querySelector("#toolbar .fchip-main")?.focus();
+}
+
+/* Side panel */
+const layer = $("#sheet-layer");
+const sheet = $("#sheet");
+let returnFocus = null;
+let openId = null;
+let recurringView = null;
+let sheetMode = null;
+function showSheet(nodes) {
+  if (layer.hidden) returnFocus = document.activeElement;
+  layer.hidden = false;
+  sheet.replaceChildren(...nodes);
+}
+function closeSheet() {
+  if (state.paying || recBusy) return;
+  layer.hidden = true;
+  openId = null;
+  recurringView = null;
+  sheetMode = null;
+  writeUrl();
+  document.querySelectorAll("tr.row.is-open").forEach((tr) => tr.classList.remove("is-open"));
+  if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+}
+layer.addEventListener("click", (event) => { if (event.target.matches("[data-close]")) closeSheet(); });
+document.addEventListener("keydown", (event) => {
+  if (layer.hidden) return;
+  if (event.key === "Escape") return closeSheet();
+  const inField = event.target instanceof Element && event.target.closest("input, select, textarea, summary");
+  if ((event.key === "ArrowDown" || event.key === "ArrowUp") && (sheetMode === "detail" || sheetMode === "rec-detail") && !inField) {
+    event.preventDefault();
+    (sheetMode === "detail" ? step : stepRecurring)(event.key === "ArrowDown" ? 1 : -1);
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const focusable = [...sheet.querySelectorAll("button:not(:disabled), a[href], input:not(:disabled), select, textarea, summary")].filter((el) => el.offsetParent !== null);
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === sheet)) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+});
+const closeButton = () => h("button", { class: "icon-btn", type: "button", "aria-label": "Close", onclick: closeSheet }, icon("x"));
+function sheetHead(eyebrow, title, extra = []) {
+  return h("div", { class: "sheet-head" }, h("div", { class: "sheet-head-main" }, h("p", { class: "eyebrow", text: eyebrow }), h("h2", { class: "sheet-title", id: "sheet-title", text: title }), extra),
+    h("div", { class: "stepper" }, closeButton()));
+}
+
+function receiptViewer(files) {
+  if (files.length === 0) return h("div", { class: "no-receipt" }, icon("image-off"), h("p", { text: "No receipt attached." }));
+  return h("div", { class: "receipts" }, files.map((f) => {
+    const caption = f.role === "invoice" ? "Invoice" : f.role === "proof" ? "Proof of payment" : "PDF";
+    let stage;
+    if (f.url && f.type.startsWith("image/")) stage = h("img", { class: "uploaded-img", src: f.url, alt: `Receipt ${caption.toLowerCase()}` });
+    else if (f.url) stage = h("iframe", { class: "uploaded-pdf", src: f.url, title: caption });
+    else {
+      const total = f.paper.lines.reduce((s, [, a]) => s + a, 0);
+      const n = (x) => x.toLocaleString("en-KE", { minimumFractionDigits: x % 1 ? 2 : 0 });
+      stage = h("div", { class: "paper is-pdf", role: "img", "aria-label": `${caption}: ${f.paper.heading}, total ${n(total)}` },
+        h("div", { class: "paper-head" }, h("span", { text: f.paper.heading }), h("span", { text: f.paper.label })),
+        h("p", { class: "paper-sub", text: f.paper.sub }),
+        f.paper.lines.map(([label, amount]) => h("div", { class: "paper-line num" }, h("span", { text: label }), h("span", { text: n(amount) }))),
+        h("div", { class: "paper-total num" }, h("span", { text: "Total" }), h("span", { text: n(total) })));
+    }
+    return h("figure", { class: "viewer" }, h("div", { class: "viewer-stage" }, stage),
+      h("figcaption", { class: "viewer-bar" }, h("span", { text: caption }),
+        h("button", { class: "text-link", type: "button", "data-mock": "Opening the file" }, "Open", icon("external"))));
+  }));
+}
+
+const visibleIds = () => sortedVisible().map((b) => b.id);
+function step(delta) {
+  const ids = visibleIds();
+  const at = ids.indexOf(openId);
+  if (at < 0) return;
+  const next = ids[at + delta];
+  if (next) openBill(next, delta);
+}
+function openBill(id, steppedBy = 0) {
+  const b = state.bills.find((x) => x.id === id);
+  if (!b) return;
+  openId = id;
+  recurringView = null;
+  sheetMode = "detail";
+  writeUrl();
+  document.querySelectorAll("tr.row").forEach((tr) => tr.classList.toggle("is-open", tr.dataset.id === id));
+  showSheet(detail(b));
+  if (!steppedBy) { sheet.focus(); return; }
+  sheet.querySelector(".sheet-body").classList.add("is-stepping");
+  const arrow = sheet.querySelector(`[aria-label="${steppedBy > 0 ? "Next bill" : "Previous bill"}"]`);
+  (arrow && !arrow.disabled ? arrow : sheet).focus();
+}
+
+function kindLine(b) {
+  const base = isRecurring(b) ? "Recurring payment" : "Bill";
+  return `${base}${b.variable ? " · variable amount" : ""}`;
+}
+function detail(b) {
+  const p = payeeOf(b);
+  const reason = UNPAID.includes(b.status) && !payable(b) ? unpayableReason(b) : null;
+  const r = recurringOf(b);
+  const rows = [
+    ["Due", dateText(b.dueOn)],
+    r ? ["Schedule", [scheduleOf(r), h("span", { class: "sub" },
+      h("button", { class: "text-link", type: "button", text: "See recurring payment", onclick: () => openRecurring(r.id) }))]] : null,
+    ["Paid by", p.method ? METHOD_LABELS[p.method] : "Not set"],
+    ["Overview heading", b.heading],
+    ["Category", b.category],
+    b.reference ? ["Reference", b.reference] : null,
+    b.paidOn ? ["Paid on", dateText(b.paidOn)] : null,
+    b.paidFrom ? ["Paid from", b.paidFrom] : null,
+    b.markedPaidBy ? ["Marked paid by", b.markedPaidBy] : null,
+    b.paidNote ? ["Payment note", b.paidNote] : null,
+    b.amountChangeReason ? ["Why the amount changed", b.amountChangeReason] : null,
+    b.cancelledAt ? ["Cancelled", dateText(b.cancelledAt)] : null,
+  ].filter(Boolean);
+  const ids = visibleIds();
+  const at = ids.indexOf(b.id);
+  return [
+    h("div", { class: "sheet-head" },
+      h("div", { class: "sheet-head-main" },
+        h("p", { class: "eyebrow", text: kindLine(b) }),
+        h("h2", { class: "sheet-title", id: "sheet-title", text: p.name }),
+        h("p", { class: "sheet-amount" }, amountNode(b, true)),
+        statusPill(b.status)),
+      h("div", { class: "stepper" },
+        h("button", { class: "icon-btn", type: "button", "aria-label": "Previous bill", disabled: at <= 0, onclick: () => step(-1) }, icon("chevron-up")),
+        h("button", { class: "icon-btn", type: "button", "aria-label": "Next bill", disabled: at < 0 || at >= ids.length - 1, onclick: () => step(1) }, icon("chevron-down")),
+        closeButton())),
+    h("div", { class: "sheet-body" },
+      b.cancelledReason ? h("div", { class: "callout callout-neutral" }, icon("ban"), h("p", { text: `Cancelled by ${b.cancelledBy}: ${b.cancelledReason}` })) : null,
+      b.status === "payout_failed" && b.failure ? h("div", { class: "callout callout-error" }, icon("circle-alert"), h("div", {}, h("p", { class: "callout-title", text: "Payment failed" }), h("p", { text: b.failure }))) : null,
+      reason ? h("div", { class: "callout callout-warn" }, icon("alert"), h("p", { text: reason })) : null,
+      h("dl", { class: "details" }, rows.map(([label, value]) => h("div", {}, h("dt", { text: label }), h("dd", { class: "num" }, value)))),
+      b.notes ? h("p", { class: "description", text: b.notes }) : null,
+      h("p", { class: "section-label", text: b.files.length > 1 ? "Files" : "File" }),
+      receiptViewer(b.files)),
+    detailFoot(b, at, ids.length),
+  ];
+}
+function detailFoot(b, at, total) {
+  const foot = h("div", { class: "sheet-foot" });
+  const position = h("span", { class: "num position", text: at >= 0 ? `${at + 1} of ${total}` : "" });
+  if (!canAct()) {
+    foot.append(h("p", { class: "read-only" }, icon("info"), "View only. Only admins add and pay bills."), h("span", { class: "spacer" }), position);
+    return foot;
+  }
+  if (!UNPAID.includes(b.status)) {
+    foot.append(position);
+    return foot;
+  }
+  const isPayable = payable(b);
+  const primary = h("div", { class: "foot-primary" });
+  if (isPayable && canPay()) {
+    const payBtn = h("button", { class: "btn btn-primary btn-lg", type: "button", disabled: state.paying }, b.status === "payout_failed" ? [icon("rotate"), "Retry payment"] : [icon("key"), "Pay"]);
+    payBtn.addEventListener("click", () => prepare(b.status === "payout_failed" ? { kind: "retry", ids: [b.id] } : { kind: "pay", ids: [b.id] }, payBtn));
+    primary.append(payBtn);
+  }
+  primary.append(h("button", { class: `btn ${isPayable ? "btn-outline" : "btn-primary"} btn-lg`, type: "button", onclick: () => showSheet(billForm(b)) },
+    icon("pencil"), b.amount == null ? "Enter the amount" : "Edit bill"));
+  const secondary = h("div", { class: "foot-secondary" },
+    h("button", { class: "btn btn-ghost", type: "button", text: "Add invoice", onclick: () => showSheet(addInvoiceForm(b)) }),
+    b.amount != null ? h("button", { class: "btn btn-ghost", type: "button", text: "Mark paid outside", onclick: () => showSheet(markPaidForm(b)) }) : null,
+    h("button", { class: "btn btn-ghost danger", type: "button", text: "Cancel bill", onclick: () => showSheet(cancelForm(b)) }));
+  foot.append(primary, secondary);
+  if (isPayable && state.role === "no-passkey") foot.append(h("p", { class: "read-only wide" }, icon("key"), "Paying needs your approval passkey."));
+  return foot;
+}
+
+/* File picking: uploads as soon as picked, up to 5, PDF or image up to 8 MB */
+const ACCEPT = ["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"];
+function fileField({ label, role, id }) {
+  const files = [];
+  const list = h("ul", { class: "files" });
+  const error = h("p", { class: "field-error", role: "alert", hidden: true }, icon("circle-alert"), h("span"));
+  const status = h("span", { class: "drop-text", text: "Choose files or drop them here" });
+  const input = h("input", { type: "file", id, multiple: true, accept: ACCEPT.join(","), class: "sr-only" });
+  const drop = h("label", { class: "drop", for: id }, icon("upload"), status);
+  const showError = (message) => { error.lastChild.textContent = message; error.hidden = !message; };
+  const paint = () => {
+    list.replaceChildren(...files.map((f) => h("li", {}, icon("paperclip"), h("span", { class: "name", text: f.name }),
+      h("button", { class: "text-link", type: "button", text: "Remove", onclick: () => { files.splice(files.indexOf(f), 1); paint(); field.dispatchEvent(new Event("change")); } }))));
+    const full = files.length >= 5;
+    input.disabled = full;
+    drop.classList.toggle("is-disabled", full);
+  };
+  input.addEventListener("change", () => {
+    const picked = [...input.files];
+    input.value = "";
+    showError("");
+    if (files.length + picked.length > 5) return showError("Add at most 5 files.");
+    for (const f of picked) {
+      if (!ACCEPT.includes(f.type)) return showError("Upload a PDF, or a JPEG, PNG, WebP or HEIC image.");
+      if (f.size === 0) return showError("That file is empty.");
+      if (f.size > 8 * 1024 * 1024) return showError("That file is too large. Keep it under 8 MB.");
+    }
+    status.textContent = "Uploading…";
+    later(() => {
+      for (const f of picked) files.push({ name: f.name, role, type: f.type, url: URL.createObjectURL(f) });
+      status.textContent = "Choose files or drop them here";
+      paint();
+      field.dispatchEvent(new Event("change"));
+    }, 500);
+  });
+  const field = h("div", { class: "field" }, h("span", { class: "field-label", text: label }), input, drop,
+    h("p", { class: "field-help", text: "A PDF, or a JPEG, PNG, WebP or HEIC image, up to 8 MB." }), list, error);
+  field.files = files;
+  return field;
+}
+
+/* Form helpers: label above, help and error below */
+function fieldError() { return h("p", { class: "field-error", role: "alert", hidden: true }, icon("circle-alert"), h("span")); }
+function setError(input, error, message) {
+  error.lastChild.textContent = message;
+  error.hidden = !message;
+  if (message) input.setAttribute("aria-invalid", "true"); else input.removeAttribute("aria-invalid");
+}
+function selectBox(select) { return h("span", { class: "select" }, select, icon("chevron-down")); }
+function parseAmount(raw, currency) {
+  const text = raw.trim();
+  if (!/^(\d{1,3}(,\d{3})+|\d+)(\.\d{1,2})?$/.test(text)) return { error: `Enter the amount in ${currency}, like 1,500 or 1500.50.` };
+  const [whole, fraction = ""] = text.replaceAll(",", "").split(".");
+  const cents = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+  if (cents === 0) return { error: "Enter an amount above zero." };
+  if (cents > (currency === "KES" ? 10_000_000_000 : 1_000_000_000)) return { error: "That amount is too large. Check it and try again." };
+  return { cents };
+}
+const typedAmount = (cents) => (cents == null ? "" : String(cents % 100 ? (cents / 100).toFixed(2) : cents / 100));
+
+function billForm(existing) {
+  const isNew = !existing;
+  sheetMode = isNew ? "new" : "edit";
+  const eyebrow = isNew ? "Bills" : payeeOf(existing).name;
+  const activePayees = Object.entries(PAYEES).filter(([, p]) => !p.archived && p.kind !== "Employee");
+  const payee = h("select", { id: "f-payee", "aria-describedby": "f-payee-error" },
+    h("option", { value: "", text: "Choose a payee" }),
+    activePayees.map(([id, p]) => h("option", { value: id, text: `${p.name} (${p.kind}, ${p.method ? METHOD_LABELS[p.method] : "No payment details yet"})` })));
+  const payeeError = fieldError();
+  const variable = h("input", { type: "checkbox", id: "f-variable" });
+  const amountLabel = h("label", { class: "field-label", for: "f-amount" });
+  const amount = h("input", { class: "input num", id: "f-amount", inputmode: "decimal", autocomplete: "off" });
+  const amountHelp = h("p", { class: "field-help" });
+  const amountError = fieldError();
+  const reasonWrap = h("div", { class: "field", hidden: true }, h("label", { class: "field-label", for: "f-reason", text: "Why did the amount change?" }));
+  const reasonInput = h("input", { class: "input", id: "f-reason", maxlength: "300", placeholder: "Late fee added" });
+  const reasonError = fieldError();
+  reasonWrap.append(reasonInput, reasonError);
+  const due = h("input", { class: "input num", id: "f-due", type: "date" });
+  const dueError = fieldError();
+  const heading = h("select", { id: "f-heading" }, isNew ? h("option", { value: "", text: "Follows the payee" }) : null,
+    h("option", { value: "Transactions", text: "Transactions" }), h("option", { value: "Subscriptions", text: "Subscriptions" }));
+  const category = h("select", { id: "f-category" }, h("option", { value: "", text: "Choose a category" }), CATEGORIES.map((c) => h("option", { value: c, text: c })));
+  const categoryError = fieldError();
+  const reference = h("input", { class: "input", id: "f-reference", maxlength: "64", placeholder: "Invoice or KRA payment number" });
+  const notes = h("textarea", { class: "textarea", id: "f-notes", maxlength: "500", rows: "2" });
+  const files = isNew ? fileField({ label: "Invoice (optional)", role: "invoice", id: "f-files" }) : null;
+
+  if (existing) {
+    payee.value = existing.payee;
+    amount.value = typedAmount(existing.amount);
+    due.value = existing.dueOn;
+    heading.value = existing.heading;
+    category.value = existing.category;
+    reference.value = existing.reference ?? "";
+    notes.value = existing.notes ?? "";
+  }
+  const currencyOf = () => (PAYEES[payee.value]?.method === "usdc" ? "USD" : "KES");
+  let currency = currencyOf();
+  const syncAmount = () => {
+    const optional = isNew && variable.checked;
+    amountLabel.textContent = `Amount (${currency})${optional ? ", optional for now" : ""}`;
+    amount.placeholder = currency === "KES" ? "15,000.00" : "120.00";
+    amountHelp.textContent = currency === "USD" ? "This payee is paid in USDC: the bill pays exactly this many USDC." : "";
+    amountHelp.hidden = currency !== "USD";
+    const changed = existing && !existing.variable && existing.amount != null && amount.value.trim() !== typedAmount(existing.amount);
+    reasonWrap.hidden = !changed;
+  };
+  payee.addEventListener("change", () => {
+    const next = currencyOf();
+    if (next !== currency) amount.value = "";
+    currency = next;
+    setError(payee, payeeError, "");
+    syncAmount();
+    refreshSubmit();
+  });
+  variable.addEventListener("change", syncAmount);
+  amount.addEventListener("input", () => { setError(amount, amountError, ""); syncAmount(); refreshSubmit(); });
+  for (const el of [due, heading, category, reference, notes, reasonInput]) el.addEventListener("input", refreshSubmit);
+  for (const el of [due, heading, category]) el.addEventListener("change", refreshSubmit);
+  syncAmount();
+
+  const submit = h("button", { class: "btn btn-primary btn-lg", type: "submit", text: isNew ? "Add bill" : "Save changes" });
+  function snapshot() { return JSON.stringify([payee.value, amount.value.trim(), due.value, heading.value, category.value, reference.value.trim(), notes.value.trim(), reasonInput.value.trim()]); }
+  const initial = snapshot();
+  function refreshSubmit() { if (!isNew) submit.disabled = snapshot() === initial; }
+  refreshSubmit();
+
+  const form = h("form", { class: "form", "aria-label": isNew ? "New bill" : "Edit bill", novalidate: true },
+    h("div", { class: "field" }, h("label", { class: "field-label", for: "f-payee", text: "Pay to" }), selectBox(payee), payeeError,
+      activePayees.length ? null : h("p", { class: "field-help", text: "Add the payee under Payees first." })),
+    isNew ? h("label", { class: "check-field", for: "f-variable" }, variable, h("span", {}, h("span", { class: "check-title", text: "Variable amount" }),
+      h("span", { class: "field-help", text: "e.g. PAYE or electricity: save it now and enter the amount before it's paid." }))) : null,
+    h("div", { class: "row-2" },
+      h("div", { class: "field" }, amountLabel, amount, amountHelp, amountError),
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "f-due", text: "Due date" }), due, dueError)),
+    reasonWrap,
+    h("div", { class: "row-2" },
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "f-heading", text: "Overview heading" }), selectBox(heading)),
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "f-category", text: "Category" }), selectBox(category), categoryError)),
+    h("div", { class: "field" }, h("label", { class: "field-label", for: "f-reference", text: "Reference (optional)" }), reference),
+    h("div", { class: "field" }, h("label", { class: "field-label", for: "f-notes", text: "Notes (optional)" }), notes),
+    files);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    let firstBad = null;
+    const bad = (input, error, message) => { setError(input, error, message); if (message && !firstBad) firstBad = input; };
+    bad(payee, payeeError, payee.value ? "" : "Pick who the bill is for.");
+    let cents = null;
+    if (amount.value.trim()) {
+      const parsed = parseAmount(amount.value, currency);
+      bad(amount, amountError, parsed.error ?? "");
+      cents = parsed.cents ?? null;
+    } else {
+      const allowed = (isNew && variable.checked) || (existing && existing.variable);
+      bad(amount, amountError, allowed ? "" : isNew ? "Enter the amount, or mark the bill as variable." : "A fixed bill needs an amount.");
+    }
+    bad(due, dueError, due.value ? "" : "Enter the due date as YYYY-MM-DD.");
+    bad(category, categoryError, category.value ? "" : "Pick a category.");
+    if (!reasonWrap.hidden) bad(reasonInput, reasonError, reasonInput.value.trim() ? "" : "Say why the amount changed.");
+    if (firstBad) { firstBad.focus(); return; }
+    submit.disabled = true;
+    submit.textContent = "Saving…";
+    later(() => {
+      const p = PAYEES[payee.value];
+      if (isNew) {
+        const bill = { id: `new-${Date.now()}`, payee: payee.value, currency, amount: cents, variable: variable.checked || undefined, dueOn: due.value, status: datedStatus(due.value),
+          heading: heading.value || (p.kind === "Subscription vendor" ? "Subscriptions" : "Transactions"), category: category.value,
+          reference: reference.value.trim() || undefined, notes: notes.value.trim() || undefined, files: files.files.slice() };
+        state.bills.push(bill);
+        state.filters = {};
+        writeUrl();
+        renderAll();
+        openBill(bill.id);
+        toast("Bill added.");
+      } else {
+        const b = existing;
+        if (!reasonWrap.hidden) b.amountChangeReason = reasonInput.value.trim();
+        Object.assign(b, { payee: payee.value, currency, amount: cents, dueOn: due.value, heading: heading.value, category: category.value,
+          reference: reference.value.trim() || undefined, notes: notes.value.trim() || undefined });
+        if (["upcoming", "due", "overdue"].includes(b.status)) b.status = datedStatus(b.dueOn);
+        renderAll();
+        openBill(b.id);
+        toast("Changes saved.");
+      }
+    }, 500);
+  });
+  const cancel = h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Cancel", onclick: () => (existing ? openBill(existing.id) : closeSheet()) });
+  form.id = "bill-form";
+  submit.setAttribute("form", "bill-form");
+  return [sheetHead(eyebrow, isNew ? "New bill" : "Edit bill"), h("div", { class: "sheet-body" }, form), h("div", { class: "sheet-foot" }, submit, cancel)];
+}
+
+function markPaidForm(b) {
+  sheetMode = "mark";
+  const date = h("input", { class: "input num", id: "m-date", type: "date", value: TODAY, max: TODAY });
+  const dateError = fieldError();
+  const from = h("select", { id: "m-from" }, h("option", { value: "", text: "Not specified" }), ACCOUNTS.map((a) => h("option", { value: a, text: a })));
+  const note = h("input", { class: "input", id: "m-note", maxlength: "500", placeholder: "Paid with the company card" });
+  const proof = fileField({ label: "Proof of payment (optional)", role: "proof", id: "m-files" });
+  const save = h("button", { class: "btn btn-primary btn-lg", type: "button", text: "Mark as paid" });
+  save.addEventListener("click", () => {
+    if (!date.value) { setError(date, dateError, "Enter the date it was paid as YYYY-MM-DD."); date.focus(); return; }
+    if (date.value > TODAY) { setError(date, dateError, "The date it was paid can't be in the future."); date.focus(); return; }
+    save.disabled = true;
+    save.textContent = "Saving…";
+    later(() => {
+      Object.assign(b, { status: "paid_outside", paidOn: date.value, paidFrom: from.value || undefined, paidNote: note.value.trim() || undefined, markedPaidBy: "Wanjiru Kamau" });
+      b.files.push(...proof.files);
+      const next = nextBillAfter(b);
+      state.selected = state.selected.filter((id) => id !== b.id);
+      renderAll();
+      openBill(b.id);
+      toast(`Marked as paid outside Expendi.${next ? NEXT_BILL_NOTE : ""}`);
+    }, 500);
+  });
+  date.addEventListener("input", () => setError(date, dateError, ""));
+  return [sheetHead(payeeOf(b).name, "Mark paid outside Expendi"),
+    h("div", { class: "sheet-body" }, h("form", { class: "form", "aria-label": "Mark paid outside Expendi" },
+      h("p", { class: "note" }, icon("info"), "It's also recorded as company spending, under the account it was paid from."),
+      h("div", { class: "row-2" },
+        h("div", { class: "field" }, h("label", { class: "field-label", for: "m-date", text: "Date paid" }), date, dateError),
+        h("div", { class: "field" }, h("label", { class: "field-label", for: "m-from", text: "Paid from" }), selectBox(from))),
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "m-note", text: "Note (optional)" }), note),
+      proof)),
+    h("div", { class: "sheet-foot" }, save, h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Back", onclick: () => openBill(b.id) }))];
+}
+
+function cancelForm(b) {
+  sheetMode = "cancel";
+  const reason = h("textarea", { class: "textarea", id: "c-reason", maxlength: "300", rows: "3", placeholder: "Subscription cancelled" });
+  const go = h("button", { class: "btn btn-primary btn-lg", type: "button", text: "Cancel bill", disabled: true });
+  reason.addEventListener("input", () => { go.disabled = !reason.value.trim(); });
+  go.addEventListener("click", () => {
+    go.disabled = true;
+    go.textContent = "Cancelling…";
+    later(() => {
+      Object.assign(b, { status: "cancelled", cancelledAt: TODAY, cancelledReason: reason.value.trim(), cancelledBy: "Wanjiru Kamau" });
+      const next = nextBillAfter(b);
+      state.selected = state.selected.filter((id) => id !== b.id);
+      renderAll();
+      openBill(b.id);
+      toast(`Bill cancelled.${next ? NEXT_BILL_NOTE : ""}`);
+    }, 500);
+  });
+  return [sheetHead(payeeOf(b).name, "Cancel this bill?"),
+    h("div", { class: "sheet-body" }, h("form", { class: "form", "aria-label": "Cancel this bill" },
+      h("div", { class: "callout callout-warn" }, icon("ban"), h("p", { text: `${payeeOf(b).name} won’t be paid for this bill. It stays in the history with your reason.` })),
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "c-reason", text: "Why won’t it be paid?" }), reason))),
+    h("div", { class: "sheet-foot" }, go, h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Keep it", onclick: () => openBill(b.id) }))];
+}
+
+function addInvoiceForm(b) {
+  sheetMode = "invoice";
+  const files = fileField({ label: "Invoice", role: "invoice", id: "i-files" });
+  const attach = h("button", { class: "btn btn-primary btn-lg", type: "button", text: "Attach", disabled: true });
+  files.addEventListener("change", () => { attach.disabled = files.files.length === 0; });
+  attach.addEventListener("click", () => {
+    attach.disabled = true;
+    attach.textContent = "Attaching…";
+    later(() => {
+      b.files.push(...files.files);
+      renderAll();
+      openBill(b.id);
+      toast(files.files.length === 1 ? "Invoice attached." : "Invoices attached.");
+    }, 500);
+  });
+  return [sheetHead(payeeOf(b).name, "Add an invoice"), h("div", { class: "sheet-body" }, h("form", { class: "form", "aria-label": "Add an invoice" }, files)),
+    h("div", { class: "sheet-foot" }, attach, h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Back", onclick: () => openBill(b.id) }))];
+}
+
+/* Paying: 24-hour hold, review, passkey, outcome */
+function namesList(names) {
+  if (names.length === 1) return names[0];
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+function prepare(request, button) {
+  const original = [...button.childNodes];
+  button.disabled = true;
+  button.replaceChildren("Working out the cost…");
+  later(() => {
+    button.disabled = false;
+    button.replaceChildren(...original);
+    const bills = request.ids.map((id) => state.bills.find((b) => b.id === id));
+    const changed = bills.filter((b) => payeeOf(b).changedRecently).map((b) => payeeOf(b).name);
+    sheetMode = "pay";
+    if (changed.length && !request.confirmed) showSheet(hold(request, changed));
+    else showSheet(review(request, RATE));
+    sheet.focus();
+  }, 700);
+}
+function hold(request, names) {
+  const tick = h("input", { type: "checkbox", id: "hold-check" });
+  const go = h("button", { class: "btn btn-primary btn-lg", type: "button", text: "Continue", disabled: true });
+  tick.addEventListener("change", () => { go.disabled = !tick.checked; });
+  go.addEventListener("click", () => prepare({ ...request, confirmed: true }, go));
+  return [sheetHead("Bills", "Payment details changed recently"),
+    h("div", { class: "sheet-body" },
+      h("div", { class: "callout callout-warn", role: "alert" }, icon("shield"), h("p", {},
+        `${namesList(names)} had their payment details changed in the last 24 hours. Swapped payment details are a common route for payment fraud. Before you pay, check ${names.length === 1 ? "their" : "each one’s"} new details with them directly, e.g. by phone.`)),
+      h("label", { class: "check-field", for: "hold-check" }, tick, h("span", { class: "check-title", text: "I’ve checked the new payment details and want to pay anyway" }))),
+    h("div", { class: "sheet-foot" }, go, h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Cancel", onclick: closeSheet }))];
+}
+function previewOf(b, rate) {
+  const p = payeeOf(b);
+  if (b.currency === "USD") {
+    const amountUsdc = b.amount / 100;
+    return { b, p, usd: true, receivesUsdc: amountUsdc, inKes: Math.floor(b.amount * rate), usdc: amountUsdc, fee: 0, total: amountUsdc };
+  }
+  const receives = Math.ceil(b.amount / 100) * 100;
+  const usdcAmount = Math.round((receives / 100 / rate) * 100) / 100;
+  const fee = Math.max(0.1, Math.ceil(usdcAmount * 0.01 * 100) / 100);
+  return { b, p, usd: false, receives, rounded: receives !== b.amount, usdc: usdcAmount, fee, total: Math.round((usdcAmount + fee) * 100) / 100 };
+}
+function review(request, rate, notice = null) {
+  const bills = request.ids.map((id) => state.bills.find((b) => b.id === id));
+  const previews = bills.map((b) => previewOf(b, rate));
+  const paidKes = previews.filter((x) => !x.usd).reduce((s, x) => s + x.receives, 0);
+  const paidUsdc = previews.filter((x) => x.usd).reduce((s, x) => s + x.receivesUsdc, 0);
+  const fees = Math.round(previews.reduce((s, x) => s + x.fee, 0) * 100) / 100;
+  const total = Math.round(previews.reduce((s, x) => s + x.total, 0) * 100) / 100;
+  const available = state.scenario === "short" ? WALLET_USDC.short : WALLET_USDC.normal;
+  const topUp = total > available ? Math.ceil((total - available) * rate) * 100 : null;
+  const changed = rate !== RATE;
+  const mark = (node) => (changed ? h("span", { class: "changed" }, node) : node);
+  const isRetry = request.kind === "retry";
+  const pay = h("button", { class: "btn btn-primary btn-lg", type: "button", disabled: topUp !== null }, icon("key"), "Pay with passkey");
+  const cancel = h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Cancel", onclick: closeSheet });
+  pay.addEventListener("click", () => confirmPayment(request, rate, previews, pay, cancel));
+  return [
+    sheetHead("Bills", isRetry ? "Retry the payment" : bills.length === 1 ? "Pay bill" : `Pay ${bills.length} bills`),
+    h("div", { class: "sheet-body", "aria-label": "Review the payment" },
+      notice,
+      h("div", { class: "previews" }, previews.map((x) => h("details", { class: "preview", open: previews.length <= 3 },
+        h("summary", {},
+          h("span", { class: "payee-mark", "aria-hidden": "true", text: markOf(x.p.name) }),
+          h("span", { style: "min-width:0" }, h("span", { class: "p-name", text: x.p.name }), h("span", { class: "p-sub", text: x.p.dest })),
+          h("span", { class: "p-amount" }, x.usd ? usdc(x.receivesUsdc) : money(x.receives, "KES")),
+          h("span", { class: "chev" }, icon("chevron-down"))),
+        h("dl", { class: "details" },
+          h("div", {}, h("dt", { text: "They receive" }), h("dd", {}, x.usd ? [usdc(x.receivesUsdc), ", exactly"] : money(x.receives, "KES"))),
+          x.rounded ? h("div", {}, h("dt", { text: "Billed" }), h("dd", {}, money(x.b.amount, "KES"), ", rounded up to a whole shilling")) : null,
+          h("div", {}, h("dt", { text: "Paid to" }), h("dd", { class: "num", text: x.p.dest })),
+          x.usd ? h("div", {}, h("dt", { text: "In KES, at today’s rate" }), h("dd", {}, mark(money(x.inKes, "KES"))))
+            : h("div", {}, h("dt", { text: "USDC" }), h("dd", {}, mark(usdc(x.usdc)))),
+          h("div", {}, h("dt", { text: "Paycrest fee, at most" }), h("dd", {}, mark(usdc(x.fee)))),
+          h("div", {}, h("dt", { text: "Total, at most" }), h("dd", {}, mark(usdc(x.total)))))))),
+      h("dl", { class: "totals" },
+        paidKes ? h("div", {}, h("dt", { text: "Paid in KES" }), h("dd", {}, money(paidKes, "KES"))) : null,
+        paidUsdc ? h("div", {}, h("dt", { text: "Paid in USDC" }), h("dd", {}, usdc(paidUsdc))) : null,
+        h("div", {}, h("dt", { text: "Paycrest fees, at most" }), h("dd", {}, mark(usdc(fees)))),
+        h("div", {}, h("dt", { text: "Total from the wallet, at most" }), h("dd", {}, mark(usdc(total))))),
+      h("p", { class: "note" }, icon("info"), "One passkey confirmation pays them all, each on its own: if one fails, the others still go through. Paycrest states its exact fee when each payment is made; what isn’t used stays in the wallet."),
+      topUp !== null
+        ? h("div", { class: "callout callout-warn" }, icon("alert"), h("div", {}, h("p", { class: "callout-title" }, "Top up ", money(topUp, "KES")),
+            h("p", {}, "The wallet doesn’t hold enough USDC for these payments. Add funds, then review it again. ", h("a", { class: "text-link", href: "wallet.html", text: "Go to Accounts" }))))
+        : h("p", { class: "note" }, icon("key"), "Your browser asks for your approval passkey. To use the one on your phone, choose “use a phone or tablet”."),
+      h("p", { class: "note", id: "pay-outcome", hidden: true })),
+    h("div", { class: "sheet-foot" }, pay, cancel),
+  ];
+}
+function confirmPayment(request, rate, previews, pay, cancel) {
+  state.paying = true;
+  pay.disabled = true;
+  cancel.disabled = true;
+  pay.replaceChildren("Waiting for your passkey…");
+  later(() => {
+    state.paying = false;
+    if (state.scenario === "cancel") {
+      pay.disabled = false;
+      cancel.disabled = false;
+      pay.replaceChildren(icon("key"), "Pay with passkey");
+      const outcome = $("#pay-outcome");
+      outcome.replaceChildren(icon("info"), "Cancelled. Nothing was sent.");
+      outcome.hidden = false;
+      return;
+    }
+    if (state.scenario === "cost" && !state.costChanged) {
+      state.costChanged = true;
+      showSheet(review(request, 131.4, h("div", { class: "callout callout-warn", role: "alert" }, icon("alert"), h("p", { text: "The cost changed since you reviewed it. Nothing was sent. Review it again." }))));
+      return;
+    }
+    finishPayment(request, previews);
+  }, 1400);
+}
+function finishPayment(request, previews) {
+  const bills = previews.map((x) => x.b);
+  const isRetry = request.kind === "retry";
+  let banner;
+  if (state.scenario === "one-fails" && !isRetry) {
+    const failed = bills[0];
+    const reason = `${payeeOf(failed).name}'s ${METHOD_LABELS[payeeOf(failed).method]} didn't accept the payment.`;
+    bills.forEach((b) => { b.status = "paying"; });
+    Object.assign(failed, { status: "payout_failed", failure: reason });
+    banner = { tone: "warn", title: "A payment failed", body: "Nothing reached that payee, and the USDC stays in or returns to the wallet. The other bills aren’t affected. You can retry it under Payment failed.", reason, retryId: failed.id };
+  } else if (state.scenario === "review") {
+    bills.forEach((b) => { b.status = "paying"; });
+    banner = { tone: "warn", title: "Expendi is checking a payment", body: "Its outcome isn’t clear yet. Don’t pay it again: Expendi will settle it." };
+  } else {
+    bills.forEach((b) => { b.status = "paying"; delete b.failure; });
+    banner = { tone: "success", title: "Payments sent", body: "M-Pesa and USDC payments usually arrive within a minute or two; banks can take longer." };
+  }
+  if (state.scenario !== "review") landLater(bills.filter((b) => b.status === "paying").map((b) => b.id));
+  state.selected = [];
+  state.banners = [banner];
+  layer.hidden = true;
+  openId = null;
+  recurringView = null;
+  sheetMode = null;
+  delete state.filters.status;
+  writeUrl();
+  renderAll();
+  $("#banners .banner:last-child .btn")?.focus();
+}
+
+/* Settling. In this mock a payout lands a few seconds after it's sent. Once a recurring bill is paid, marked paid outside
+   or cancelled, its payment's next bill is created, as the background job does, but only while the payment is active. */
+const NEXT_BILL_NOTE = " Its next bill is in To pay.";
+const owedBill = (r) => state.bills.find((b) => b.recurringId === r.id && isOpen(b));
+const lastBillDue = (r) => state.bills.filter((b) => b.recurringId === r.id).map((b) => b.dueOn).sort().at(-1);
+function nextDueOf(r) {
+  if (r.state === "ended") return null;
+  const owed = owedBill(r);
+  return withinEnd(r, firstOnOrAfter(r, owed ? addDays(owed.dueOn, 1) : TODAY));
+}
+function addRecurringBill(r, dueOn) {
+  state.created += 1;
+  const bill = { id: `${r.id}-${state.created}`, payee: r.payee, currency: r.currency, amount: r.variable ? null : r.amount, variable: r.variable || undefined,
+    dueOn, status: datedStatus(dueOn), heading: r.heading, category: r.category, recurringId: r.id, files: [] };
+  state.bills.push(bill);
+  return bill;
+}
+function nextBillAfter(b) {
+  const r = recurringOf(b);
+  if (!r || r.state !== "active" || owedBill(r)) return null;
+  const due = withinEnd(r, firstOnOrAfter(r, addDays(b.dueOn, 1)));
+  return due ? addRecurringBill(r, due) : null;
+}
+function landLater(ids) {
+  const generation = state.generation;
+  setTimeout(() => {
+    if (generation !== state.generation) return;
+    const landed = ids.map((id) => state.bills.find((b) => b.id === id)).filter((b) => b?.status === "paying");
+    if (landed.length === 0) return;
+    let created = 0;
+    for (const b of landed) {
+      Object.assign(b, { status: "paid", paidOn: TODAY });
+      if (nextBillAfter(b)) created += 1;
+    }
+    keepFocus(() => { renderTabs(); renderResults(); });
+    toast(landed.length === 1 ? `${payeeOf(landed[0]).name} received the payment.${created ? NEXT_BILL_NOTE : ""}` : `${landed.length} payees received their payments.`);
+  }, 6000);
+}
+
+/* Recurring payments live in the side panel, as in Ramp: the list, each payment's details, its form, and pause, resume and end. */
+let recBusy = false;
+let recLoaded = false;
+let recAttempts = 0;
+let recToken = 0;
+const STATE_ORDER = { active: 0, paused: 1, ended: 2 };
+const statePill = (s) => h("span", { class: `status is-${STATES[s].tone}`, text: STATES[s].label });
+const amountText = (r) => (r.amount == null ? "Variable" : `${r.currency} ${r.currency === "KES" ? fmtKes(r.amount) : fmt(r.amount)}`);
+const dueKey = (r) => owedBill(r)?.dueOn ?? nextDueOf(r) ?? "9999-12-31";
+const sortedRecurring = () => [...state.recurring].sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state]
+  || dueKey(a).localeCompare(dueKey(b)) || payeeOf(a).name.localeCompare(payeeOf(b).name));
+const recurringIds = () => sortedRecurring().map((r) => r.id);
+const defaultHeading = (payeeId) => (PAYEES[payeeId]?.kind === "Subscription vendor" ? "Subscriptions" : "Transactions");
+const VIEW_ONLY = "View only. Only admins set up and change recurring payments.";
+
+function showRecurringSheet(mode, viewing, nodes) {
+  openId = null;
+  recurringView = viewing;
+  sheetMode = mode;
+  writeUrl();
+  document.querySelectorAll("tr.row.is-open").forEach((tr) => tr.classList.remove("is-open"));
+  showSheet(nodes);
+}
+function listHead() {
+  return h("div", { class: "sheet-head" },
+    h("div", { class: "sheet-head-main" }, h("p", { class: "eyebrow", text: "Bills" }), h("h2", { class: "sheet-title", id: "sheet-title", text: "Recurring payments" }),
+      h("p", { class: "sheet-sub", text: "Set up once. Each one's next bill is always ready in To pay." })),
+    h("div", { class: "stepper" }, closeButton()));
+}
+function listFoot(withNew) {
+  return h("div", { class: "sheet-foot" },
+    withNew ? h("button", { class: "btn btn-primary btn-lg", type: "button", onclick: () => openRecurringForm(null) }, icon("plus"), "New recurring payment") : null,
+    h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Close", onclick: closeSheet }),
+    canAct() ? null : h("p", { class: "read-only" }, icon("info"), VIEW_ONLY));
+}
+function loadRecurring(viewing, then) {
+  const token = ++recToken;
+  const bar = (style) => h("div", { class: "skel", style });
+  showRecurringSheet("rec-loading", viewing, [listHead(),
+    h("div", { class: "sheet-body is-flush", "aria-busy": "true" }, h("p", { class: "sr-only", role: "status", text: "Loading recurring payments…" }),
+      h("ul", { class: "rec-list", "aria-hidden": "true" }, Array.from({ length: 6 }, () => h("li", {}, h("div", { class: "rec-row" },
+        bar("width:32px;height:32px"), h("div", {}, bar("width:55%;height:14px;margin-top:5px"), bar("width:80%;height:12px;margin-top:9px")),
+        h("div", { class: "rec-due" }, bar("width:84px;height:14px;margin-top:5px"), bar("width:64px;height:20px"))))))),
+    listFoot(false)]);
+  sheet.focus();
+  later(() => {
+    if (token !== recToken || layer.hidden || sheetMode !== "rec-loading") return;
+    recAttempts += 1;
+    if (state.scenario === "error" && recAttempts === 1) {
+      showRecurringSheet("rec-error", viewing, [listHead(),
+        h("div", { class: "sheet-body is-flush" }, h("div", { class: "load-error", role: "alert" }, icon("circle-alert"), h("strong", { text: "Recurring payments didn't load" }),
+          h("p", { text: NET_ERROR }), h("button", { class: "btn btn-outline", type: "button", text: "Try again", onclick: () => loadRecurring(viewing, then) }))),
+        listFoot(false)]);
+      return;
+    }
+    recLoaded = true;
+    then();
+  }, 600);
+}
+
+function openRecurringList(fromId = null) {
+  if (!recLoaded) { loadRecurring("all", () => openRecurringList()); return; }
+  const items = sortedRecurring();
+  const body = h("div", { class: "sheet-body is-flush" });
+  if (items.length === 0) {
+    body.append(h("div", { class: "empty" }, icon("repeat"), h("strong", { text: "No recurring payments yet." }),
+      h("p", { text: "Set up rent, subscriptions or a monthly KRA payment once, and its next bill is always ready in Bills." }),
+      canAct() ? h("button", { class: "btn btn-outline", type: "button", onclick: () => openRecurringForm(null) }, icon("plus"), "New recurring payment") : null));
+  } else {
+    body.append(h("ul", { class: "rec-list", "aria-label": "Recurring payments" }, items.map((r) => {
+      const p = payeeOf(r);
+      const owed = owedBill(r);
+      const due = owed?.dueOn ?? nextDueOf(r);
+      return h("li", {}, h("button", { class: "rec-row", type: "button", "data-id": r.id, onclick: () => openRecurring(r.id) },
+        h("span", { class: "payee-mark", "aria-hidden": "true", text: markOf(p.name) }),
+        h("span", { class: "rec-main" },
+          h("span", { class: "rec-name" }, h("span", { text: p.name }), r.state === "active" ? null : statePill(r.state)),
+          h("span", { class: "rec-meta num", text: `${scheduleOf(r)} · ${amountText(r)}` })),
+        h("span", { class: "rec-due" }, due ? [h("span", { class: "num", text: dateText(due) }), owed ? statusPill(owed.status) : null]
+          : h("span", { class: "no-more", text: "No more bills" }))));
+    })));
+  }
+  showRecurringSheet("rec-list", "all", [listHead(), body, listFoot(canAct() && items.length > 0)]);
+  (sheet.querySelector(`.rec-row[data-id="${fromId}"]`) ?? sheet).focus();
+}
+
+function stepRecurring(delta) {
+  const ids = recurringIds();
+  const at = ids.indexOf(recurringView);
+  if (at < 0) return;
+  const next = ids[at + delta];
+  if (next) openRecurring(next, delta);
+}
+function openRecurring(id, steppedBy = 0) {
+  const r = state.recurring.find((x) => x.id === id);
+  if (!r) return;
+  if (!recLoaded) { loadRecurring(id, () => openRecurring(id)); return; }
+  showRecurringSheet("rec-detail", id, recurringDetail(r));
+  if (!steppedBy) { sheet.focus(); return; }
+  sheet.querySelector(".sheet-body").classList.add("is-stepping");
+  const arrow = sheet.querySelector(`[aria-label="${steppedBy > 0 ? "Next payment" : "Previous payment"}"]`);
+  (arrow && !arrow.disabled ? arrow : sheet).focus();
+}
+function nextBillSection(r) {
+  const b = owedBill(r);
+  if (b) {
+    return h("section", { class: "sheet-section", "aria-label": "Next bill" }, h("h3", { class: "section-label", text: "Next bill" }),
+      h("div", { class: "next-bill" },
+        h("span", { class: "next-bill-due num", text: `Due ${dateText(b.dueOn)}` }),
+        h("span", { class: `next-bill-amount${b.amount == null ? " is-missing" : ""}` }, b.amount == null ? "Amount to enter" : money(b.amount, b.currency)),
+        statusPill(b.status),
+        h("button", { class: "text-link next-bill-open", type: "button", onclick: () => openBill(b.id) }, "Open bill", icon("chevron-right"))),
+      r.payVia === "expendi"
+        ? h("p", { class: "note" }, icon("info"), "Bills aren’t paid automatically on the due date. An admin pays each one in Bills, with their approval passkey.") : null);
+  }
+  if (r.state === "ended") {
+    return h("section", { class: "sheet-section", "aria-label": "Next bill" }, h("h3", { class: "section-label", text: "Next bill" }), h("p", { class: "no-more-box", text: "No more bills" }));
+  }
+  return null;
+}
+function recurringDetail(r) {
+  const p = payeeOf(r);
+  const next = nextDueOf(r);
+  const rows = [
+    ["When", scheduleOf(r)],
+    ["Starts", dateText(r.startsOn)],
+    ["Ends", r.endsOn ? dateText(r.endsOn) : "No end date"],
+    next ? [owedBill(r) ? "The bill after that" : "Next bill", `Due ${dateText(next)}`] : null,
+    ["How it’s paid", r.payVia === "outside" ? "Outside Expendi. Mark each bill paid once you’ve paid it." : PAY_VIA.expendi],
+    ["Reminder", reminderInWords(r.reminder)],
+    ["Overview heading", r.heading],
+    ["Category", r.category],
+  ].filter(Boolean);
+  const ids = recurringIds();
+  const at = ids.indexOf(r.id);
+  return [
+    h("div", { class: "sheet-head" },
+      h("div", { class: "sheet-head-main" },
+        h("button", { class: "back-link", type: "button", onclick: () => openRecurringList(r.id) }, icon("chevron-left"), "Back to recurring payments"),
+        h("h2", { class: "sheet-title", id: "sheet-title", text: p.name }),
+        h("p", { class: "sheet-amount" }, r.amount == null ? h("span", { class: "to-enter", text: "Variable amount" }) : money(r.amount, r.currency)),
+        statePill(r.state)),
+      h("div", { class: "stepper" },
+        h("button", { class: "icon-btn", type: "button", "aria-label": "Previous payment", disabled: at <= 0, onclick: () => stepRecurring(-1) }, icon("chevron-up")),
+        h("button", { class: "icon-btn", type: "button", "aria-label": "Next payment", disabled: at < 0 || at >= ids.length - 1, onclick: () => stepRecurring(1) }, icon("chevron-down")),
+        closeButton())),
+    h("div", { class: "sheet-body" },
+      nextBillSection(r),
+      h("dl", { class: "details" }, rows.map(([label, value]) => h("div", {}, h("dt", { text: label }), h("dd", { class: "num", text: value }))))),
+    recurringFoot(r, at, ids.length),
+  ];
+}
+function recurringFoot(r, at, total) {
+  const foot = h("div", { class: "sheet-foot" });
+  const position = h("span", { class: "num position", text: at >= 0 ? `${at + 1} of ${total}` : "" });
+  if (!canAct()) {
+    foot.append(h("p", { class: "read-only" }, icon("info"), VIEW_ONLY), h("span", { class: "spacer" }), position);
+    return foot;
+  }
+  if (r.state === "ended") {
+    foot.append(position);
+    return foot;
+  }
+  const error = h("p", { class: "field-error read-only wide", role: "alert", hidden: true }, icon("circle-alert"), h("span"));
+  const primary = h("div", { class: "foot-primary" });
+  if (r.state === "paused") {
+    const resumeBtn = h("button", { class: "btn btn-primary btn-lg", type: "button" }, icon("play"), "Resume");
+    resumeBtn.addEventListener("click", () => resume(r, resumeBtn, error));
+    primary.append(resumeBtn);
+  }
+  primary.append(h("button", { class: "btn btn-outline btn-lg", type: "button", onclick: () => openRecurringForm(r) }, icon("pencil"), "Edit payment"));
+  const secondary = h("div", { class: "foot-secondary" },
+    r.state === "active" ? h("button", { class: "btn btn-ghost", type: "button", text: "Pause", onclick: () => confirmRecurring(r, "pause") }) : null,
+    h("button", { class: "btn btn-ghost danger", type: "button", text: "End payment", onclick: () => confirmRecurring(r, "end") }));
+  foot.append(primary, secondary, error);
+  return foot;
+}
+
+/* Pause keeps the bill already there; resume skips dates that passed while paused and creates the next bill if none is owed. */
+function resume(r, button, error) {
+  recBusy = true;
+  button.disabled = true;
+  button.replaceChildren("Resuming…");
+  error.hidden = true;
+  later(() => {
+    recBusy = false;
+    if (!owedBill(r)) {
+      const last = lastBillDue(r);
+      const due = withinEnd(r, firstOnOrAfter(r, last && last >= TODAY ? addDays(last, 1) : TODAY));
+      if (!due) {
+        button.disabled = false;
+        button.replaceChildren(icon("play"), "Resume");
+        error.lastChild.textContent = "Its end date has passed, so there's nothing to resume. End it instead.";
+        error.hidden = false;
+        return;
+      }
+      addRecurringBill(r, due);
+    }
+    r.state = "active";
+    renderAll();
+    openRecurring(r.id);
+    toast("Payment resumed.");
+  }, 600);
+}
+const CONFIRMATIONS = {
+  pause: { title: "Pause this payment?", message: (payee) => `No new bills for ${payee} until you resume it. The bill already there stays.`, confirm: "Pause", iconName: "pause", done: "Payment paused." },
+  end: { title: "End this payment?", message: (payee) => `No more bills for ${payee}. The bill already there stays. Ending is final: it can’t be undone.`, confirm: "End payment", iconName: "ban", done: "Payment ended." },
+};
+function confirmRecurring(r, kind) {
+  const c = CONFIRMATIONS[kind];
+  const name = payeeOf(r).name;
+  const go = h("button", { class: "btn btn-primary btn-lg", type: "button", text: c.confirm });
+  const keep = h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Keep it", onclick: () => openRecurring(r.id) });
+  go.addEventListener("click", () => {
+    recBusy = true;
+    go.disabled = keep.disabled = true;
+    go.textContent = "Working…";
+    later(() => {
+      recBusy = false;
+      if (kind === "pause") r.state = "paused";
+      else { r.state = "ended"; r.endsOn = TODAY; }
+      renderAll();
+      openRecurring(r.id);
+      toast(c.done);
+    }, 600);
+  });
+  showRecurringSheet("rec-confirm", r.id, [sheetHead(name, c.title),
+    h("div", { class: "sheet-body" }, h("div", { class: "callout callout-warn" }, icon(c.iconName), h("p", { text: c.message(name) }))),
+    h("div", { class: "sheet-foot" }, go, keep)]);
+  sheet.focus();
+}
+
+/* Payees and categories load with the form, as in the app. When the network is down (the error scenario), each fails once. */
+function asyncField({ host, loadingText, againText, isEmpty, emptyNode, control }) {
+  let attempts = 0;
+  const load = (fromRetry) => {
+    host.replaceChildren(h("p", { class: "loading-line", role: "status", text: loadingText }));
+    later(() => {
+      attempts += 1;
+      if (state.scenario === "error" && attempts === 1) {
+        host.replaceChildren(h("div", { class: "callout callout-error", role: "alert" }, icon("circle-alert"),
+          h("div", {}, h("p", { text: NET_ERROR }), h("button", { class: "btn btn-outline", type: "button", text: againText, onclick: () => load(true) }))));
+        return;
+      }
+      if (isEmpty()) { host.replaceChildren(emptyNode()); return; }
+      host.replaceChildren(control);
+      if (fromRetry) control.querySelector("select")?.focus();
+    }, 500);
+  };
+  load(false);
+}
+
+function recurringForm(r) {
+  const isNew = !r;
+  let currency = r ? r.currency : "KES";
+  const choosable = Object.entries(PAYEES).filter(([, p]) => !p.archived && p.kind !== "Employee").sort(([, a], [, b]) => a.name.localeCompare(b.name));
+
+  const payee = h("select", { id: "r-payee" }, h("option", { value: "", text: "Choose a payee", disabled: true, selected: true }),
+    choosable.map(([id, p]) => h("option", { value: id, text: `${p.name} · ${p.kind}${p.method === "outside" ? ", paid outside Expendi" : ""}` })));
+  const payeeError = fieldError();
+  const payeeHost = h("div", { class: "async-state" });
+
+  const variable = h("input", { type: "checkbox", id: "r-variable", checked: Boolean(r?.variable) });
+  const amountLabel = h("label", { class: "field-label", for: "r-amount" });
+  const amount = h("input", { class: "input num", id: "r-amount", inputmode: "decimal", autocomplete: "off", value: r ? typedAmount(r.amount) : "" });
+  const usdHelp = h("p", { class: "field-help", text: "This payee is paid in USDC: each bill pays exactly this many USDC." });
+  const editHelp = r ? h("p", { class: "field-help", text: "A new amount applies from the next bill. To change the bill already created, edit that bill." }) : null;
+  const amountError = fieldError();
+  const amountField = h("div", { class: "field" }, amountLabel, amount, usdHelp, editHelp, amountError);
+
+  const often = h("select", { id: "r-often" }, Object.entries(SCHEDULE_LABELS).map(([value, label]) => h("option", { value, text: label, selected: value === "monthly" })));
+  const starts = h("input", { class: "input num", id: "r-starts", type: "date", value: TODAY });
+  const startsError = fieldError();
+  const weekday = h("select", { id: "r-weekday" }, WEEKDAYS.map((name, i) => h("option", { value: String(i + 1), text: name })));
+  const weekdayError = fieldError();
+  const weekdayField = h("div", { class: "field", hidden: true }, h("label", { class: "field-label", for: "r-weekday", text: "Due every" }), selectBox(weekday), weekdayError);
+  const monthDay = h("input", { class: "input num", id: "r-day", type: "number", min: "1", max: "31", inputmode: "numeric", value: String(Number(TODAY.slice(8))) });
+  const monthDayError = fieldError();
+  const monthDayField = h("div", { class: "field" }, h("label", { class: "field-label", for: "r-day", text: "Day of the month it’s due (1 to 31)" }), monthDay,
+    h("p", { class: "field-help", text: "In a shorter month, it’s due on the month’s last day." }), monthDayError);
+  const preview = h("div", { class: "due-preview", "aria-live": "polite" }, icon("calendar"), h("div", {}, h("strong"), h("span", { class: "sub num" })));
+
+  const ends = h("input", { class: "input num", id: "r-ends", type: "date", value: r?.endsOn ?? "" });
+  const endsError = fieldError();
+  const endsField = h("div", { class: "field" }, h("label", { class: "field-label", for: "r-ends", text: "End date (optional)" }), ends, h("p", { class: "field-help", text: "Leave blank to keep going." }), endsError);
+
+  const payVia = h("select", { id: "r-via" }, Object.entries(PAY_VIA_OPTIONS).map(([value, label]) => h("option", { value, text: label })));
+  const viaHelp = h("p", { class: "field-help", text: "This payee is paid outside Expendi.", hidden: true });
+
+  const reminder = h("input", { class: "input num", id: "r-reminder", type: "number", min: "0", max: "30", inputmode: "numeric", value: String(r?.reminder ?? 3) });
+  const reminderError = fieldError();
+  const heading = h("select", { id: "r-heading" }, ["Transactions", "Subscriptions"].map((x) => h("option", { value: x, text: x, selected: x === (r?.heading ?? "Transactions") })));
+  let headingTouched = false;
+
+  const category = h("select", { id: "r-category" }, h("option", { value: "", text: "Choose a category", disabled: true, selected: !r }),
+    CATEGORIES.map((c) => h("option", { value: c, text: c, selected: c === r?.category })));
+  const categoryError = fieldError();
+  const categoryHost = h("div", { class: "async-state" });
+  const formError = h("div", { class: "callout callout-error", role: "alert", hidden: true }, icon("circle-alert"), h("p"));
+
+  const dayValue = () => (often.value === "weekly" ? weekday.value : monthDay.value.trim());
+  const syncAmount = () => {
+    amountLabel.textContent = `Amount (${currency})`;
+    amount.placeholder = currency === "USD" ? "120.00" : "45,000.00";
+    amountLabel.hidden = variable.checked;
+    amount.hidden = variable.checked;
+    usdHelp.hidden = variable.checked || currency !== "USD";
+    amountField.hidden = isNew && variable.checked;
+  };
+  const syncSchedule = () => {
+    const weekly = often.value === "weekly";
+    weekdayField.hidden = !weekly;
+    monthDayField.hidden = weekly;
+    const day = Number(dayValue());
+    const valid = /^\d+$/.test(dayValue()) && day >= 1 && day <= (weekly ? 7 : 31) && isIso(starts.value);
+    preview.hidden = !valid;
+    if (!valid) return;
+    preview.querySelector("strong").textContent = `Due: ${describeSchedule(often.value, day, starts.value)}`;
+    preview.querySelector(".sub").textContent = `First bill due ${dateText(firstOnOrAfter({ schedule: often.value, day, startsOn: starts.value }, starts.value))}`;
+  };
+
+  payee.addEventListener("change", () => {
+    const p = PAYEES[payee.value];
+    const next = p.method === "usdc" ? "USD" : "KES";
+    if (next !== currency) amount.value = "";
+    currency = next;
+    const outside = p.method === "outside";
+    payVia.options[0].disabled = outside;
+    if (outside) payVia.value = "outside";
+    viaHelp.hidden = !outside;
+    if (!headingTouched) heading.value = defaultHeading(payee.value);
+    setError(payee, payeeError, "");
+    syncAmount();
+  });
+  variable.addEventListener("change", () => { setError(amount, amountError, ""); syncAmount(); refreshSubmit(); });
+  amount.addEventListener("input", () => { setError(amount, amountError, ""); refreshSubmit(); });
+  often.addEventListener("change", () => {
+    const validStart = isIso(starts.value);
+    if (often.value === "weekly") weekday.value = validStart ? String(isoWeekday(starts.value)) : "1";
+    else monthDay.value = validStart ? String(Number(starts.value.slice(8))) : "";
+    setError(monthDay, monthDayError, "");
+    syncSchedule();
+  });
+  for (const el of [starts, monthDay]) el.addEventListener("input", () => { setError(el, el === starts ? startsError : monthDayError, ""); syncSchedule(); });
+  starts.addEventListener("change", syncSchedule);
+  weekday.addEventListener("change", syncSchedule);
+  heading.addEventListener("change", () => { headingTouched = true; refreshSubmit(); });
+  ends.addEventListener("input", () => { setError(ends, endsError, ""); refreshSubmit(); });
+  ends.addEventListener("change", refreshSubmit);
+  reminder.addEventListener("input", () => { setError(reminder, reminderError, ""); refreshSubmit(); });
+  category.addEventListener("change", () => { setError(category, categoryError, ""); refreshSubmit(); });
+  syncAmount();
+  syncSchedule();
+
+  const submitText = isNew ? "Set up payment" : "Save changes";
+  const submit = h("button", { class: "btn btn-primary btn-lg", type: "submit", form: "recurring-form", text: submitText });
+  const snapshot = () => JSON.stringify([variable.checked, variable.checked ? "" : amount.value.trim(), ends.value, reminder.value.trim(), heading.value, category.value]);
+  const initial = snapshot();
+  function refreshSubmit() { if (!isNew) submit.disabled = snapshot() === initial; }
+  refreshSubmit();
+
+  if (isNew) {
+    asyncField({ host: payeeHost, loadingText: "Loading payees…", againText: "Load payees again", isEmpty: () => choosable.length === 0,
+      emptyNode: () => h("p", { class: "field-help" }, "Add the payee under ", h("a", { class: "text-link", href: "payees.html", text: "Payees" }), " first, then come back to set up the payment."),
+      control: selectBox(payee) });
+  }
+  asyncField({ host: categoryHost, loadingText: "Loading categories…", againText: "Load categories again", isEmpty: () => false, control: selectBox(category) });
+
+  const setOnce = r ? h("div", { class: "set-once" },
+    h("dl", { class: "details" }, [["Pay to", payeeOf(r).name], ["When", scheduleOf(r)], ["Starts", dateText(r.startsOn)], ["How it’s paid", PAY_VIA[r.payVia]]]
+      .map(([label, value]) => h("div", {}, h("dt", { text: label }), h("dd", { class: "num", text: value })))),
+    h("p", { class: "field-help", text: "To change who it’s paid to, when, or how, end this payment and set up a new one." })) : null;
+
+  const form = h("form", { class: "form", id: "recurring-form", "aria-label": isNew ? "New recurring payment" : "Edit recurring payment", novalidate: true },
+    h("p", { class: "note" }, icon("info"), isNew ? "Its first bill is created now and shows in To pay."
+      : `Changes apply to the bills still to come. The overview heading follows the payee (${defaultHeading(r.payee)}) unless you pick another.`),
+    setOnce,
+    isNew ? h("div", { class: "field" }, h("label", { class: "field-label", for: "r-payee", text: "Pay to" }), payeeHost, payeeError) : null,
+    h("label", { class: "check-field", for: "r-variable" }, variable, h("span", {}, h("span", { class: "check-title", text: "Variable amount" }),
+      h("span", { class: "field-help", text: "Entered on each bill, e.g. PAYE or electricity." }))),
+    amountField,
+    isNew ? h("div", { class: "row-2" },
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "r-often", text: "How often" }), selectBox(often)),
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "r-starts", text: "Start date" }), starts, startsError)) : null,
+    isNew ? h("div", { class: "row-2" }, weekdayField, monthDayField, endsField) : endsField,
+    isNew ? preview : null,
+    isNew ? h("div", { class: "field" }, h("label", { class: "field-label", for: "r-via", text: "How it’s paid" }), selectBox(payVia), viaHelp) : null,
+    h("div", { class: "row-2" },
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "r-reminder", text: "Remind admins (days before it’s due)" }), reminder,
+        h("p", { class: "field-help", text: "Up to 30 days. Admins are also reminded on the due date, and once if it’s overdue." }), reminderError),
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "r-heading", text: "Overview heading" }), selectBox(heading))),
+    h("div", { class: "field" }, h("label", { class: "field-label", for: "r-category", text: "Category" }), categoryHost, categoryError),
+    formError);
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    formError.hidden = true;
+    let firstBad = null;
+    const bad = (input, error, message) => { setError(input, error, message); if (message && !firstBad) firstBad = input; };
+    if (isNew) bad(payee, payeeError, payee.value ? "" : "Pick who it's paid to.");
+    let cents = null;
+    if (variable.checked) bad(amount, amountError, "");
+    else if (!amount.value.trim()) bad(amount, amountError, "Enter the amount, or mark the payment as variable.");
+    else {
+      const parsed = parseAmount(amount.value, currency);
+      bad(amount, amountError, parsed.error ?? "");
+      cents = parsed.cents ?? null;
+    }
+    const startsOn = isNew ? starts.value : r.startsOn;
+    if (isNew) {
+      const weekly = often.value === "weekly";
+      const raw = dayValue();
+      bad(weekly ? weekday : monthDay, weekly ? weekdayError : monthDayError, !/^\d+$/.test(raw) ? "Pick the day it falls due."
+        : Number(raw) < 1 || Number(raw) > (weekly ? 7 : 31) ? (weekly ? "Pick a weekday, 1 (Monday) to 7 (Sunday)." : "Pick a day of the month, 1 to 31.") : "");
+      bad(starts, startsError, isIso(starts.value) ? "" : "Enter the start date as YYYY-MM-DD.");
+    }
+    const endsOn = ends.value;
+    bad(ends, endsError, ends.validity.badInput ? "Enter the end date as YYYY-MM-DD."
+      : endsOn && isIso(startsOn) && endsOn < startsOn ? "The end date can't be before the start date." : "");
+    const rem = reminder.value.trim();
+    bad(reminder, reminderError, !/^-?\d+$/.test(rem) ? "Enter the reminder lead time in whole days."
+      : Number(rem) < 0 ? "The reminder can't be after the due date." : Number(rem) > 30 ? "Remind at most 30 days before the due date." : "");
+    bad(category, categoryError, category.value ? "" : "Pick a category.");
+    if (firstBad) { if (firstBad.isConnected && !firstBad.hidden) firstBad.focus(); return; }
+
+    recBusy = true;
+    submit.disabled = true;
+    submit.textContent = "Saving…";
+    later(() => {
+      recBusy = false;
+      const fail = (message) => {
+        formError.lastChild.textContent = message;
+        formError.hidden = false;
+        submit.disabled = false;
+        submit.textContent = submitText;
+        formError.scrollIntoView({ block: "nearest" });
+      };
+      if (isNew) {
+        const item = { id: "", payee: payee.value, category: category.value, heading: heading.value, variable: variable.checked, currency, amount: variable.checked ? null : cents,
+          schedule: often.value, day: Number(dayValue()), startsOn, endsOn: endsOn || null, payVia: payVia.value, reminder: Number(rem), state: "active" };
+        if (startsOn < TODAY) return fail("The start date can't be in the past.");
+        const first = firstOnOrAfter(item, startsOn);
+        if (item.endsOn && first > item.endsOn) return fail("No payment falls due between the start and end dates.");
+        state.created += 1;
+        item.id = `rec-${state.created}`;
+        state.recurring.push(item);
+        addRecurringBill(item, first);
+        renderAll();
+        openRecurring(item.id);
+        toast("Recurring payment set up. Its first bill is in To pay.");
+        return;
+      }
+      Object.assign(r, { variable: variable.checked, amount: variable.checked ? null : cents, endsOn: endsOn || null, reminder: Number(rem), heading: heading.value, category: category.value });
+      renderAll();
+      openRecurring(r.id);
+      toast("Changes saved.");
+    }, 600);
+  });
+  const cancel = h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Cancel", onclick: () => (r ? openRecurring(r.id) : openRecurringList()) });
+  return [sheetHead(isNew ? "Recurring payments" : payeeOf(r).name, isNew ? "New recurring payment" : "Edit recurring payment"),
+    h("div", { class: "sheet-body" }, form), h("div", { class: "sheet-foot" }, submit, cancel)];
+}
+function openRecurringForm(r) {
+  showRecurringSheet(r ? "rec-edit" : "rec-new", r ? r.id : "all", recurringForm(r));
+  sheet.focus();
+}
+
+/* Page */
+function renderAll() {
+  $("#page-sub").textContent = canAct()
+    ? "Suppliers, rent, utilities, subscriptions and statutory payments. Pay up to 20 bills with one passkey; each is paid on its own."
+    : "Suppliers, rent, utilities, subscriptions and statutory payments. Only admins add and pay bills.";
+  $("#import-btn").hidden = !canAct();
+  $("#new-bill").hidden = !canAct();
+  $("#role-label").textContent = state.role === "accountant" ? "Accountant" : "Admin";
+  renderBanners();
+  renderTabs();
+  renderToolbar();
+  renderResults();
+}
+$("#new-bill").addEventListener("click", () => showSheet(billForm(null)));
+$("#recurring-btn").addEventListener("click", () => openRecurringList());
+
+function reset() {
+  const fromUrl = readUrl();
+  state.role = $("#mock-role").value;
+  state.scenario = $("#mock-scenario").value;
+  state.generation += 1;
+  state.recurring = state.scenario === "empty" ? [] : sampleRecurring();
+  state.bills = state.scenario === "empty" ? sampleBills().filter((b) => !isOpen(b)).map((b) => ({ ...b, recurringId: undefined })) : sampleBills();
+  state.filters = fromUrl.filters;
+  state.selected = [];
+  state.banners = [];
+  state.paying = false;
+  state.costChanged = false;
+  state.loading = true;
+  state.loadError = false;
+  recLoaded = false;
+  recAttempts = 0;
+  recToken += 1;
+  recBusy = false;
+  layer.hidden = true;
+  openId = null;
+  recurringView = null;
+  sheetMode = null;
+  renderAll();
+  later(() => {
+    state.loading = false;
+    state.loadError = state.scenario === "error";
+    renderAll();
+    const linked = fromUrl.billId && !state.loadError ? state.bills.find((b) => b.id === fromUrl.billId) : null;
+    if (linked) {
+      if (viewOf(linked) !== view()) {
+        if (viewOf(linked) === "open") delete state.filters.view; else state.filters.view = viewOf(linked);
+        delete state.filters.status;
+        renderAll();
+      }
+      openBill(linked.id);
+    } else if (fromUrl.recurring && !state.loadError) {
+      if (fromUrl.recurring === "all") openRecurringList();
+      else if (state.recurring.some((r) => r.id === fromUrl.recurring)) openRecurring(fromUrl.recurring);
+      if (!layer.hidden) returnFocus = $("#recurring-btn");
+    }
+  }, 600);
+}
+$("#mock-role").addEventListener("change", reset);
+$("#mock-scenario").addEventListener("change", reset);
+
+/* Mobile navigation */
+const sidebar = $("#sidebar");
+const scrim = $("#scrim");
+const menuBtn = $("#menu-btn");
+function setNav(isOpenNow) {
+  sidebar.classList.toggle("is-open", isOpenNow);
+  scrim.hidden = !isOpenNow;
+  menuBtn.setAttribute("aria-expanded", String(isOpenNow));
+  if (isOpenNow) sidebar.querySelector(".sb-link")?.focus();
+}
+menuBtn.addEventListener("click", () => setNav(true));
+scrim.addEventListener("click", () => setNav(false));
+document.addEventListener("keydown", (event) => { if (event.key === "Escape" && sidebar.classList.contains("is-open")) { setNav(false); menuBtn.focus(); } });
+
+reset();
+</script>
+</body>
+</html>

@@ -1,0 +1,1384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expendi Accounts Mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400..600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<style>
+:root {
+  --brand-50: #fff4f0;
+  --brand-100: #ffe7de;
+  --brand-500: #ff7e5f;
+  --brand-600: #f0613e;
+  --brand-700: #cc4528;
+  --brand-800: #a63620;
+  --gray-25: #fcfcfd;
+  --gray-50: #f9fafb;
+  --gray-100: #f2f4f7;
+  --gray-200: #e4e7ec;
+  --gray-300: #d0d5dd;
+  --gray-400: #98a2b3;
+  --gray-500: #667085;
+  --gray-600: #475467;
+  --gray-700: #344054;
+  --gray-900: #101828;
+  --error-50: #fef3f2;
+  --error-700: #b42318;
+  --warn-50: #fffaeb;
+  --warn-600: #dc6803;
+  --warn-700: #b54708;
+  --success-50: #ecfdf3;
+  --success-700: #067647;
+  --blue-50: #eff8ff;
+  --blue-500: #2e90fa;
+  --blue-700: #175cd3;
+  --amber-500: #f79009;
+  --green-500: #17b26a;
+  --red-500: #f04438;
+
+  --bg: var(--gray-50);
+  --surface: #ffffff;
+  --text: var(--gray-900);
+  --text-2: var(--gray-600);
+  --text-3: var(--gray-500);
+  --border: var(--gray-200);
+  --hairline: var(--gray-100);
+  --control-border: var(--gray-300);
+
+  /* Shape rule: controls and business marks 8px, panels 14px, pills and people full. */
+  --r-control: 8px;
+  --r-panel: 14px;
+  --r-full: 999px;
+  --shadow-panel: 0 1px 2px rgba(16, 24, 40, .04), 0 12px 32px -18px rgba(16, 24, 40, .16);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+
+  --series-main: var(--brand-700);
+
+  /* Type weights by role (docs/design-system.md, Confident). */
+  --w-display: 400; --w-heading: 400; --w-title: 600; --w-name: 600; --w-amount: 500; --w-ui: 500; --w-strong: 600; --w-button: 600;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+h1, h2, h3, p, dl, dd, ol, ul { margin: 0; }
+.num { font-variant-numeric: tabular-nums; }
+.ic { width: 16px; height: 16px; flex: none; display: block; stroke-width: 1.75; }
+:focus-visible { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.ccy { font-size: .72em; font-weight: var(--w-ui); letter-spacing: .04em; color: var(--text-3); }
+.money { white-space: nowrap; }
+
+/* Shell */
+.app { display: flex; min-height: 100dvh; }
+.sidebar {
+  position: sticky; top: 0; height: 100dvh; width: 248px; flex: none;
+  background: var(--surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+}
+.sb-top { padding: 16px 12px 8px; display: flex; flex-direction: column; gap: 10px; }
+.company {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 6px 8px; border: 0; background: none; border-radius: var(--r-control); text-align: left;
+}
+.company:hover { background: var(--gray-50); }
+.company img { width: 32px; height: 32px; border-radius: var(--r-control); }
+.company-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.company-name { font-weight: var(--w-name); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.company-role { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.company .ic { color: var(--gray-400); }
+.search {
+  display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: var(--r-control); background: var(--gray-50); color: var(--text-3);
+}
+.search span { flex: 1; text-align: left; }
+kbd {
+  font: inherit; font-size: 11px; line-height: 16px; color: var(--text-3);
+  border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; background: var(--surface);
+}
+.sb-nav { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
+.sb-group { margin-top: 16px; }
+.sb-label { padding: 0 8px 4px; font-size: 12px; line-height: 16px; color: var(--gray-400); font-weight: var(--w-ui); }
+.sb-link {
+  display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 8px;
+  border-radius: var(--r-control); color: var(--gray-700); text-decoration: none; transition: background-color .15s ease;
+}
+.sb-link:hover { background: var(--gray-50); }
+.sb-link .ic { color: var(--gray-400); }
+.sb-link.is-active { background: var(--brand-50); color: var(--brand-800); font-weight: var(--w-ui); }
+.sb-link.is-active .ic { color: var(--brand-700); }
+.count {
+  margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-full);
+  background: var(--brand-100); color: var(--brand-800); font-size: 12px; font-weight: var(--w-strong);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sb-user { display: flex; align-items: center; gap: 10px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
+.sb-user .who { min-width: 0; }
+.sb-user .who p:first-child { font-weight: var(--w-name); }
+.sb-user .who p:last-child { font-size: 12px; line-height: 16px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.main-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar { display: none; }
+.main { width: 100%; max-width: 1240px; margin: 0 auto; padding: 40px 32px 72px; }
+
+/* Atoms */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); box-shadow: var(--shadow-panel); }
+.panel-flat { box-shadow: none; }
+.person, .business, .tile {
+  width: 36px; height: 36px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: var(--w-strong); letter-spacing: .02em; color: var(--gray-700);
+}
+.person { border-radius: var(--r-full); background: var(--gray-100); }
+.business, .tile { border-radius: var(--r-control); background: var(--surface); border: 1px solid var(--border); }
+.tile { color: var(--gray-600); }
+.pill {
+  display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px 0 6px;
+  border-radius: var(--r-full); font-size: 12px; font-weight: var(--w-ui); white-space: nowrap; flex: none;
+}
+.pill .ic { width: 13px; height: 13px; }
+.pill-neutral { background: var(--gray-100); color: var(--gray-700); }
+.pill-warn { background: var(--warn-50); color: var(--warn-700); }
+.pill-success { background: var(--success-50); color: var(--success-700); }
+/* Status: a filled tint means it needs attention or money is moving; an outline means it's only a record. Always a text label, never colour alone. */
+.status { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--r-full); font-size: 12px; font-weight: var(--w-ui); white-space: nowrap; flex: none; }
+.status.is-waiting { background: var(--warn-50); color: var(--warn-700); }
+.status.is-moving { background: var(--blue-50); color: var(--blue-700); }
+.status.is-paid { background: var(--success-50); color: var(--success-700); }
+.status.is-failed { background: var(--error-50); color: var(--error-700); }
+.status.is-rejected { background: var(--gray-100); color: var(--gray-700); }
+.status.is-quiet { background: var(--surface); border-color: var(--border); color: var(--text-2); }
+@keyframes beat { 0%, 100% { box-shadow: 0 0 0 0 rgba(46, 144, 250, .5); } 60% { box-shadow: 0 0 0 4px rgba(46, 144, 250, 0); } }
+.group-count {
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-full);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--gray-100); color: var(--gray-700); font-size: 12px; font-weight: var(--w-ui);
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 36px; padding: 0 14px; border-radius: var(--r-control); border: 1px solid transparent;
+  font-size: 14px; font-weight: var(--w-button); white-space: nowrap; text-decoration: none;
+  transition: background-color .15s ease, border-color .15s ease, transform .15s var(--ease-out);
+}
+.btn .ic { width: 16px; height: 16px; }
+.btn-primary { background: var(--brand-500); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--brand-600); }
+.btn-primary .ccy { color: #fff; }
+.btn-outline { background: var(--surface); border-color: var(--control-border); color: var(--gray-700); }
+.btn-outline:hover:not(:disabled) { background: var(--gray-50); }
+.btn-ghost { background: none; color: var(--gray-600); }
+.btn-ghost:hover:not(:disabled) { background: var(--gray-100); color: var(--gray-900); }
+.btn-lg { height: 44px; }
+.btn-sm { height: 32px; padding: 0 10px; font-size: 14px; }
+.btn-block { width: 100%; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.icon-btn {
+  width: 36px; height: 36px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: none; border-radius: var(--r-control); color: var(--gray-500);
+}
+.icon-btn:hover { background: var(--gray-100); color: var(--gray-700); }
+.info { border: 0; background: none; padding: 2px; color: var(--gray-400); border-radius: 4px; }
+.info:hover { color: var(--gray-600); }
+.card-title { display: flex; align-items: center; gap: 8px; font-size: 18px; line-height: 26px; font-weight: var(--w-title); }
+.card-sub { margin-top: 2px; color: var(--text-2); }
+.callout {
+  display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-control);
+  font-size: 14px; line-height: 20px;
+}
+.callout .ic { margin-top: 2px; }
+.callout-warn { background: var(--warn-50); color: var(--warn-700); }
+
+/* Page */
+.page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px; }
+.page-title { font-size: 24px; line-height: 32px; font-weight: var(--w-heading); letter-spacing: -0.02em; }
+.page-sub { margin-top: 4px; color: var(--text-2); }
+.head-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.wallet-grid { margin-top: 24px; display: grid; gap: 16px; align-items: start; grid-template-columns: minmax(0, 1fr) 352px; }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* Balance */
+.balance-card { padding: 20px 24px 16px; }
+.account-head { display: flex; align-items: center; gap: 10px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--hairline); }
+.balance-label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text-2); font-weight: var(--w-ui); }
+.balance-top { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 32px; }
+.balance { display: flex; align-items: baseline; gap: 6px; }
+.balance .big { font-size: 32px; line-height: 40px; font-weight: var(--w-display); letter-spacing: -0.025em; }
+.balance .cents { color: var(--gray-400); }
+.balance .unit { font-size: 14px; font-weight: var(--w-ui); letter-spacing: .04em; color: var(--text-3); }
+.balance-kes { margin-top: 2px; color: var(--text-3); }
+.flows { display: flex; gap: 32px; }
+.flows dt { font-size: 12px; line-height: 16px; color: var(--text-3); font-weight: var(--w-ui); }
+.flows dd { margin-top: 2px; font-size: 16px; line-height: 24px; font-weight: var(--w-amount); }
+.chart-head { margin-top: 24px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.viz { position: relative; min-height: 180px; margin-top: 8px; }
+.viz-svg { overflow: visible; }
+.viz-svg .grid { stroke: var(--hairline); stroke-width: 1; }
+.viz-svg .axis-base { stroke: var(--gray-300); stroke-width: 1; }
+.viz-svg .axis-label { fill: var(--text-3); font-size: 11px; }
+.viz-svg .line-main { fill: none; stroke: var(--series-main); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.viz-svg .end-label { font-size: 12px; font-weight: 500; fill: var(--text); }
+.viz-svg .cross-line { stroke: var(--gray-400); stroke-width: 1; }
+.viz-svg .dot-main { fill: var(--series-main); stroke: var(--surface); stroke-width: 2; }
+.link-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: none; border-radius: 4px;
+  color: var(--text-2); font-size: 12px;
+}
+.link-btn:hover { color: var(--text); }
+.mini-table { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: 14px; }
+.mini-table[hidden] { display: none; }
+.mini-table th, .mini-table td { padding: 8px 0; text-align: right; border-top: 1px solid var(--hairline); }
+.mini-table th:first-child, .mini-table td:first-child { text-align: left; }
+.mini-table thead th { color: var(--text-3); font-weight: 400; border-top: 0; font-size: 12px; }
+
+/* Deposit */
+.rail-card { padding: 18px 20px 20px; }
+.deposit.is-highlight { box-shadow: 0 0 0 2px var(--brand-500), var(--shadow-panel); }
+.deposit { transition: box-shadow .3s ease; }
+.qr {
+  margin: 16px auto 0; width: 164px; height: 164px; padding: 8px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--r-control); background: #fff;
+}
+.qr svg { width: 100%; height: 100%; display: block; }
+.qr[hidden] { display: none; }
+.address-label { margin-top: 16px; font-size: 12px; line-height: 16px; color: var(--text-3); font-weight: var(--w-ui); }
+.address { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px 7px; font-size: 14px; line-height: 20px; letter-spacing: .02em; }
+.address span:first-child { color: var(--text-3); }
+.deposit-actions { margin-top: 14px; }
+.deposit .callout { margin-top: 14px; }
+
+/* Allowed addresses */
+.addrs { list-style: none; padding: 0; margin-top: 8px; }
+.addrs li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; }
+.addrs li + li { border-top: 1px solid var(--hairline); }
+.addr-name { font-size: 14px; line-height: 20px; font-weight: var(--w-name); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.addr-detail { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.addrs-empty { margin-top: 12px; padding: 16px; border: 1px dashed var(--control-border); border-radius: var(--r-control); color: var(--text-2); text-align: center; }
+.trust { margin-top: 14px; display: flex; gap: 8px; align-items: flex-start; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.trust .ic { width: 14px; height: 14px; margin-top: 1px; color: var(--success-700); }
+.area-addresses .btn-block { margin-top: 12px; }
+
+/* History */
+.history { overflow: hidden; }
+.history-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px 14px; }
+.segmented { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-control); background: var(--gray-100); margin: 0; border: 0; }
+.segmented label {
+  position: relative; display: inline-flex; align-items: center; height: 30px; padding: 0 12px;
+  border-radius: 6px; font-size: 14px; font-weight: var(--w-ui); color: var(--text-2); cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
+}
+.segmented input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.segmented label:has(input:checked) { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(16, 24, 40, .1); }
+.segmented label:has(input:focus-visible) { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+.day {
+  padding: 8px 20px; font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-3);
+  background: var(--gray-25); border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+}
+.txs { list-style: none; padding: 0; }
+.txs li + li { border-top: 1px solid var(--hairline); }
+.tx {
+  width: 100%; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  padding: 12px 20px; border: 0; background: none; text-align: left; transition: background-color .15s ease;
+}
+.tx:hover { background: var(--gray-25); }
+.tx-main { min-width: 0; }
+.tx-name { font-size: 16px; line-height: 24px; font-weight: var(--w-name); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-detail { font-size: 14px; line-height: 20px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.tx-amount { font-size: 16px; line-height: 24px; font-weight: var(--w-amount); }
+.tx-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.history-foot { padding: 12px 20px 16px; border-top: 1px solid var(--hairline); }
+.history-empty { padding: 32px 20px; text-align: center; color: var(--text-2); border-top: 1px solid var(--hairline); }
+
+/* Tooltip */
+.tip {
+  position: fixed; z-index: 60; pointer-events: none; min-width: 168px; padding: 8px 10px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-control);
+  box-shadow: 0 12px 32px -12px rgba(16, 24, 40, .22); font-size: 12px; line-height: 16px;
+}
+.tip[hidden] { display: none; }
+.tip-head { color: var(--text-3); margin-bottom: 6px; }
+.tip-row { display: flex; align-items: center; gap: 8px; }
+.tip-row strong { font-size: 14px; font-weight: var(--w-strong); color: var(--text); font-variant-numeric: tabular-nums; }
+.tip-row .lbl { color: var(--text-3); }
+.tip-key { width: 12px; flex: none; }
+.tip-foot { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--hairline); color: var(--text-2); }
+
+/* Side panel */
+.sheet-layer { position: fixed; inset: 0; z-index: 50; }
+.sheet-layer[hidden] { display: none; }
+.sheet-scrim { position: absolute; inset: 0; background: rgba(16, 24, 40, .24); }
+.sheet {
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(480px, 100%);
+  display: flex; flex-direction: column; background: var(--surface);
+  box-shadow: -16px 0 48px -16px rgba(16, 24, 40, .2);
+}
+.sheet:focus { outline: none; }
+.sheet-head { display: flex; gap: 12px; align-items: flex-start; padding: 20px 20px 18px 24px; border-bottom: 1px solid var(--border); }
+.sheet-head-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.eyebrow { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.sheet-title { font-size: 18px; line-height: 26px; font-weight: var(--w-title); overflow-wrap: anywhere; }
+.sheet-amount { font-size: 24px; line-height: 32px; font-weight: var(--w-heading); letter-spacing: -0.02em; }
+.sheet-head .pill, .sheet-head .status { margin-top: 4px; }
+.sheet-body { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+.sheet-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--border); }
+.sheet-note { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; color: var(--text-2); }
+.sheet-note .ic { margin-top: 2px; color: var(--text-3); }
+.details { display: flex; flex-direction: column; }
+.details div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid var(--hairline); font-size: 14px; }
+.details div:first-child { border-top: 0; }
+.details dt { color: var(--text-3); }
+.details dd { overflow-wrap: anywhere; }
+
+.steps { list-style: none; padding: 0; }
+.steps li { position: relative; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 12px; padding-bottom: 18px; }
+.steps li:last-child { padding-bottom: 0; }
+.steps li:not(:last-child)::before { content: ""; position: absolute; left: 9px; top: 22px; bottom: 2px; width: 2px; border-radius: 1px; background: var(--gray-200); }
+.steps li.is-done:not(:last-child)::before { background: var(--gray-700); }
+.step-dot {
+  width: 20px; height: 20px; border-radius: var(--r-full); border: 2px solid var(--gray-300); background: var(--surface);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.step-dot .ic { width: 12px; height: 12px; stroke-width: 2.5; }
+.is-done .step-dot { background: var(--gray-900); border-color: var(--gray-900); color: #fff; }
+.is-current .step-dot { border-color: var(--brand-700); }
+.is-current .step-dot::after { content: ""; width: 8px; height: 8px; border-radius: var(--r-full); background: var(--brand-700); }
+.is-failed .step-dot { background: var(--warn-50); border-color: var(--warn-600); color: var(--warn-700); }
+.step-label { font-size: 14px; line-height: 20px; }
+.is-pending .step-label { color: var(--text-3); }
+.is-failed .step-label { color: var(--warn-700); font-weight: var(--w-ui); }
+.step-time { font-size: 12px; line-height: 20px; color: var(--text-3); }
+.step-sub { grid-column: 2 / -1; font-size: 12px; line-height: 16px; color: var(--text-2); margin-top: -2px; }
+
+.field { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.field-label { font-size: 12px; line-height: 16px; font-weight: var(--w-ui); color: var(--text-2); padding: 0; }
+.field-help { font-size: 12px; line-height: 16px; color: var(--text-3); display: flex; justify-content: space-between; gap: 8px; }
+.field-error { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--error-700); }
+.field-error .ic { width: 14px; height: 14px; }
+.field-error[hidden] { display: none; }
+.text-input {
+  height: 44px; padding: 0 12px; border: 1px solid var(--control-border); border-radius: var(--r-control); background: var(--surface);
+  width: 100%; min-width: 0;
+}
+.text-input::placeholder { color: var(--text-3); }
+.text-input[aria-invalid="true"] { border-color: var(--error-700); }
+.choices { display: flex; flex-direction: column; gap: 8px; }
+.choice {
+  position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; align-items: center;
+  padding: 12px; border: 1px solid var(--border); border-radius: var(--r-control); cursor: pointer; transition: border-color .15s ease, background-color .15s ease;
+}
+.choice:hover { border-color: var(--gray-400); }
+.choice input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--brand-700); background: var(--brand-50); box-shadow: inset 0 0 0 1px var(--brand-700); }
+.choice:has(input:focus-visible) { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+.amount-box {
+  display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 8px 0 14px;
+  border: 1px solid var(--control-border); border-radius: var(--r-control); background: var(--surface);
+}
+.amount-box:focus-within { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+.amount-box.is-invalid { border-color: var(--error-700); }
+.amount-box input { flex: 1; min-width: 0; border: 0; outline: none; background: none; font-size: 24px; line-height: 32px; font-weight: var(--w-heading); font-variant-numeric: tabular-nums; }
+.amount-box input::placeholder { color: var(--gray-300); }
+.amount-box .unit { font-size: 14px; font-weight: var(--w-ui); letter-spacing: .04em; color: var(--text-3); }
+
+.result { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 24px 8px 8px; }
+.result-icon { width: 48px; height: 48px; border-radius: var(--r-full); background: var(--success-50); color: var(--success-700); display: flex; align-items: center; justify-content: center; }
+.result-icon .ic { width: 24px; height: 24px; }
+.result-title { font-size: 18px; line-height: 26px; font-weight: var(--w-title); }
+.result p { color: var(--text-2); max-width: 34ch; }
+
+.skel { border-radius: var(--r-control); background: var(--gray-100); }
+
+.toast {
+  position: fixed; left: 50%; bottom: 24px; z-index: 70; max-width: calc(100% - 32px);
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--r-panel);
+  background: var(--gray-900); color: #fff; font-size: 14px; box-shadow: 0 16px 40px -16px rgba(16, 24, 40, .5);
+  opacity: 0; transform: translate(-50%, 12px); pointer-events: none; transition: opacity .2s ease, transform .3s var(--ease-out);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast .ic { color: var(--brand-500); }
+.scrim { position: fixed; inset: 0; z-index: 39; background: rgba(16, 24, 40, .24); }
+.scrim[hidden] { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .reveal { animation: rise .55s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms); }
+  .btn:active:not(:disabled) { transform: scale(.98); }
+  .sheet-scrim { animation: fade .2s ease; }
+  .sheet { animation: slide .32s var(--ease-out); }
+  .skel { animation: pulse 1.4s ease-in-out infinite; }
+  .is-new { animation: rise .5s var(--ease-out) both; background: var(--brand-50); transition: background-color 1.6s ease; }
+  .step-panel { animation: fade .25s ease; }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes slide { from { transform: translateX(24px); opacity: 0; } }
+@keyframes pulse { 50% { opacity: .55; } }
+
+@media (max-width: 1120px) {
+  .wallet-grid { display: flex; flex-direction: column; }
+  .col { display: contents; }
+  .area-balance { order: 1; }
+  .area-deposit { order: 2; }
+  .area-history { order: 3; }
+  .area-addresses { order: 4; }
+}
+@media (max-width: 900px) {
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 40; transform: translateX(-100%); transition: transform .25s var(--ease-out); }
+  .sidebar.is-open { transform: none; }
+  .topbar {
+    position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 12px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .topbar img { width: 28px; height: 28px; border-radius: var(--r-control); }
+  .topbar .company-name { font-size: 16px; }
+  .main { padding: 24px 24px 56px; }
+}
+@media (max-width: 600px) {
+  .main { padding: 20px 16px 48px; }
+  .head-actions { width: 100%; }
+  .head-actions .btn { flex: 1; }
+  .balance-card { padding: 20px 16px 12px; }
+  .history-head { padding-left: 16px; padding-right: 16px; }
+  .day { padding-left: 16px; padding-right: 16px; }
+  .tx { padding-left: 16px; padding-right: 16px; gap: 12px; }
+  .history-foot { padding-left: 16px; padding-right: 16px; }
+  .details div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .sheet-head { padding-left: 16px; }
+  .sheet-body, .sheet-foot { padding-left: 16px; padding-right: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <div class="sb-top">
+      <button class="company" type="button" data-mock="Switch company">
+        <img src="../../apps/web/public/expendi-mark.png" alt="">
+        <span class="company-text">
+          <span class="company-name">Mwangaza Logistics</span>
+          <span class="company-role">Admin</span>
+        </span>
+        <i data-icon="chevrons"></i>
+      </button>
+      <button class="search" type="button" data-mock="Search">
+        <i data-icon="search"></i><span>Search</span><kbd>⌘K</kbd>
+      </button>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-group">
+        <p class="sb-label">Workspace</p>
+        <a class="sb-link" href="overview.html"><i data-icon="dashboard"></i>Overview</a>
+        <a class="sb-link is-active" href="wallet.html" aria-current="page"><i data-icon="wallet"></i>Accounts</a>
+      </div>
+      <div class="sb-group">
+        <p class="sb-label">Spend &amp; pay</p>
+        <a class="sb-link" href="approvals.html"><i data-icon="approve"></i>Approvals<span class="count num">6</span></a>
+        <a class="sb-link" href="expenses.html"><i data-icon="receipt"></i>Expenses<span class="count num">2</span></a>
+        <a class="sb-link" href="bills.html"><i data-icon="file"></i>Bills<span class="count num">5</span></a>
+        <a class="sb-link" href="payroll.html"><i data-icon="banknote"></i>Payroll<span class="count num">1</span></a>
+      </div>
+      <div class="sb-group">
+        <p class="sb-label">Manage</p>
+        <a class="sb-link" href="payees.html"><i data-icon="building"></i>Payees</a>
+        <a class="sb-link" href="team.html"><i data-icon="users"></i>Team</a>
+        <a class="sb-link" href="settings.html"><i data-icon="settings"></i>Settings</a>
+      </div>
+      <div class="sb-group">
+        <p class="sb-label">Insights</p>
+        <a class="sb-link" href="reports.html"><i data-icon="chart"></i>Reports</a>
+        <a class="sb-link" href="activity.html"><i data-icon="activity"></i>Activity</a>
+      </div>
+    </nav>
+    <div class="sb-user">
+      <span class="person" aria-hidden="true">WK</span>
+      <div class="who"><p>Wanjiru Kamau</p><p>wanjiru@mwangaza.co.ke</p></div>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <button class="icon-btn" type="button" id="menu-btn" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false"><i data-icon="menu"></i></button>
+      <img src="../../apps/web/public/expendi-mark.png" alt="">
+      <span class="company-name">Mwangaza Logistics</span>
+    </header>
+
+    <main class="main">
+      <div class="page-head reveal">
+        <div>
+          <h1 class="page-title">Accounts</h1>
+          <p class="page-sub">Where the company's money is held, and every movement in and out.</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn btn-outline btn-lg" type="button" id="withdraw-btn"><i data-icon="arrow-up-right"></i>Withdraw</button>
+          <button class="btn btn-primary btn-lg" type="button" id="deposit-btn"><i data-icon="arrow-down-left"></i>Deposit</button>
+        </div>
+      </div>
+
+      <div class="wallet-grid">
+        <div class="col">
+        <section class="panel balance-card area-balance reveal" style="--i:1" aria-labelledby="balance-label">
+          <div class="account-head">
+            <h2 class="card-title" id="balance-label">USDC wallet</h2>
+            <span class="pill pill-neutral">On Base</span>
+          </div>
+          <p class="balance-label">Balance
+            <button class="info" type="button" aria-label="Exchange rate" data-tip="Paycrest rate today: KES 129.00 per USDC"><i data-icon="info"></i></button>
+          </p>
+          <div class="balance-top">
+            <div>
+              <p class="balance num" id="balance"></p>
+              <p class="balance-kes num" id="balance-kes"></p>
+            </div>
+            <dl class="flows">
+              <div><dt>In this month</dt><dd class="num" id="flow-in"></dd></div>
+              <div><dt>Out this month</dt><dd class="num" id="flow-out"></dd></div>
+            </dl>
+          </div>
+          <div class="chart-head"><span>Balance at the end of each day, last 30 days</span></div>
+          <div class="viz" id="balance-chart"></div>
+          <button class="link-btn" type="button" id="balance-table-btn" aria-expanded="false" aria-controls="balance-table"><i data-icon="table"></i><span>Show as table</span></button>
+          <table class="mini-table num" id="balance-table" hidden></table>
+        </section>
+
+        <section class="panel history area-history reveal" style="--i:3" aria-labelledby="history-title">
+          <div class="history-head">
+            <h2 class="card-title" id="history-title">History</h2>
+            <fieldset class="segmented" id="filter">
+              <legend class="sr-only">Show</legend>
+              <label><input type="radio" name="filter" value="all" checked>All</label>
+              <label><input type="radio" name="filter" value="in">Money in</label>
+              <label><input type="radio" name="filter" value="out">Money out</label>
+            </fieldset>
+          </div>
+          <div id="history-list"></div>
+          <div class="history-foot" id="history-foot">
+            <button class="btn btn-outline" type="button" id="more-btn">Load more</button>
+          </div>
+        </section>
+        </div>
+
+        <div class="col">
+        <section class="panel panel-flat rail-card deposit area-deposit reveal" style="--i:2" id="deposit-card" aria-labelledby="deposit-title">
+          <h2 class="card-title" id="deposit-title">Deposit address</h2>
+          <p class="card-sub">Send USDC here from an exchange or another wallet.</p>
+          <div class="qr" id="qr"></div>
+          <p class="address-label">Base address</p>
+          <p class="address num" id="address"></p>
+          <div class="deposit-actions"><button class="btn btn-outline btn-block" type="button" id="copy-btn"><i data-icon="copy"></i><span>Copy address</span></button></div>
+          <p class="callout callout-warn"><i data-icon="alert"></i><span>Send USDC on Base only. Anything else sent here can be lost.</span></p>
+        </section>
+
+        <section class="panel panel-flat rail-card area-addresses reveal" style="--i:4" aria-labelledby="addresses-title">
+          <h2 class="card-title" id="addresses-title">Allowed addresses <span class="group-count num" id="address-count"></span></h2>
+          <p class="card-sub">Withdrawals can only go to these Base addresses.</p>
+          <div id="addresses"></div>
+          <button class="btn btn-outline btn-block" type="button" id="add-address-btn"><i data-icon="plus"></i>Add address</button>
+          <p class="trust"><i data-icon="shield"></i><span>Only admins withdraw or change this list, each confirming with their passkey.</span></p>
+        </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="sheet-layer" id="sheet-layer" hidden>
+  <div class="sheet-scrim" data-close></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" tabindex="-1"></div>
+</div>
+<div class="tip" id="tip" role="tooltip" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const LUCIDE_NAMES = {
+  "dashboard": "LayoutDashboard", "wallet": "Wallet", "approve": "CircleCheck", "check-circle": "CircleCheck",
+  "receipt": "ReceiptText", "file": "FileText", "repeat": "Repeat", "banknote": "Banknote", "building": "Building2",
+  "users": "Users", "settings": "Settings", "chart": "ChartColumn", "activity": "Activity", "search": "Search",
+  "chevrons": "ChevronsUpDown", "check": "Check", "x": "X", "alert": "TriangleAlert", "circle-alert": "CircleAlert",
+  "info": "Info", "menu": "Menu", "table": "Table2", "key": "KeyRound", "arrow-down-left": "ArrowDownLeft",
+  "arrow-up-right": "ArrowUpRight", "undo": "Undo2", "vault": "Landmark", "copy": "Copy", "plus": "Plus",
+  "shield": "ShieldCheck", "external": "ExternalLink",
+};
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (selector) => document.querySelector(selector);
+
+function icon(name) {
+  const node = window.lucide?.[LUCIDE_NAMES[name]];
+  if (!node) return document.createElement("span");
+  const svg = window.lucide.createElement(node);
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "ic");
+  svg.removeAttribute("width");
+  svg.removeAttribute("height");
+  return svg;
+}
+
+function h(tag, props, ...children) {
+  const el = document.createElement(tag);
+  for (const [key, value] of Object.entries(props ?? {})) {
+    if (value == null || value === false) continue;
+    if (key === "class") el.className = value;
+    else if (key === "text") el.textContent = value;
+    else if (key.startsWith("on")) el.addEventListener(key.slice(2), value);
+    else el.setAttribute(key, value === true ? "" : value);
+  }
+  for (const child of children.flat()) {
+    if (child != null && child !== false) el.append(child);
+  }
+  return el;
+}
+
+document.querySelectorAll("i[data-icon]").forEach((el) => el.replaceWith(icon(el.dataset.icon)));
+
+/* Money: USDC is held in micro units (6 decimals), like the app's base units. */
+const MICRO = 1_000_000;
+const RATE = 129;
+const usdcText = (micro) => (Math.abs(micro) / MICRO).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signed = (micro) => `${micro < 0 ? "−" : "+"}${usdcText(micro)}`;
+const kesText = (n) => Math.round(n).toLocaleString("en-KE");
+const usdcAmount = (micro, { sign = false } = {}) =>
+  h("span", { class: "money num" }, sign ? signed(micro) : usdcText(micro), " ", h("span", { class: "ccy", text: "USDC" }));
+const kesAmount = (n) => h("span", { class: "money num" }, h("span", { class: "ccy", text: "KES" }), " ", kesText(n));
+const shortAddress = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`;
+
+/* Toast and mock-only actions */
+const toastEl = $("#toast");
+let toastTimer;
+function toast(message) {
+  toastEl.replaceChildren(icon("check"), h("span", { text: message }));
+  toastEl.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("show"), 3200);
+}
+document.addEventListener("click", (event) => {
+  const trigger = event.target.closest("[data-mock]");
+  if (!trigger) return;
+  event.preventDefault();
+  toast(`${trigger.dataset.mock} isn't part of this mock.`);
+});
+
+/* Sample data */
+const DEPOSIT_ADDRESS = "0x8f3a5b2c9d1e4f7a6b0c3d2e1f9a8b7c6d5e4c21";
+const SENDER = "0x71c9a2b4d6e8f0a1b3c5d7e9f2a4b6c8d0e28b2e";
+const TODAY = "2026-11-06";
+let balanceMicro = 16_420_800_000;
+let allowed = [
+  { id: "a1", label: "Treasury on Coinbase", address: "0x12ab7c3e9f04d5b6a8c1e2f3d4b5a6c7e8f99f3c", added: "12 Aug" },
+  { id: "a2", label: "Ledger cold storage", address: "0x5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f", added: "3 Sep" },
+];
+const STATUS = {
+  funding: { label: "Sending", tone: "moving" },
+  paying: { label: "On its way", tone: "moving" },
+  paid: { label: "Paid", tone: "paid" },
+  failed: { label: "Failed", tone: "failed" },
+};
+const cents = (usd) => Math.round(usd * 100) * 10_000;
+let history = [
+  { id: "t1", day: "2026-11-06", time: "09:20", kind: "payment", name: "Twiga Foods", mark: "TF", micro: -cents(1441.86), kes: 186000, payTo: "M-Pesa Paybill 222111 · Account TF-0091", status: "paying", note: "Supplier invoice INV-4471" },
+  { id: "t2", day: "2026-11-06", time: "08:05", kind: "payment", name: "Kevin Mwangi", mark: "KM", person: true, micro: -cents(155.04), kes: 20000, payTo: "M-Pesa 0711 ••• 482", status: "funding", note: "Petty cash float top-up" },
+  { id: "t3", day: "2026-11-05", time: "16:42", kind: "deposit", micro: cents(6000), from: SENDER },
+  { id: "t4", day: "2026-11-05", time: "11:10", kind: "payment", name: "Daniel Kiprop", mark: "DK", person: true, micro: -cents(18.6), kes: 2400, payTo: "M-Pesa 0733 ••• 905", status: "paid", note: "Reimbursement: parking at JKIA" },
+  { id: "t5", day: "2026-11-04", time: "14:03", kind: "payment", name: "Kenya Power", mark: "KP", micro: -cents(110.47), kes: 14250, payTo: "M-Pesa Paybill 888880 · Account 54012339", status: "paid" },
+  { id: "t6", day: "2026-11-04", time: "10:31", kind: "refund", micro: cents(31.78), refundOf: "Zuku" },
+  { id: "t7", day: "2026-11-04", time: "10:28", kind: "payment", name: "Zuku", mark: "ZK", micro: -cents(31.78), kes: 4100, payTo: "M-Pesa Paybill 320320 · Account 118-2219", status: "failed", failure: "The paybill didn't accept the account number." },
+  { id: "t8", day: "2026-11-03", time: "15:55", kind: "withdrawal", micro: -cents(2000), to: "a1" },
+  { id: "t9", day: "2026-11-01", time: "09:00", kind: "payment", name: "Jubilee Health", mark: "JH", micro: -cents(500), kes: 64500, payTo: "M-Pesa Paybill 511000 · Account JH-77812", status: "paid", note: "Staff medical cover, November" },
+  { id: "t10", day: "2026-10-31", time: "17:20", kind: "deposit", micro: cents(12000), from: SENDER },
+  { id: "t11", day: "2026-10-28", time: "10:00", kind: "payroll", name: "Payroll for October", micro: -cents(9612.4), kes: 1240000, people: 14, status: "paid" },
+  { id: "t12", day: "2026-10-25", time: "12:15", kind: "payment", name: "Bidco Kenya", mark: "BK", micro: -cents(930.23), kes: 120000, payTo: "M-Pesa Paybill 400200 · Account BID-2210", status: "paid" },
+  { id: "t13", day: "2026-10-20", time: "09:45", kind: "deposit", micro: cents(2000), from: SENDER },
+  { id: "t14", day: "2026-10-15", time: "08:30", kind: "payment", name: "Kilimani Properties", mark: "KP", micro: -cents(375.97), kes: 48500, payTo: "M-Pesa Paybill 522522 · Account KP-1182", status: "paid", note: "Office rent, October" },
+  { id: "t15", day: "2026-10-10", time: "13:05", kind: "payment", name: "Twiga Foods", mark: "TF", micro: -cents(759.69), kes: 98000, payTo: "M-Pesa Paybill 222111 · Account TF-0091", status: "paid" },
+  { id: "t16", day: "2026-10-08", time: "10:00", kind: "deposit", micro: cents(2500), from: SENDER },
+];
+
+function fakeHash(seed) {
+  let x = [...seed].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 7);
+  let out = "0x";
+  for (let i = 0; i < 64; i++) { x = (x * 1103515245 + 12345) >>> 0; out += (x >>> 16 & 15).toString(16); }
+  return out;
+}
+
+/* Dates (UTC so the sample days never shift) */
+const toDate = (iso) => new Date(`${iso}T00:00:00Z`);
+const isoOf = (date) => date.toISOString().slice(0, 10);
+const addDays = (iso, n) => { const d = toDate(iso); d.setUTCDate(d.getUTCDate() + n); return isoOf(d); };
+const dayMonth = (iso) => toDate(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+function dayHeading(iso) {
+  if (iso === TODAY) return "Today";
+  if (iso === addDays(TODAY, -1)) return "Yesterday";
+  return toDate(iso).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" });
+}
+
+/* Balance figures */
+function renderBalance() {
+  const totalCents = Math.round(balanceMicro / 10_000);
+  const whole = Math.floor(totalCents / 100).toLocaleString("en-KE");
+  const fraction = String(totalCents % 100).padStart(2, "0");
+  $("#balance").replaceChildren(h("span", { class: "big" }, whole, h("span", { class: "cents", text: `.${fraction}` })), h("span", { class: "unit", text: "USDC" }));
+  $("#balance-kes").replaceChildren(h("span", { class: "ccy", text: "≈ KES" }), ` ${kesText((balanceMicro / MICRO) * RATE)}`);
+  const thisMonth = history.filter((t) => t.day.startsWith(TODAY.slice(0, 7)));
+  const totalIn = thisMonth.filter((t) => t.micro > 0).reduce((s, t) => s + t.micro, 0);
+  const totalOut = thisMonth.filter((t) => t.micro < 0).reduce((s, t) => s + t.micro, 0);
+  $("#flow-in").replaceChildren(usdcAmount(totalIn, { sign: true }));
+  $("#flow-out").replaceChildren(usdcAmount(totalOut, { sign: true }));
+}
+
+function dailyBalances() {
+  const days = Array.from({ length: 31 }, (_, i) => addDays(TODAY, i - 30));
+  let running = balanceMicro;
+  const values = new Array(days.length);
+  for (let i = days.length - 1; i >= 0; i--) {
+    values[i] = running;
+    running -= history.filter((t) => t.day === days[i]).reduce((s, t) => s + t.micro, 0);
+  }
+  return days.map((day, i) => ({ day, micro: values[i] }));
+}
+
+/* Tooltip */
+const tip = $("#tip");
+function showTip(head, rows, foot, anchor) {
+  tip.replaceChildren(
+    h("div", { class: "tip-head", text: head }),
+    ...rows.map((row) => h("div", { class: "tip-row" }, h("span", { class: "tip-key", style: row.key }), h("strong", { text: row.value }), h("span", { class: "lbl", text: row.label }))),
+    ...(foot ? [h("div", { class: "tip-foot", text: foot })] : []),
+  );
+  tip.hidden = false;
+  const { width, height } = tip.getBoundingClientRect();
+  let left = anchor.x + 14;
+  if (left + width > innerWidth - 8) left = anchor.x - width - 14;
+  const top = Math.min(Math.max(8, anchor.y - height / 2), innerHeight - height - 8);
+  tip.style.left = `${Math.max(8, left)}px`;
+  tip.style.top = `${top}px`;
+}
+const hideTip = () => { tip.hidden = true; };
+document.querySelectorAll("[data-tip]").forEach((el) => {
+  const show = () => {
+    const r = el.getBoundingClientRect();
+    tip.replaceChildren(h("div", { text: el.dataset.tip }));
+    tip.hidden = false;
+    tip.style.left = `${Math.min(r.left, innerWidth - tip.offsetWidth - 8)}px`;
+    tip.style.top = `${r.bottom + 6}px`;
+  };
+  el.addEventListener("pointerenter", show);
+  el.addEventListener("focus", show);
+  el.addEventListener("pointerleave", hideTip);
+  el.addEventListener("blur", hideTip);
+});
+
+/* Balance chart: a step line, because the balance only moves when money does. */
+function balanceChart(host) {
+  const maxMicro = 20_000 * MICRO;
+  const ticks = [0, 5000, 10000, 15000, 20000];
+  let active = null;
+  let hasDrawn = false;
+  const el = (tag, attrs = {}) => { const node = document.createElementNS(SVG_NS, tag); for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v); return node; };
+
+  function draw() {
+    const series = dailyBalances();
+    const W = host.clientWidth;
+    if (!W) return;
+    const H = 180;
+    const m = { t: 10, r: 56, b: 24, l: 36 };
+    const iw = W - m.l - m.r;
+    const ih = H - m.t - m.b;
+    const x = (i) => m.l + (i / (series.length - 1)) * iw;
+    const y = (micro) => m.t + ih - (micro / maxMicro) * ih;
+    let path = `M${x(0).toFixed(1)} ${y(series[0].micro).toFixed(1)}`;
+    for (let i = 1; i < series.length; i++) path += ` H${x(i).toFixed(1)} V${y(series[i].micro).toFixed(1)}`;
+
+    const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: "viz-svg", tabindex: "0", role: "img",
+      "aria-label": `Balance at the end of each day for the last 30 days. Lowest ${usdcText(Math.min(...series.map((p) => p.micro)))} USDC on 28 Oct after payroll; ${usdcText(balanceMicro)} USDC today. Use the arrow keys to read each day.` });
+    const defs = el("defs");
+    const grad = el("linearGradient", { id: "balance-fill", x1: "0", y1: "0", x2: "0", y2: "1" });
+    grad.append(el("stop", { offset: "0%", "stop-color": "#ff7e5f", "stop-opacity": "0.18" }), el("stop", { offset: "100%", "stop-color": "#ff7e5f", "stop-opacity": "0" }));
+    defs.append(grad);
+    svg.append(defs);
+    for (const t of ticks) {
+      svg.append(el("line", { x1: m.l, x2: m.l + iw, y1: y(t * MICRO), y2: y(t * MICRO), class: t === 0 ? "axis-base" : "grid" }));
+      const label = el("text", { x: m.l - 8, y: y(t * MICRO), class: "axis-label", "text-anchor": "end", "dominant-baseline": "middle" });
+      label.textContent = t === 0 ? "0" : `${t / 1000}K`;
+      svg.append(label);
+    }
+    [0, 7, 14, 21, 28].forEach((i) => {
+      const label = el("text", { x: x(i), y: H - 4, class: "axis-label", "text-anchor": "middle" });
+      label.textContent = dayMonth(series[i].day);
+      svg.append(label);
+    });
+    const area = el("path", { d: `${path} V${y(0)} H${x(0)} Z`, fill: "url(#balance-fill)" });
+    const line = el("path", { d: path, class: "line-main" });
+    svg.append(area, line);
+    const end = series.at(-1);
+    svg.append(el("circle", { cx: x(series.length - 1), cy: y(end.micro), r: 4, class: "dot-main" }));
+    const endLabel = el("text", { x: x(series.length - 1) + 10, y: y(end.micro), class: "end-label num", "dominant-baseline": "middle" });
+    endLabel.textContent = `${(end.micro / MICRO / 1000).toFixed(1)}K`;
+    svg.append(endLabel);
+
+    const cross = el("g", { visibility: "hidden" });
+    const vline = el("line", { y1: m.t, y2: m.t + ih, class: "cross-line" });
+    const dot = el("circle", { r: 4, class: "dot-main" });
+    cross.append(vline, dot);
+    svg.append(cross);
+    const hit = el("rect", { x: m.l - 6, y: 0, width: iw + 12, height: H - m.b, fill: "transparent" });
+    svg.append(hit);
+
+    function show(i) {
+      active = i;
+      const px = x(i);
+      vline.setAttribute("x1", px); vline.setAttribute("x2", px);
+      dot.setAttribute("cx", px); dot.setAttribute("cy", y(series[i].micro));
+      cross.setAttribute("visibility", "visible");
+      const r = svg.getBoundingClientRect();
+      showTip(`End of ${dayMonth(series[i].day)}`,
+        [{ key: "border-top:2px solid var(--series-main)", value: `${usdcText(series[i].micro)} USDC`, label: "Balance" }],
+        `≈ KES ${kesText((series[i].micro / MICRO) * RATE)}`,
+        { x: r.left + px, y: r.top + m.t + ih / 2 });
+    }
+    function hide() { active = null; cross.setAttribute("visibility", "hidden"); hideTip(); }
+    hit.addEventListener("pointermove", (event) => {
+      const r = svg.getBoundingClientRect();
+      const i = Math.round(((event.clientX - r.left - m.l) / iw) * (series.length - 1));
+      show(Math.min(series.length - 1, Math.max(0, i)));
+    });
+    hit.addEventListener("pointerleave", hide);
+    svg.addEventListener("focus", () => show(active ?? series.length - 1));
+    svg.addEventListener("blur", hide);
+    svg.addEventListener("keydown", (event) => {
+      const current = active ?? series.length - 1;
+      const next = { ArrowLeft: current - 1, ArrowRight: current + 1, Home: 0, End: series.length - 1 }[event.key];
+      if (next === undefined) return;
+      event.preventDefault();
+      show(Math.min(series.length - 1, Math.max(0, next)));
+    });
+    host.replaceChildren(svg);
+
+    if (!hasDrawn && !reduceMotion) {
+      const length = line.getTotalLength();
+      line.style.strokeDasharray = `${length}`;
+      line.style.strokeDashoffset = `${length}`;
+      area.style.opacity = "0";
+      line.getBoundingClientRect();
+      line.style.transition = "stroke-dashoffset 1.2s cubic-bezier(.16, 1, .3, 1) 300ms";
+      line.style.strokeDashoffset = "0";
+      area.style.transition = "opacity .8s ease 900ms";
+      area.style.opacity = "1";
+    }
+    hasDrawn = true;
+  }
+
+  new ResizeObserver(draw).observe(host);
+  return { redraw: draw };
+}
+const chart = balanceChart($("#balance-chart"));
+
+function renderTable() {
+  const series = dailyBalances();
+  $("#balance-table").replaceChildren(
+    h("thead", {}, h("tr", {}, h("th", { scope: "col", text: "End of day" }), h("th", { scope: "col", text: "USDC" }), h("th", { scope: "col", text: "About KES" }))),
+    h("tbody", {}, [0, 7, 14, 21, 28, 30].map((i) => h("tr", {},
+      h("th", { scope: "row", text: dayMonth(series[i].day) }),
+      h("td", { text: usdcText(series[i].micro) }),
+      h("td", { text: kesText((series[i].micro / MICRO) * RATE) }),
+    ))),
+  );
+}
+$("#balance-table-btn").addEventListener("click", (event) => {
+  const btn = event.currentTarget;
+  const open = btn.getAttribute("aria-expanded") !== "true";
+  btn.setAttribute("aria-expanded", String(open));
+  btn.querySelector("span").textContent = open ? "Hide table" : "Show as table";
+  $("#balance-table").hidden = !open;
+});
+
+/* Deposit address */
+function renderQr() {
+  const host = $("#qr");
+  if (typeof window.qrcode !== "function") { host.hidden = true; return; }
+  const qr = window.qrcode(0, "M");
+  qr.addData(DEPOSIT_ADDRESS);
+  qr.make();
+  const count = qr.getModuleCount();
+  const margin = 1;
+  let d = "";
+  for (let row = 0; row < count; row++) {
+    for (let col = 0; col < count; col++) if (qr.isDark(row, col)) d += `M${col + margin} ${row + margin}h1v1h-1z`;
+  }
+  const size = count + margin * 2;
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "QR code of the deposit address");
+  svg.setAttribute("shape-rendering", "crispEdges");
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", d);
+  path.setAttribute("fill", "#101828");
+  svg.append(path);
+  host.replaceChildren(svg);
+}
+function chunkedAddress(address) {
+  return [h("span", { text: "0x" }), ...address.slice(2).match(/.{4}/g).map((part) => h("span", { text: part }))];
+}
+$("#address").replaceChildren(...chunkedAddress(DEPOSIT_ADDRESS));
+renderQr();
+
+function copyText(text, onDone) {
+  Promise.resolve()
+    .then(() => navigator.clipboard.writeText(text))
+    .then(onDone, () => toast("Couldn't copy. Select the address and copy it instead."));
+}
+$("#copy-btn").addEventListener("click", (event) => {
+  const label = event.currentTarget.querySelector("span");
+  copyText(DEPOSIT_ADDRESS, () => {
+    label.textContent = "Copied";
+    toast("Deposit address copied.");
+    setTimeout(() => { label.textContent = "Copy address"; }, 2000);
+  });
+});
+$("#deposit-btn").addEventListener("click", () => {
+  const card = $("#deposit-card");
+  card.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+  card.classList.add("is-highlight");
+  setTimeout(() => card.classList.remove("is-highlight"), 1600);
+  $("#copy-btn").focus({ preventScroll: true });
+});
+
+/* History */
+let filter = "all";
+let showAll = false;
+const FIRST_PAGE_FROM = "2026-11-01";
+
+function txTitle(t) {
+  if (t.kind === "deposit") return "Deposit";
+  if (t.kind === "withdrawal") return "Withdrawal";
+  if (t.kind === "refund") return "Refund";
+  return t.name;
+}
+function txDetail(t) {
+  if (t.kind === "deposit") return `From ${shortAddress(t.from)}`;
+  if (t.kind === "withdrawal") { const a = allowedById(t.to); return a ? `To ${a.label}` : "To an allowed address"; }
+  if (t.kind === "refund") return `${t.refundOf} payment failed, money returned`;
+  if (t.kind === "payroll") return `${t.people} people · KES ${kesText(t.kes)}`;
+  return `KES ${kesText(t.kes)}${t.note ? ` · ${t.note}` : ""}`;
+}
+function txMark(t) {
+  if (t.kind === "deposit") return h("span", { class: "tile", "aria-hidden": "true" }, icon("arrow-down-left"));
+  if (t.kind === "withdrawal") return h("span", { class: "tile", "aria-hidden": "true" }, icon("vault"));
+  if (t.kind === "refund") return h("span", { class: "tile", "aria-hidden": "true" }, icon("undo"));
+  if (t.kind === "payroll") return h("span", { class: "tile", "aria-hidden": "true" }, icon("users"));
+  return h("span", { class: t.person ? "person" : "business", "aria-hidden": "true", text: t.mark });
+}
+const allowedById = (id) => allowed.find((a) => a.id === id) ?? WITHDRAWN_TO.get(id);
+const WITHDRAWN_TO = new Map();
+
+function statusPill(status) {
+  if (!status || status === "paid") return null;
+  const s = STATUS[status];
+  return h("span", { class: `status is-${s.tone}`, text: s.label });
+}
+
+function renderHistory(newId) {
+  const visible = history
+    .filter((t) => showAll || t.day >= FIRST_PAGE_FROM)
+    .filter((t) => filter === "all" || (filter === "in" ? t.micro > 0 : t.micro < 0));
+  const list = $("#history-list");
+  if (visible.length === 0) {
+    list.replaceChildren(h("p", { class: "history-empty", text: filter === "in" ? "No money in for these dates." : "No money out for these dates." }));
+  } else {
+    const days = [...new Set(visible.map((t) => t.day))];
+    list.replaceChildren(...days.map((day) => h("section", { "aria-label": dayHeading(day) },
+      h("h3", { class: "day", text: dayHeading(day) }),
+      h("ul", { class: "txs" }, visible.filter((t) => t.day === day).map((t) => h("li", { class: t.id === newId ? "is-new" : null },
+        h("button", { class: "tx", type: "button", onclick: () => openSheet(() => txSheet(t)) },
+          txMark(t),
+          h("span", { class: "tx-main" }, h("span", { class: "tx-name", text: txTitle(t), style: "display:block" }), h("span", { class: "tx-detail", text: txDetail(t), style: "display:block" })),
+          h("span", { class: "tx-right" },
+            h("span", { class: "tx-amount" }, usdcAmount(t.micro, { sign: true })),
+            h("span", { class: "tx-meta" }, statusPill(t.status), h("span", { class: "num", text: t.time })),
+          ),
+        ),
+      ))),
+    )));
+  }
+  $("#history-foot").hidden = showAll;
+}
+$("#filter").addEventListener("change", (event) => { filter = event.target.value; renderHistory(); });
+$("#more-btn").addEventListener("click", () => { showAll = true; renderHistory(); });
+
+/* Allowed addresses */
+let removing = null;
+function renderAddresses() {
+  $("#address-count").textContent = String(allowed.length);
+  if (allowed.length === 0) {
+    $("#addresses").replaceChildren(h("p", { class: "addrs-empty", text: "No addresses yet. Add one to withdraw." }));
+    return;
+  }
+  $("#addresses").replaceChildren(h("ul", { class: "addrs" }, allowed.map((a) => h("li", {},
+    h("span", { class: "tile", "aria-hidden": "true" }, icon("vault")),
+    h("div", { style: "min-width:0" }, h("p", { class: "addr-name", text: a.label }), h("p", { class: "addr-detail num", text: `${shortAddress(a.address)} · Added ${a.added}` })),
+    h("button", {
+      class: "btn btn-ghost btn-sm", type: "button", disabled: removing !== null,
+      "aria-label": removing === a.id ? undefined : `Remove ${a.label}`,
+      onclick: () => removeAddress(a),
+    }, removing === a.id ? "Waiting for your passkey…" : "Remove"),
+  ))));
+}
+function removeAddress(address) {
+  removing = address.id;
+  renderAddresses();
+  setTimeout(() => {
+    WITHDRAWN_TO.set(address.id, address);
+    allowed = allowed.filter((a) => a !== address);
+    removing = null;
+    renderAddresses();
+    toast(`${address.label} removed.`);
+  }, reduceMotion ? 300 : 1200);
+}
+
+/* Side panel */
+const layer = $("#sheet-layer");
+const sheet = $("#sheet");
+let returnFocus = null;
+let sheetTimer;
+function closeButton() {
+  return h("button", { class: "icon-btn", type: "button", "aria-label": "Close", onclick: closeSheet }, icon("x"));
+}
+function skeleton() {
+  const bar = (w, ht, mt = 0) => h("div", { class: "skel", style: `width:${w};height:${ht}px;margin-top:${mt}px` });
+  return [
+    h("div", { class: "sheet-head" },
+      h("div", { class: "sheet-head-main" }, h("h2", { class: "sr-only", id: "sheet-title", text: "Loading" }), bar("25%", 12), bar("60%", 20, 6), bar("45%", 28, 6)),
+      closeButton()),
+    h("div", { class: "sheet-body", "aria-busy": "true" }, ...Array.from({ length: 6 }, (_, i) => bar(i % 2 ? "70%" : "100%", 14))),
+  ];
+}
+function openSheet(build, { instant = false } = {}) {
+  returnFocus = document.activeElement;
+  layer.hidden = false;
+  clearTimeout(sheetTimer);
+  if (instant) {
+    sheet.replaceChildren(...build());
+    sheet.focus();
+    return;
+  }
+  sheet.replaceChildren(...skeleton());
+  sheet.focus();
+  sheetTimer = setTimeout(() => sheet.replaceChildren(...build()), 550);
+}
+function setSheet(nodes) { sheet.replaceChildren(...nodes); }
+function closeSheet() {
+  clearTimeout(sheetTimer);
+  layer.hidden = true;
+  if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+}
+layer.addEventListener("click", (event) => { if (event.target.matches("[data-close]")) closeSheet(); });
+document.addEventListener("keydown", (event) => {
+  if (layer.hidden) return;
+  if (event.key === "Escape") return closeSheet();
+  if (event.key !== "Tab") return;
+  const focusable = [...sheet.querySelectorAll("button:not(:disabled), input")].filter((el) => el.offsetParent !== null || el.type === "radio");
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === sheet)) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+});
+function sheetHead({ eyebrow, title, amount, pill }) {
+  return h("div", { class: "sheet-head" },
+    h("div", { class: "sheet-head-main" },
+      h("p", { class: "eyebrow", text: eyebrow }),
+      h("h2", { class: "sheet-title", id: "sheet-title", text: title }),
+      amount ? h("p", { class: "sheet-amount" }, amount) : null,
+      pill ?? null),
+    closeButton());
+}
+const detailList = (rows) => h("dl", { class: "details" }, rows.filter(Boolean).map(([label, value]) => h("div", {}, h("dt", { text: label }), h("dd", { class: "num" }, value))));
+
+function plusMinutes(time, minutes) {
+  const [hh, mm] = time.split(":").map(Number);
+  const total = hh * 60 + mm + minutes;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+function paymentSteps(t) {
+  const order = ["Approved", "Sending", "On its way", "Paid"];
+  const reached = { funding: 1, paying: 2, paid: 3, failed: 2 }[t.status];
+  const items = order.map((label, i) => {
+    if (t.status === "failed" && i === 2) return { label: "Failed", state: "failed", time: plusMinutes(t.time, 1), sub: `${t.failure} The money came back to the wallet.` };
+    if (t.status === "failed" && i > 2) return null;
+    const state = i < reached || t.status === "paid" ? "done" : i === reached ? "current" : "pending";
+    return { label, state, time: state === "pending" ? "" : plusMinutes(t.time, i === 0 ? -2 : i - 1) };
+  }).filter(Boolean);
+  return h("ol", { class: "steps", "aria-label": "Payment progress" }, items.map((s) => h("li", { class: `is-${s.state}` },
+    h("span", { class: "step-dot", "aria-hidden": "true" }, s.state === "done" ? icon("check") : s.state === "failed" ? icon("alert") : null),
+    h("span", { class: "step-label" }, s.label, h("span", { class: "sr-only", text: s.state === "current" ? ", in progress" : s.state === "pending" ? ", not yet" : "" })),
+    h("span", { class: "step-time num", text: s.time }),
+    s.sub ? h("p", { class: "step-sub", text: s.sub }) : null,
+  )));
+}
+
+function txSheet(t) {
+  const when = `${dayHeading(t.day) === "Today" || dayHeading(t.day) === "Yesterday" ? dayHeading(t.day) : dayMonth(t.day)}, ${t.time}`;
+  const hash = fakeHash(t.id);
+  const basescan = h("button", { class: "btn btn-ghost", type: "button", "data-mock": "Basescan link" }, icon("external"), "View on Basescan");
+  const foot = h("div", { class: "sheet-foot" }, h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Close", onclick: closeSheet }), t.kind === "payroll" ? null : basescan);
+  const amount = usdcAmount(t.micro, { sign: true });
+  if (t.kind === "deposit") {
+    return [sheetHead({ eyebrow: "Deposit", title: "Money in", amount }),
+      h("div", { class: "sheet-body" }, detailList([
+        ["From", h("span", { class: "address" }, chunkedAddress(t.from))],
+        ["Network", "Base"],
+        ["Received", when],
+        ["About", `KES ${kesText((t.micro / MICRO) * RATE)} at today's rate`],
+        ["Transaction", shortAddress(hash)],
+      ])), foot];
+  }
+  if (t.kind === "withdrawal") {
+    const a = allowedById(t.to);
+    return [sheetHead({ eyebrow: "Withdrawal", title: a ? a.label : "Allowed address", amount }),
+      h("div", { class: "sheet-body" }, detailList([
+        ["To", a ? h("span", { class: "address" }, chunkedAddress(a.address)) : "Removed address"],
+        ["Network", "Base"],
+        ["Gas", "Paid by Expendi"],
+        ["Sent", when],
+        ["Approved by", "Wanjiru Kamau, with passkey"],
+        ["Transaction", shortAddress(hash)],
+      ])), foot];
+  }
+  if (t.kind === "refund") {
+    return [sheetHead({ eyebrow: "Refund", title: `${t.refundOf} payment returned`, amount }),
+      h("div", { class: "sheet-body" },
+        h("p", { class: "sheet-note" }, icon("info"), `The ${t.refundOf} payment failed, so the USDC came back to the wallet. Nothing else needs doing unless you want to pay it again.`),
+        detailList([["Returned", when], ["Transaction", shortAddress(hash)]])), foot];
+  }
+  if (t.kind === "payroll") {
+    return [sheetHead({ eyebrow: "Payroll", title: t.name, amount, pill: null }),
+      h("div", { class: "sheet-body" },
+        h("p", { class: "sheet-note" }, icon("info"), "All 14 payments arrived. Each person's payment is listed in the payroll run."),
+        detailList([["In KES", kesAmount(t.kes)], ["People", String(t.people)], ["Rate", `KES ${RATE.toFixed(2)} per USDC`], ["Paid", when]])),
+      h("div", { class: "sheet-foot" },
+        h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Close", onclick: closeSheet }),
+        h("button", { class: "btn btn-ghost", type: "button", "data-mock": "Payroll run" }, icon("external"), "Open payroll run"))];
+  }
+  return [sheetHead({ eyebrow: "Payment", title: t.name, amount, pill: statusPill(t.status) }),
+    h("div", { class: "sheet-body" },
+      paymentSteps(t),
+      detailList([
+        ["In KES", kesAmount(t.kes)],
+        ["Rate", `KES ${RATE.toFixed(2)} per USDC`],
+        ["Paid to", t.payTo],
+        t.note ? ["For", t.note] : null,
+        ["Approved by", "Wanjiru Kamau"],
+        ["Transaction", shortAddress(hash)],
+      ])), foot];
+}
+
+/* Withdraw */
+let draft = { addressId: null, input: "" };
+
+function parseUsdc(input, availableMicro) {
+  const match = /^(\d*)(?:\.(\d*))?$/.exec(input.trim().replace(",", "."));
+  const whole = match?.[1] ?? "";
+  const fraction = match?.[2] ?? "";
+  if (!match || whole.length + fraction.length === 0) return { error: "Enter an amount in USDC." };
+  if (fraction.length > 6) return { error: "USDC has at most 6 decimal places." };
+  const micro = Number(`${whole || "0"}${fraction.padEnd(6, "0")}`);
+  if (micro === 0) return { error: "Enter an amount above zero." };
+  if (micro > availableMicro) return { error: "That's more than the wallet holds." };
+  return { micro };
+}
+
+function withdrawForm() {
+  if (allowed.length === 0) {
+    return [sheetHead({ eyebrow: "USDC wallet", title: "Withdraw USDC" }),
+      h("div", { class: "sheet-body" }, h("p", { class: "addrs-empty", text: "Withdrawals go only to addresses on the company's allowlist. Add one first." })),
+      h("div", { class: "sheet-foot" },
+        h("button", { class: "btn btn-primary btn-lg", type: "button", onclick: () => setSheet(addAddressForm()) }, icon("plus"), "Add address"),
+        h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Cancel", onclick: closeSheet }))];
+  }
+  if (!allowed.some((a) => a.id === draft.addressId)) draft.addressId = allowed[0].id;
+  const error = h("p", { class: "field-error", id: "amount-error", role: "alert", hidden: true }, icon("circle-alert"), h("span"));
+  const estimate = h("span", { class: "num" });
+  const amountBox = h("div", { class: "amount-box" });
+  const input = h("input", { id: "amount", inputmode: "decimal", autocomplete: "off", placeholder: "0.00", value: draft.input, "aria-describedby": "amount-help amount-error" });
+  const updateEstimate = () => {
+    const parsed = parseUsdc(input.value, balanceMicro);
+    estimate.textContent = parsed.micro ? `≈ KES ${kesText((parsed.micro / MICRO) * RATE)}` : "";
+  };
+  input.addEventListener("input", () => {
+    draft.input = input.value;
+    error.hidden = true;
+    input.removeAttribute("aria-invalid");
+    amountBox.classList.remove("is-invalid");
+    updateEstimate();
+  });
+  amountBox.append(input, h("span", { class: "unit", text: "USDC" }),
+    h("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Max", onclick: () => { input.value = (Math.floor(balanceMicro / 10_000) / 100).toFixed(2); input.dispatchEvent(new Event("input")); input.focus(); } }));
+  updateEstimate();
+
+  const review = () => {
+    const parsed = parseUsdc(input.value, balanceMicro);
+    if (parsed.error) {
+      error.lastChild.textContent = parsed.error;
+      error.hidden = false;
+      input.setAttribute("aria-invalid", "true");
+      amountBox.classList.add("is-invalid");
+      input.focus();
+      return;
+    }
+    setSheet(withdrawReview(parsed.micro));
+  };
+
+  return [sheetHead({ eyebrow: "USDC wallet", title: "Withdraw USDC" }),
+    h("div", { class: "sheet-body step-panel" },
+      h("fieldset", { class: "field" },
+        h("legend", { class: "field-label", text: "Send to" }),
+        h("div", { class: "choices" }, allowed.map((a) => h("label", { class: "choice" },
+          h("input", { type: "radio", name: "to", value: a.id, checked: a.id === draft.addressId, onchange: () => { draft.addressId = a.id; } }),
+          h("span", { class: "tile", "aria-hidden": "true" }, icon("vault")),
+          h("span", { style: "min-width:0" }, h("span", { class: "addr-name", text: a.label, style: "display:block" }), h("span", { class: "addr-detail num", text: shortAddress(a.address), style: "display:block" })),
+        )))),
+      h("div", { class: "field" },
+        h("label", { class: "field-label", for: "amount", text: "Amount" }),
+        amountBox,
+        h("p", { class: "field-help", id: "amount-help" }, h("span", { class: "num", text: `Available: ${usdcText(balanceMicro)} USDC` }), estimate),
+        error)),
+    h("div", { class: "sheet-foot" },
+      h("button", { class: "btn btn-primary btn-lg", type: "button", text: "Review", onclick: review }),
+      h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Cancel", onclick: closeSheet }))];
+}
+
+function withdrawReview(micro) {
+  const a = allowed.find((x) => x.id === draft.addressId);
+  const confirmBtn = h("button", { class: "btn btn-primary btn-lg", type: "button" }, icon("key"), "Withdraw with passkey");
+  const changeBtn = h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Change", onclick: () => setSheet(withdrawForm()) });
+  confirmBtn.addEventListener("click", () => {
+    confirmBtn.disabled = true;
+    changeBtn.disabled = true;
+    confirmBtn.replaceChildren("Waiting for your passkey…");
+    setTimeout(() => {
+      applyWithdrawal(micro, a);
+      setSheet(withdrawResult(micro, a));
+    }, reduceMotion ? 300 : 1400);
+  });
+  return [sheetHead({ eyebrow: "Withdraw USDC", title: "Review the withdrawal", amount: usdcAmount(micro) }),
+    h("div", { class: "sheet-body step-panel" },
+      detailList([
+        ["To", a.label],
+        ["Address", h("span", { class: "address" }, chunkedAddress(a.address))],
+        ["Network", "Base"],
+        ["About", `KES ${kesText((micro / MICRO) * RATE)}`],
+        ["Left after", `${usdcText(balanceMicro - micro)} USDC`],
+      ]),
+      h("p", { class: "sheet-note" }, icon("info"), "Expendi pays the gas, so exactly this amount arrives. Your browser asks for your approval passkey.")),
+    h("div", { class: "sheet-foot" }, confirmBtn, changeBtn)];
+}
+
+let lastNewId = null;
+function applyWithdrawal(micro, address) {
+  const now = new Date();
+  lastNewId = `w${now.getTime()}`;
+  history.unshift({ id: lastNewId, day: TODAY, time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`, kind: "withdrawal", micro: -micro, to: address.id });
+  balanceMicro -= micro;
+  draft = { addressId: address.id, input: "" };
+  renderBalance();
+  chart.redraw();
+  renderTable();
+  renderHistory(lastNewId);
+}
+
+function withdrawResult(micro, address) {
+  return [sheetHead({ eyebrow: "Withdraw USDC", title: "Withdrawal sent" }),
+    h("div", { class: "sheet-body step-panel" },
+      h("div", { class: "result", role: "status" },
+        h("span", { class: "result-icon", "aria-hidden": "true" }, icon("check")),
+        h("p", { class: "result-title num", text: `${usdcText(micro)} USDC to ${address.label}` }),
+        h("p", { text: "It's on its way on Base and shows in the history." }))),
+    h("div", { class: "sheet-foot" }, h("button", { class: "btn btn-primary btn-lg", type: "button", text: "Done", onclick: closeSheet }))];
+}
+
+/* Add address */
+function addAddressForm() {
+  const nameInput = h("input", { class: "text-input", id: "addr-name", autocomplete: "off", maxlength: "60", placeholder: "e.g. Treasury on Coinbase", "aria-describedby": "addr-name-error" });
+  const addrInput = h("input", { class: "text-input num", id: "addr-value", autocomplete: "off", spellcheck: "false", placeholder: "0x…", "aria-describedby": "addr-value-help addr-value-error" });
+  const nameError = h("p", { class: "field-error", id: "addr-name-error", role: "alert", hidden: true }, icon("circle-alert"), h("span"));
+  const addrError = h("p", { class: "field-error", id: "addr-value-error", role: "alert", hidden: true }, icon("circle-alert"), h("span"));
+  const showError = (input, el, message) => {
+    el.lastChild.textContent = message;
+    el.hidden = !message;
+    if (message) input.setAttribute("aria-invalid", "true"); else input.removeAttribute("aria-invalid");
+  };
+  nameInput.addEventListener("input", () => showError(nameInput, nameError, ""));
+  addrInput.addEventListener("input", () => showError(addrInput, addrError, ""));
+  const submit = h("button", { class: "btn btn-primary btn-lg", type: "button" }, icon("key"), "Add with passkey");
+  submit.addEventListener("click", () => {
+    const label = nameInput.value.trim();
+    const address = addrInput.value.trim();
+    const nameMessage = label.length === 0 ? "Give the address a name." : label.length > 60 ? "Keep the name to 60 characters or fewer." : "";
+    const addrMessage = /^0x[0-9a-fA-F]{40}$/.test(address) ? "" : "Enter a Base address (0x and 40 characters).";
+    showError(nameInput, nameError, nameMessage);
+    showError(addrInput, addrError, addrMessage);
+    if (nameMessage) return nameInput.focus();
+    if (addrMessage) return addrInput.focus();
+    submit.disabled = true;
+    submit.replaceChildren("Waiting for your passkey…");
+    setTimeout(() => {
+      allowed.push({ id: `a${Date.now()}`, label, address, added: "6 Nov" });
+      renderAddresses();
+      closeSheet();
+      toast(`${label} added.`);
+    }, reduceMotion ? 300 : 1200);
+  });
+  return [sheetHead({ eyebrow: "Allowed addresses", title: "Add an address" }),
+    h("div", { class: "sheet-body step-panel" },
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "addr-name", text: "Name" }), nameInput, nameError),
+      h("div", { class: "field" }, h("label", { class: "field-label", for: "addr-value", text: "Base address" }), addrInput,
+        h("p", { class: "field-help", id: "addr-value-help", text: "Check it carefully: USDC sent to a wrong address can't be recovered." }), addrError)),
+    h("div", { class: "sheet-foot" }, submit, h("button", { class: "btn btn-outline btn-lg", type: "button", text: "Cancel", onclick: closeSheet }))];
+}
+
+$("#withdraw-btn").addEventListener("click", () => openSheet(withdrawForm, { instant: true }));
+$("#add-address-btn").addEventListener("click", () => openSheet(addAddressForm, { instant: true }));
+
+/* Mobile navigation */
+const sidebar = $("#sidebar");
+const scrim = $("#scrim");
+const menuBtn = $("#menu-btn");
+function setNav(open) {
+  sidebar.classList.toggle("is-open", open);
+  scrim.hidden = !open;
+  menuBtn.setAttribute("aria-expanded", String(open));
+  if (open) sidebar.querySelector(".sb-link")?.focus();
+}
+menuBtn.addEventListener("click", () => setNav(true));
+scrim.addEventListener("click", () => setNav(false));
+document.addEventListener("keydown", (event) => { if (event.key === "Escape" && sidebar.classList.contains("is-open")) { setNav(false); menuBtn.focus(); } });
+
+renderBalance();
+renderTable();
+renderHistory();
+renderAddresses();
+</script>
+</body>
+</html>
