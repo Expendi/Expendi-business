@@ -80,6 +80,8 @@ const NOT_ENOUGH = "There isn't enough in the Card balance.";
 const OVER_LIMIT = "It's over this card's monthly limit.";
 const OVER_ACCOUNT_LIMIT = "It's over the spending limit for this account.";
 const NOT_ALLOWED_HERE = "This merchant isn't allowed on this card.";
+const CASH_AND_GAMBLING =
+  "Cash and gambling purchases aren't allowed on Expendi cards.";
 const TRY_AGAIN = "The card system couldn't confirm it in time. Try again.";
 
 /** Lithic's `detailed_results`, then its `result`, in plain English. */
@@ -102,6 +104,7 @@ const DECLINE_REASONS: Readonly<Record<string, string>> = {
   MERCHANT_NOT_PERMITTED: NOT_ALLOWED_HERE,
   AUTH_RULE_BLOCKED_MCC: NOT_ALLOWED_HERE,
   AUTH_RULE_BLOCKED_COUNTRY: NOT_ALLOWED_HERE,
+  PROGRAM_USAGE_RESTRICTION: CASH_AND_GAMBLING,
   SUSPECTED_FRAUD: "It was stopped as possible fraud.",
   CUSTOMER_ASA_TIMEOUT: TRY_AGAIN,
   MALFORMED_ASA_RESPONSE: TRY_AGAIN,
