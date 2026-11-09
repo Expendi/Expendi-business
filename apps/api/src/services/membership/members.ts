@@ -18,6 +18,7 @@ import { memberships, organizations, users } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { Conflict, Forbidden, NotFound } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { requestCardClosures } from "../cards/leavers.js";
 import { accountantAccessEmail } from "../email/accountant-access-email.js";
 import { EmailSender } from "../email/email-sender.js";
 import { inviteEmail } from "../email/invite-email.js";
@@ -480,6 +481,13 @@ export function changeMemberRole(
           before: { role: target.role },
           after: { role },
         });
+        if (isAccountant(role)) {
+          yield* requestCardClosures(tx, {
+            organizationId,
+            membershipId: target.id,
+            actor: { type: "user", id: admin.userId },
+          });
+        }
       }
       return yield* selectMember(tx, organizationId, target.id);
     }),
@@ -518,6 +526,11 @@ export function removeMember(
         entity: { type: "membership", id: target.id },
         before: { role: target.role, status: target.status },
         after: { status: "removed" },
+      });
+      yield* requestCardClosures(tx, {
+        organizationId,
+        membershipId: target.id,
+        actor: { type: "user", id: admin.userId },
       });
       return yield* selectMember(tx, organizationId, target.id);
     }),

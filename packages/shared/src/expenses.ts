@@ -22,7 +22,8 @@ import { companySpendingReceiptSchema } from "./company-spending.js";
 /**
  * How the list groups expenses. Petty cash is spending from a float plus
  * the claims a float purchase overspent into; issuing or topping up a float
- * pays the holder ahead of spending and is never an expense.
+ * pays the holder ahead of spending and is never an expense. A Card expense
+ * groups with company spending: it's the company's money, not a reimbursement.
  */
 export const EXPENSE_LIST_KINDS = ["claim", "petty_cash", "company"] as const;
 export const expenseListKindSchema = z.enum(EXPENSE_LIST_KINDS, {
@@ -34,7 +35,7 @@ export function expenseListKindOf(
   kind: ExpenseKind,
   floatId: string | null,
 ): ExpenseListKind {
-  if (kind === "company") return "company";
+  if (kind === "company" || kind === "card") return "company";
   return kind === "float" || floatId !== null ? "petty_cash" : "claim";
 }
 

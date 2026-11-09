@@ -17,14 +17,16 @@ import { query } from "../../db/scope.js";
  * - Float issues and top-ups are money handed out, not spent: the float's
  *   spending counts instead, with claims over a float (`float_id`) as
  *   petty cash. Withdrawals move the company's own money.
- * - Recorded spending: company spending, float spending, and claims
- *   imported as paid before Expendi. A bill marked paid outside appears only
- *   as the company spending it recorded (`expenses.bill_id`), never as a
- *   bill as well.
+ * - Recorded spending: company spending, float spending, Card expenses, and
+ *   claims imported as paid before Expendi. A bill marked paid outside
+ *   appears only as the company spending it recorded (`expenses.bill_id`),
+ *   never as a bill as well. A Card expense reads as company spending here
+ *   (this response's `kind` doesn't name cards yet).
  *
  * `personId` is who was paid or spent it: the claimant, the float holder,
- * or a bill's payee (their membership, or the personnel payee). Company
- * spending names nobody: its membership is only who recorded it.
+ * the cardholder, or a bill's payee (their membership, or the personnel
+ * payee). Company spending names nobody: its membership is only who recorded
+ * it.
  */
 export interface SpendingPaymentsFilter {
   /** First day included, `YYYY-MM-DD`. */
@@ -73,7 +75,9 @@ export function readSpendingPayments(
         UNION ALL
         SELECT e.id::text,
           coalesce(e.bill_id, e.id)::text,
-          CASE WHEN e.bill_id IS NOT NULL THEN 'bill' ELSE e.kind::text END,
+          CASE WHEN e.bill_id IS NOT NULL THEN 'bill'
+            WHEN e.kind = 'card' THEN 'company'
+            ELSE e.kind::text END,
           e.merchant,
           e.spent_on::text,
           e.amount_kes::text,
@@ -84,14 +88,16 @@ export function readSpendingPayments(
           CASE WHEN e.bill_id IS NOT NULL THEN coalesce(pe.membership_id, pe.id)
             WHEN e.kind = 'company' THEN NULL
             ELSE e.membership_id END::text,
-          CASE WHEN e.kind = 'float' THEN 'float' ELSE 'outside' END
+          CASE WHEN e.kind = 'float' THEN 'float'
+            WHEN e.kind = 'card' THEN 'expendi'
+            ELSE 'outside' END
         FROM expenses e
         JOIN categories c ON c.id = e.category_id
         LEFT JOIN bills b ON b.id = e.bill_id
         LEFT JOIN payees pe ON pe.id = b.payee_id
         WHERE e.organization_id = ${organizationId}
           AND (
-            (e.kind = 'company' AND e.status = 'recorded')
+            (e.kind IN ('company', 'card') AND e.status = 'recorded')
             OR (e.kind = 'float' AND e.status = 'recorded' AND NOT ${filter.withoutFloatSpending ?? false})
             OR (e.kind = 'claim' AND e.status = 'paid_outside')
           )

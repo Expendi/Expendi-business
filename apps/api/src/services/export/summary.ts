@@ -30,6 +30,7 @@ const EXPENSE_KINDS: ReadonlySet<MoneyOutRow["kind"]> = new Set([
   "claim",
   "float",
   "company",
+  "card",
 ]);
 
 const ETIMS_STATUSES = ["attached", "none", "not_required", ""] as const;

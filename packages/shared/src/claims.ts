@@ -7,9 +7,10 @@ import { payoutStatusSchema } from "./wallet-history.js";
 
 /**
  * Money out recorded with a receipt (spec §5): a staff claim, spending from
- * a petty cash float, or company spending paid outside Expendi.
+ * a petty cash float, company spending paid outside Expendi, or a purchase
+ * on an Expendi card.
  */
-export const EXPENSE_KINDS = ["claim", "float", "company"] as const;
+export const EXPENSE_KINDS = ["claim", "float", "company", "card"] as const;
 export const expenseKindSchema = z.enum(EXPENSE_KINDS);
 export type ExpenseKind = z.infer<typeof expenseKindSchema>;
 
@@ -28,7 +29,8 @@ export type ExpenseSource = (typeof EXPENSE_SOURCES)[number];
 
 /**
  * Claim statuses (spec §5). `paid_outside` is imported history and
- * `recorded` is float or company spending; neither is ever approved or paid.
+ * `recorded` is float, company or card spending; neither is ever approved
+ * or paid.
  */
 export const EXPENSE_STATUSES = [
   "submitted",

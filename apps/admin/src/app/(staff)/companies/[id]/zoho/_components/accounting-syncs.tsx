@@ -55,6 +55,7 @@ const EXPENSE_LABELS: Record<ExpenseKind, string> = {
   claim: "Claim",
   float: "Petty cash",
   company: "Company spending",
+  card: "Expendi card",
 };
 
 function subjectLabel({ subjectType, subject }: AccountingSync): string {

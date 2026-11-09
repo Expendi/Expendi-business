@@ -50,7 +50,8 @@ import { readWarnings } from "./rules.js";
 
 /**
  * All expenses (spec §6.14): claims, petty cash and company spending in one
- * list, for admins and accountants; the route admits no one else. Each
+ * list, Card expenses among the company's, for admins and accountants; the
+ * route admits no one else. Each
  * expense row is listed once. Petty cash is spending from a float plus the
  * claims a float purchase overspent into; a float's issue and top-ups are
  * payouts in `float_movements`, never rows here. Expenses are money already
@@ -152,7 +153,7 @@ const LIST_KIND_FILTERS: Readonly<Record<ExpenseListKind, SQL | undefined>> = {
     eq(expenses.kind, "float"),
     and(eq(expenses.kind, "claim"), isNotNull(expenses.floatId)),
   ),
-  company: eq(expenses.kind, "company"),
+  company: inArray(expenses.kind, ["company", "card"]),
 };
 
 /** The first and last day of a `YYYY-MM` month, inclusive. */

@@ -206,6 +206,7 @@ const KIND_NAMES: Readonly<Record<ExpenseKind, string>> = {
   claim: "claim",
   float: "petty cash spending",
   company: "company spending",
+  card: "Expendi card purchase",
 };
 
 /**

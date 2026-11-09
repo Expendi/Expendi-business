@@ -11,6 +11,7 @@ import { createApprovalPasskeyRoutes } from "./routes/approval-passkey.js";
 import { createHealthRoutes } from "./routes/health.js";
 import { createZohoIntegrationRoutes } from "./routes/integrations/zoho.js";
 import { createInternalRoutes } from "./routes/internal/index.js";
+import { createLithicWebhookRoutes } from "./routes/lithic-webhook.js";
 import { createMeRoutes } from "./routes/me.js";
 import {
   createOrganizationRoutes,
@@ -37,6 +38,7 @@ export function createApp({ runtime }: { readonly runtime: AppRuntime }): App {
   // Signed by the provider, not a user, so no login middleware.
   app.route("/webhooks", createAlchemyWebhookRoutes(runtime));
   app.route("/webhooks", createPaycrestWebhookRoutes(runtime));
+  app.route("/webhooks", createLithicWebhookRoutes(runtime));
   // Opened by a company's accountant, who has no Expendi login: the connect
   // link's token and Zoho's signed state authorize each step.
   app.route("/integrations/zoho", createZohoIntegrationRoutes(runtime));

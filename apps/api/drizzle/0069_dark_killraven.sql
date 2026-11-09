@@ -1,0 +1,1 @@
+ALTER TYPE "public"."ops_alert_kind" ADD VALUE 'card_close_failed';

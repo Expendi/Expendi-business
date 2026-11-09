@@ -170,6 +170,7 @@ export const MONEY_OUT_KINDS = [
   "bill",
   "salary",
   "company",
+  "card",
 ] as const;
 export type MoneyOutKind = (typeof MONEY_OUT_KINDS)[number];
 

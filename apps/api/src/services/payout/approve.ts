@@ -31,6 +31,7 @@ import { query, withScope } from "../../db/scope.js";
 import { isAllowlisted } from "../allowlist/allowlist.js";
 import { startApproval, verifyApproval } from "../approval/passkeys.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { cardLoadsTodayKes } from "../cards/balance.js";
 import { fromMicro } from "../paycrest/amounts.js";
 import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
 import { payoutIntentHash } from "./intent.js";
@@ -167,11 +168,39 @@ export function requestPayoutApproval(input: {
 /** Start of today in Nairobi, where "today" for the daily cap is (§7.4). */
 const startOfNairobiDay = sql`(date_trunc('day', now() AT TIME ZONE 'Africa/Nairobi') AT TIME ZONE 'Africa/Nairobi')`;
 
+const countsAgainstCaps = notInArray(payouts.status, [
+  "awaiting_approval",
+  "failed",
+]);
+
+/** Today's payouts that use up the daily cap, in KES cents. */
+export function payoutsTodayKes(
+  tx: Transaction,
+  organizationId: string,
+): Effect.Effect<bigint, DatabaseError> {
+  return query(() =>
+    tx
+      .select({
+        total: sql<string>`coalesce(sum(${payouts.amountKes}), 0)::text`,
+      })
+      .from(payouts)
+      .where(
+        and(
+          eq(payouts.organizationId, organizationId),
+          isNull(payouts.payrollRunId),
+          ne(payouts.subjectType, "withdrawal"),
+          countsAgainstCaps,
+          gte(payouts.approvedAt, startOfNairobiDay),
+        ),
+      ),
+  ).pipe(Effect.map(([today]) => BigInt(today?.total ?? "0")));
+}
+
 /**
- * The daily cap covers claims, floats and bills (§7.4). A withdrawal moves
- * the company's own money to its own allowlisted address, so it neither
- * needs room under the cap nor uses any; the per-transaction cap still
- * bounds it.
+ * The daily cap covers claims, floats, bills and Card loads (§7.4). A
+ * withdrawal moves the company's own money to its own allowlisted address,
+ * so it neither needs room under the cap nor uses any; the per-transaction
+ * cap still bounds it.
  */
 function checkCaps(
   tx: Transaction,
@@ -183,7 +212,6 @@ function checkCaps(
     if (batch.every((payout) => payout.subjectType === "withdrawal")) return;
     const batchKes = batch.reduce((sum, payout) => sum + payout.amountKes, 0n);
     const payrollRunId = batch[0]?.payrollRunId ?? null;
-    const counted = notInArray(payouts.status, ["awaiting_approval", "failed"]);
 
     if (payrollRunId) {
       const [run] = yield* query(() =>
@@ -202,7 +230,9 @@ function checkCaps(
             total: sql<string>`coalesce(sum(${payouts.amountKes}), 0)::text`,
           })
           .from(payouts)
-          .where(and(eq(payouts.payrollRunId, payrollRunId), counted)),
+          .where(
+            and(eq(payouts.payrollRunId, payrollRunId), countsAgainstCaps),
+          ),
       );
       if (BigInt(paid?.total ?? "0") + batchKes > run.capKes) {
         return yield* reject(
@@ -213,23 +243,10 @@ function checkCaps(
       return;
     }
 
-    const [today] = yield* query(() =>
-      tx
-        .select({
-          total: sql<string>`coalesce(sum(${payouts.amountKes}), 0)::text`,
-        })
-        .from(payouts)
-        .where(
-          and(
-            eq(payouts.organizationId, organizationId),
-            isNull(payouts.payrollRunId),
-            ne(payouts.subjectType, "withdrawal"),
-            counted,
-            gte(payouts.approvedAt, startOfNairobiDay),
-          ),
-        ),
-    );
-    if (BigInt(today?.total ?? "0") + batchKes > dailyCapKes) {
+    const today =
+      (yield* payoutsTodayKes(tx, organizationId)) +
+      (yield* cardLoadsTodayKes(tx, organizationId));
+    if (today + batchKes > dailyCapKes) {
       return yield* reject(
         "daily_cap",
         "This would take today's payouts over the company's daily cap.",

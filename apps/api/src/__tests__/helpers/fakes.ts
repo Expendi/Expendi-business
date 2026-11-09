@@ -17,6 +17,13 @@ import type {
   ReceiptFlag,
 } from "../../services/extraction/receipt-schema.js";
 import type {
+  LithicAccountHolder,
+  LithicBusinessInput,
+  LithicCardholderInput,
+  LithicCardPatch,
+  LithicTransaction,
+} from "../../services/lithic/lithic-client.js";
+import type {
   PaycrestOrder,
   PaycrestOrderRequest,
 } from "../../services/paycrest/paycrest-client.js";
@@ -52,6 +59,7 @@ import {
   ReceiptExtractionError,
   ReceiptExtractor,
 } from "../../services/extraction/receipt-extractor.js";
+import { Lithic, LithicError } from "../../services/lithic/lithic-client.js";
 import { fromMicro, toMicro } from "../../services/paycrest/amounts.js";
 import {
   Paycrest,
@@ -358,6 +366,202 @@ export function signPaycrestBody(rawBody: string): string {
     .digest("hex");
 }
 
+interface FakeLithicCard {
+  readonly token: string;
+  readonly lastFour: string;
+  readonly accountToken: string;
+  readonly memo: string;
+  state: string;
+  monthlyLimitUsdCents: bigint;
+}
+
+/** A Lithic transaction with sensible defaults, as `getTransaction` returns. */
+export function fakeLithicTransaction(fields: {
+  readonly token: string;
+  readonly cardToken: string;
+  readonly status?: string;
+  readonly result?: string;
+  /** Signed as Lithic reports them: a hold or spend is negative. */
+  readonly hold?: number;
+  readonly settlement?: number;
+  readonly merchant?: string;
+  readonly mcc?: string;
+  readonly events?: readonly string[];
+  readonly detailedResults?: readonly string[];
+  readonly created?: string;
+}): LithicTransaction {
+  return {
+    token: fields.token,
+    card_token: fields.cardToken,
+    status: fields.status ?? "PENDING",
+    result: fields.result ?? "APPROVED",
+    created: fields.created ?? "2026-11-08T10:00:00Z",
+    amounts: {
+      hold: { amount: fields.hold ?? 0 },
+      settlement: { amount: fields.settlement ?? 0 },
+    },
+    merchant: {
+      descriptor: fields.merchant ?? "ACME SOFTWARE",
+      mcc: fields.mcc ?? "5734",
+      city: "NAIROBI",
+      country: "KEN",
+    },
+    events: (fields.events ?? ["AUTHORIZATION"]).map((type) => ({
+      type,
+      result: fields.result ?? "APPROVED",
+      detailed_results: [...(fields.detailedResults ?? ["APPROVED"])],
+    })),
+  };
+}
+
+/**
+ * In-memory Lithic. `nextCreateFailure: "ambiguous"` records the account
+ * holder and then errors, as the real sandbox does on a 500.
+ */
+export function makeFakeLithic() {
+  const businesses: LithicBusinessInput[] = [];
+  const cardholders: LithicCardholderInput[] = [];
+  const holders = new Map<string, LithicAccountHolder>();
+  const cards = new Map<string, FakeLithicCard>();
+  const updates: { token: string; patch: LithicCardPatch }[] = [];
+  const embedSessions: string[] = [];
+  const transactions = new Map<string, LithicTransaction>();
+  let sequence = 0;
+  const state = {
+    businesses,
+    cardholders,
+    holders,
+    cards,
+    updates,
+    embedSessions,
+    transactions,
+    nextCreateFailure: null as "ambiguous" | "refused" | null,
+    failCreateCard: false,
+    failUpdateCard: false,
+    failGetTransaction: false,
+    signaturesValid: true,
+    reset() {
+      businesses.length = 0;
+      cardholders.length = 0;
+      holders.clear();
+      cards.clear();
+      updates.length = 0;
+      embedSessions.length = 0;
+      transactions.clear();
+      state.nextCreateFailure = null;
+      state.failCreateCard = false;
+      state.failUpdateCard = false;
+      state.failGetTransaction = false;
+      state.signaturesValid = true;
+    },
+  };
+  const failure = (code: string, ambiguous: boolean, status = 503) =>
+    new LithicError({
+      message: `fake Lithic: ${code}`,
+      status,
+      code,
+      ambiguous,
+    });
+
+  const createHolder = (externalId: string) =>
+    Effect.suspend(() => {
+      const planned = state.nextCreateFailure;
+      state.nextCreateFailure = null;
+      if (planned === "refused") {
+        return Effect.fail(failure("HTTP_400", false, 400));
+      }
+      sequence += 1;
+      const holder = {
+        token: `holder-${sequence}`,
+        accountToken: `account-${sequence}`,
+      };
+      holders.set(externalId, holder);
+      return planned === "ambiguous"
+        ? Effect.fail(failure("HTTP_500", true, 500))
+        : Effect.succeed(holder);
+    });
+
+  const layer = Layer.succeed(Lithic, {
+    configured: true,
+    revealOrigin: "https://business.test",
+    createBusiness: (input) =>
+      Effect.suspend(() => {
+        businesses.push(input);
+        return createHolder(input.externalId);
+      }),
+    createCardholder: (input) =>
+      Effect.suspend(() => {
+        cardholders.push(input);
+        return createHolder(input.externalId);
+      }),
+    findAccountHolder: (externalId) =>
+      Effect.sync(() => holders.get(externalId) ?? null),
+    createCard: ({ accountToken, memo, monthlyLimitUsdCents }) =>
+      Effect.suspend(() => {
+        if (state.failCreateCard) {
+          return Effect.fail(failure("HTTP_500", true, 500));
+        }
+        sequence += 1;
+        const card: FakeLithicCard = {
+          token: `card-${sequence}`,
+          lastFour: String(1000 + sequence).slice(-4),
+          accountToken,
+          memo,
+          state: "OPEN",
+          monthlyLimitUsdCents,
+        };
+        cards.set(card.token, card);
+        return Effect.succeed({
+          token: card.token,
+          lastFour: card.lastFour,
+          state: card.state,
+        });
+      }),
+    updateCard: (token, patch) =>
+      Effect.suspend(() => {
+        if (state.failUpdateCard) {
+          return Effect.fail(failure("HTTP_500", true, 500));
+        }
+        const card = cards.get(token);
+        if (!card) return Effect.fail(failure("HTTP_404", false, 404));
+        updates.push({ token, patch });
+        if (patch.state) card.state = patch.state;
+        if (patch.monthlyLimitUsdCents !== undefined) {
+          card.monthlyLimitUsdCents = patch.monthlyLimitUsdCents;
+        }
+        return Effect.succeed({
+          token: card.token,
+          lastFour: card.lastFour,
+          state: card.state,
+        });
+      }),
+    createEmbedSession: (cardToken) =>
+      Effect.sync(() => {
+        embedSessions.push(cardToken);
+        return {
+          session: `session-for-${cardToken}`,
+          expiresAt: new Date(Date.now() + 300_000),
+        };
+      }),
+    getTransaction: (token) =>
+      Effect.suspend(() => {
+        if (state.failGetTransaction) {
+          return Effect.fail(failure("TRANSPORT_ERROR", false));
+        }
+        const transaction = transactions.get(token);
+        return transaction
+          ? Effect.succeed(transaction)
+          : Effect.fail(failure("HTTP_404", false, 404));
+      }),
+    verifyEventSignature: (_rawBody, headers) =>
+      state.signaturesValid && headers.signature !== undefined,
+    verifyAuthorizationSignature: (_rawBody, headers) =>
+      state.signaturesValid && headers.signature !== undefined,
+  });
+
+  return { layer, state };
+}
+
 const KES_INSTITUTIONS = [
   { code: "SAFAKEPC", name: "M-PESA", type: "mobile_money" },
   { code: "KCBLKENX", name: "Kenya Commercial Bank", type: "bank" },
@@ -378,6 +582,8 @@ export function makeFakePaycrest() {
     orders,
     rateCalls,
     rateFor: (_usdcAmount: string): string => "128.68",
+    /** Holds a rate answer back, so a test can line callers up. */
+    rateGate: null as (() => Promise<void>) | null,
     transactionFee: "0.02",
     /** Rewrites the next created order, e.g. to make it unsafe. */
     nextOrder: null as ((order: PaycrestOrder) => PaycrestOrder) | null,
@@ -390,6 +596,7 @@ export function makeFakePaycrest() {
       orders.clear();
       rateCalls.length = 0;
       state.rateFor = () => "128.68";
+      state.rateGate = null;
       state.transactionFee = "0.02";
       state.nextOrder = null;
       state.nextCreateFailure = null;
@@ -408,12 +615,16 @@ export function makeFakePaycrest() {
   const layer = Layer.succeed(Paycrest, {
     rate: (usdcAmount) => {
       rateCalls.push(usdcAmount);
-      return state.failRate
-        ? Effect.fail(unavailable("TRANSPORT_ERROR"))
-        : Effect.succeed({
-            rate: state.rateFor(usdcAmount),
-            providerIds: ["fakeProvider"],
-          });
+      return Effect.promise(() => state.rateGate?.() ?? Promise.resolve()).pipe(
+        Effect.flatMap(() =>
+          state.failRate
+            ? Effect.fail(unavailable("TRANSPORT_ERROR"))
+            : Effect.succeed({
+                rate: state.rateFor(usdcAmount),
+                providerIds: ["fakeProvider"],
+              }),
+        ),
+      );
     },
     institutions: () => Effect.succeed(KES_INSTITUTIONS),
     verifyAccount: () => Effect.succeed("OK"),

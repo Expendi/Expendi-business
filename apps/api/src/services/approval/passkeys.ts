@@ -287,7 +287,10 @@ export type ConfirmationPurpose =
   | "change_allowlist"
   | "change_payee"
   | "change_salary"
-  | "change_payroll_margin";
+  | "change_payroll_margin"
+  | "manage_cards"
+  | "load_card_balance"
+  | "reveal_card";
 
 export function startApproval(input: {
   readonly organizationId: string;

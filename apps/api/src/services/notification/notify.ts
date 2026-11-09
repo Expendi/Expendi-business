@@ -2,11 +2,13 @@ import { Effect } from "effect";
 
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
+import type { CardNotificationEvent } from "./card-notifications.js";
 import type { ClaimNotificationEvent } from "./claim-notifications.js";
 import type { NotificationChannel, OutgoingNotification } from "./outgoing.js";
 import type { SpendingNotificationEvent } from "./spending-notifications.js";
 import { notificationOutbox } from "../../db/schema/index.js";
 import { query } from "../../db/scope.js";
+import { cardNotifications } from "./card-notifications.js";
 import { claimNotifications } from "./claim-notifications.js";
 import {
   billReminderNotifications,
@@ -22,7 +24,7 @@ import {
  * that sends nothing.
  */
 export type NotificationEvent =
-  ClaimNotificationEvent | SpendingNotificationEvent;
+  ClaimNotificationEvent | SpendingNotificationEvent | CardNotificationEvent;
 
 function compose(
   tx: Transaction,
@@ -47,6 +49,13 @@ function compose(
     case "float_issued":
     case "float_topped_up":
       return floatPaidNotifications(tx, event);
+    case "card_issued":
+    case "card_receipt_needed":
+    case "card_receipt_reminder":
+    case "card_purchase_declined":
+    case "card_refund_received":
+    case "card_balance_low":
+      return cardNotifications(tx, event);
   }
 }
 

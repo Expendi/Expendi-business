@@ -11,6 +11,7 @@ import type { PrivyAuth } from "../services/auth/privy-auth.js";
 import type { BaseRpc } from "../services/chain/base-rpc.js";
 import type { EmailSender } from "../services/email/email-sender.js";
 import type { ReceiptExtractor } from "../services/extraction/receipt-extractor.js";
+import type { Lithic } from "../services/lithic/lithic-client.js";
 import type { PushSender } from "../services/notification/push-sender.js";
 import type { Paycrest } from "../services/paycrest/paycrest-client.js";
 import type { OtpProvider } from "../services/phone-verification/otp-provider.js";
@@ -29,6 +30,7 @@ import { PrivyAuthLive } from "../services/auth/privy-auth.js";
 import { BaseRpcLive } from "../services/chain/base-rpc.js";
 import { EmailSenderLive } from "../services/email/email-sender.js";
 import { ReceiptExtractorLive } from "../services/extraction/receipt-extractor.js";
+import { LithicLive } from "../services/lithic/lithic-client.js";
 import { PushSenderLive } from "../services/notification/push-sender.js";
 import { PaycrestLive } from "../services/paycrest/paycrest-client.js";
 import { OtpProviderLive } from "../services/phone-verification/telnyx-verify.js";
@@ -49,6 +51,7 @@ export type AppDeps =
   | AlchemyWebhook
   | BaseRpc
   | Paycrest
+  | Lithic
   | ApprovalSettings
   | EmailSender
   | OtpProvider
@@ -68,6 +71,7 @@ export interface ExternalLayers {
   readonly alchemyWebhook: Layer.Layer<AlchemyWebhook, AppLayerError>;
   readonly baseRpc: Layer.Layer<BaseRpc, AppLayerError>;
   readonly paycrest: Layer.Layer<Paycrest, AppLayerError>;
+  readonly lithic: Layer.Layer<Lithic, AppLayerError>;
   readonly approvalSettings: Layer.Layer<ApprovalSettings, AppLayerError>;
   readonly emailSender: Layer.Layer<EmailSender, AppLayerError>;
   readonly otpProvider: Layer.Layer<OtpProvider, AppLayerError>;
@@ -84,6 +88,7 @@ export const LiveExternalLayers: ExternalLayers = {
   alchemyWebhook: AlchemyWebhookLive,
   baseRpc: BaseRpcLive,
   paycrest: PaycrestLive,
+  lithic: LithicLive,
   approvalSettings: ApprovalSettingsLive,
   emailSender: EmailSenderLive,
   otpProvider: OtpProviderLive,
@@ -107,6 +112,7 @@ export function makeAppLayer(
     external.alchemyWebhook,
     external.baseRpc,
     external.paycrest,
+    external.lithic,
     external.approvalSettings,
     external.emailSender,
     external.otpProvider,

@@ -13,6 +13,7 @@ export const OPS_ALERT_KINDS = [
   "reconciliation_stopped",
   "low_company_balance",
   "zoho_sync_failing",
+  "card_close_failed",
 ] as const;
 export const opsAlertKindSchema = z.enum(OPS_ALERT_KINDS);
 export type OpsAlertKind = z.infer<typeof opsAlertKindSchema>;

@@ -70,6 +70,7 @@ interface Books {
     readonly billId: string;
     readonly claimId: string;
     readonly floatId: string;
+    readonly cardId: string;
     readonly itemId: string;
     readonly payeeId: string;
     readonly runId: string;
@@ -157,6 +158,40 @@ async function openFloat(
   return float.id;
 }
 
+/** A company with cards on and one card, written straight to the tables. */
+async function openCard(
+  company: TestCompany,
+  membershipId: string,
+  categoryId: string,
+): Promise<string> {
+  const { organizationId, admin } = company;
+  const { rows } = await runInScope(
+    db,
+    { organizationId, userId: admin.id, role: "admin" },
+    (tx) =>
+      tx.execute<{ id: string }>(sql`
+        WITH account AS (
+          INSERT INTO paid_from_accounts (organization_id, name, kind)
+          VALUES (${organizationId}, 'Expendi cards', 'card') RETURNING id
+        ), program AS (
+          INSERT INTO card_programs (organization_id, legal_name, kra_pin, address_line1, city, postal_code, phone, contact_first_name, contact_last_name, contact_email, contact_phone, lithic_account_holder_token, lithic_account_token, paid_from_account_id, turned_on_by)
+          SELECT ${organizationId}, 'Books Ltd', 'P051234567X', 'Waiyaki Way', 'Nairobi', '00100', '+254700000001', 'Amina', 'Otieno', 'amina@example.com', '+254700000002', 'holder-books', 'account-books', account.id, ${admin.id}
+          FROM account
+        ), holder AS (
+          INSERT INTO cardholders (organization_id, membership_id, lithic_account_holder_token, lithic_account_token)
+          VALUES (${organizationId}, ${membershipId}, 'holder-amina', 'account-amina') RETURNING id
+        )
+        INSERT INTO cards (organization_id, cardholder_id, membership_id, lithic_card_token, nickname, last_four, monthly_limit_usd_cents, default_category_id, issued_by)
+        SELECT ${organizationId}, holder.id, ${membershipId}, ${`card-${randomUUID()}`}, 'Books card', '4242', 50000, ${categoryId}, ${admin.id}
+        FROM holder
+        RETURNING id
+      `),
+  );
+  const [card] = rows;
+  if (!card) throw new Error("card insert returned no row");
+  return card.id;
+}
+
 async function seedBooks(): Promise<Books> {
   const company = await createCompany(db);
   const wallet = await createActiveWallet(db, company);
@@ -198,6 +233,7 @@ async function seedBooks(): Promise<Books> {
   const claimId = await submitClaim(company, amina.user, officeId);
   const spendingId = await recordCompanySpending(company, officeId);
   const floatId = await openFloat(company, amina.membershipId);
+  const cardId = await openCard(company, amina.membershipId, officeId);
 
   const accountant = await createUser(db);
   const accountantMembershipId = await addMember(db, company, accountant, {
@@ -217,6 +253,7 @@ async function seedBooks(): Promise<Books> {
       salaryId,
       spendingId,
       floatId,
+      cardId,
     },
   };
 }
@@ -335,6 +372,16 @@ describe("company routes for an accountant", () => {
     expect(companyEndpoints(app).map(keyOf)).toEqual(
       expect.arrayContaining([
         `GET ${COMPANY_ROUTES}/activity`,
+        `GET ${COMPANY_ROUTES}/cards`,
+        `GET ${COMPANY_ROUTES}/cards/:cardId`,
+        `GET ${COMPANY_ROUTES}/cards/loads`,
+        `GET ${COMPANY_ROUTES}/cards/program`,
+        `POST ${COMPANY_ROUTES}/cards/program`,
+        `POST ${COMPANY_ROUTES}/cards/confirmations`,
+        `POST ${COMPANY_ROUTES}/cards/confirmations/:challengeId`,
+        `POST ${COMPANY_ROUTES}/cards/:cardId/freeze`,
+        `POST ${COMPANY_ROUTES}/cards/:cardId/close`,
+        `POST ${COMPANY_ROUTES}/cards/:cardId/lower-limit`,
         `GET ${COMPANY_ROUTES}/categories`,
         `POST ${COMPANY_ROUTES}/categories`,
         `PATCH ${COMPANY_ROUTES}/categories/:categoryId`,
