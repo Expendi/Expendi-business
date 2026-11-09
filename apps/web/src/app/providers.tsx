@@ -12,6 +12,12 @@ import { readPublicEnv } from "~/env";
 
 const publicEnv = readPublicEnv();
 
+/**
+ * Pages that stand alone: a card's details are shown with no account and
+ * no third-party script on the page but Lithic's embed.
+ */
+const STANDALONE_PATHS: ReadonlySet<string> = new Set(["/card-reveal"]);
+
 function makeQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
@@ -39,6 +45,8 @@ export function Providers({ children }: { children: ReactNode }): JSX.Element {
   if (process.env.NODE_ENV === "development" && pathname.startsWith("/dev/")) {
     return <>{children}</>;
   }
+
+  if (STANDALONE_PATHS.has(pathname)) return <>{children}</>;
 
   if (!publicEnv.ok) {
     return <MissingConfig invalidKeys={publicEnv.invalidKeys} />;

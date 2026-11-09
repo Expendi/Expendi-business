@@ -26,6 +26,10 @@ const config = {
           "/.well-known/:file(apple-app-site-association|assetlinks\\.json)",
         headers: [{ key: "Content-Type", value: "application/json" }],
       },
+      {
+        source: "/card-reveal",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
     ];
   },
 };

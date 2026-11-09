@@ -1,9 +1,17 @@
 import type {
+  CardPurchaseStatus,
   ExpenseStatus,
   ExpenseSummaryQuery,
 } from "@expendi-business/shared";
 
 import type { ExpenseListParams } from "./customer-api";
+
+/** The Purchases tab's filters, as `GET …/cards/purchases` takes them. */
+export interface CardPurchaseFilters {
+  readonly cardId: string | null;
+  readonly status: CardPurchaseStatus | null;
+  readonly needsReceipt: "true" | "false" | null;
+}
 
 export const queryKeys = {
   me: (privyUserId: string) => ["me", privyUserId] as const,
@@ -25,4 +33,14 @@ export const queryKeys = {
     ["claims", organizationId, "queue", status] as const,
   claim: (organizationId: string, claimId: string) =>
     ["claims", organizationId, "detail", claimId] as const,
+  /** Every card query of a company, to refresh after a card or its money changes. */
+  cards: (organizationId: string) => ["cards", organizationId] as const,
+  cardProgram: (organizationId: string) =>
+    ["cards", organizationId, "program"] as const,
+  cardList: (organizationId: string) =>
+    ["cards", organizationId, "list"] as const,
+  cardLoads: (organizationId: string) =>
+    ["cards", organizationId, "loads"] as const,
+  cardPurchases: (organizationId: string, filters: CardPurchaseFilters) =>
+    ["cards", organizationId, "purchases", filters] as const,
 };

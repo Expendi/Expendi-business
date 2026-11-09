@@ -113,6 +113,7 @@ export const KIND_LABELS: Record<MoneyOutKind, string> = {
   bill: "Bill",
   salary: "Salary",
   company: "Company",
+  card: "Card",
 };
 
 export const FLOAT_TRANSFER_LABELS = {

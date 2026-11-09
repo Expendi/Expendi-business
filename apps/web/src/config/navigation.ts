@@ -5,6 +5,7 @@ import {
   Building2Icon,
   ChartColumnIcon,
   CircleCheckIcon,
+  CreditCardIcon,
   FileTextIcon,
   LayoutDashboardIcon,
   ReceiptTextIcon,
@@ -50,6 +51,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: ReceiptTextIcon,
     group: "Spend & pay",
     count: "expenses",
+  },
+  {
+    title: "Cards",
+    href: "/cards",
+    icon: CreditCardIcon,
+    group: "Spend & pay",
   },
   {
     title: "Bills",

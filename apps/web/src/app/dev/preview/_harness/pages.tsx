@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import { ActivityView } from "~/app/(company)/activity/_components/activity-view";
 import { ApprovalsView } from "~/app/(company)/approvals/_components/approvals-view";
 import { BillsView } from "~/app/(company)/bills/_components/bills-view";
+import { CardsView } from "~/app/(company)/cards/_components/cards-view";
 import { ExpensesView } from "~/app/(company)/expenses/_components/expenses-view";
 import { OverviewView } from "~/app/(company)/overview/_components/overview-view";
 import { PayeesView } from "~/app/(company)/payees/_components/payees-view";
@@ -26,6 +27,7 @@ export const PAGE_PREVIEWS: Readonly<Record<string, PagePreview>> = {
   activity: { path: "/activity", View: ActivityView },
   approvals: { path: "/approvals", View: ApprovalsView },
   bills: { path: "/bills", View: BillsView },
+  cards: { path: "/cards", View: CardsView },
   expenses: { path: "/expenses", View: ExpensesView },
   overview: { path: "/overview", View: OverviewView },
   payees: { path: "/payees", View: PayeesView },

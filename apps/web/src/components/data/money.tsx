@@ -7,7 +7,7 @@ import { formatKes, formatUsdc } from "~/lib/money";
 /** KES is in cents; USD and USDC are in USDC base units (6 decimals). */
 export type MoneyCurrency = "KES" | "USD" | "USDC";
 
-function CurrencyCode({ code }: { code: string }): JSX.Element {
+export function CurrencyCode({ code }: { code: string }): JSX.Element {
   return (
     <span
       data-ccy=""
