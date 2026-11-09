@@ -58,6 +58,14 @@ export function usdcCovering(kesCents: bigint, rate: string): bigint {
   return ceilDiv(kesCents * MICRO * MICRO, rateMicro * CENTS_PER_SHILLING);
 }
 
+/**
+ * KES cents that `usdCents` US cents convert to at `rate`, rounded to the
+ * nearest cent: what a Card expense records at settlement.
+ */
+export function kesCentsFromUsdCents(usdCents: bigint, rate: string): bigint {
+  return (usdCents * toMicro(rate) + MICRO / 2n) / MICRO;
+}
+
 /** KES cents that `usdc` (base units) converts to at `rate`, rounded down. */
 export function kesCentsFor(usdc: bigint, rate: string): bigint {
   return (usdc * toMicro(rate) * CENTS_PER_SHILLING) / (MICRO * MICRO);

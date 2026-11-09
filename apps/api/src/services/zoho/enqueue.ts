@@ -109,9 +109,10 @@ export function enqueuePaidClaim(
 }
 
 /**
- * Petty cash or company spending, just recorded. Company spending that a
- * bill marked paid outside recorded is that bill's: the bill is queued
- * instead, so the payment reaches Zoho once.
+ * Petty cash or company spending, just recorded, or a Card expense once it
+ * has its receipt or an admin's reason (the caller decides that). Company
+ * spending that a bill marked paid outside recorded is that bill's: the bill
+ * is queued instead, so the payment reaches Zoho once.
  */
 export function enqueueRecordedSpending(
   tx: Transaction,
@@ -127,7 +128,7 @@ export function enqueueRecordedSpending(
           and(
             eq(expenses.id, expenseId),
             eq(expenses.organizationId, organizationId),
-            inArray(expenses.kind, ["float", "company"]),
+            inArray(expenses.kind, ["float", "company", "card"]),
             eq(expenses.status, "recorded"),
             eq(expenses.source, "app"),
             isNull(expenses.billId),

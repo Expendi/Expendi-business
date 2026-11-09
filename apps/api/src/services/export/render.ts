@@ -77,6 +77,7 @@ const KIND_LABELS: Readonly<Record<MoneyOutKind, string>> = {
   bill: "Bill",
   salary: "Salary",
   company: "Company",
+  card: "Expendi card",
 };
 
 const STATUS_LABELS: Readonly<Record<string, string>> = {

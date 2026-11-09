@@ -40,19 +40,61 @@ const company = (name: string): OpsAlertDetail => ({
   value: name,
 });
 
-/** A Paycrest webhook that failed signature verification, raised by the route. */
-export function webhookSignatureFailure(source: "paycrest"): AlertSignal {
+const WEBHOOK_SOURCES = {
+  paycrest: {
+    name: "Paycrest",
+    whatToCheck:
+      "Requests to /webhooks/paycrest are failing their signature check. Check PAYCREST_API_SECRET against Paycrest's dashboard; if it matches, someone else is sending them.",
+  },
+  lithic: {
+    name: "Lithic",
+    whatToCheck:
+      "Requests to /webhooks/lithic are failing their signature check. Check LITHIC_WEBHOOK_SECRET and LITHIC_ASA_SECRET against Lithic's dashboard; if they match, someone else is sending them.",
+  },
+} as const;
+
+/** A provider's webhook that failed signature verification, raised by the route. */
+export function webhookSignatureFailure(
+  source: keyof typeof WEBHOOK_SOURCES,
+): AlertSignal {
+  const { name, whatToCheck } = WEBHOOK_SOURCES[source];
   return {
     kind: "webhook_signature_failure",
     subjectKey: source,
     organizationId: null,
-    title: "Paycrest webhook failed signature verification",
+    title: `${name} webhook failed signature verification`,
     details: [
-      { label: "Source", value: "Paycrest webhook" },
+      { label: "Source", value: `${name} webhook` },
+      { label: "What to check", value: whatToCheck },
+    ],
+  };
+}
+
+/**
+ * A leaver's Expendi card that Lithic keeps refusing to close, raised by the
+ * close-cards job and resolved once it closes. The card goes on working until
+ * then, so someone needs to look.
+ */
+export function cardCloseFailed(card: {
+  readonly cardId: string;
+  readonly organizationId: string;
+  readonly organizationName: string;
+  readonly lastFour: string;
+  readonly attempts: number;
+}): AlertSignal {
+  return {
+    kind: "card_close_failed",
+    subjectKey: card.cardId,
+    organizationId: card.organizationId,
+    title: `Card ending ${card.lastFour} couldn't be closed at ${card.organizationName}`,
+    details: [
+      company(card.organizationName),
+      { label: "Card", value: card.cardId },
+      { label: "Attempts", value: String(card.attempts) },
       {
         label: "What to check",
         value:
-          "Requests to /webhooks/paycrest are failing their signature check. Check PAYCREST_API_SECRET against Paycrest's dashboard; if it matches, someone else is sending them.",
+          "This card belongs to someone who left the company and it stays usable until Lithic closes it. Check Lithic's status; the job keeps retrying.",
       },
     ],
   };

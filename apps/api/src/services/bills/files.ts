@@ -92,6 +92,7 @@ export function checkAttachableBillFiles(
             uploadedBy: receiptFiles.uploadedBy,
             expenseId: receiptFiles.expenseId,
             billId: receiptFiles.billId,
+            cardPurchaseId: receiptFiles.cardPurchaseId,
           })
           .from(receiptFiles)
           .where(
@@ -106,6 +107,7 @@ export function checkAttachableBillFiles(
       file.uploadedBy === tenant.userId &&
       file.storageKey !== null &&
       file.expenseId === null &&
+      file.cardPurchaseId === null &&
       (file.billId === null || file.billId === billId)
         ? [{ ...file, storageKey: file.storageKey }]
         : [],
@@ -169,6 +171,7 @@ export function attachBillFiles(
             inArray(receiptFiles.id, added),
             isNull(receiptFiles.expenseId),
             isNull(receiptFiles.billId),
+            isNull(receiptFiles.cardPurchaseId),
           ),
         )
         .returning({ id: receiptFiles.id }),

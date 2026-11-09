@@ -22,7 +22,7 @@ export const paidFromAccountKind = pgEnum(
 
 /**
  * A company's own list of the accounts it pays from outside Expendi, e.g.
- * its bank account or the founder's company card (spec §6.23). Company
+ * its bank account or a bank card (spec §6.23). Company
  * spending names the one it came from, and the accountant maps each to a
  * Zoho Books Paid Through account (spec §6.17, T44). Archiving hides an
  * account from new spending but keeps it on old records, so a name only has

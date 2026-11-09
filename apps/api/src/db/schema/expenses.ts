@@ -210,7 +210,12 @@ export const expenses = pgTable(
     ),
     check(
       "expenses_company_links",
-      sql`${table.kind} = 'company' OR (${table.paidFromAccountId} IS NULL AND ${table.billId} IS NULL)`,
+      sql`${table.kind}::text IN ('company', 'card') OR (${table.paidFromAccountId} IS NULL AND ${table.billId} IS NULL)`,
+    ),
+    // `::text`: this runs in the transaction that adds 'card' to the enum.
+    check(
+      "expenses_card_recorded",
+      sql`${table.kind}::text <> 'card' OR (${table.status} = 'recorded' AND ${table.paidFromAccountId} IS NOT NULL AND ${table.billId} IS NULL)`,
     ),
     check(
       "expenses_float_recorded",

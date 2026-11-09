@@ -15,6 +15,7 @@ export * from "./paid-from-accounts.js";
 export * from "./payees.js";
 export * from "./payouts.js";
 export * from "./payroll-runs.js";
+export * from "./cards.js";
 export * from "./phone-verification-challenges.js";
 export * from "./platform-settings.js";
 export * from "./receipt-files.js";

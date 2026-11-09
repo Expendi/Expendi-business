@@ -21,10 +21,11 @@ import { query } from "../../db/scope.js";
  * - bills and salaries paid in the month, through Expendi or outside it. A
  *   bill paid outside is also a company spending row (`expenses.bill_id`);
  *   it is listed once, as the bill.
- * - other company spending dated in the month
+ * - other company spending and Card expenses dated in the month
  */
 
-export type MoneyOutKind = "claim" | "float" | "bill" | "salary" | "company";
+export type MoneyOutKind =
+  "claim" | "float" | "bill" | "salary" | "company" | "card";
 
 export interface MoneyOutRow {
   readonly id: string;
@@ -151,7 +152,7 @@ function readExpenses(
             AND e.paid_at >= ${month.startAt} AND e.paid_at < ${month.endAt})
           OR (e.kind = 'claim' AND e.status = 'paid_outside'
             AND e.spent_on >= ${month.start}::date AND e.spent_on < ${month.end}::date)
-          OR (e.kind IN ('float', 'company') AND e.status = 'recorded'
+          OR (e.kind IN ('float', 'company', 'card') AND e.status = 'recorded'
             AND e.spent_on >= ${month.start}::date AND e.spent_on < ${month.end}::date)
         )
     `),
@@ -321,8 +322,9 @@ const KIND_ORDER: Readonly<Record<MoneyOutKind, number>> = {
   claim: 0,
   float: 1,
   company: 2,
-  bill: 3,
-  salary: 4,
+  card: 3,
+  bill: 4,
+  salary: 5,
 };
 
 function toMoneyOut(record: MoneyOutRecord): MoneyOutRow {

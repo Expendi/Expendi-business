@@ -166,6 +166,7 @@ function reusablePendingFile(
           uploadedBy: receiptFiles.uploadedBy,
           expenseId: receiptFiles.expenseId,
           billId: receiptFiles.billId,
+          cardPurchaseId: receiptFiles.cardPurchaseId,
         })
         .from(receiptFiles)
         .where(
@@ -176,7 +177,9 @@ function reusablePendingFile(
         )
         .for("update"),
     );
-    if (!existing) return yield* Effect.fail(alreadyUploaded);
+    if (existing?.cardPurchaseId !== null) {
+      return yield* Effect.fail(alreadyUploaded);
+    }
     if (existing.expenseId !== null) {
       const earlier = yield* findExpense(
         tx,
@@ -286,13 +289,14 @@ const oneSmsPerExpense = new BadRequest({
 
 /**
  * Checks that every file is the caller's, free to use (or already on
- * `expenseId`), and really in storage with the size they declared. Run it
- * before the transaction that attaches them: it calls R2.
+ * `expenseId` or `cardPurchaseId`), and really in storage with the size they
+ * declared. Run it before the transaction that attaches them: it calls R2.
  */
 export function checkAttachableReceipts(
   tenant: Tenant,
   receiptFileIds: readonly string[],
   expenseId: string | null = null,
+  cardPurchaseId: string | null = null,
 ): Effect.Effect<
   void,
   BadRequest | ServiceUnavailable | DatabaseError,
@@ -311,6 +315,7 @@ export function checkAttachableReceipts(
             uploadedBy: receiptFiles.uploadedBy,
             expenseId: receiptFiles.expenseId,
             billId: receiptFiles.billId,
+            cardPurchaseId: receiptFiles.cardPurchaseId,
           })
           .from(receiptFiles)
           .where(
@@ -326,7 +331,9 @@ export function checkAttachableReceipts(
         file.uploadedBy === tenant.userId &&
         file.billId === null &&
         file.kind !== "pdf" &&
-        (file.expenseId === null || file.expenseId === expenseId),
+        (file.expenseId === null || file.expenseId === expenseId) &&
+        (file.cardPurchaseId === null ||
+          file.cardPurchaseId === cardPurchaseId),
     );
     if (usable.length !== receiptFileIds.length) {
       return yield* Effect.fail(receiptUnavailable);
@@ -408,6 +415,7 @@ export function setExpenseReceipts(
             inArray(receiptFiles.id, added),
             isNull(receiptFiles.expenseId),
             isNull(receiptFiles.billId),
+            isNull(receiptFiles.cardPurchaseId),
           ),
         )
         .returning({ id: receiptFiles.id }),
@@ -416,5 +424,57 @@ export function setExpenseReceipts(
       return yield* Effect.fail(receiptUnavailable);
     }
     return previous;
+  });
+}
+
+/**
+ * Adds the caller's pending files to an Expendi card purchase, inside the
+ * transaction that locks the purchase, and returns the ones newly added.
+ * Files already on it are left as they are, so a retried request adds
+ * nothing. Set `expenseId` once the Card expense exists; a purchase's files
+ * pick it up when the expense is recorded otherwise.
+ */
+export function addCardPurchaseReceipts(
+  tx: Transaction,
+  tenant: Tenant,
+  purchase: { readonly id: string; readonly expenseId: string | null },
+  receiptFileIds: readonly string[],
+): Effect.Effect<readonly string[], BadRequest | DatabaseError> {
+  return Effect.gen(function* () {
+    const onPurchase = yield* query(() =>
+      tx
+        .select({ id: receiptFiles.id })
+        .from(receiptFiles)
+        .where(
+          and(
+            eq(receiptFiles.organizationId, tenant.organizationId),
+            eq(receiptFiles.cardPurchaseId, purchase.id),
+            inArray(receiptFiles.id, [...receiptFileIds]),
+          ),
+        ),
+    );
+    const already = new Set(onPurchase.map((file) => file.id));
+    const added = receiptFileIds.filter((id) => !already.has(id));
+    if (added.length === 0) return [];
+    const attached = yield* query(() =>
+      tx
+        .update(receiptFiles)
+        .set({ cardPurchaseId: purchase.id, expenseId: purchase.expenseId })
+        .where(
+          and(
+            eq(receiptFiles.organizationId, tenant.organizationId),
+            eq(receiptFiles.uploadedBy, tenant.userId),
+            inArray(receiptFiles.id, added),
+            isNull(receiptFiles.expenseId),
+            isNull(receiptFiles.billId),
+            isNull(receiptFiles.cardPurchaseId),
+          ),
+        )
+        .returning({ id: receiptFiles.id }),
+    );
+    if (attached.length !== added.length) {
+      return yield* Effect.fail(receiptUnavailable);
+    }
+    return added;
   });
 }

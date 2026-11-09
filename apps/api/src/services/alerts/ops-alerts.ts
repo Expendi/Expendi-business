@@ -135,6 +135,27 @@ export function raiseAlert(
   );
 }
 
+/** Resolves one raised incident once its cause has cleared, e.g. a stuck card closed. */
+export function resolveAlert(
+  kind: OpsAlertKind,
+  subjectKey: string,
+): Effect.Effect<void, DatabaseError, DatabaseService> {
+  return withScope(SYSTEM_SCOPE, (tx) =>
+    query(() =>
+      tx
+        .update(opsAlerts)
+        .set({ resolvedAt: sql`now()` })
+        .where(
+          and(
+            eq(opsAlerts.kind, kind),
+            eq(opsAlerts.subjectKey, subjectKey),
+            isNull(opsAlerts.resolvedAt),
+          ),
+        ),
+    ),
+  );
+}
+
 /** Marks a station job's run as finished, on the database's clock. */
 export function recordHeartbeat(
   job: string,

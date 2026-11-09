@@ -15,6 +15,7 @@ import {
 import { BILL_FILE_ROLES, RECEIPT_FILE_KINDS } from "@expendi-business/shared";
 
 import { bills } from "./bills.js";
+import { cardPurchases } from "./cards.js";
 import { timestamps } from "./columns.js";
 import { expenses } from "./expenses.js";
 import { organizations } from "./organizations.js";
@@ -39,6 +40,11 @@ export const receiptFiles = pgTable(
     expenseId: uuid("expense_id"),
     /** A bill's attachment (spec §6.20). */
     billId: uuid("bill_id"),
+    /**
+     * Added to an Expendi card purchase, which may not have its Card expense
+     * yet; `expense_id` is set too once it does.
+     */
+    cardPurchaseId: uuid("card_purchase_id"),
     /** Set with `bill_id`: the invoice, or proof the bill was paid outside Expendi. */
     billRole: billFileRole("bill_role"),
     /** Only the uploader can attach a pending file. */
@@ -78,6 +84,11 @@ export const receiptFiles = pgTable(
       columns: [table.billId, table.organizationId],
       foreignColumns: [bills.id, bills.organizationId],
     }),
+    foreignKey({
+      name: "receipt_files_card_purchase_organization_fk",
+      columns: [table.cardPurchaseId, table.organizationId],
+      foreignColumns: [cardPurchases.id, cardPurchases.organizationId],
+    }),
     uniqueIndex("receipt_files_sha256_unique").on(
       table.organizationId,
       table.sha256,
@@ -85,9 +96,14 @@ export const receiptFiles = pgTable(
     uniqueIndex("receipt_files_storage_key_unique").on(table.storageKey),
     index("receipt_files_expense_id_idx").on(table.expenseId),
     index("receipt_files_bill_id_idx").on(table.billId),
+    index("receipt_files_card_purchase_id_idx").on(table.cardPurchaseId),
     check(
       "receipt_files_one_owner",
       sql`${table.expenseId} IS NULL OR ${table.billId} IS NULL`,
+    ),
+    check(
+      "receipt_files_card_purchase_not_bill",
+      sql`${table.cardPurchaseId} IS NULL OR ${table.billId} IS NULL`,
     ),
     check(
       "receipt_files_bill_role",

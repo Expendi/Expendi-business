@@ -324,6 +324,21 @@ function expensePosting(
           receiptCodes(expense),
         );
         break;
+      case "card":
+        if (expense.status !== "recorded" || expense.source !== "app") {
+          return yield* notPostable(
+            "Only Expendi card spending recorded in Expendi syncs to Zoho.",
+          );
+        }
+        paidThroughAccountId = yield* paidFromAccountOf(
+          { name: found.paidFromName, accountId: found.paidFromAccountId },
+          expense.paidFromAccountId !== null,
+        );
+        description = fitDescription(
+          [expense.merchant, expense.description],
+          receiptCodes(expense),
+        );
+        break;
     }
     if (!accountId || !paidThroughAccountId) {
       return yield* mappingNeeded(UNFINISHED_MAPPING);

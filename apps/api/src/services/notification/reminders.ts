@@ -45,7 +45,7 @@ const NAIROBI_HOUR = new Intl.DateTimeFormat("en-US", {
   hourCycle: "h23",
 });
 
-function nairobiHour(at: Date): number {
+export function nairobiHour(at: Date): number {
   return Number(NAIROBI_HOUR.format(at));
 }
 
@@ -61,7 +61,7 @@ export function billReminderStage(
 }
 
 /** Dedupe keys among `keys` already in the company's outbox. */
-function alreadyQueued(
+export function alreadyQueued(
   tx: Transaction,
   organizationId: string,
   keys: readonly string[],

@@ -18,6 +18,8 @@ import { signUpCompany } from "../services/organization/create-organization.js";
 import { createActivityRoutes } from "./activity.js";
 import { createAllowlistRoutes } from "./allowlist.js";
 import { createBillRoutes } from "./bills.js";
+import { createCardPurchaseRoutes } from "./card-purchases.js";
+import { createCardRoutes } from "./cards.js";
 import { createCategoryRoutes } from "./categories.js";
 import { createClaimRoutes } from "./claims.js";
 import { createExpenseRoutes } from "./expenses.js";
@@ -99,6 +101,8 @@ export function createOrganizationRoutes(
     })
     .route("/activity", createActivityRoutes(runtime))
     .route("/bills", createBillRoutes(runtime))
+    .route("/cards/purchases", createCardPurchaseRoutes(runtime))
+    .route("/cards", createCardRoutes(runtime))
     .route("/categories", createCategoryRoutes(runtime))
     .route("/claims", createClaimRoutes(runtime))
     .route("/company-spending", createCompanySpendingRoutes(runtime))

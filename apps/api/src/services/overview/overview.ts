@@ -162,9 +162,10 @@ function serialiseCash(cash: CashCheck): SpendingOverview["cash"] {
 type OutstandingExpense = SpendingOverview["outstanding"]["claims"][number];
 
 /**
- * Claims waiting for approval, and petty cash spent without a receipt or,
- * with one, without the eTIMS invoice its category expects. An overspend's
- * extra claim shares its float spending's receipt and invoice.
+ * Claims waiting for approval, petty cash spent without a receipt or, with
+ * one, without the eTIMS invoice its category expects, and Card expenses
+ * with no receipt and no admin's reason. An overspend's extra claim shares
+ * its float spending's receipt and invoice.
  */
 function readOutstandingExpenses(tx: Transaction, organizationId: string) {
   return query(() =>
@@ -180,11 +181,12 @@ function readOutstandingExpenses(tx: Transaction, organizationId: string) {
           c.name AS "categoryName", e.description,
           CASE
             WHEN e.kind = 'claim' THEN 'approval'
+            WHEN e.kind = 'card' AND e.no_receipt_reason IS NOT NULL THEN NULL
             WHEN NOT EXISTS (
               SELECT 1 FROM receipt_files r
               WHERE r.expense_id IN (e.id, e.overspend_claim_id)
             ) THEN 'receipt'
-            WHEN e.source = 'app'
+            WHEN e.kind <> 'card' AND e.source = 'app'
               AND coalesce(extra.etims_status, e.etims_status) = 'none'
               THEN 'etims'
           END AS need,
@@ -197,7 +199,7 @@ function readOutstandingExpenses(tx: Transaction, organizationId: string) {
         WHERE e.organization_id = ${organizationId}
           AND (
             (e.kind = 'claim' AND e.status = 'submitted')
-            OR (e.kind = 'float' AND e.status = 'recorded')
+            OR (e.kind IN ('float', 'card') AND e.status = 'recorded')
           )
       ) outstanding
       WHERE need IS NOT NULL

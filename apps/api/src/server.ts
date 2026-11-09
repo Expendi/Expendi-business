@@ -5,6 +5,8 @@ import { ConfigService } from "./config.js";
 import { makeRuntime } from "./runtime.js";
 import { alertChecksJob } from "./station/alert-checks.js";
 import { billStatusJob } from "./station/bill-status.js";
+import { cardReceiptRemindersJob } from "./station/card-receipt-reminders.js";
+import { closeCardsJob } from "./station/close-cards.js";
 import { confirmOnchainJob } from "./station/confirm-onchain.js";
 import { monthlyExportJob } from "./station/monthly-export.js";
 import { payrollDraftsJob } from "./station/payroll-drafts.js";
@@ -12,6 +14,7 @@ import {
   pushNotificationsJob,
   pushReceiptsJob,
 } from "./station/push-notifications.js";
+import { reconcileLithicJob } from "./station/reconcile-lithic.js";
 import { reconcilePaycrestJob } from "./station/reconcile-paycrest.js";
 import { recurringBillsJob } from "./station/recurring-bills.js";
 import { spendingRemindersJob } from "./station/reminders.js";
@@ -41,6 +44,9 @@ const stopStation = startStation(runtime, [
   pushReceiptsJob,
   zohoSyncJob,
   alertChecksJob,
+  closeCardsJob,
+  reconcileLithicJob,
+  cardReceiptRemindersJob,
 ]);
 
 function shutdown(signal: NodeJS.Signals): void {
