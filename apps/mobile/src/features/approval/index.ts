@@ -1,3 +1,4 @@
+export type { PasskeySetupCopy } from "./approval-passkey-gate";
 export {
   ApprovalPasskeyGate,
   SetUpApprovalPasskey,
