@@ -15,14 +15,28 @@ import {
   useEnrolApprovalPasskey,
 } from "./use-approval-passkey";
 
+export interface PasskeySetupCopy {
+  readonly title: string;
+  readonly description: string;
+}
+
+const PAYMENTS_SETUP_COPY: PasskeySetupCopy = {
+  title: "Set up your approval passkey",
+  description:
+    "You confirm every payment and withdrawal with your fingerprint or face. Set it up once on this phone.",
+};
+
 /**
- * Shows `children` once the admin has an approval passkey; until then,
- * asks them to set one up. Every money action needs it (spec §7.3).
+ * Shows `children` once the person has an approval passkey; until then,
+ * asks them to set one up. Every money action needs it (spec §7.3), and so
+ * does seeing a card's details, so `setupCopy` can say what it's for.
  */
 export function ApprovalPasskeyGate({
   children,
+  setupCopy,
 }: {
   children: ReactNode;
+  setupCopy?: PasskeySetupCopy;
 }): JSX.Element {
   const status = useApprovalPasskeyStatus();
 
@@ -42,11 +56,15 @@ export function ApprovalPasskeyGate({
       </View>
     );
   }
-  if (!status.data.enrolled) return <SetUpApprovalPasskey />;
+  if (!status.data.enrolled) return <SetUpApprovalPasskey copy={setupCopy} />;
   return <>{children}</>;
 }
 
-export function SetUpApprovalPasskey(): JSX.Element {
+export function SetUpApprovalPasskey({
+  copy = PAYMENTS_SETUP_COPY,
+}: {
+  copy?: PasskeySetupCopy | undefined;
+}): JSX.Element {
   const enrol = useEnrolApprovalPasskey();
   const { signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
@@ -68,12 +86,10 @@ export function SetUpApprovalPasskey(): JSX.Element {
       className="gap-4 rounded-2xl border border-gray-200 p-5"
     >
       <View className="gap-1">
-        <Text className="text-lg font-bold text-gray-900">
-          Set up your approval passkey
-        </Text>
+        <Text className="text-lg font-bold text-gray-900">{copy.title}</Text>
         <Text className="text-base text-gray-600">
           {supported
-            ? "You confirm every payment and withdrawal with your fingerprint or face. Set it up once on this phone."
+            ? copy.description
             : "This phone can't use passkeys. Turn on a screen lock, then come back to set one up."}
         </Text>
       </View>

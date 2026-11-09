@@ -6,6 +6,7 @@ import { Image, Switch, View } from "react-native";
 import type {
   Category,
   CompanySpendingDetail,
+  ExpenseKind,
   OverviewHeading,
   RecordCompanySpendingRequest,
   UpdateCompanySpendingRequest,
@@ -559,10 +560,7 @@ function SpendingReview({
 }): JSX.Element {
   const router = useRouter();
   const duplicate = duplicateOfError(submitError);
-  const openEarlier = (
-    expenseId: string,
-    kind: "claim" | "float" | "company",
-  ) =>
+  const openEarlier = (expenseId: string, kind: ExpenseKind) =>
     kind === "company"
       ? router.push({
           pathname: "/spending/[spendingId]",
@@ -617,7 +615,9 @@ function SpendingReview({
         <ErrorMessage
           message={submitError ? describeApiError(submitError) : null}
         />
-        {duplicate?.expenseId && duplicate.kind !== "float" ? (
+        {duplicate?.expenseId &&
+        duplicate.kind !== "float" &&
+        duplicate.kind !== "card" ? (
           <Button
             label="Open the earlier record"
             variant="secondary"

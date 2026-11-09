@@ -6,7 +6,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "~/features/auth/auth-provider";
 import { useCompanySession } from "~/features/company/company-provider";
-import { notificationTarget } from "~/lib/notification-target";
+import {
+  notificationHref,
+  notificationQueryKey,
+  notificationTarget,
+} from "~/lib/notification-target";
 import {
   getPushToken,
   pushPermission,
@@ -17,7 +21,6 @@ import {
   unregisterPushToken,
   wasAskedAboutPush,
 } from "~/lib/push";
-import { queryKeys } from "~/lib/query-keys";
 import { useApi } from "~/providers/api-provider";
 import { PushPrePrompt } from "./push-pre-prompt";
 
@@ -28,8 +31,8 @@ const warn = (what: string) => (error: unknown) => {
 /**
  * Push for the signed-in person (spec §6.10): registers this phone once
  * they've reached the app (asking first, once, if the system hasn't yet),
- * unregisters it on sign-out, and opens the claim a tapped notification is
- * about, in its company.
+ * unregisters it on sign-out, and opens the claim or card a tapped
+ * notification is about, in its company.
  */
 export function PushNotifications(): JSX.Element {
   const api = useApi();
@@ -98,12 +101,9 @@ export function PushNotifications(): JSX.Element {
     if (!target || !company) return;
     selectCompany(company.organizationId);
     void queryClient.invalidateQueries({
-      queryKey: queryKeys.claims(company.organizationId),
+      queryKey: notificationQueryKey(target),
     });
-    router.push({
-      pathname: "/claims/[claimId]",
-      params: { claimId: target.claimId },
-    });
+    router.push(notificationHref(target));
   }, [lastResponse, companies, selectCompany, queryClient, router]);
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export function PushNotifications(): JSX.Element {
         const target = notificationTarget(request.content.data);
         if (!target) return;
         void queryClient.invalidateQueries({
-          queryKey: queryKeys.claims(target.organizationId),
+          queryKey: notificationQueryKey(target),
         });
       },
     );

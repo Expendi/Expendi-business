@@ -144,6 +144,38 @@ export const queryKeys = {
     ["organizations", organizationId, "floats", "list", mine] as const,
   float: (organizationId: string, floatId: string) =>
     ["organizations", organizationId, "floats", "detail", floatId] as const,
+  /** Prefix of cards and their purchases, so one invalidation refreshes both. */
+  cards: (organizationId: string) =>
+    ["organizations", organizationId, "cards"] as const,
+  myCards: (organizationId: string) =>
+    ["organizations", organizationId, "cards", "mine"] as const,
+  /** Prefix of every loaded purchase list. */
+  cardPurchaseLists: (organizationId: string) =>
+    ["organizations", organizationId, "cards", "purchases", "list"] as const,
+  cardPurchaseList: (
+    organizationId: string,
+    filters: {
+      readonly cardId: string | null;
+      readonly needsReceipt: boolean;
+    },
+  ) =>
+    [
+      "organizations",
+      organizationId,
+      "cards",
+      "purchases",
+      "list",
+      filters,
+    ] as const,
+  cardPurchase: (organizationId: string, purchaseId: string) =>
+    [
+      "organizations",
+      organizationId,
+      "cards",
+      "purchases",
+      "detail",
+      purchaseId,
+    ] as const,
   /** Preparing a float payment; outside `floats` so refreshing floats never prepares again. */
   floatPayment: (organizationId: string, floatId: string, movementId: string) =>
     [

@@ -5,6 +5,7 @@ import {
   Banknote,
   CircleCheck,
   Contact,
+  CreditCard,
   Download,
   FileText,
   Plus,
@@ -140,6 +141,12 @@ export function WorkspaceNavigation({ isAdmin }: { isAdmin: boolean }) {
             }
             icon={Receipt}
             onPress={() => router.push("/claims")}
+          />
+          <ListRow
+            title="My Expendi cards"
+            subtitle="Your cards, purchases and receipts"
+            icon={CreditCard}
+            onPress={() => router.push("/cards")}
           />
           <ListRow
             title="My petty cash"

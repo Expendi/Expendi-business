@@ -213,6 +213,26 @@ function RootNavigator(): JSX.Element {
           options={withHeader("Edit claim")}
         />
         <Stack.Screen
+          name="(employee)/cards/index"
+          options={withHeader("My Expendi cards")}
+        />
+        <Stack.Screen
+          name="(employee)/cards/[cardId]/index"
+          options={withHeader("Card")}
+        />
+        <Stack.Screen
+          name="(employee)/cards/[cardId]/reveal"
+          options={withHeader("Card details")}
+        />
+        <Stack.Screen
+          name="(employee)/cards/purchases/[purchaseId]/index"
+          options={withHeader("Purchase")}
+        />
+        <Stack.Screen
+          name="(employee)/cards/purchases/[purchaseId]/receipt"
+          options={withHeader("Add receipt")}
+        />
+        <Stack.Screen
           name="(employee)/petty-cash/index"
           options={withHeader("Petty cash")}
         />
