@@ -376,6 +376,19 @@ describe("POST /webhooks/lithic", () => {
     );
   });
 
+  it("explains a purchase the cash and gambling rule blocked", async () => {
+    const blocked = newToken();
+    await deliver(blocked, {
+      status: "DECLINED",
+      result: "DECLINED",
+      detailedResults: ["PROGRAM_USAGE_RESTRICTION"],
+    });
+    expect(await readPurchaseByToken(db, card.company, blocked)).toMatchObject({
+      declineReason:
+        "Cash and gambling purchases aren't allowed on Expendi cards.",
+    });
+  });
+
   it("makes no expense for a refund, and puts it back in the Card balance", async () => {
     const token = newToken();
     await deliver(token, {
