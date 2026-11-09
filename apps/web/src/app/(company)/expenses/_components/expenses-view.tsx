@@ -93,7 +93,7 @@ import {
 import {
   ETIMS_LABELS,
   EXPENSE_STATUS,
-  KIND_LABELS,
+  expenseKindLabel,
   KIND_TAB_LABELS,
   personName,
   STATUS_ORDER,
@@ -737,7 +737,7 @@ export function ExpenseTable({
                     {expense.merchant}
                   </RowTitle>
                   <RowMeta
-                    text={`${KIND_LABELS[expense.listKind]} · ${expense.category.name}`}
+                    text={`${expenseKindLabel(expense)} · ${expense.category.name}`}
                   >
                     <Flags expense={expense} etims="collapsed" />
                   </RowMeta>

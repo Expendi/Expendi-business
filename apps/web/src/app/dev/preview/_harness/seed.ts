@@ -11,6 +11,7 @@ import {
   SETTLED_BILLS,
   WALLET,
 } from "./fixtures/bills";
+import { seedCards } from "./fixtures/cards";
 import { CLAIMS_SUMMARY } from "./fixtures/claims";
 import { ORGANIZATION_ID } from "./fixtures/company";
 import { seedExpensesAndApprovals } from "./fixtures/expenses";
@@ -39,6 +40,7 @@ export function seedSampleData(client: QueryClient): void {
     enrolledAt: "2026-10-01T09:00:00.000Z",
   });
   seedBills(client);
+  seedCards(client);
   seedTeam(client);
   seedExpensesAndApprovals(client);
   seedOverview(client);

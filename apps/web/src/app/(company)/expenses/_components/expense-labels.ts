@@ -1,5 +1,6 @@
 import type {
   EtimsStatus,
+  Expense,
   ExpenseListKind,
   ExpenseStatus,
   ExpenseWarning,
@@ -25,6 +26,13 @@ export const KIND_TAB_LABELS: Record<ExpenseListKind, string> = {
   petty_cash: "Petty cash",
   company: "Company spending",
 };
+
+/** What a row says it is. A Card expense is listed with company spending. */
+export function expenseKindLabel(
+  expense: Pick<Expense, "kind" | "listKind">,
+): string {
+  return expense.kind === "card" ? "Card" : KIND_LABELS[expense.listKind];
+}
 
 /** The app's wording (`apps/mobile/src/features/claims/claim-status.tsx`). */
 export const EXPENSE_STATUS: Record<

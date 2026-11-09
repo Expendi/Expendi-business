@@ -26,7 +26,7 @@ import {
   describeWarning,
   ETIMS_LABELS,
   EXPENSE_STATUS,
-  KIND_LABELS,
+  expenseKindLabel,
   personName,
   warningKey,
 } from "./expense-labels";
@@ -34,12 +34,13 @@ import { ReceiptGallery } from "./receipt-gallery";
 
 /** Who the expense belongs to, in the words its kind uses. */
 function personLabel(expense: Expense): string {
+  if (expense.kind === "card") return "Cardholder";
   if (expense.listKind === "company") return "Recorded by";
   return expense.kind === "float" ? "Float holder" : "Submitted by";
 }
 
 function eyebrowOf(expense: Expense): string {
-  const label = KIND_LABELS[expense.listKind];
+  const label = expenseKindLabel(expense);
   return expense.kind === "claim" && expense.floatId
     ? `${label} · for what the float didn't cover`
     : label;

@@ -98,6 +98,7 @@ describe("the sidebar's badges", () => {
         "Accounts",
         "Approvals",
         "Expenses",
+        "Cards",
         "Bills",
         "Payroll",
         "Payees",
