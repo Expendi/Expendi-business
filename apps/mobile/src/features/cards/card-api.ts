@@ -170,3 +170,19 @@ export async function attachCardReceipt(
     z.unknown(),
   );
 }
+
+export function attachCardReceiptMutation(
+  api: ApiClient,
+  organizationId: string,
+  purchaseId: string,
+  reloadCards: () => Promise<unknown>,
+) {
+  return {
+    mutationFn: (request: AttachCardReceiptRequest) =>
+      attachCardReceipt(api, organizationId, purchaseId, request),
+    onSuccess: () => {
+      // Not awaited: `needsReceipt` going false swaps the form out, and React Query then drops the caller's `mutate` callback.
+      void reloadCards();
+    },
+  };
+}

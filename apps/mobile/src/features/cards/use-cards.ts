@@ -26,7 +26,7 @@ import { usePasskeyApproval } from "~/features/approval";
 import { queryKeys } from "~/lib/query-keys";
 import { useApi } from "~/providers/api-provider";
 import {
-  attachCardReceipt,
+  attachCardReceiptMutation,
   confirmCardReveal,
   findLoadedPurchase,
   findMyCardPurchase,
@@ -152,11 +152,9 @@ export function useAttachCardReceipt(
 ): UseMutationResult<void, Error, AttachCardReceiptRequest> {
   const api = useApi();
   const invalidate = useInvalidateCards(organizationId);
-  return useMutation({
-    mutationFn: (request) =>
-      attachCardReceipt(api, organizationId, purchaseId, request),
-    onSuccess: invalidate,
-  });
+  return useMutation(
+    attachCardReceiptMutation(api, organizationId, purchaseId, invalidate),
+  );
 }
 
 /**

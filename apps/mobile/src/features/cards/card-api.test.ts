@@ -1,5 +1,6 @@
 import type { InfiniteData } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { MutationObserver, QueryClient } from "@tanstack/react-query";
+import { describe, expect, it, vi } from "vitest";
 
 import type { CardPurchase, CardPurchaseList } from "@expendi-business/shared";
 
@@ -7,6 +8,7 @@ import type { ApiClient } from "../../lib/api";
 import { ApiError } from "../../lib/api";
 import {
   attachCardReceipt,
+  attachCardReceiptMutation,
   attachReceiptRequest,
   confirmCardReveal,
   findLoadedPurchase,
@@ -332,5 +334,24 @@ describe("adding a receipt", () => {
         body: request,
       },
     ]);
+  });
+
+  it("tells the caller it saved without waiting for the cards to reload", async () => {
+    // #given
+    const { api } = fakeApi({ anything: true });
+    const neverReloads = () => new Promise<void>(() => undefined);
+    const observer = new MutationObserver(
+      new QueryClient(),
+      attachCardReceiptMutation(api, ORG, PURCHASE, neverReloads),
+    );
+    const unsubscribe = observer.subscribe(() => undefined);
+    const saved = vi.fn();
+
+    // #when
+    void observer.mutate({ receiptFileIds: [FILE] }, { onSuccess: saved });
+
+    // #then
+    await vi.waitFor(() => expect(saved).toHaveBeenCalledOnce());
+    unsubscribe();
   });
 });
