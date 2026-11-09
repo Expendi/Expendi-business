@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "steps": {
+    "build": {
+      "commands": ["pnpm turbo run build --filter=@expendi-business/api"]
+    }
+  },
+  "deploy": {
+    "startCommand": "pnpm --filter @expendi-business/api start"
+  }
+}
