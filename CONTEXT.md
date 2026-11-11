@@ -4,6 +4,50 @@ Expense management for companies in Kenya: staff spending, approvals, payments a
 
 ## Language
 
+### Chains and wallets
+
+**Main chain**:
+The chain where every company's money sits at rest. It is NEAR.
+_Avoid_: Home chain, primary network, settlement chain
+
+**Company wallet**:
+The one account on the main chain that holds a single company's USDC. Never shared between companies.
+_Avoid_: Treasury, main wallet, NEAR wallet
+
+**Transit wallet**:
+A company's own account on Base that holds nothing at rest. Money passes through it on the way to a cash-out, and refunds return to it.
+_Avoid_: Base wallet, bridge wallet, refund wallet
+
+**Gas relayer**:
+The Expendi-owned account that pays network fees, so a company wallet never holds anything but USDC.
+_Avoid_: Paymaster, sponsor, fee wallet
+
+### Moving money
+
+**Fund-in**:
+A company adding money to its company wallet by sending a supported asset from any supported chain.
+_Avoid_: Deposit, on-ramp, bridge in
+
+**Cash-out**:
+A payout the recipient receives as shillings through M-Pesa, a till, a paybill or a bank.
+_Avoid_: Off-ramp, fiat payout
+
+**USDC payout**:
+A payout the recipient receives as USDC on the payee chain they chose.
+_Avoid_: Onchain payout, crypto payout
+
+**Payee chain**:
+The chain a USDC payee or withdrawal address receives on.
+_Avoid_: Network, destination chain
+
+**Base hop**:
+Moving an exact amount of a company's USDC from its company wallet to its transit wallet so a cash-out can be funded.
+_Avoid_: Bridge, bridging, swap
+
+**Sweep**:
+Returning whatever sits in a transit wallet to the company wallet.
+_Avoid_: Reverse bridge, drain
+
 ### Cards
 
 **Expendi card**:
