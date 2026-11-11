@@ -32,6 +32,8 @@ const run = (
   capKes: (BigInt(totalKes) + 1_000_000n).toString(),
   people,
   leftOut: 0,
+  adjusted: 0,
+  oneOffs: 0,
   progress: {
     paid: status === "paid" ? people : 0,
     paying: 0,
@@ -57,6 +59,7 @@ const salary = (
     method,
     archived: false,
     payoutPhoneConfirmed: true,
+    accountEnding: method === "bank" ? "4471" : null,
   },
   category: { id: id(400), name: "Salaries" },
   amountKes,
