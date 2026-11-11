@@ -76,6 +76,61 @@ dark-token definitions; the current product remains light by default.
 - Bottom sheets scroll and avoid the keyboard; safe-area padding stays intact.
 - Keep existing routes, permissions, API behavior, and financial calculations.
 
+## Dashboard shell and themes (web and admin)
+
+Both browser apps use the shell from the
+[next-shadcn-admin-dashboard](https://github.com/arhamkhnz/next-shadcn-admin-dashboard)
+template, built on shadcn `Sidebar`. Each app has its own copy in `components/app-shell.tsx`,
+`components/app-sidebar.tsx`, `components/site-header.tsx` and `components/shell/`.
+
+- **Sidebar**: collapses to icons (with tooltips) or off-canvas. Variant is sidebar, inset or floating.
+  The header holds the brand and the company (web) or "Internal" (admin). Nav badges come from
+  `hooks/use-nav-counts.ts` (web only). The footer has the account menu.
+- **Header (48px)**: the sidebar trigger, the page title, ⌘K / Ctrl+K page search, layout
+  controls, a light/dark/system switcher and the account menu. It is sticky by default.
+- **Content**: centred at `max-w-screen-2xl` or full width. Pages can opt out of padding with
+  `data-content-padding="false"`.
+- **Preferences**: theme mode, colour preset, font, content width, navbar style, sidebar variant
+  and collapse mode. They live in year-long cookies written by the browser
+  (`lib/preferences/preferences-client.ts`). The root layout reads them with `cookies()`, so the
+  first paint already matches; a boot script resolves "system". Defaults: light, Expendi preset,
+  Outfit, centred, sticky, inset, icon.
+- **Presets**: the Expendi preset (coral, gray, Outfit, see Tokens) is the default and the brand.
+  Tangerine, Soft pop and Brutalist come from the template (`src/styles/presets/`) and are
+  opt-in per viewer only. Never design a screen for them.
+- **Dark mode**: every semantic token and the raw gray, brand and tint scales have dark values in
+  `app/styles.css`, so older markup stays legible. New markup uses semantic tokens only
+  (`foreground`, `muted-foreground`, `card`, `border`, `primary`, `accent`); the mapping is in
+  `apps/web/src/components/data/README.md`. Status tints (warn, success, error, blue) stay raw.
+- **Primary button**: `bg-primary text-primary-foreground`, white on coral 500 as in the
+  approved mocks. It follows a preset's primary.
+- **Dev preview**: `/dev/preview/<page>` renders every page in the real shell against typed
+  fixtures, with no sign-in, in development only. Web uses `?role=accountant` and admin
+  `?role=viewer` for the read-only view.
+
+## Page patterns
+
+- **Tables**: `components/data/data-table` (TanStack Table v9, registry in
+  `lib/data-table-features.ts`):
+  - `useDataTable`, `DataTable` and `DataTableColumnHeader` (with `aria-sort`), with column defs
+    in a `columns.tsx` beside the view.
+  - `DataTableToolbar` holds search, filter chips and the Columns menu; the Columns menu hides
+    where tables become cards.
+  - `DataTablePagination` appears only on lists that run long.
+  - Lists the API filters, sorts or pages use `manual` mode.
+  - Sort helpers are in `data-table/sort.ts`: `pressedKey` + `nextSort` when the page picks the
+    direction, `sortFromTable` when the table does.
+- **Cells and phone cards**: `components/data/cells.tsx` (`RowTitle`, `RowMeta`, `Mini`,
+  `EntityMark`, `RowCheckbox`, `PhoneCard`). Under a 720px panel or a 900px window, `DataTable`
+  renders `renderPhoneCard` rows in a labelled list instead of the table.
+- **KPI cards**: `StatCards` / `StatCard` use the template's card (icon chip, label, large
+  tabular figure, optional trend badge). There are at most four; they sit 2×2 under 1100px and
+  go compact under 600px.
+- **Charts**: shadcn `ui/chart` on Recharts. Use `TrendChart` for area/bar series and
+  `MonthBars` for month columns (the selected month is coral, the rest muted). Colours come from
+  `--chart-1…5`. Every chart keeps a "Show as table" view (`table-toggle.tsx`) and Recharts'
+  keyboard accessibility layer.
+
 ## Mobile reference and implementation
 
 The mobile reference is `recurring-payments-frontend/apps/expo`, especially its
@@ -123,7 +178,9 @@ salaries appear only on Payroll. Visible text says "reimbursement", never "claim
   coral 800 text and no border. Up to five chips share the tabs' row; more,
   or not enough width, stacks them under the tabs.
 - Status badges are a colour tint plus text, with no dot.
-- Tables are one flat list with sortable headers and no group header rows.
+- Tables are one flat list with sortable headers and no group header rows. The one
+  exception is Accounts history: one table per Nairobi day under a day heading, with
+  aligned columns.
   Rows have two lines: the name at 600, then a muted meta line with small
   markers. Rows that can't be selected have no checkbox. Under a 720px panel
   the table becomes cards. There is no horizontal page scroll.
@@ -147,6 +204,25 @@ salaries appear only on Payroll. Visible text says "reimbursement", never "claim
   resolution retain their reason, evidence, review, and confirmation steps.
 - Import layout selection, mapping, preview and review gates retain their
   existing behavior; their controls and preview table follow the same patterns.
+- Admin uses the same shell, preferences, themes and `components/data/data-table` kit as web.
+  The kit folders are kept identical, so copy changes both ways. Tables run in `manual` mode
+  with no client paging, because the internal API has no sort parameters. Cursor paging uses
+  `components/cursor-pager.tsx`, and unsortable columns use `components/plain-column.tsx`.
+- Admin tables have no phone cards: wide tables scroll inside their Card on phones. `JsonDiff`
+  stays a plain `ui/table`, since its row tints carry meaning.
+
+## Verification (2026-11-11, template shell)
+
+- Web: 41 test files, 348 tests; typecheck, lint, prettier and production build passed.
+  Admin: 4 files, 13 tests; typecheck, lint, prettier and production build passed.
+- Every web page (11) and admin page (11) was rendered in `/dev/preview` with headless
+  Chrome at 1440px and 390px, in light and dark. Tangerine and the floating sidebar were
+  checked on a sample, as were the read-only roles (`accountant`, `viewer`) and the bill and
+  payee sheets. There were no runtime errors apart from a missing `/favicon.ico`, which was
+  already missing before this work.
+- Contrast is still open: the primary button is white on coral 500 (about 2.6:1), as the
+  approved mocks draw it. Dark labels (7.1:1, the 2026-11-02 check) would need
+  `--primary-foreground` set back to gray 900.
 
 ## Verification (2026-11-02)
 
