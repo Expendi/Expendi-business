@@ -40,7 +40,6 @@ import {
   StatCards,
   StatCardSkeleton,
 } from "~/components/data/stat-cards";
-import { nextSort } from "~/components/data/table";
 import { useDeepLinkParams } from "~/components/data/use-deep-link-param";
 import { Button } from "~/components/ui/button";
 import { useAuth } from "~/contexts/auth-context";
@@ -78,8 +77,9 @@ import { approxKesTotal } from "~/lib/money";
 import { queryKeys } from "~/lib/query-keys";
 import { useApprovalPasskeyStatus } from "~/lib/use-approval";
 import { PaymentResultBanner } from "./bill-payment-review";
-import { BillsResults, canSelect } from "./bills-results";
+import { BillsResults } from "./bills-results";
 import { BillsSheet, NO_LOCAL_SHEET } from "./bills-sheet";
+import { canSelect } from "./columns";
 
 type BillParam = "view" | BillFilterParam | "billId" | "recurring" | "new";
 
@@ -396,7 +396,10 @@ function CompanyBills({
         onSort={(key) =>
           setSorts((current) => ({
             ...current,
-            [view]: nextSort(sort, key, firstSortDir(key, view)),
+            [view]:
+              sort.key === key
+                ? { key, dir: sort.dir === "asc" ? "desc" : "asc" }
+                : { key, dir: firstSortDir(key, view) },
           }))
         }
         rate={rate}

@@ -5,6 +5,8 @@ import type { JSX, ReactNode } from "react";
 import { cn } from "cn";
 import { ChartColumnIcon, TagIcon } from "lucide-react";
 import Link from "next/link";
+import { useMemo } from "react";
+import { Line, LineChart, ReferenceDot, XAxis, YAxis } from "recharts";
 
 import type { ReportSpending } from "@expendi-business/shared";
 
@@ -14,23 +16,34 @@ import type {
   ChangeContext,
   SpendingMonthView,
 } from "./reports-display";
-import type { TipContent, TipKey } from "./viz/chart-tip";
-import type { SortState } from "~/components/data/table";
+import type {
+  DataTableColumnDef,
+  SortState,
+} from "~/components/data/data-table";
+import type { MonthTip } from "~/components/data/month-bars";
+import { PhoneCard, RowMeta, RowTitle } from "~/components/data/cells";
+import {
+  DataTable,
+  DataTableColumnHeader,
+  pressedKey,
+  toSorting,
+  useDataTable,
+} from "~/components/data/data-table";
 import { Money } from "~/components/data/money";
+import { MonthBars } from "~/components/data/month-bars";
 import { ResultsBody, ResultsPanel } from "~/components/data/results";
 import { EmptyState, ErrorState, Skel } from "~/components/data/states";
-import {
-  DataRow,
-  DataTable,
-  PhoneCard,
-  PhoneCards,
-  RowMeta,
-  RowTitle,
-  SortHeader,
-  Td,
-  Th,
-} from "~/components/data/table";
+import { MiniTable, TableToggle } from "~/components/data/table-toggle";
 import { Button } from "~/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { ChartContainer } from "~/components/ui/chart";
 import { monthAbbr, monthLabel, shiftMonth } from "./report-month";
 import {
   categoryMeta,
@@ -40,10 +53,15 @@ import {
   headingLabel,
   isNotableRise,
 } from "./reports-display";
-import { ColumnChart } from "./viz/column-chart";
-import { MiniTable, TableToggle } from "./viz/table-toggle";
 
 const kesText = (value: number) => `KES ${value.toLocaleString("en-KE")}`;
+
+const CATEGORY_KEYS: readonly CategorySortKey[] = [
+  "name",
+  "previous",
+  "current",
+  "change",
+];
 
 function soFar(month: string, thisMonth: string, text = " (so far)"): string {
   return month === thisMonth ? text : "";
@@ -74,17 +92,17 @@ export function SpendingBody({
   if (spending.isPending) return <SpendingSkeleton />;
   if (spending.isError) {
     return (
-      <div className="mt-4 rounded-panel border border-gray-200 bg-surface">
+      <Card className="mt-4 gap-0 py-0 shadow-xs">
         <ErrorState
           title="Spending didn't load"
           onRetry={() => void spending.refetch()}
         />
-      </div>
+      </Card>
     );
   }
   if (months.every((month) => month.total === 0)) {
     return (
-      <div className="mt-4 rounded-panel border border-gray-200 bg-surface">
+      <Card className="mt-4 gap-0 py-0 shadow-xs">
         <EmptyState
           icon={ChartColumnIcon}
           title={`Nothing paid out in these ${String(months.length)} months`}
@@ -99,7 +117,7 @@ export function SpendingBody({
           Bills, payroll runs, reimbursements and petty cash show up here once
           they&apos;re paid.
         </EmptyState>
-      </div>
+      </Card>
     );
   }
   return (
@@ -140,25 +158,21 @@ function VizCard({
   foot: ReactNode;
 }): JSX.Element {
   return (
-    <article
+    <Card
+      role="article"
       aria-labelledby={titleId}
-      className="flex min-w-0 flex-col rounded-panel border border-gray-200 bg-surface p-5 text-sm shadow-panel max-[600px]:p-4"
+      className="shadow-xs max-[600px]:[--card-spacing:--spacing(4)]"
     >
-      <h3
-        id={titleId}
-        className="text-lg leading-[26px] font-(--w-title) text-gray-900"
-      >
-        {title}
-      </h3>
-      <p className="mt-0.5 text-gray-500">{sub}</p>
-      {children}
-      <div className="mt-auto pt-3">{foot}</div>
-    </article>
+      <CardHeader>
+        <CardTitle id={titleId} role="heading" aria-level={3}>
+          {title}
+        </CardTitle>
+        <CardDescription>{sub}</CardDescription>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+      <CardFooter className="mt-auto block">{foot}</CardFooter>
+    </Card>
   );
-}
-
-function tipKey(month: string, selected: string): TipKey {
-  return month === selected ? "selected" : "context";
 }
 
 function MoneyOutCard({
@@ -171,17 +185,13 @@ function MoneyOutCard({
   const { month: selected, thisMonth } = context;
   const index = months.findIndex((entry) => entry.month === selected);
   const current = months[index];
-  const tip = (at: number): TipContent => {
+  const tip = (at: number): MonthTip => {
     const entry = months[at];
     if (!entry) return { head: "", rows: [] };
     return {
       head: `${monthLabel(entry.month)}${soFar(entry.month, thisMonth)}`,
       rows: [
-        {
-          key: tipKey(entry.month, selected),
-          value: kesText(entry.total),
-          label: "Money out",
-        },
+        { value: kesText(entry.total), label: "Money out" },
         ...HEADING_KEYS.map((key) => ({
           value: kesText(entry.headings[key]),
           label: headingLabel(key),
@@ -221,17 +231,15 @@ function MoneyOutCard({
         </TableToggle>
       }
     >
-      <div className="mt-4">
-        <ColumnChart
-          labels={months.map((entry) => monthAbbr(entry.month))}
-          values={months.map((entry) => entry.total)}
-          selected={index}
-          height={(width) => (width > 0 && width < 520 ? 240 : 340)}
-          axis
-          ariaLabel={`Money out by month. ${monthLabel(selected)}${soFar(selected, thisMonth)}: ${kesText(current?.total ?? 0)}. Use the arrow keys to read each month.`}
-          tip={tip}
-        />
-      </div>
+      <MonthBars
+        labels={months.map((entry) => monthAbbr(entry.month))}
+        values={months.map((entry) => entry.total)}
+        selected={index}
+        axis
+        className="h-60 min-[600px]:h-80"
+        ariaLabel={`Money out by month. ${monthLabel(selected)}${soFar(selected, thisMonth)}: ${kesText(current?.total ?? 0)}. Use the arrow keys to read each month.`}
+        tip={tip}
+      />
     </VizCard>
   );
 }
@@ -274,13 +282,13 @@ function HeadingCard({
         </TableToggle>
       }
     >
-      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-5 max-[600px]:gap-4">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-5 max-[600px]:gap-4">
         {HEADING_KEYS.map((key) => {
           const value = current?.headings[key] ?? 0;
           const previous = current?.previousHeadings[key] ?? 0;
           return (
             <div key={key} className="min-w-0">
-              <p className="text-xs leading-4 font-(--w-ui) text-gray-600">
+              <p className="text-xs leading-4 font-(--w-ui) text-muted-foreground">
                 {headingLabel(key)}
               </p>
               <p className="mt-0.5 text-base leading-6 font-(--w-amount)">
@@ -289,16 +297,16 @@ function HeadingCard({
                   currency="KES"
                 />
               </p>
-              <p className="text-xs leading-4 text-gray-500">
+              <p className="text-xs leading-4 text-muted-foreground">
                 {changeLine(value, previous, context)}
               </p>
               <div className="mt-2">
-                <ColumnChart
+                <MonthBars
                   labels={months.map((entry) => monthAbbr(entry.month))}
                   values={months.map((entry) => entry.headings[key])}
                   selected={index}
-                  height={96}
                   axis={false}
+                  className="h-28"
                   ariaLabel={`${headingLabel(key)} by month: ${kesText(value)} in ${monthLabel(selected)}${soFar(selected, thisMonth)}. Use the arrow keys to read each month.`}
                   tip={(at) => {
                     const entry = months[at];
@@ -309,7 +317,6 @@ function HeadingCard({
                       rows: entry
                         ? [
                             {
-                              key: tipKey(entry.month, selected),
                               value: kesText(entry.headings[key]),
                               label: headingLabel(key),
                             },
@@ -327,7 +334,9 @@ function HeadingCard({
   );
 }
 
-/** A category's months as a thin gray line, the chosen month dotted. */
+const SPARK_CONFIG = { value: { label: "Money out" } } as const;
+
+/** A category's months as a thin line, the chosen month dotted. */
 export function Spark({
   values,
   selected,
@@ -335,40 +344,38 @@ export function Spark({
   values: readonly number[];
   selected: number;
 }): JSX.Element {
-  const W = 96;
-  const H = 28;
-  const max = Math.max(...values, 1);
-  const x = (index: number) =>
-    values.length === 1 ? W / 2 : (index / (values.length - 1)) * (W - 8) + 4;
-  const y = (value: number) => H - 4 - (value / max) * (H - 8);
-  const path = values
-    .map(
-      (value, index) =>
-        `${index ? "L" : "M"}${x(index).toFixed(1)} ${y(value).toFixed(1)}`,
-    )
-    .join("");
+  const data = values.map((value, index) => ({ index, value }));
   const point = values[selected];
   return (
-    <svg
-      width={W}
-      height={H}
-      viewBox={`0 0 ${String(W)} ${String(H)}`}
+    <ChartContainer
+      config={SPARK_CONFIG}
       aria-hidden="true"
-      className="block overflow-visible"
+      className="aspect-auto h-7 w-24 justify-start"
     >
-      <path
-        d={path}
-        className="fill-none stroke-gray-400 stroke-2 [stroke-linecap:round] [stroke-linejoin:round]"
-      />
-      {point !== undefined ? (
-        <circle
-          cx={x(selected)}
-          cy={y(point)}
-          r={4}
-          className="fill-brand-700 stroke-surface stroke-2"
+      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+        <XAxis dataKey="index" hide />
+        <YAxis hide domain={[0, Math.max(...values, 1)]} />
+        <Line
+          dataKey="value"
+          type="linear"
+          stroke="var(--muted-foreground)"
+          strokeOpacity={0.6}
+          strokeWidth={2}
+          dot={false}
+          isAnimationActive={false}
         />
-      ) : null}
-    </svg>
+        {point !== undefined ? (
+          <ReferenceDot
+            x={selected}
+            y={point}
+            r={4}
+            fill="var(--primary)"
+            stroke="var(--card)"
+            strokeWidth={2}
+          />
+        ) : null}
+      </LineChart>
+    </ChartContainer>
   );
 }
 
@@ -386,7 +393,7 @@ function ChangeText({
     <span
       className={cn(
         "whitespace-nowrap tabular-nums",
-        up ? "font-(--w-ui) text-gray-900" : "text-gray-500",
+        up ? "font-(--w-ui) text-foreground" : "text-muted-foreground",
       )}
     >
       {text}
@@ -400,6 +407,98 @@ function phoneChange(row: CategoryRow, previousMonth: string): string {
   if (delta === "New") return `New since ${monthAbbr(previousMonth)}`;
   if (delta === "None") return "";
   return `${delta} on ${monthAbbr(previousMonth)}`;
+}
+
+function categoryColumns({
+  monthCount,
+  month,
+  thisMonth,
+  onOpen,
+}: {
+  monthCount: number;
+  month: string;
+  thisMonth: string;
+  onOpen: (id: string) => void;
+}): DataTableColumnDef<CategoryRow>[] {
+  const partial = month === thisMonth;
+  const previousLabel = monthLabel(shiftMonth(month, -1));
+  const currentLabel = `${monthLabel(month)}${soFar(month, thisMonth, " so far")}`;
+  return [
+    {
+      id: "name",
+      accessorFn: (row) => row.name,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Category" />
+      ),
+      cell: ({ row }) => (
+        <>
+          <RowTitle onOpen={() => onOpen(row.original.id)}>
+            {row.original.name}
+          </RowTitle>
+          <RowMeta text={categoryMeta(row.original, month)} />
+        </>
+      ),
+      meta: { kind: "main", label: "Category" },
+    },
+    {
+      id: "trend",
+      header: `Last ${String(monthCount)} months`,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Spark values={row.original.trend} selected={monthCount - 1} />
+      ),
+      meta: {
+        collapse: "md",
+        className: "w-[120px]",
+        label: `Last ${String(monthCount)} months`,
+      },
+    },
+    {
+      id: "previous",
+      accessorFn: (row) => row.previous,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={previousLabel} />
+      ),
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap text-muted-foreground">
+          <Money amount={row.original.previousKes} currency="KES" />
+        </span>
+      ),
+      meta: { align: "end", label: previousLabel },
+    },
+    {
+      id: "current",
+      accessorFn: (row) => row.current,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={currentLabel} />
+      ),
+      cell: ({ row }) => (
+        <span className="text-base leading-6 font-(--w-amount) whitespace-nowrap">
+          <Money amount={row.original.currentKes} currency="KES" />
+        </span>
+      ),
+      meta: { align: "end", label: currentLabel },
+    },
+    {
+      id: "change",
+      accessorFn: (row) => row.current - row.previous,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Change" />
+      ),
+      cell: ({ row }) => (
+        <ChangeText
+          row={row.original}
+          partial={partial}
+          text={
+            partial
+              ? "So far"
+              : deltaText(row.original.current, row.original.previous)
+          }
+        />
+      ),
+      meta: { align: "end", label: "Change" },
+    },
+  ];
 }
 
 function CategoryPanel({
@@ -423,15 +522,36 @@ function CategoryPanel({
   const partial = month === thisMonth;
   const previousMonth = shiftMonth(month, -1);
   const previousLabel = monthLabel(previousMonth);
-  const selectedIndex = months.length - 1;
+  const monthCount = months.length;
+  const columns = useMemo(
+    () =>
+      categoryColumns({
+        monthCount,
+        month,
+        thisMonth,
+        onOpen: onOpenCategory,
+      }),
+    [monthCount, month, thisMonth, onOpenCategory],
+  );
+  const table = useDataTable({
+    data: rows,
+    columns,
+    getRowId: (row) => row.id,
+    manual: { sorting: true },
+    paginate: false,
+    sorting: {
+      value: toSorting(sort),
+      onChange: (next) => onSort(pressedKey(next, sort, CATEGORY_KEYS)),
+    },
+  });
   return (
     <ResultsPanel label="By category">
-      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-gray-200 px-5 pt-[18px] pb-3.5 max-[600px]:p-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-border px-5 pt-[18px] pb-3.5 max-[600px]:p-4">
         <div>
-          <h3 className="text-lg leading-[26px] font-(--w-title) text-gray-900">
+          <h3 className="text-lg leading-[26px] font-(--w-title) text-foreground">
             By category
           </h3>
-          <p className="mt-0.5 text-gray-500">
+          <p className="mt-0.5 text-muted-foreground">
             {monthLabel(month)}
             {soFar(month, thisMonth, " so far")} against {previousLabel}. Open a
             category for its months and largest payments.
@@ -439,108 +559,45 @@ function CategoryPanel({
         </div>
       </div>
       <ResultsBody>
-        <DataTable caption="Spending by category">
-          <thead>
-            <tr>
-              <SortHeader
-                label="Category"
-                sortKey="name"
-                sort={sort}
-                onSort={onSort}
-              />
-              <Th collapse="md">Last {months.length} months</Th>
-              <SortHeader
-                label={previousLabel}
-                sortKey="previous"
-                sort={sort}
-                onSort={onSort}
-                align="end"
-              />
-              <SortHeader
-                label={`${monthLabel(month)}${soFar(month, thisMonth, " so far")}`}
-                sortKey="current"
-                sort={sort}
-                onSort={onSort}
-                align="end"
-              />
-              <SortHeader
-                label="Change"
-                sortKey="change"
-                sort={sort}
-                onSort={onSort}
-                align="end"
-              />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <DataRow
-                key={row.id}
-                open={openCategoryId === row.id}
-                onOpen={() => onOpenCategory(row.id)}
-              >
-                <Td kind="main">
-                  <RowTitle onOpen={() => onOpenCategory(row.id)}>
-                    {row.name}
-                  </RowTitle>
-                  <RowMeta text={categoryMeta(row, month)} />
-                </Td>
-                <Td collapse="md" className="w-[120px] pt-3.5">
-                  <Spark values={row.trend} selected={selectedIndex} />
-                </Td>
-                <Td align="end">
-                  <span className="inline-block pt-0.5 whitespace-nowrap text-gray-600">
-                    <Money amount={row.previousKes} currency="KES" />
-                  </span>
-                </Td>
-                <Td align="end">
-                  <span className="text-base leading-6 font-(--w-amount) whitespace-nowrap">
-                    <Money amount={row.currentKes} currency="KES" />
-                  </span>
-                </Td>
-                <Td align="end">
-                  <ChangeText
-                    row={row}
-                    partial={partial}
-                    text={
-                      partial ? "So far" : deltaText(row.current, row.previous)
-                    }
-                  />
-                </Td>
-              </DataRow>
-            ))}
-          </tbody>
-        </DataTable>
-        <PhoneCards label="Categories">
-          {rows.map((row) => (
+        <DataTable
+          table={table}
+          caption="Spending by category"
+          phoneLabel="Categories"
+          onRowOpen={(row) => onOpenCategory(row.id)}
+          openRowId={openCategoryId}
+          renderPhoneCard={(row) => (
             <PhoneCard
               key={row.id}
               mark={
                 <span
                   aria-hidden="true"
-                  className="inline-flex size-8 items-center justify-center rounded-control border border-gray-200 bg-surface text-gray-700"
+                  className="inline-flex size-8 items-center justify-center rounded-control border border-border bg-card text-secondary-foreground"
                 >
                   <TagIcon className="size-4" />
                 </span>
               }
-              title={row.name}
-              sub={categoryMeta(row, month)}
+              title={row.original.name}
+              sub={categoryMeta(row.original, month)}
               aside={
                 <span className="inline-flex flex-col items-end">
                   <span className="font-(--w-amount)">
-                    <Money amount={row.currentKes} currency="KES" />
+                    <Money amount={row.original.currentKes} currency="KES" />
                   </span>
                   <ChangeText
-                    row={row}
+                    row={row.original}
                     partial={partial}
-                    text={partial ? "So far" : phoneChange(row, previousMonth)}
+                    text={
+                      partial
+                        ? "So far"
+                        : phoneChange(row.original, previousMonth)
+                    }
                   />
                 </span>
               }
               onOpen={() => onOpenCategory(row.id)}
             />
-          ))}
-        </PhoneCards>
+          )}
+        />
       </ResultsBody>
     </ResultsPanel>
   );
@@ -556,7 +613,7 @@ function SpendingSkeleton(): JSX.Element {
         {[0, 1].map((card) => (
           <div
             key={card}
-            className="rounded-panel border border-gray-200 bg-surface p-5"
+            className="rounded-xl border border-border bg-card p-5 shadow-xs"
           >
             <Skel width="40%" height={18} />
             <Skel width="65%" height={12} style={{ marginTop: 8 }} />
@@ -566,7 +623,7 @@ function SpendingSkeleton(): JSX.Element {
       </div>
       <div
         aria-hidden="true"
-        className="mt-4 rounded-panel border border-gray-200 bg-surface p-5"
+        className="mt-4 rounded-xl border border-border bg-card p-5 shadow-xs"
       >
         {[70, 62, 54, 46, 38].map((width, row) => (
           <Skel

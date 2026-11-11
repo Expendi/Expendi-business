@@ -72,12 +72,15 @@ export function MenuChip({
         aria-expanded={open}
         disabled={disabled}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
-        className="inline-flex h-9 items-center gap-2 rounded-control border border-control-border bg-surface px-3 text-sm font-(--w-ui) whitespace-nowrap text-gray-700 transition-colors duration-150 hover:not-disabled:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 aria-expanded:border-gray-900"
+        className="inline-flex h-9 items-center gap-2 rounded-control border border-input bg-card px-3 text-sm font-(--w-ui) whitespace-nowrap text-secondary-foreground transition-colors duration-150 hover:not-disabled:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50 aria-expanded:border-foreground"
       >
-        <Icon aria-hidden="true" className="size-4 text-gray-500" />
+        <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
         <span className="sr-only">{label}: </span>
         {display}
-        <ChevronDownIcon aria-hidden="true" className="size-4 text-gray-500" />
+        <ChevronDownIcon
+          aria-hidden="true"
+          className="size-4 text-muted-foreground"
+        />
       </button>
       {open ? (
         <ChipMenu
@@ -230,7 +233,7 @@ function ChipMenu({
       {footer ? (
         <div
           ref={footerRef}
-          className="flex flex-col gap-1.5 border-t border-hairline px-3 pt-2.5 pb-3"
+          className="flex flex-col gap-1.5 border-t border-border px-3 pt-2.5 pb-3"
         >
           <CloseMenuContext value={onClose}>{footer}</CloseMenuContext>
         </div>

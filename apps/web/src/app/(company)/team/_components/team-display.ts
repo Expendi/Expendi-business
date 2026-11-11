@@ -5,8 +5,8 @@ import type {
 } from "@expendi-business/shared";
 import { MEMBERSHIP_ROLES } from "@expendi-business/shared";
 
+import type { SortState } from "~/components/data/data-table";
 import type { StatusTone } from "~/components/data/status-badge";
-import type { SortState } from "~/components/data/table";
 import { ROLE_LABELS } from "~/config/roles";
 
 /** What each role can do (spec §4), as the app words it. */

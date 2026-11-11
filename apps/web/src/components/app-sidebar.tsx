@@ -1,90 +1,107 @@
 "use client";
 
 import { ChevronsUpDownIcon } from "lucide-react";
-import Image from "next/image";
+import Link from "next/link";
+import { useShallow } from "zustand/react/shallow";
 
+import type { Account } from "~/components/shell/account-menu";
 import type { NavCounts } from "~/hooks/use-nav-counts";
+import { BrandMark } from "~/components/brand-mark";
 import { NavMain } from "~/components/nav-main";
 import { NavUser } from "~/components/nav-user";
-import { NAV_ITEMS } from "~/config/navigation";
-import { ROLE_LABELS } from "~/config/roles";
-import { useDashboard } from "~/contexts/dashboard-context";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  useSidebar,
+} from "~/components/ui/sidebar";
+import { HOME_PATH, NAV_ITEMS } from "~/config/navigation";
+import { usePreferencesStore } from "~/stores/preferences/preferences-provider";
 
-/** The company switcher, the grouped pages with their badges, and the person signed in. */
-export function AppSidebar({
-  path,
-  counts,
-  name,
-  email,
-  onSwitchCompany,
-  onSignOut,
-  onNavigate,
-}: {
-  path: string;
-  counts: NavCounts;
-  name: string | null;
-  email: string;
-  onSwitchCompany: (() => void) | null;
-  onSignOut: () => void;
-  onNavigate: () => void;
-}) {
-  const { company } = useDashboard();
-  const role = ROLE_LABELS[company.role];
-  const identity = (
+function Identity({ companyName }: { companyName: string }) {
+  return (
     <>
-      <Image
-        src="/expendi-mark.png"
-        alt=""
-        width={32}
-        height={32}
-        className="size-8 shrink-0 rounded-control"
-      />
-      <span className="flex min-w-0 flex-1 flex-col">
+      <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg">
+        <BrandMark />
+      </span>
+      <span className="grid min-w-0 flex-1 text-left leading-tight">
+        <span className="truncate font-semibold">Expendi Business</span>
         <span
-          className="truncate font-(--w-name) text-gray-900"
-          title={company.name}
+          className="truncate text-xs text-muted-foreground"
+          title={companyName}
         >
-          {company.name}
+          {companyName}
         </span>
-        <span className="text-xs leading-4 text-gray-500">{role}</span>
       </span>
     </>
   );
+}
+
+/**
+ * The brand and company (a company switcher when there's more than one),
+ * the grouped pages with their badges, and the person signed in. Its style
+ * and how it collapses come from the layout controls.
+ */
+export function AppSidebar({
+  path,
+  counts,
+  account,
+}: {
+  path: string;
+  counts: NavCounts;
+  account: Account;
+}) {
+  const { variant, collapsible } = usePreferencesStore(
+    useShallow((state) => ({
+      variant: state.values.sidebar_variant,
+      collapsible: state.values.sidebar_collapsible,
+    })),
+  );
+  const { setOpenMobile } = useSidebar();
+  const { companyName, onSwitchCompany } = account;
   return (
-    <div className="flex h-full min-h-0 flex-col bg-surface text-sm">
-      <div className="flex flex-col gap-2.5 px-3 pt-4 pb-2">
-        {onSwitchCompany ? (
-          <button
-            type="button"
-            onClick={onSwitchCompany}
-            aria-label={`${company.name}, ${role}. Switch company`}
-            className="flex w-full items-center gap-2.5 rounded-control border-0 bg-transparent px-2 py-1.5 text-left transition-colors duration-150 hover:bg-gray-50"
-          >
-            {identity}
-            <ChevronsUpDownIcon
-              aria-hidden="true"
-              className="size-4 shrink-0 text-gray-400"
-            />
-          </button>
-        ) : (
-          <div className="flex w-full items-center gap-2.5 px-2 py-1.5">
-            {identity}
-          </div>
-        )}
-      </div>
-      <NavMain
-        items={NAV_ITEMS}
-        path={path}
-        counts={counts}
-        onNavigate={onNavigate}
-      />
-      <NavUser
-        name={name}
-        email={email}
-        role={role}
-        onSignOut={onSignOut}
-        onSwitchCompany={onSwitchCompany}
-      />
-    </div>
+    <Sidebar variant={variant} collapsible={collapsible}>
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            {onSwitchCompany ? (
+              <SidebarMenuButton
+                size="lg"
+                tooltip="Switch company"
+                aria-label={`${companyName}, ${account.role}. Switch company`}
+                onClick={() => {
+                  setOpenMobile(false);
+                  onSwitchCompany();
+                }}
+              >
+                <Identity companyName={companyName} />
+                <ChevronsUpDownIcon
+                  aria-hidden="true"
+                  className="ml-auto text-muted-foreground"
+                />
+              </SidebarMenuButton>
+            ) : (
+              <SidebarMenuButton size="lg" asChild>
+                <Link href={HOME_PATH} onClick={() => setOpenMobile(false)}>
+                  <Identity companyName={companyName} />
+                </Link>
+              </SidebarMenuButton>
+            )}
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <NavMain items={NAV_ITEMS} path={path} counts={counts} />
+      </SidebarContent>
+      <SidebarFooter>
+        <NavUser account={account} />
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
   );
 }

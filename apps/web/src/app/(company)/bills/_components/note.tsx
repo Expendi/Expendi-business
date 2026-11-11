@@ -11,10 +11,10 @@ export function Note({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <p className="flex items-start gap-2 text-gray-600">
+    <p className="flex items-start gap-2 text-muted-foreground">
       <Icon
         aria-hidden="true"
-        className="mt-0.5 size-4 shrink-0 text-gray-500"
+        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
       />
       <span>{children}</span>
     </p>

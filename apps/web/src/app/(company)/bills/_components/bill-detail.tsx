@@ -173,7 +173,9 @@ export function BillDetailBody({
         ) : null}
       </DetailList>
       {bill.notes ? (
-        <p className="whitespace-pre-wrap text-gray-700">{bill.notes}</p>
+        <p className="whitespace-pre-wrap text-secondary-foreground">
+          {bill.notes}
+        </p>
       ) : null}
       <SectionLabel>{bill.files.length > 1 ? "Files" : "File"}</SectionLabel>
       <BillFiles files={bill.files} />
@@ -243,7 +245,7 @@ export function BillDetailFooter({
   if (bill.payrollRunId !== null) {
     return (
       <>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted-foreground">
           Paid with its payroll run, under{" "}
           <Link href="/payroll" className={textLinkClass}>
             Payroll

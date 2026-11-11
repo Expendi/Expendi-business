@@ -20,9 +20,9 @@ import type {
 import type { PreviewRow } from "~/features/bills/bill-payment";
 import { textLinkClass } from "~/components/data/actions";
 import { Banner } from "~/components/data/banner";
+import { EntityMark, RowCheckbox } from "~/components/data/cells";
 import { Callout } from "~/components/data/detail-sheet";
 import { Money } from "~/components/data/money";
-import { EntityMark, RowCheckbox } from "~/components/data/table";
 import { Button } from "~/components/ui/button";
 import {
   billPreviewRows,
@@ -73,7 +73,7 @@ export function PaymentHold({
           checked={checked}
           onChange={(event) => setChecked(event.target.checked)}
         />
-        <span className="text-sm font-(--w-ui) text-gray-900">
+        <span className="text-sm font-(--w-ui) text-foreground">
           {warning.confirmLabel}
         </span>
       </label>
@@ -95,9 +95,9 @@ function PreviewList({ rows }: { rows: readonly PreviewRow[] }): JSX.Element {
       {rows.map((row) => (
         <div
           key={row.label}
-          className="grid grid-cols-[11rem_minmax(0,1fr)] gap-3 border-t border-hairline py-[9px] max-[600px]:grid-cols-[minmax(0,1fr)] max-[600px]:gap-0.5"
+          className="grid grid-cols-[11rem_minmax(0,1fr)] gap-3 border-t border-border py-[9px] max-[600px]:grid-cols-[minmax(0,1fr)] max-[600px]:gap-0.5"
         >
-          <dt className="text-gray-500">{row.label}</dt>
+          <dt className="text-muted-foreground">{row.label}</dt>
           <dd className="[overflow-wrap:anywhere] tabular-nums">{row.value}</dd>
         </div>
       ))}
@@ -159,7 +159,7 @@ export function PaymentReview({
           <details
             key={preview.billId}
             open={openAll}
-            className="group/preview rounded-control border border-gray-200"
+            className="group/preview rounded-control border border-border"
           >
             <summary className="grid cursor-pointer list-none grid-cols-[32px_minmax(0,1fr)_auto_16px] items-center gap-3 rounded-control px-3 py-2.5 [&::-webkit-details-marker]:hidden">
               <EntityMark name={preview.payeeName} />
@@ -167,7 +167,7 @@ export function PaymentReview({
                 <span className="block truncate font-(--w-name)">
                   {preview.payeeName}
                 </span>
-                <span className="block truncate text-xs leading-4 text-gray-500">
+                <span className="block truncate text-xs leading-4 text-muted-foreground">
                   {preview.paidTo.label}
                 </span>
               </span>
@@ -176,7 +176,7 @@ export function PaymentReview({
               </span>
               <ChevronDownIcon
                 aria-hidden="true"
-                className="size-4 text-gray-500 transition-transform duration-200 ease-out-expo group-open/preview:rotate-180"
+                className="size-4 text-muted-foreground transition-transform duration-200 ease-out-expo group-open/preview:rotate-180"
               />
             </summary>
             <PreviewList rows={billPreviewRows(preview)} />
@@ -185,11 +185,11 @@ export function PaymentReview({
       </div>
       <dl
         aria-label="Total"
-        className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-control bg-gray-50 px-4 py-3.5 max-[600px]:grid-cols-1"
+        className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-control bg-muted/60 px-4 py-3.5 max-[600px]:grid-cols-1"
       >
         {billTotalRows(payment).map((row) => (
           <div key={row.label}>
-            <dt className="text-xs leading-4 font-(--w-ui) text-gray-500">
+            <dt className="text-xs leading-4 font-(--w-ui) text-muted-foreground">
               {row.label}
             </dt>
             <dd className="mt-1 text-base leading-6 font-(--w-amount) tabular-nums">

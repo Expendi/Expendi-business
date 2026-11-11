@@ -1,8 +1,16 @@
 import type { LucideIcon } from "lucide-react";
 import type { JSX, ReactNode } from "react";
 import { cn } from "cn";
+import { TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import { Children } from "react";
 
+import { Badge } from "~/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+} from "~/components/ui/card";
 import { Skel } from "./states";
 
 export const MAX_STAT_CARDS = 4;
@@ -11,18 +19,25 @@ export const MAX_STAT_CARDS = 4;
 export type StatTone = "total" | "attention" | "danger" | "clear";
 
 const ICON_TONES: Record<StatTone, string> = {
-  total: "bg-gray-100 text-gray-600",
-  attention: "bg-warn-50 text-warn-700",
-  danger: "bg-error-50 text-error-700",
-  clear: "bg-success-50 text-success-700",
+  total: "border-border bg-muted text-muted-foreground",
+  attention: "border-transparent bg-warn-50 text-warn-700",
+  danger: "border-transparent bg-error-50 text-error-700",
+  clear: "border-transparent bg-success-50 text-success-700",
 };
 
+/** A change since the last period; neutral, since "up" isn't always good. */
+export interface StatTrend {
+  readonly direction: "up" | "down";
+  /** e.g. "+12% on October", read out in full. */
+  readonly label: string;
+}
+
 const cardClass =
-  "flex min-w-0 flex-col items-stretch gap-1 rounded-panel border border-gray-200 bg-surface p-4 text-left text-gray-900 max-[600px]:p-3.5";
+  "min-w-0 gap-3 bg-linear-to-t from-primary/5 to-card shadow-xs dark:bg-card max-[600px]:gap-1.5 max-[600px]:py-3";
 
 /**
- * Company-wide numbers, at most four, never clickable: filtering lives in
- * the chips beside the tabs.
+ * Company-wide numbers as the template's KPI cards, at most four, never
+ * clickable: filtering lives in the chips beside the tabs.
  */
 export function StatCards({
   label = "Summary",
@@ -46,10 +61,10 @@ export function StatCards({
       aria-label={label}
       data-columns={columns}
       className={cn(
-        "group/stats mt-4 grid gap-3 [animation-delay:60ms] motion-safe:animate-rise",
+        "group/stats mt-4 grid gap-4 [animation-delay:60ms] motion-safe:animate-rise",
         columns === 3
           ? "grid-cols-3 max-[600px]:grid-cols-1 max-[600px]:gap-2"
-          : "grid-cols-4 max-[1100px]:grid-cols-2",
+          : "grid-cols-4 max-[1100px]:grid-cols-2 max-[600px]:gap-2",
       )}
     >
       {children}
@@ -64,6 +79,7 @@ export function StatCard({
   value,
   sub,
   extra,
+  trend,
 }: {
   icon: LucideIcon;
   tone: StatTone;
@@ -71,46 +87,61 @@ export function StatCard({
   value: ReactNode;
   sub?: ReactNode;
   extra?: ReactNode;
+  trend?: StatTrend;
 }): JSX.Element {
+  const TrendIcon =
+    trend?.direction === "down" ? TrendingDownIcon : TrendingUpIcon;
   return (
-    <div
-      className={cn(
-        cardClass,
-        "group-data-[columns=3]/stats:max-[600px]:flex-row group-data-[columns=3]/stats:max-[600px]:flex-wrap group-data-[columns=3]/stats:max-[600px]:items-center group-data-[columns=3]/stats:max-[600px]:gap-x-3 group-data-[columns=3]/stats:max-[600px]:py-3",
-      )}
-    >
-      <span className="flex items-center gap-2 text-xs leading-4 font-(--w-ui) text-gray-600 group-data-[columns=3]/stats:max-[600px]:flex-auto">
+    <Card size="sm" className={cardClass}>
+      <CardHeader className="flex items-center gap-2 max-[600px]:px-3.5">
         <span
           className={cn(
-            "inline-flex size-6 shrink-0 items-center justify-center rounded-control",
+            "flex size-7 shrink-0 items-center justify-center rounded-lg border",
             ICON_TONES[tone],
           )}
         >
-          <Icon aria-hidden="true" className="size-3.5" />
+          <Icon aria-hidden="true" className="size-4" />
         </span>
-        {label}
-      </span>
-      <span className="mt-1.5 text-2xl leading-8 font-(--w-figure) tracking-[-0.02em] tabular-nums group-data-[columns=3]/stats:max-[600px]:order-2 group-data-[columns=3]/stats:max-[600px]:mt-0 group-data-[columns=3]/stats:max-[600px]:text-lg group-data-[columns=3]/stats:max-[600px]:leading-[26px] [&_[data-ccy]]:text-[0.6em]">
-        {value}
-      </span>
-      {extra ? (
-        <span className="text-sm leading-5 text-gray-600">{extra}</span>
-      ) : null}
-      {sub ? (
-        <span className="text-xs leading-4 text-gray-500 tabular-nums group-data-[columns=3]/stats:max-[600px]:order-3 group-data-[columns=3]/stats:max-[600px]:basis-full group-data-[columns=3]/stats:max-[600px]:pl-8">
-          {sub}
-        </span>
-      ) : null}
-    </div>
+        <CardDescription className="min-w-0 text-sm">{label}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-1 max-[600px]:px-3.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-3xl leading-9 font-(--w-amount) tracking-tight text-card-foreground tabular-nums max-[600px]:text-xl max-[600px]:leading-7 [&_[data-ccy]]:text-[0.55em]">
+            {value}
+          </span>
+          {trend ? (
+            <Badge variant="outline" aria-label={trend.label}>
+              <TrendIcon aria-hidden="true" />
+              <span aria-hidden="true">{trend.label}</span>
+            </Badge>
+          ) : null}
+        </div>
+        {extra ? (
+          <span className="text-sm leading-5 text-muted-foreground">
+            {extra}
+          </span>
+        ) : null}
+        {sub ? (
+          <span className="text-xs leading-4 text-muted-foreground tabular-nums">
+            {sub}
+          </span>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
 export function StatCardSkeleton(): JSX.Element {
   return (
-    <div className={cardClass} aria-hidden="true">
-      <Skel width="60%" height={12} />
-      <Skel width="45%" height={28} style={{ marginTop: 10 }} />
-      <Skel width="70%" height={12} style={{ marginTop: 6 }} />
-    </div>
+    <Card size="sm" className={cardClass} aria-hidden="true">
+      <CardHeader className="flex items-center gap-2">
+        <Skel width={28} height={28} />
+        <Skel width="50%" height={12} />
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        <Skel width="45%" height={30} />
+        <Skel width="70%" height={12} />
+      </CardContent>
+    </Card>
   );
 }

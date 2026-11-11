@@ -24,7 +24,7 @@ export function TableToggle({
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
-        className="inline-flex items-center gap-1.5 rounded-[4px] border-0 bg-transparent px-0 py-1 text-xs leading-4 text-gray-600 hover:text-gray-900"
+        className="inline-flex items-center gap-1.5 rounded-[4px] border-0 bg-transparent px-0 py-1 text-xs leading-4 text-muted-foreground hover:text-foreground"
       >
         <Table2Icon aria-hidden="true" className="size-3.5" />
         {open ? "Hide table" : "Show as table"}
@@ -47,7 +47,7 @@ export function MiniTable({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <table className="mt-2 w-full border-collapse text-sm tabular-nums [&_td]:border-t [&_td]:border-hairline [&_td]:py-2 [&_td]:pl-3 [&_td]:text-right [&_td]:whitespace-nowrap [&_th]:py-2 [&_th]:pl-3 [&_th]:text-right [&_th]:whitespace-nowrap [&_th:first-child]:pl-0 [&_th:first-child]:text-left [&_tbody_th]:border-t [&_tbody_th]:border-hairline [&_tbody_th]:font-normal [&_tr[data-selected]]:font-(--w-ui)">
+    <table className="mt-2 w-full border-collapse text-sm tabular-nums [&_td]:border-t [&_td]:border-border [&_td]:py-2 [&_td]:pl-3 [&_td]:text-right [&_td]:whitespace-nowrap [&_th]:py-2 [&_th]:pl-3 [&_th]:text-right [&_th]:whitespace-nowrap [&_th:first-child]:pl-0 [&_th:first-child]:text-left [&_tbody_th]:border-t [&_tbody_th]:border-border [&_tbody_th]:font-normal [&_tr[data-selected]]:font-(--w-ui)">
       <caption className="sr-only">{caption}</caption>
       <thead>
         <tr>
@@ -55,7 +55,7 @@ export function MiniTable({
             <th
               key={label}
               scope="col"
-              className="text-xs leading-4 font-normal text-gray-500"
+              className="text-xs leading-4 font-normal text-muted-foreground"
             >
               {label}
             </th>

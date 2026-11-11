@@ -27,6 +27,7 @@ import type { RunPayment } from "./run-payment";
 import type { FieldErrors } from "./sheet-parts";
 import type { PasskeyState } from "~/features/payment-ui";
 import { TextLinkButton } from "~/components/data/actions";
+import { EntityMark, RowCheckbox } from "~/components/data/cells";
 import {
   Callout,
   DetailItem,
@@ -40,7 +41,6 @@ import {
 import { Money } from "~/components/data/money";
 import { Skel } from "~/components/data/states";
 import { StatusBadge } from "~/components/data/status-badge";
-import { EntityMark, RowCheckbox } from "~/components/data/table";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import {
@@ -324,7 +324,7 @@ export function RunSheet({
             checked={holdChecked}
             onChange={(event) => setHoldChecked(event.target.checked)}
           />
-          <span className="font-(--w-ui) text-gray-900">
+          <span className="font-(--w-ui) text-foreground">
             {warning.confirmLabel}
           </span>
         </label>
@@ -758,7 +758,7 @@ function PayList({
   return (
     <ul
       aria-label="Who’s paid"
-      className="m-0 list-none rounded-control border border-gray-200 p-0"
+      className="m-0 list-none rounded-lg border border-border p-0"
     >
       {sortPayments(payments).map((row) => {
         const leftOut = row.leftOut !== null;
@@ -770,29 +770,29 @@ function PayList({
         return (
           <li
             key={row.billId}
-            className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 border-t border-row-divider p-3 first:border-t-0 max-[600px]:grid-cols-[32px_minmax(0,1fr)]"
+            className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 border-t border-border p-3 first:border-t-0 max-[600px]:grid-cols-[32px_minmax(0,1fr)]"
           >
             <EntityMark name={row.payee.name} kind="person" />
             <div className="min-w-0">
               <p
                 className={cn(
                   "font-(--w-name) [overflow-wrap:anywhere]",
-                  leftOut && "text-gray-500",
+                  leftOut && "text-muted-foreground",
                 )}
               >
                 {row.payee.name}
               </p>
-              <p className="text-gray-500 [overflow-wrap:anywhere]">
+              <p className="text-muted-foreground [overflow-wrap:anywhere]">
                 {row.kind === "one_off"
                   ? `One-off: ${row.note ?? ""}`
                   : "Salary"}
               </p>
               {row.leftOut ? (
-                <p className="mt-0.5 text-xs leading-4 text-gray-600 [overflow-wrap:anywhere]">
+                <p className="mt-0.5 text-xs leading-4 text-muted-foreground [overflow-wrap:anywhere]">
                   Left out: {row.leftOut.reason}
                 </p>
               ) : row.adjustmentReason ? (
-                <p className="mt-0.5 text-xs leading-4 text-gray-600 [overflow-wrap:anywhere]">
+                <p className="mt-0.5 text-xs leading-4 text-muted-foreground [overflow-wrap:anywhere]">
                   Changed for this run: {row.adjustmentReason}
                 </p>
               ) : null}
@@ -809,7 +809,7 @@ function PayList({
                 currency="KES"
                 className={cn(
                   "font-(--w-amount)",
-                  leftOut && "text-gray-500 line-through",
+                  leftOut && "text-muted-foreground line-through",
                 )}
               />
               <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>

@@ -39,7 +39,7 @@ export function ReceiptViewer({
 }): JSX.Element {
   if (receipts.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-stone-300 bg-white p-4 text-sm text-stone-600">
+      <p className="rounded-lg border border-dashed border-border bg-card p-4 text-sm text-muted-foreground">
         No receipt attached.
       </p>
     );
@@ -50,21 +50,21 @@ export function ReceiptViewer({
         <li key={receipt.id}>
           <figure className="space-y-2">
             {receipt.kind === "sms_text" ? (
-              <pre className="font-sans text-sm whitespace-pre-wrap break-words rounded-lg border border-stone-200 bg-stone-50 p-3">
+              <pre className="font-sans text-sm whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/60 p-3">
                 {receipt.text}
               </pre>
             ) : receipt.kind === "pdf" ? (
               <iframe
                 title={captionOf(receipt)}
                 src={receipt.url}
-                className="h-96 w-full rounded-lg border border-stone-200 bg-white"
+                className="h-96 w-full rounded-lg border border-border bg-card"
               />
             ) : (
               <a
                 href={receipt.url}
                 target="_blank"
                 rel="noreferrer"
-                className="relative block h-96 w-full overflow-hidden rounded-lg border border-stone-200 bg-stone-100"
+                className="relative block h-96 w-full overflow-hidden rounded-lg border border-border bg-muted"
               >
                 <Image
                   src={receipt.url}
@@ -76,7 +76,7 @@ export function ReceiptViewer({
                 />
               </a>
             )}
-            <figcaption className="flex items-center justify-between text-xs text-stone-500">
+            <figcaption className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{captionOf(receipt)}</span>
               {receipt.kind === "sms_text" ? null : (
                 <a

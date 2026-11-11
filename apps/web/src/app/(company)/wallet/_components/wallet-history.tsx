@@ -1,32 +1,22 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
 import type { JSX } from "react";
-import { ArrowDownLeftIcon, LandmarkIcon, Undo2Icon } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import type { WalletHistoryItem } from "@expendi-business/shared";
 
-import type { HistoryFilter, TxKind } from "./wallet-display";
-import { EmptyState, ErrorState, Skel } from "~/components/data/states";
-import { StatusBadge } from "~/components/data/status-badge";
-import { EntityMark } from "~/components/data/table";
+import type { HistoryFilter } from "./wallet-display";
+import type { DataTableColumnDef } from "~/components/data/data-table";
+import { DataTable, useDataTable } from "~/components/data/data-table";
+import { EmptyState, ErrorState } from "~/components/data/states";
 import { useDeepLinkParam } from "~/components/data/use-deep-link-param";
 import { Button } from "~/components/ui/button";
+import { Card } from "~/components/ui/card";
 import { describeApiError } from "~/lib/api";
-import { panelClass, SignedUsdc } from "./balance-card";
+import { historyColumns, TxPhoneCard } from "./columns";
 import { TxSheet } from "./tx-sheet";
 import { useWalletHistory } from "./wallet-api";
-import {
-  dayHeading,
-  filterHistory,
-  groupByDay,
-  nairobiTime,
-  rowBadge,
-  txDetail,
-  txKind,
-  txTitle,
-} from "./wallet-display";
+import { dayHeading, filterHistory, groupByDay } from "./wallet-display";
 
 const FILTERS: readonly { value: HistoryFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -56,29 +46,39 @@ export function WalletHistory({
   const history = useWalletHistory(organizationId);
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const [openId, setOpenId] = useDeepLinkParam("txId");
-  const items = history.data?.pages.flatMap((page) => page.items) ?? [];
-  const visible = filterHistory(items, filter);
+  const items = useMemo(
+    () => history.data?.pages.flatMap((page) => page.items) ?? [],
+    [history.data],
+  );
+  const visible = useMemo(() => filterHistory(items, filter), [items, filter]);
+  const days = useMemo(() => groupByDay(visible), [visible]);
   const open = items.find((item) => item.id === openId) ?? null;
   const index = open ? visible.findIndex((item) => item.id === open.id) : -1;
+  const openItem = useCallback(
+    (item: WalletHistoryItem) => setOpenId(item.id),
+    [setOpenId],
+  );
+  const columns = useMemo(() => historyColumns(openItem), [openItem]);
 
   return (
-    <section
+    <Card
+      role="region"
       aria-labelledby="history-title"
-      className={`${panelClass} overflow-hidden`}
+      className="gap-0 overflow-hidden py-0 shadow-xs"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-[18px] pb-3.5 max-[600px]:px-4">
         <h2
           id="history-title"
-          className="text-lg leading-[26px] font-(--w-title) text-gray-900"
+          className="text-lg leading-[26px] font-(--w-title) text-foreground"
         >
           History
         </h2>
-        <fieldset className="m-0 inline-flex gap-0.5 rounded-control border-0 bg-gray-100 p-[3px]">
+        <fieldset className="m-0 inline-flex gap-0.5 rounded-lg border-0 bg-muted p-[3px]">
           <legend className="sr-only">Show</legend>
           {FILTERS.map((option) => (
             <label
               key={option.value}
-              className="relative inline-flex h-[30px] cursor-pointer items-center rounded-[6px] px-3 text-sm font-(--w-ui) text-gray-600 transition-colors duration-150 has-checked:bg-surface has-checked:text-gray-900 has-checked:shadow-[0_1px_2px_rgb(16_24_40/0.1)] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-brand-700"
+              className="relative inline-flex h-[30px] cursor-pointer items-center rounded-md px-3 text-sm font-(--w-ui) text-muted-foreground transition-colors duration-150 has-checked:bg-background has-checked:text-foreground has-checked:shadow-sm has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring dark:has-checked:bg-input/30"
             >
               <input
                 type="radio"
@@ -94,7 +94,7 @@ export function WalletHistory({
         </fieldset>
       </div>
       {history.isPending ? (
-        <HistorySkeleton />
+        <HistoryLoading columns={columns} />
       ) : history.isError ? (
         <ErrorState
           title="The history didn't load"
@@ -103,36 +103,26 @@ export function WalletHistory({
           {describeApiError(history.error)}
         </ErrorState>
       ) : visible.length === 0 ? (
-        <div className="border-t border-hairline">
+        <div className="border-t border-border">
           <EmptyState title={EMPTY[filter].title}>
             {EMPTY[filter].text}
           </EmptyState>
         </div>
       ) : (
-        groupByDay(visible).map((group) => (
-          <section key={group.day} aria-label={dayHeading(group.day, today)}>
-            <h3 className="border-y border-hairline bg-gray-25 px-5 py-2 text-xs leading-4 font-(--w-ui) text-gray-500 max-[600px]:px-4">
-              {dayHeading(group.day, today)}
-            </h3>
-            <ul className="m-0 list-none p-0">
-              {group.items.map((item) => (
-                <li
-                  key={item.id}
-                  className="border-t border-hairline first:border-t-0"
-                >
-                  <TxRow
-                    item={item}
-                    open={item.id === openId}
-                    onOpen={() => setOpenId(item.id)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </section>
+        days.map((group, at) => (
+          <DayGroup
+            key={group.day}
+            heading={dayHeading(group.day, today)}
+            items={group.items}
+            columns={columns}
+            openId={openId}
+            onOpen={openItem}
+            showHead={at === 0}
+          />
         ))
       )}
       {history.hasNextPage ? (
-        <div className="border-t border-hairline px-5 pt-3 pb-4 max-[600px]:px-4">
+        <div className="border-t border-border px-5 pt-3 pb-4 max-[600px]:px-4">
           <Button
             variant="outline"
             size="md"
@@ -160,100 +150,77 @@ export function WalletHistory({
           nextLabel: "Next movement",
         }}
       />
+    </Card>
+  );
+}
+
+/**
+ * One Nairobi day's movements under its heading. Each day is its own table
+ * on the shared kit; only the first shows its column headings.
+ */
+function DayGroup({
+  heading,
+  items,
+  columns,
+  openId,
+  onOpen,
+  showHead,
+}: {
+  heading: string;
+  items: readonly WalletHistoryItem[];
+  columns: DataTableColumnDef<WalletHistoryItem>[];
+  openId: string | null;
+  onOpen: (item: WalletHistoryItem) => void;
+  showHead: boolean;
+}): JSX.Element {
+  const table = useDataTable({
+    data: items,
+    columns,
+    getRowId: (item) => item.id,
+    paginate: false,
+  });
+  return (
+    <section aria-label={heading}>
+      <h3 className="border-y border-border bg-muted/40 px-5 py-2 text-xs leading-4 font-(--w-ui) text-muted-foreground max-[600px]:px-4">
+        {heading}
+      </h3>
+      <DataTable
+        table={table}
+        caption={heading}
+        onRowOpen={onOpen}
+        openRowId={openId}
+        className={showHead ? undefined : "[&_thead]:sr-only"}
+        renderPhoneCard={(row) => (
+          <TxPhoneCard
+            key={row.id}
+            item={row.original}
+            onOpen={() => onOpen(row.original)}
+          />
+        )}
+      />
     </section>
   );
 }
 
-const TILES: Partial<Record<TxKind, LucideIcon>> = {
-  deposit: ArrowDownLeftIcon,
-  topup: ArrowDownLeftIcon,
-  withdrawal: LandmarkIcon,
-  refund: Undo2Icon,
-};
-
-/** A tile for the wallet's own movements; initials for whoever was paid. */
-export function TxMark({ item }: { item: WalletHistoryItem }): JSX.Element {
-  const kind = txKind(item);
-  const Tile = TILES[kind];
-  if (Tile) {
-    return (
-      <span
-        aria-hidden="true"
-        className="inline-flex size-8 flex-none items-center justify-center rounded-control border border-gray-200 bg-surface text-gray-600"
-      >
-        <Tile className="size-4" />
-      </span>
-    );
-  }
-  const subject = item.payout?.subjectType;
-  const person =
-    kind === "salary" || subject === "claim" || subject === "float";
-  return (
-    <EntityMark
-      name={item.payout?.recipientName ?? txTitle(item)}
-      kind={person ? "person" : "business"}
-    />
-  );
-}
-
-function TxRow({
-  item,
-  open,
-  onOpen,
+function HistoryLoading({
+  columns,
 }: {
-  item: WalletHistoryItem;
-  open: boolean;
-  onOpen: () => void;
+  columns: DataTableColumnDef<WalletHistoryItem>[];
 }): JSX.Element {
-  const badge = rowBadge(item);
+  const table = useDataTable({
+    data: [],
+    columns,
+    getRowId: (item) => item.id,
+    paginate: false,
+  });
   return (
-    <button
-      type="button"
-      aria-haspopup="dialog"
-      onClick={onOpen}
-      data-open={open || undefined}
-      className="grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3.5 border-0 bg-transparent px-5 py-3 text-left transition-colors duration-150 hover:bg-gray-25 data-open:bg-gray-50 data-open:shadow-[inset_3px_0_0_var(--color-gray-900)] max-[600px]:gap-3 max-[600px]:px-4"
-    >
-      <TxMark item={item} />
-      <span className="min-w-0">
-        <span className="block truncate text-base leading-6 font-(--w-name) text-gray-900">
-          {txTitle(item)}
-        </span>
-        <span className="block truncate text-sm leading-5 text-gray-500">
-          {txDetail(item)}
-        </span>
-      </span>
-      <span className="flex flex-col items-end gap-0.5">
-        <span className="text-base leading-6 font-(--w-amount)">
-          <SignedUsdc amount={item.usdcAmount} />
-        </span>
-        <span className="flex items-center gap-1.5 text-xs leading-4 text-gray-500">
-          {badge ? (
-            <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
-          ) : null}
-          <span className="tabular-nums">{nairobiTime(item.createdAt)}</span>
-        </span>
-      </span>
-    </button>
-  );
-}
-
-function HistorySkeleton(): JSX.Element {
-  return (
-    <div aria-busy="true" className="border-t border-hairline">
-      {[0, 1, 2, 3].map((row) => (
-        <div
-          key={row}
-          className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3.5 border-t border-hairline px-5 py-3 first:border-t-0"
-        >
-          <Skel width={32} height={32} />
-          <div>
-            <Skel width="45%" height={14} />
-            <Skel width="65%" height={12} style={{ marginTop: 8 }} />
-          </div>
-          <Skel width={90} height={14} />
-        </div>
-      ))}
+    <div className="border-t border-border">
+      <DataTable
+        table={table}
+        caption="Loading history"
+        loading
+        skeletonRows={4}
+      />
     </div>
   );
 }

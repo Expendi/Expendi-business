@@ -13,8 +13,8 @@ import {
   SALARY_PAYEE_METHODS,
 } from "@expendi-business/shared";
 
+import type { SortState } from "~/components/data/data-table";
 import type { StatusTone } from "~/components/data/status-badge";
-import type { SortState } from "~/components/data/table";
 import { blankToNull, centsToTyped } from "~/features/bills/bill-draft";
 import { METHOD_LABELS } from "~/features/payees/payee-display";
 

@@ -296,6 +296,34 @@ describe("the payroll page", () => {
     );
   });
 
+  it("marks the sorted column on each table and keeps paging in the footer", () => {
+    // #when
+    const runs = render();
+    const salaries = render({ url: "view=salaries" });
+
+    // #then
+    const sorted = (html: string) =>
+      [
+        ...html.matchAll(
+          /<th[^>]*aria-sort="(ascending|descending)"[^>]*>(.*?)<\/th>/g,
+        ),
+      ].map(([, direction, header]) => [
+        direction,
+        header?.replace(/<[^>]+>/g, ""),
+      ]);
+    expect({
+      runs: sorted(runs),
+      salaries: sorted(salaries),
+      runsFooter: runs.includes("Rows per page"),
+      salariesFooter: salaries.includes("Rows per page"),
+    }).toEqual({
+      runs: [["descending", "Pay day"]],
+      salaries: [["ascending", "Person"]],
+      runsFooter: true,
+      salariesFooter: true,
+    });
+  });
+
   it("keeps Add salary the page's one coral button: Review run is an outline", () => {
     // #when
     const html = render();

@@ -22,16 +22,35 @@ import {
   WalletIcon,
   XIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { Bill, BillStatus, PayeeMethod } from "@expendi-business/shared";
 
+import type {
+  DataTableColumnDef,
+  SortState,
+} from "~/components/data/data-table";
 import type { FilterOption } from "~/components/data/filter-chip";
 import type { KindTab } from "~/components/data/kind-tabs";
 import type { StatusTone } from "~/components/data/status-badge";
-import type { SortState } from "~/components/data/table";
 import { IconButton, TextLinkButton } from "~/components/data/actions";
 import { Banner, Banners } from "~/components/data/banner";
+import {
+  EntityMark,
+  Mini,
+  PhoneCard,
+  RowCheckbox,
+  RowMeta,
+  RowTitle,
+} from "~/components/data/cells";
+import {
+  DataTable,
+  DataTableColumnHeader,
+  nextSort,
+  pressedKey,
+  toSorting,
+  useDataTable,
+} from "~/components/data/data-table";
 import {
   Callout,
   DetailItem,
@@ -63,22 +82,6 @@ import {
 } from "~/components/data/stat-cards";
 import { EmptyState, ErrorState } from "~/components/data/states";
 import { StatusBadge } from "~/components/data/status-badge";
-import {
-  DataRow,
-  DataTable,
-  EntityMark,
-  Mini,
-  nextSort,
-  PhoneCard,
-  PhoneCards,
-  RowCheckbox,
-  RowMeta,
-  RowTitle,
-  SortHeader,
-  TableSkeletonRows,
-  Td,
-  Th,
-} from "~/components/data/table";
 import { useDeepLinkParam } from "~/components/data/use-deep-link-param";
 import { Button } from "~/components/ui/button";
 import {
@@ -102,6 +105,7 @@ import {
 } from "~/lib/money";
 import { OPEN_BILLS } from "./fixtures/bills";
 import { KES_RATE, TODAY } from "./fixtures/company";
+import { KitPatterns } from "./kit-patterns";
 
 const STATUS: Record<BillStatus, { label: string; tone: StatusTone }> = {
   upcoming: { label: "Upcoming", tone: "quiet" },
@@ -346,6 +350,12 @@ export function KitGallery(): JSX.Element {
       <StatCardsDemo />
       <BillsDemo />
 
+      <KitSection title="Template page patterns: KPI cards, data table (client and manual), charts">
+        <div className="mt-4">
+          <KitPatterns />
+        </div>
+      </KitSection>
+
       <KitSection title="Results head, stacked (forced), with filters set">
         <StackedDemo />
       </KitSection>
@@ -378,11 +388,7 @@ export function KitGallery(): JSX.Element {
             }
           />
           <ResultsBody busy>
-            <DataTable caption="Loading bills">
-              <tbody>
-                <TableSkeletonRows />
-              </tbody>
-            </DataTable>
+            <LoadingBillsTable />
           </ResultsBody>
         </ResultsPanel>
         <ResultsPanel label="Error">
@@ -519,6 +525,129 @@ const SORT_FIRST: Record<SortKey, "asc" | "desc"> = {
   status: "asc",
 };
 
+const SORT_KEYS: readonly SortKey[] = ["date", "payee", "amount", "status"];
+
+function billColumns({
+  view,
+  checkbox,
+  onOpen,
+}: {
+  view: View;
+  checkbox: ((bill: Bill) => ReactNode) | null;
+  onOpen: (id: string) => void;
+}): DataTableColumnDef<Bill>[] {
+  const columns: DataTableColumnDef<Bill>[] = [
+    {
+      id: "date",
+      accessorFn: (bill) => bill.dueOn,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Due" />
+      ),
+      cell: ({ row }) => (
+        <>
+          {dateText(row.original.dueOn)}
+          <DueHint bill={row.original} />
+        </>
+      ),
+      meta: { kind: "date", label: "Due" },
+    },
+    {
+      id: "payee",
+      accessorFn: (bill) => bill.payee.name,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Payee" />
+      ),
+      cell: ({ row }) => (
+        <span className="flex min-w-0 items-start gap-3">
+          <EntityMark name={row.original.payee.name} />
+          <span className="min-w-0">
+            <RowTitle onOpen={() => onOpen(row.original.id)}>
+              {row.original.payee.name}
+            </RowTitle>
+            <RowMeta
+              text={[row.original.reference, row.original.category.name]
+                .filter(Boolean)
+                .join(" · ")}
+            >
+              <Markers bill={row.original} />
+            </RowMeta>
+          </span>
+        </span>
+      ),
+      meta: { kind: "main", label: "Payee" },
+    },
+    {
+      id: "method",
+      accessorFn: (bill) => bill.payee.method ?? "",
+      header: "Paid by",
+      cell: ({ row }) => (
+        <span
+          className={
+            row.original.payee.method ? "text-gray-600" : "text-gray-500"
+          }
+        >
+          {row.original.payee.method
+            ? METHODS[row.original.payee.method]
+            : "Not set"}
+        </span>
+      ),
+      enableSorting: false,
+      meta: {
+        collapse: "lg",
+        label: "Paid by",
+        className: "whitespace-nowrap",
+      },
+    },
+    {
+      id: "amount",
+      accessorFn: (bill) => kesValue(bill).toString(),
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Amount" />
+      ),
+      cell: ({ row }) => <BillAmount bill={row.original} />,
+      meta: { align: "end", label: "Amount" },
+    },
+    {
+      id: "status",
+      accessorFn: (bill) => bill.status,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Status" />
+      ),
+      cell: ({ row }) => (
+        <StatusBadge tone={STATUS[row.original.status].tone}>
+          {STATUS[row.original.status].label}
+        </StatusBadge>
+      ),
+      meta: { label: "Status" },
+    },
+  ];
+  if (view !== "open" || !checkbox) return columns;
+  return [
+    {
+      id: "select",
+      header: () => <span className="sr-only">Select</span>,
+      cell: ({ row }) => checkbox(row.original),
+      enableSorting: false,
+      meta: { kind: "checkbox" },
+    },
+    ...columns,
+  ];
+}
+
+function LoadingBillsTable(): JSX.Element {
+  const columns = useMemo(
+    () =>
+      billColumns({ view: "paying", checkbox: null, onOpen: () => undefined }),
+    [],
+  );
+  const table = useDataTable({
+    data: [] as Bill[],
+    columns,
+    getRowId: (bill) => bill.id,
+  });
+  return <DataTable table={table} caption="Loading bills" loading />;
+}
+
 function BillsDemo(): JSX.Element {
   const [view, setView] = useState<View>("open");
   const [status, setStatus] = useState<string | null>(null);
@@ -539,6 +668,10 @@ function BillsDemo(): JSX.Element {
     (category === null || bill.category.name === category);
   const rows = OPEN_BILLS.filter((bill) => inView(bill) && matches(bill)).sort(
     compare(sort),
+  );
+  const selectedRows = useMemo(
+    () => Object.fromEntries(selected.map((id) => [id, true as const])),
+    [selected],
   );
   const tabs: readonly KindTab<View>[] = [
     {
@@ -582,6 +715,27 @@ function BillsDemo(): JSX.Element {
       />
     );
   }
+
+  const columns = billColumns({
+    view,
+    checkbox,
+    onOpen: setOpenId,
+  });
+  const table = useDataTable({
+    data: rows,
+    columns,
+    getRowId: (bill) => bill.id,
+    manual: { sorting: true },
+    paginate: false,
+    sorting: {
+      value: toSorting(sort),
+      onChange: (next) => {
+        const key = pressedKey(next, sort, SORT_KEYS);
+        setSort(nextSort(sort, key, SORT_FIRST[key]));
+      },
+    },
+    rowSelection: { value: selectedRows },
+  });
 
   return (
     <ResultsPanel label="Bills">
@@ -660,111 +814,17 @@ function BillsDemo(): JSX.Element {
             }
           />
         ) : (
-          <>
-            <DataTable caption="Bills to pay">
-              <thead>
-                <tr>
-                  {view === "open" ? (
-                    <Th checkbox>
-                      <span className="sr-only">Select</span>
-                    </Th>
-                  ) : null}
-                  <SortHeader
-                    label="Due"
-                    sortKey="date"
-                    sort={sort}
-                    onSort={(key) =>
-                      setSort(nextSort(sort, key, SORT_FIRST[key]))
-                    }
-                  />
-                  <SortHeader
-                    label="Payee"
-                    sortKey="payee"
-                    sort={sort}
-                    onSort={(key) =>
-                      setSort(nextSort(sort, key, SORT_FIRST[key]))
-                    }
-                  />
-                  <Th collapse="lg">Paid by</Th>
-                  <SortHeader
-                    label="Amount"
-                    sortKey="amount"
-                    align="end"
-                    sort={sort}
-                    onSort={(key) =>
-                      setSort(nextSort(sort, key, SORT_FIRST[key]))
-                    }
-                  />
-                  <SortHeader
-                    label="Status"
-                    sortKey="status"
-                    sort={sort}
-                    onSort={(key) =>
-                      setSort(nextSort(sort, key, SORT_FIRST[key]))
-                    }
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((bill) => (
-                  <DataRow
-                    key={bill.id}
-                    open={bill.id === openId}
-                    selected={selected.includes(bill.id)}
-                    onOpen={() => setOpenId(bill.id)}
-                  >
-                    {view === "open" ? (
-                      <Td kind="checkbox">{checkbox(bill)}</Td>
-                    ) : null}
-                    <Td kind="date">
-                      {dateText(bill.dueOn)}
-                      <DueHint bill={bill} />
-                    </Td>
-                    <Td kind="main">
-                      <span className="flex min-w-0 items-start gap-3">
-                        <EntityMark name={bill.payee.name} />
-                        <span className="min-w-0">
-                          <RowTitle onOpen={() => setOpenId(bill.id)}>
-                            {bill.payee.name}
-                          </RowTitle>
-                          <RowMeta
-                            text={[bill.reference, bill.category.name]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          >
-                            <Markers bill={bill} />
-                          </RowMeta>
-                        </span>
-                      </span>
-                    </Td>
-                    <Td
-                      collapse="lg"
-                      className={
-                        bill.payee.method
-                          ? "whitespace-nowrap text-gray-600"
-                          : "whitespace-nowrap text-gray-500"
-                      }
-                    >
-                      {bill.payee.method
-                        ? METHODS[bill.payee.method]
-                        : "Not set"}
-                    </Td>
-                    <Td align="end">
-                      <BillAmount bill={bill} />
-                    </Td>
-                    <Td>
-                      <StatusBadge tone={STATUS[bill.status].tone}>
-                        {STATUS[bill.status].label}
-                      </StatusBadge>
-                    </Td>
-                  </DataRow>
-                ))}
-              </tbody>
-            </DataTable>
-            <PhoneCards label="Bills">
-              {rows.map((bill) => (
+          <DataTable
+            table={table}
+            caption="Bills to pay"
+            phoneLabel="Bills"
+            onRowOpen={(bill) => setOpenId(bill.id)}
+            openRowId={openId}
+            renderPhoneCard={(row) => {
+              const bill = row.original;
+              return (
                 <PhoneCard
-                  key={bill.id}
+                  key={row.id}
                   mark={<EntityMark name={bill.payee.name} />}
                   title={bill.payee.name}
                   sub={`Due ${dateText(bill.dueOn)}`}
@@ -781,9 +841,9 @@ function BillsDemo(): JSX.Element {
                   check={view === "open" ? checkbox(bill) : undefined}
                   selected={selected.includes(bill.id)}
                 />
-              ))}
-            </PhoneCards>
-          </>
+              );
+            }}
+          />
         )}
         {view === "open" ? (
           <SelectionBar

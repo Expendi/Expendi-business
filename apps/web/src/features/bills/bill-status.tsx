@@ -109,7 +109,11 @@ export function BillAmount({
   }
   return (
     <span
-      className={size === "sheet" ? "text-base text-gray-500" : "text-gray-500"}
+      className={
+        size === "sheet"
+          ? "text-base text-muted-foreground"
+          : "text-muted-foreground"
+      }
     >
       To enter
     </span>

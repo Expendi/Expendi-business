@@ -17,13 +17,13 @@ import type { PreparedPayrollPayment } from "~/features/payroll/payroll-api";
 import type { PayrollPaymentRequest } from "~/features/payroll/payroll-payment";
 import { textLinkClass } from "~/components/data/actions";
 import { Banner } from "~/components/data/banner";
+import { EntityMark } from "~/components/data/cells";
 import {
   Callout,
   DetailItem,
   DetailList,
 } from "~/components/data/detail-sheet";
 import { Money } from "~/components/data/money";
-import { EntityMark } from "~/components/data/table";
 import { Button } from "~/components/ui/button";
 import {
   CostChangedError,
@@ -196,15 +196,15 @@ export function PayrollReview({
           <details
             key={person.billId}
             open={payment.people.length <= 3}
-            className="group rounded-control border border-gray-200"
+            className="group rounded-lg border border-border"
           >
-            <summary className="grid cursor-pointer list-none grid-cols-[32px_minmax(0,1fr)_auto_16px] items-center gap-3 rounded-control px-3 py-2.5 [&::-webkit-details-marker]:hidden">
+            <summary className="grid cursor-pointer list-none grid-cols-[32px_minmax(0,1fr)_auto_16px] items-center gap-3 rounded-lg px-3 py-2.5 [&::-webkit-details-marker]:hidden">
               <EntityMark name={person.payeeName} kind="person" />
               <span className="min-w-0">
                 <span className="block truncate font-(--w-name)">
                   {person.payeeName}
                 </span>
-                <span className="block truncate text-xs leading-4 text-gray-500">
+                <span className="block truncate text-xs leading-4 text-muted-foreground">
                   {person.paidTo.label}
                 </span>
               </span>
@@ -213,10 +213,10 @@ export function PayrollReview({
               </span>
               <ChevronDownIcon
                 aria-hidden="true"
-                className="size-4 text-gray-500 transition-transform duration-200 group-open:rotate-180"
+                className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
               />
             </summary>
-            <div className="border-t border-hairline px-3 pt-2 pb-3 pl-14 max-[600px]:pl-3">
+            <div className="border-t border-border px-3 pt-2 pb-3 pl-14 max-[600px]:pl-3">
               <DetailList>
                 {personRows(person).map((row) => (
                   <DetailItem key={row.label} label={row.label}>
@@ -228,10 +228,10 @@ export function PayrollReview({
           </details>
         ))}
       </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-control bg-gray-50 px-4 py-3.5 max-[600px]:grid-cols-1">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg bg-muted/60 px-4 py-3.5 max-[600px]:grid-cols-1">
         {totals.map((row) => (
           <div key={row.label}>
-            <dt className="text-xs leading-4 font-(--w-ui) text-gray-500">
+            <dt className="text-xs leading-4 font-(--w-ui) text-muted-foreground">
               {row.label}
             </dt>
             <dd className="mt-1 text-base leading-6 font-(--w-amount) tabular-nums">

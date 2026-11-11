@@ -1044,12 +1044,12 @@ export function PayeeSheet({
         </SheetNote>
       )}
       {payee.details?.method === "outside" ? (
-        <p className="-mt-2 text-xs leading-4 text-gray-500">
+        <p className="-mt-2 text-xs leading-4 text-muted-foreground">
           {METHOD_DESCRIPTIONS.outside}
         </p>
       ) : null}
       {payee.detailsChangedAt ? (
-        <p className="-mt-1.5 text-xs leading-4 text-gray-500 tabular-nums">
+        <p className="-mt-1.5 text-xs leading-4 text-muted-foreground tabular-nums">
           Last changed {formatNairobiDateTime(payee.detailsChangedAt)}.
         </p>
       ) : null}
@@ -1058,7 +1058,7 @@ export function PayeeSheet({
           <Link href={`/bills?payee=${payee.id}`} className={textLinkClass}>
             See bills for {payee.name}
           </Link>
-          <span className="text-gray-500 tabular-nums">
+          <span className="text-muted-foreground tabular-nums">
             {" "}
             · {String(billCount)} {billCount === 1 ? "bill" : "bills"}
           </span>

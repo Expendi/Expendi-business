@@ -439,7 +439,7 @@ function CompanyApprovals({
         <section
           id="approval-queue"
           aria-label="Reimbursements"
-          className="flex flex-col overflow-clip rounded-panel border border-gray-200 bg-surface shadow-panel [animation-delay:60ms] motion-safe:animate-rise"
+          className="flex flex-col overflow-clip rounded-xl border border-border bg-card shadow-xs [animation-delay:60ms] motion-safe:animate-rise"
         >
           <ClaimQueue
             tab={tab}
@@ -468,7 +468,7 @@ function CompanyApprovals({
           <section
             aria-label="Reimbursement details"
             aria-live="polite"
-            className="sticky top-4 flex max-h-[calc(100dvh-32px)] flex-col overflow-hidden rounded-panel border border-gray-200 bg-surface shadow-panel [animation-delay:120ms] max-[1023px]:hidden motion-safe:animate-rise"
+            className="sticky top-4 flex max-h-[calc(100dvh-32px)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs [animation-delay:120ms] max-[1023px]:hidden motion-safe:animate-rise"
           >
             {active ? (
               <>
@@ -483,7 +483,7 @@ function CompanyApprovals({
                     detailFailed={detail.isError}
                   />
                 </div>
-                <div className="flex flex-wrap items-center gap-2 border-t border-gray-200 bg-surface px-6 py-3.5 max-[600px]:px-4">
+                <div className="flex flex-wrap items-center gap-2 border-t border-border bg-card px-6 py-3.5 max-[600px]:px-4">
                   {actionsFor(active)}
                 </div>
               </>

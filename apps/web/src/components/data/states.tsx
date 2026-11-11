@@ -24,7 +24,7 @@ export function Skel({
     <div
       aria-hidden="true"
       className={cn(
-        "rounded-control bg-gray-100 motion-safe:animate-skeleton",
+        "rounded-control bg-muted motion-safe:animate-skeleton",
         className,
       )}
       style={{ width, height, ...style }}
@@ -45,9 +45,9 @@ export function EmptyState({
   action?: ReactNode;
 }): JSX.Element {
   return (
-    <div className="flex flex-col items-center gap-2 px-6 py-14 text-center text-sm text-gray-600">
-      <Icon aria-hidden="true" className="size-7 text-gray-500" />
-      <strong className="text-base leading-6 font-(--w-title) text-gray-900">
+    <div className="flex flex-col items-center gap-2 px-6 py-14 text-center text-sm text-muted-foreground">
+      <Icon aria-hidden="true" className="size-7 text-muted-foreground" />
+      <strong className="text-base leading-6 font-(--w-title) text-foreground">
         {title}
       </strong>
       {children ? <p>{children}</p> : null}
@@ -71,10 +71,10 @@ export function ErrorState({
   return (
     <div
       role="alert"
-      className="flex flex-col items-center gap-2 px-6 py-14 text-center text-sm text-gray-600"
+      className="flex flex-col items-center gap-2 px-6 py-14 text-center text-sm text-muted-foreground"
     >
       <CircleAlertIcon aria-hidden="true" className="size-7 text-error-700" />
-      <strong className="text-base leading-6 font-(--w-title) text-gray-900">
+      <strong className="text-base leading-6 font-(--w-title) text-foreground">
         {title}
       </strong>
       {children ? <p>{children}</p> : null}

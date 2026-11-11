@@ -21,7 +21,7 @@ export function ResultsPanel({
   return (
     <section
       aria-label={label}
-      className="@container/results mt-4 overflow-clip rounded-panel border border-gray-200 bg-surface text-sm shadow-panel [animation-delay:120ms] motion-safe:animate-rise"
+      className="@container/results mt-4 overflow-clip rounded-xl border border-border bg-card text-sm shadow-xs [animation-delay:120ms] motion-safe:animate-rise"
     >
       {children}
     </section>
@@ -124,14 +124,14 @@ export function ResultsHead({
     <div
       ref={headRef}
       data-stacked={stacked ? "true" : undefined}
-      className="group/head flex items-stretch gap-x-8 gap-y-2 border-b border-gray-200 pr-4 pl-3 data-[stacked=true]:flex-col data-[stacked=true]:gap-0 data-[stacked=true]:p-0"
+      className="group/head flex items-stretch gap-x-8 gap-y-2 border-b border-border pr-4 pl-3 data-[stacked=true]:flex-col data-[stacked=true]:gap-0 data-[stacked=true]:p-0"
     >
       {tabs}
       <div
         ref={barRef}
         role="group"
         aria-label={filtersLabel}
-        className="flex min-w-0 flex-auto flex-nowrap items-center justify-end gap-2 py-3 max-[600px]:group-not-data-[stacked=true]/head:px-3 group-data-[stacked=true]/head:flex-wrap group-data-[stacked=true]/head:justify-start group-data-[stacked=true]/head:bg-gray-25 group-data-[stacked=true]/head:px-4"
+        className="flex min-w-0 flex-auto flex-nowrap items-center justify-end gap-2 py-3 max-[600px]:group-not-data-[stacked=true]/head:px-3 group-data-[stacked=true]/head:flex-wrap group-data-[stacked=true]/head:justify-start group-data-[stacked=true]/head:bg-muted/40 group-data-[stacked=true]/head:px-4"
       >
         <FilterLabel />
         {chips}
@@ -177,7 +177,7 @@ export function ResultsFoot({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-3 text-xs text-gray-500">
+    <div className="flex items-center justify-between gap-3 px-4 py-3 text-xs text-muted-foreground">
       {children}
     </div>
   );

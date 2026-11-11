@@ -14,9 +14,9 @@ import {
 } from "@expendi-business/shared";
 
 import type { SpendingRange } from "./reports-api";
-import type { SortState } from "~/components/data/table";
+import type { SortState } from "~/components/data/data-table";
+import { kesValue } from "~/lib/chart-scale";
 import { dayMonthLabel, monthName, shiftMonth } from "./report-month";
-import { kesValue } from "./viz/scale";
 
 export const DOWNLOADS: readonly {
   readonly format: ReportFormat;

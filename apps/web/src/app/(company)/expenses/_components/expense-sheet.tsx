@@ -101,12 +101,12 @@ export function ExpenseDetails({
         <DetailItem label="eTIMS">
           {ETIMS_LABELS[expense.etimsStatus]}
           {expense.etimsInvoiceNumber ? (
-            <span className="block text-xs leading-4 text-gray-500">
+            <span className="block text-xs leading-4 text-muted-foreground">
               Invoice {expense.etimsInvoiceNumber}
             </span>
           ) : null}
           {expense.etimsSupplierPin ? (
-            <span className="block text-xs leading-4 text-gray-500">
+            <span className="block text-xs leading-4 text-muted-foreground">
               Supplier PIN {expense.etimsSupplierPin}
             </span>
           ) : null}
@@ -134,7 +134,7 @@ export function ExpenseDetails({
         ) : null}
       </DetailList>
       {expense.description ? (
-        <p className="whitespace-pre-wrap text-gray-700">
+        <p className="whitespace-pre-wrap text-secondary-foreground">
           {expense.description}
         </p>
       ) : null}
@@ -234,7 +234,7 @@ export function ExpenseSheet({
         index >= 0 || (expense && isInApprovals(expense)) ? (
           <>
             {index >= 0 ? (
-              <span className="text-gray-500 tabular-nums">
+              <span className="text-muted-foreground tabular-nums">
                 {index + 1} of {ids.length}
               </span>
             ) : null}

@@ -23,14 +23,37 @@ import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 import { textLinkClass } from "~/components/data/actions";
 import { Skel } from "~/components/data/states";
 import { Button } from "~/components/ui/button";
+import { Card } from "~/components/ui/card";
 import { usePaidFromAccounts } from "~/features/bills/bills-api";
 import { describeApiError } from "~/lib/api";
 import { CopyButton } from "./copy-button";
 import { GroupedAddress } from "./tx-sheet";
 import { PAID_FROM_KIND_LABELS } from "./wallet-display";
 
-export const railCardClass =
-  "min-w-0 rounded-panel border border-gray-200 bg-surface px-5 pt-[18px] pb-5";
+const railCardClass = "gap-0 px-5 pt-[18px] pb-5";
+
+export function RailCard({
+  id,
+  titleId,
+  className,
+  children,
+}: {
+  id?: string;
+  titleId: string;
+  className?: string;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <Card
+      id={id}
+      role="region"
+      aria-labelledby={titleId}
+      className={cn(railCardClass, className)}
+    >
+      {children}
+    </Card>
+  );
+}
 
 export function RailTitle({
   id,
@@ -45,7 +68,7 @@ export function RailTitle({
     <div className="flex items-center gap-2">
       <h2
         id={id}
-        className="flex items-center gap-2 text-lg leading-[26px] font-(--w-title) text-gray-900"
+        className="flex items-center gap-2 text-lg leading-[26px] font-(--w-title) text-foreground"
       >
         {children}
       </h2>
@@ -67,18 +90,18 @@ export function RailRow({
   action?: ReactNode;
 }): JSX.Element {
   return (
-    <li className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 border-t border-hairline py-3 first:border-t-0">
+    <li className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 border-t border-border py-3 first:border-t-0">
       <span
         aria-hidden="true"
-        className="inline-flex size-8 items-center justify-center rounded-control border border-gray-200 bg-surface text-gray-600"
+        className="inline-flex size-8 items-center justify-center rounded-control border border-border bg-card text-muted-foreground"
       >
         <Icon className="size-4" />
       </span>
       <div className="min-w-0">
-        <p className="truncate text-sm leading-5 font-(--w-name) text-gray-900">
+        <p className="truncate text-sm leading-5 font-(--w-name) text-foreground">
           {title}
         </p>
-        <p className="truncate text-xs leading-4 text-gray-500 tabular-nums">
+        <p className="truncate text-xs leading-4 text-muted-foreground tabular-nums">
           {detail}
         </p>
       </div>
@@ -107,21 +130,20 @@ export function DepositCard({
 }): JSX.Element {
   const chainName = PAYEE_CHAIN_NAMES[chain];
   return (
-    <section
+    <RailCard
       id="deposit"
-      aria-labelledby="deposit-title"
+      titleId="deposit-title"
       className={cn(
-        railCardClass,
         "scroll-mt-6 transition-shadow duration-300",
-        highlighted && "shadow-[0_0_0_2px_var(--color-brand-500)]",
+        highlighted && "shadow-[0_0_0_2px_var(--primary)]",
       )}
     >
       <RailTitle id="deposit-title">Fund in</RailTitle>
-      <p className="mt-0.5 text-sm text-gray-600">
+      <p className="mt-0.5 text-sm text-muted-foreground">
         Send USDC on {chainName} to the company wallet from an exchange or
         another wallet.
       </p>
-      <p className="mt-4 text-xs leading-4 font-(--w-ui) text-gray-500">
+      <p className="mt-4 text-xs leading-4 font-(--w-ui) text-muted-foreground">
         {chain === "near" ? "NEAR account" : `${chainName} address`}
       </p>
       <p className="mt-1 text-sm leading-5 select-all">
@@ -139,7 +161,7 @@ export function DepositCard({
       </p>
       {onFundIn ? (
         <>
-          <p className="mt-3.5 text-sm text-gray-600">
+          <p className="mt-3.5 text-sm text-muted-foreground">
             USDC on Base, Ethereum, Arbitrum or Solana needs its own one-time
             address.
           </p>
@@ -154,7 +176,7 @@ export function DepositCard({
           </Button>
         </>
       ) : null}
-    </section>
+    </RailCard>
   );
 }
 
@@ -177,7 +199,7 @@ export function PaidFromAccounts({
 }): JSX.Element {
   const accounts = usePaidFromAccounts(organizationId);
   return (
-    <section aria-labelledby="paid-from-title" className={railCardClass}>
+    <RailCard titleId="paid-from-title">
       <RailTitle
         id="paid-from-title"
         aside={
@@ -188,7 +210,7 @@ export function PaidFromAccounts({
       >
         Paid-from accounts
       </RailTitle>
-      <p className="mt-0.5 text-sm text-gray-600">
+      <p className="mt-0.5 text-sm text-muted-foreground">
         Company spending paid outside Expendi says which of these it came from.
       </p>
       {accounts.isPending ? (
@@ -197,7 +219,7 @@ export function PaidFromAccounts({
           <Skel width="55%" height={14} />
         </div>
       ) : accounts.isError ? (
-        <p role="alert" className="mt-3 text-sm text-error-700">
+        <p role="alert" className="mt-3 text-sm text-destructive">
           {describeApiError(accounts.error)}{" "}
           <button
             type="button"
@@ -208,7 +230,7 @@ export function PaidFromAccounts({
           </button>
         </p>
       ) : accounts.data.length === 0 ? (
-        <p className="mt-3 rounded-control border border-dashed border-control-border p-4 text-center text-sm text-gray-600">
+        <p className="mt-3 rounded-control border border-dashed border-input p-4 text-center text-sm text-muted-foreground">
           No accounts yet. Add them in Settings.
         </p>
       ) : (
@@ -223,6 +245,6 @@ export function PaidFromAccounts({
           ))}
         </ul>
       )}
-    </section>
+    </RailCard>
   );
 }

@@ -23,6 +23,7 @@ import type {
 } from "./activity-display";
 import type { SheetStepper } from "~/components/data/detail-sheet";
 import { TextLinkButton, textLinkClass } from "~/components/data/actions";
+import { EntityMark } from "~/components/data/cells";
 import {
   Callout,
   DetailItem,
@@ -34,7 +35,6 @@ import {
 } from "~/components/data/detail-sheet";
 import { KesTotal, Money } from "~/components/data/money";
 import { StatusBadge } from "~/components/data/status-badge";
-import { EntityMark } from "~/components/data/table";
 import { formatNairobiDateTime } from "~/lib/nairobi-time";
 import {
   ACTOR_ABOUT,
@@ -103,7 +103,7 @@ export function EntrySheet({
       stepper={stepper}
       headerExtra={
         <>
-          <p className="mt-0.5 [overflow-wrap:anywhere] text-gray-600">
+          <p className="mt-0.5 [overflow-wrap:anywhere] text-muted-foreground">
             {batch
               ? `${batchCount(row) ?? ""} with one passkey approval`
               : recordName(lead.entity)}
@@ -157,7 +157,7 @@ export function EntrySheet({
           </DetailItem>
         ) : null}
         <DetailItem label="Action">
-          <span className="[overflow-wrap:anywhere] text-gray-600">
+          <span className="[overflow-wrap:anywhere] text-muted-foreground">
             {lead.action}
           </span>
         </DetailItem>
@@ -243,7 +243,7 @@ function BatchList({
   return (
     <ul
       aria-label="Paid together"
-      className="m-0 list-none divide-y divide-hairline rounded-control border border-gray-200 p-0"
+      className="m-0 list-none divide-y divide-border rounded-control border border-border p-0"
     >
       {row.subjects.map((entry) => {
         const [name = "", ...rest] = recordName(entry.entity).split(", ");
@@ -256,7 +256,7 @@ function BatchList({
             <EntityMark name={name} />
             <span className="min-w-0">
               <span className="block truncate font-(--w-name)">{name}</span>
-              <span className="flex flex-wrap gap-x-3 text-xs leading-4 text-gray-500">
+              <span className="flex flex-wrap gap-x-3 text-xs leading-4 text-muted-foreground">
                 <span>
                   {rest.join(", ") || entityTypeOf(entry.entity.type).label}
                 </span>
@@ -276,10 +276,10 @@ function BatchList({
           </li>
         );
       })}
-      <li className="flex items-center justify-between gap-3 rounded-b-control bg-gray-25 px-3 py-2.5 text-gray-600">
+      <li className="flex items-center justify-between gap-3 rounded-b-control bg-muted/40 px-3 py-2.5 text-muted-foreground">
         <span className="tabular-nums">{batchCount(row)}</span>
         {total ? (
-          <span className="font-(--w-amount) text-gray-900">
+          <span className="font-(--w-amount) text-foreground">
             <KesTotal total={total} />
           </span>
         ) : null}
@@ -291,7 +291,7 @@ function BatchList({
 function Shown({ value }: { value: ShownValue }): JSX.Element {
   switch (value.kind) {
     case "none":
-      return <span className="font-normal text-gray-500">None</span>;
+      return <span className="font-normal text-muted-foreground">None</span>;
     case "text":
       return <>{value.text}</>;
     case "money":
@@ -310,11 +310,11 @@ function ChangesTable({
   rows: readonly ChangeRow[];
 }): JSX.Element {
   const cell =
-    "border-t border-hairline px-3 py-2.5 align-top [overflow-wrap:break-word]";
+    "border-t border-border px-3 py-2.5 align-top [overflow-wrap:break-word]";
   const head =
-    "border-b border-gray-200 bg-gray-25 px-3 py-2 text-left text-xs leading-4 font-(--w-ui) text-gray-500";
+    "border-b border-border bg-muted/40 px-3 py-2 text-left text-xs leading-4 font-(--w-ui) text-muted-foreground";
   return (
-    <div className="overflow-hidden rounded-control border border-gray-200">
+    <div className="overflow-hidden rounded-control border border-border">
       <table className="w-full table-fixed border-separate border-spacing-0 [&_tbody_tr:first-child_td]:border-t-0">
         <colgroup>
           <col className="w-[32%]" />
@@ -345,9 +345,9 @@ function ChangesTable({
         <tbody>
           {rows.map((row) => (
             <tr key={row.key}>
-              <td className={cn(cell, "text-gray-500")}>{row.label}</td>
+              <td className={cn(cell, "text-muted-foreground")}>{row.label}</td>
               {hasBefore ? (
-                <td className={cn(cell, "text-gray-600")}>
+                <td className={cn(cell, "text-muted-foreground")}>
                   {row.before ? (
                     <Shown value={row.before} />
                   ) : (
@@ -359,10 +359,10 @@ function ChangesTable({
                 className={cn(
                   cell,
                   row.changed
-                    ? "font-(--w-ui) text-gray-900"
+                    ? "font-(--w-ui) text-foreground"
                     : row.before
-                      ? "text-gray-600"
-                      : "text-gray-900",
+                      ? "text-muted-foreground"
+                      : "text-foreground",
                 )}
               >
                 <Shown value={row.after} />
@@ -390,15 +390,15 @@ function RecordedValues({ row }: { row: ActivityRow }): JSX.Element {
           after: row.entries[0]?.after ?? null,
         };
   return (
-    <details className="group/raw rounded-control border border-gray-200">
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-control px-3 py-2.5 font-(--w-ui) text-gray-600 hover:text-gray-900 [&::-webkit-details-marker]:hidden">
+    <details className="group/raw rounded-control border border-border">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-control px-3 py-2.5 font-(--w-ui) text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
         Recorded values
         <ChevronDownIcon
           aria-hidden="true"
-          className="ml-auto size-4 text-gray-500 transition-transform duration-200 group-open/raw:rotate-180"
+          className="ml-auto size-4 text-muted-foreground transition-transform duration-200 group-open/raw:rotate-180"
         />
       </summary>
-      <pre className="m-0 max-h-80 overflow-auto rounded-b-control border-t border-hairline bg-gray-25 p-3 text-xs leading-4 whitespace-pre-wrap text-gray-700 tabular-nums [overflow-wrap:anywhere]">
+      <pre className="m-0 max-h-80 overflow-auto rounded-b-control border-t border-border bg-muted/40 p-3 text-xs leading-4 whitespace-pre-wrap text-secondary-foreground tabular-nums [overflow-wrap:anywhere]">
         {JSON.stringify(value, null, 2)}
       </pre>
     </details>

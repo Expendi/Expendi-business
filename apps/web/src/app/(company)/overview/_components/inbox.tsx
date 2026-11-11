@@ -14,10 +14,11 @@ import { obligationAction } from "@expendi-business/shared";
 
 import type { InboxGroup, InboxItem } from "./overview-display";
 import type { StatusTone } from "~/components/data/status-badge";
+import { EntityMark } from "~/components/data/cells";
 import { Money } from "~/components/data/money";
 import { StatusBadge } from "~/components/data/status-badge";
-import { EntityMark } from "~/components/data/table";
 import { Button } from "~/components/ui/button";
+import { Card } from "~/components/ui/card";
 import {
   dayMonth,
   expenseMeta,
@@ -25,9 +26,6 @@ import {
   overdueLabel,
   paymentMeta,
 } from "./overview-display";
-
-const panelClass =
-  "rounded-panel border border-gray-200 bg-surface shadow-panel";
 
 /** Grouped rows of what needs someone today, each with its next step. */
 export function Inbox({
@@ -39,23 +37,21 @@ export function Inbox({
 }): JSX.Element {
   let position = 0;
   return (
-    <div
-      className={`${panelClass} mt-6 overflow-hidden [animation-delay:70ms] motion-safe:animate-rise`}
-    >
+    <Card className="mt-6 gap-0 overflow-hidden py-0 shadow-xs [animation-delay:70ms] motion-safe:animate-rise">
       {groups.map((group) => {
         const titleId = `inbox-${group.id}`;
         return (
           <section
             key={group.id}
             aria-labelledby={titleId}
-            className="not-first:border-t not-first:border-gray-200"
+            className="not-first:border-t not-first:border-border"
           >
             <h2
               id={titleId}
-              className="flex items-center gap-2 px-5 pt-4 pb-1 text-sm leading-5 font-(--w-ui) text-gray-600 max-[600px]:px-4"
+              className="flex items-center gap-2 px-5 pt-4 pb-1 text-sm leading-5 font-(--w-ui) text-muted-foreground max-[600px]:px-4"
             >
               {group.title}
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-100 px-1.5 text-xs text-gray-700 tabular-nums">
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-xs text-secondary-foreground tabular-nums">
                 {group.items.length}
               </span>
             </h2>
@@ -72,7 +68,7 @@ export function Inbox({
           </section>
         );
       })}
-    </div>
+    </Card>
   );
 }
 
@@ -106,7 +102,7 @@ function InboxRow({
   return (
     <li
       style={{ animationDelay: `${String(120 + index * 45)}ms` }}
-      className="grid grid-cols-[36px_minmax(0,1fr)] gap-3.5 px-5 pt-3.5 pb-4 transition-colors duration-150 not-first:border-t not-first:border-hairline hover:bg-gray-25 max-[600px]:gap-3 max-[600px]:px-4 motion-safe:animate-rise"
+      className="grid grid-cols-[36px_minmax(0,1fr)] gap-3.5 px-5 pt-3.5 pb-4 transition-colors duration-150 not-first:border-t not-first:border-border hover:bg-muted/40 max-[600px]:gap-3 max-[600px]:px-4 motion-safe:animate-rise"
     >
       <span className="[&>span]:size-9">
         <EntityMark name={view.markName} kind={view.markKind} />
@@ -115,7 +111,7 @@ function InboxRow({
         <div className="flex items-baseline justify-between gap-3">
           <Link
             href={view.href}
-            className="min-w-0 rounded-[4px] text-base leading-6 font-(--w-name) [overflow-wrap:anywhere] text-gray-900 hover:underline hover:decoration-gray-300 hover:underline-offset-3"
+            className="min-w-0 rounded-[4px] text-base leading-6 font-(--w-name) [overflow-wrap:anywhere] text-foreground hover:underline hover:decoration-border hover:underline-offset-3"
           >
             {view.title}
           </Link>
@@ -123,7 +119,7 @@ function InboxRow({
             {view.amount}
           </span>
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm leading-5 text-gray-500">
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm leading-5 text-muted-foreground">
           {view.meta ? <span>{view.meta}</span> : null}
           {view.pill}
         </div>
@@ -153,7 +149,7 @@ function amountOf(row: CashObligation): ReactNode {
     return <Money amount={row.amountKes} currency="KES" />;
   }
   return (
-    <span className="text-sm font-normal text-gray-500">
+    <span className="text-sm font-normal text-muted-foreground">
       {row.needsAmount ? "Amount not entered" : "Amount unknown"}
     </span>
   );
@@ -244,7 +240,7 @@ function rowView(item: InboxItem, canAct: boolean): RowView {
         <Button asChild size="md" variant="outline">
           <Link href={href}>View expense</Link>
         </Button>
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-muted-foreground">
           {holder} adds{" "}
           {item.kind === "receipt" ? "the receipt" : "the eTIMS invoice"} in the
           Expendi app.
@@ -261,9 +257,7 @@ export function CaughtUp({
   next: CashObligation | undefined;
 }): JSX.Element {
   return (
-    <div
-      className={`${panelClass} mt-6 flex items-start gap-3.5 p-5 motion-safe:animate-rise`}
-    >
+    <Card className="mt-6 flex-row items-start gap-3.5 px-5 py-5 shadow-xs motion-safe:animate-rise">
       <CheckCircleIcon
         aria-hidden="true"
         className="size-6 shrink-0 text-success-700"
@@ -271,7 +265,7 @@ export function CaughtUp({
       <div>
         <p>Nothing needs you right now.</p>
         {next ? (
-          <p className="mt-0.5 text-gray-500 tabular-nums">
+          <p className="mt-0.5 text-muted-foreground tabular-nums">
             Next payment: {next.name},{" "}
             {next.amountKes === null ? (
               "amount not entered"
@@ -282,6 +276,6 @@ export function CaughtUp({
           </p>
         ) : null}
       </div>
-    </div>
+    </Card>
   );
 }

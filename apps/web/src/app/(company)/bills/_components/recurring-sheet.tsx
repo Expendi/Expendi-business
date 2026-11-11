@@ -11,11 +11,15 @@ import {
   PlusIcon,
   RepeatIcon,
 } from "lucide-react";
+import { useMemo } from "react";
 
 import type { RecurringItem } from "@expendi-business/shared";
 
+import type { DataTableColumnDef } from "~/components/data/data-table";
 import type { RecurringItemAction } from "~/features/recurring/recurring-api";
 import { TextLinkButton } from "~/components/data/actions";
+import { EntityMark, RowMeta, RowTitle } from "~/components/data/cells";
+import { DataTable, useDataTable } from "~/components/data/data-table";
 import {
   Callout,
   DetailItem,
@@ -26,9 +30,8 @@ import {
   SheetPosition,
 } from "~/components/data/detail-sheet";
 import { Money } from "~/components/data/money";
-import { EmptyState, ErrorState, Skel } from "~/components/data/states";
+import { EmptyState, ErrorState } from "~/components/data/states";
 import { StatusBadge } from "~/components/data/status-badge";
-import { EntityMark } from "~/components/data/table";
 import { Button } from "~/components/ui/button";
 import { FieldError } from "~/components/ui/field";
 import { storedAmount } from "~/features/bills/bill-amount";
@@ -74,34 +77,6 @@ function StateBadge({
   );
 }
 
-function ListSkeleton(): JSX.Element {
-  return (
-    <div aria-busy="true">
-      <p className="sr-only" role="status">
-        Loading recurring payments…
-      </p>
-      <ul aria-hidden="true" className="m-0 list-none p-0">
-        {[0, 1, 2, 3, 4, 5].map((row) => (
-          <li
-            key={row}
-            className="grid grid-cols-[32px_minmax(0,1fr)_auto] gap-3 border-b border-row-divider px-6 py-3.5 max-[600px]:px-4"
-          >
-            <Skel width={32} height={32} />
-            <div>
-              <Skel width="55%" height={14} style={{ marginTop: 5 }} />
-              <Skel width="80%" height={12} style={{ marginTop: 9 }} />
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              <Skel width={84} height={14} style={{ marginTop: 5 }} />
-              <Skel width={64} height={20} />
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 /**
  * Every recurring payment but salaries: active first, then paused, then
  * ended, the soonest due first. Each row opens its details.
@@ -127,8 +102,7 @@ export function RecurringList({
       <ErrorState title="Recurring payments didn't load" onRetry={onRetry} />
     );
   }
-  if (items === undefined) return <ListSkeleton />;
-  if (items.length === 0) {
+  if (items?.length === 0) {
     return (
       <EmptyState
         icon={RepeatIcon}
@@ -147,45 +121,93 @@ export function RecurringList({
       </EmptyState>
     );
   }
-  return (
-    <ul aria-label="Recurring payments" className="m-0 list-none p-0">
-      {items.map((item) => {
-        const due = nextDueDate(item);
+  return <RecurringTable items={items} onOpen={onOpen} />;
+}
+
+function recurringColumns(
+  onOpen: (itemId: string) => void,
+): DataTableColumnDef<RecurringItem>[] {
+  return [
+    {
+      id: "payment",
+      accessorFn: (item) => item.payee.name,
+      header: "Payment",
+      cell: ({ row }) => {
+        const item = row.original;
         return (
-          <li key={item.id} className="border-b border-row-divider">
-            <button
-              type="button"
-              data-item={item.id}
-              onClick={() => onOpen(item.id)}
-              className="grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 border-0 bg-transparent px-6 py-3.5 text-left transition-colors duration-150 hover:bg-gray-25 focus-visible:-outline-offset-2 max-[600px]:px-4"
-            >
-              <EntityMark name={item.payee.name} />
-              <span className="min-w-0">
-                <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-base leading-6 font-(--w-name) text-gray-900">
-                  <span>{item.payee.name}</span>
-                  {item.state === "active" ? null : <StateBadge item={item} />}
-                </span>
-                <span className="block text-gray-500 tabular-nums">
-                  {scheduleInWords(item)} · {recurringAmountText(item)}
-                </span>
+          <span className="flex min-w-0 items-start gap-3">
+            <EntityMark name={item.payee.name} />
+            <span className="min-w-0">
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <RowTitle onOpen={() => onOpen(item.id)}>
+                  {item.payee.name}
+                </RowTitle>
+                {item.state === "active" ? null : <StateBadge item={item} />}
               </span>
-              <span className="flex flex-col items-end gap-1 whitespace-nowrap text-gray-600">
-                {due ? (
-                  <>
-                    <span className="tabular-nums">{formatIsoDate(due)}</span>
-                    {item.nextBill ? (
-                      <BillStatusBadge status={item.nextBill.status} />
-                    ) : null}
-                  </>
-                ) : (
-                  <span className="text-gray-500">No more bills</span>
-                )}
-              </span>
-            </button>
-          </li>
+              <RowMeta
+                text={`${scheduleInWords(item)} · ${recurringAmountText(item)}`}
+              />
+            </span>
+          </span>
         );
-      })}
-    </ul>
+      },
+      enableSorting: false,
+      enableHiding: false,
+      meta: { kind: "main", label: "Payment" },
+    },
+    {
+      id: "next",
+      accessorFn: (item) => nextDueDate(item) ?? "",
+      header: "Next bill",
+      cell: ({ row }) => {
+        const item = row.original;
+        const due = nextDueDate(item);
+        return due ? (
+          <span className="flex flex-col items-end gap-1 whitespace-nowrap">
+            <span className="tabular-nums">{formatIsoDate(due)}</span>
+            {item.nextBill ? (
+              <BillStatusBadge status={item.nextBill.status} />
+            ) : null}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">No more bills</span>
+        );
+      },
+      enableSorting: false,
+      enableHiding: false,
+      meta: { align: "end", label: "Next bill" },
+    },
+  ];
+}
+
+function RecurringTable({
+  items,
+  onOpen,
+}: {
+  items: readonly RecurringItem[] | undefined;
+  onOpen: (itemId: string) => void;
+}): JSX.Element {
+  const columns = useMemo(() => recurringColumns(onOpen), [onOpen]);
+  const table = useDataTable({
+    data: items ?? [],
+    columns,
+    getRowId: (item) => item.id,
+    paginate: false,
+  });
+  return (
+    <div aria-busy={items === undefined || undefined}>
+      {items === undefined ? (
+        <p className="sr-only" role="status">
+          Loading recurring payments…
+        </p>
+      ) : null}
+      <DataTable
+        table={table}
+        caption="Recurring payments"
+        loading={items === undefined}
+        onRowOpen={(item) => onOpen(item.id)}
+      />
+    </div>
   );
 }
 
@@ -227,7 +249,7 @@ export function BackToRecurring({
     <button
       type="button"
       onClick={onBack}
-      className="-ml-0.5 inline-flex items-center gap-0.5 rounded-[4px] border-0 bg-transparent p-0 text-xs leading-4 font-(--w-ui) text-gray-600 hover:text-gray-900"
+      className="-ml-0.5 inline-flex items-center gap-0.5 rounded-[4px] border-0 bg-transparent p-0 text-xs leading-4 font-(--w-ui) text-muted-foreground hover:text-foreground"
     >
       <ChevronLeftIcon aria-hidden="true" className="size-3.5" />
       Back to recurring payments
@@ -246,7 +268,9 @@ export function RecurringSheetHeader({
     <>
       <p className="mt-0.5 text-2xl leading-8 font-(--w-heading) tracking-[-0.02em]">
         {stored === null ? (
-          <span className="text-base text-gray-500">Variable amount</span>
+          <span className="text-base text-muted-foreground">
+            Variable amount
+          </span>
         ) : (
           <Money
             amount={stored}
@@ -272,7 +296,7 @@ function NextBill({
     return (
       <section aria-label="Next bill" className="flex flex-col gap-2">
         <SectionLabel>Next bill</SectionLabel>
-        <p className="rounded-control border border-dashed border-control-border px-4 py-3.5 text-gray-600">
+        <p className="rounded-control border border-dashed border-input px-4 py-3.5 text-muted-foreground">
           No more bills
         </p>
       </section>
@@ -283,7 +307,7 @@ function NextBill({
   return (
     <section aria-label="Next bill" className="flex flex-col gap-2">
       <SectionLabel>Next bill</SectionLabel>
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-control border border-gray-200 px-4 py-3.5">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-control border border-border px-4 py-3.5">
         <span className="text-base leading-6 font-(--w-name) tabular-nums">
           Due {formatIsoDate(bill.dueOn)}
         </span>

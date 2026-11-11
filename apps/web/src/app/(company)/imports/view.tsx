@@ -206,12 +206,12 @@ function CompanyImports({
           Back to {kind === "history" ? "Expenses" : "Bills"}
         </Link>
         <h1 className="text-2xl font-semibold">Import your spreadsheet</h1>
-        <p className="max-w-2xl text-sm text-stone-600">
+        <p className="max-w-2xl text-sm text-muted-foreground">
           Bring paid expenses or unpaid bills into{" "}
           <strong>{companyName}</strong>. Match your columns, check the preview,
           then import. Your file is only saved as records after you confirm.
         </p>
-        <p className="max-w-2xl text-sm text-stone-600">
+        <p className="max-w-2xl text-sm text-muted-foreground">
           Imports never send money. Paid expenses appear in Expenses and reports
           without being sent to Zoho. Unpaid bills appear in Bills for payment
           later.
@@ -259,7 +259,7 @@ function CompanyImports({
             </select>
           </label>
         </div>
-        <div className="space-y-2 text-sm text-stone-600">
+        <div className="space-y-2 text-sm text-muted-foreground">
           <p>
             Use UTF-8 CSV or TSV, up to 500 non-empty rows and 512 KB. Dates:
             DD/MM/YYYY or YYYY-MM-DD. Amounts: KES, for example 1,500.00.
@@ -306,7 +306,7 @@ function CompanyImports({
             : "Create missing categories when I confirm"}
         </label>
         {!createMissing ? (
-          <p className="text-sm text-stone-600">
+          <p className="text-sm text-muted-foreground">
             Only existing active names will be accepted. Missing names will
             appear as errors in the preview.
           </p>
@@ -322,9 +322,9 @@ function CompanyImports({
           />
         </label>
         {file ? (
-          <section className="space-y-4 border-t border-stone-200 pt-6">
+          <section className="space-y-4 border-t border-border pt-6">
             <h2 className="text-lg font-semibold">2. Match your columns</h2>
-            <p className="text-sm text-stone-600">
+            <p className="text-sm text-muted-foreground">
               {file.name} · {file.parsed.rows.length} data rows ·{" "}
               {file.parsed.ignored.length} template/summary rows skipped. Check
               the suggested matches. Required fields are marked *.
@@ -363,7 +363,7 @@ function CompanyImports({
                 </label>
               ))}
             </div>
-            <p className="text-sm text-stone-600">
+            <p className="text-sm text-muted-foreground">
               Overview heading is optional: transactions (default),
               subscriptions, salaries or petty_cash. Bills support transactions
               or subscriptions.
@@ -385,14 +385,14 @@ function CompanyImports({
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="text-sm text-error-700">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : null}
       {done ? (
         <div
           role="status"
-          className="space-y-2 rounded-lg border border-stone-200 p-4"
+          className="space-y-2 rounded-lg border border-border p-4"
         >
           <p>{done}</p>
           <Link
@@ -416,7 +416,7 @@ function CompanyImports({
             Total to import: KES{" "}
             {formatKesCents(preview.report.totalKes ?? "0")}
           </p>
-          <p className="text-sm text-stone-600">
+          <p className="text-sm text-muted-foreground">
             Nothing has been imported yet. Only ready rows count toward this
             total. Exact repeats are skipped; review similar transactions before
             confirming.

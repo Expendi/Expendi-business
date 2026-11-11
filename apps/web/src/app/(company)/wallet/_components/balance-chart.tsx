@@ -1,24 +1,32 @@
 "use client";
 
-import type { JSX, KeyboardEvent } from "react";
-import { useId, useRef } from "react";
+import type { JSX } from "react";
+import { useId } from "react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ReferenceDot,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import type { DailyBalance } from "./wallet-display";
-import type { TipContent } from "~/app/(company)/reports/_components/viz/chart-tip";
-import {
-  ChartTip,
-  nextIndex,
-  useChartHover,
-  useElementWidth,
-} from "~/app/(company)/reports/_components/viz/chart-tip";
-import {
-  compact,
-  niceScale,
-} from "~/app/(company)/reports/_components/viz/scale";
+import type { TipContent } from "~/components/data/chart-tip";
+import type { ChartConfig } from "~/components/ui/chart";
+import { ChartContainer, ChartTooltip } from "~/components/ui/chart";
+import { compact } from "~/lib/chart-scale";
 import { dayMonth } from "./wallet-display";
 
-const HEIGHT = 180;
-const MARGIN = { t: 10, r: 56, b: 24, l: 36 };
+const CONFIG = {
+  balance: { label: "Balance", color: "var(--chart-1)" },
+} satisfies ChartConfig;
+
+interface BalancePoint {
+  readonly day: string;
+  readonly value: number;
+  readonly source: DailyBalance;
+}
 
 /** USDC base units as whole USDC, only for placing the line. */
 function usdcValue(units: string): number {
@@ -27,8 +35,8 @@ function usdcValue(units: string): number {
 
 /**
  * The balance at the end of each day: a step line, because the balance
- * only moves when money does. A crosshair reads any day; on focus the
- * arrow keys, Home and End do.
+ * only moves when money does. The tooltip reads any day; on focus the arrow
+ * keys do.
  */
 export function BalanceChart({
   series,
@@ -39,180 +47,107 @@ export function BalanceChart({
   ariaLabel: string;
   tip: (point: DailyBalance) => TipContent;
 }): JSX.Element {
-  const host = useRef<HTMLDivElement>(null);
-  const width = useElementWidth(host);
-  const hover = useChartHover();
-  const fillId = useId();
-
-  const values = series.map((point) => usdcValue(point.units));
-  const count = values.length;
-  const iw = Math.max(0, width - MARGIN.l - MARGIN.r);
-  const ih = HEIGHT - MARGIN.t - MARGIN.b;
-  const { top, ticks } = niceScale(Math.max(0, ...values));
-  const x = (index: number) =>
-    MARGIN.l + (count > 1 ? (index / (count - 1)) * iw : iw / 2);
-  const y = (value: number) => MARGIN.t + ih - (Math.max(0, value) / top) * ih;
-
-  let line = "";
-  values.forEach((value, index) => {
-    line +=
-      index === 0
-        ? `M${x(0).toFixed(1)} ${y(value).toFixed(1)}`
-        : ` H${x(index).toFixed(1)} V${y(value).toFixed(1)}`;
-  });
-  const area = `${line} V${y(0).toFixed(1)} H${x(0).toFixed(1)} Z`;
-  const last = count - 1;
-  const end = values[last] ?? 0;
-
-  function anchorFor(index: number) {
-    const rect = host.current?.getBoundingClientRect();
-    return {
-      x: (rect?.left ?? 0) + x(index),
-      y: (rect?.top ?? 0) + MARGIN.t + ih / 2,
-    };
-  }
-
-  function onKeyDown(event: KeyboardEvent<SVGSVGElement>) {
-    const next = nextIndex(event.key, hover.active ?? last, count);
-    if (next === null) return;
-    event.preventDefault();
-    hover.show(next, anchorFor(next));
-  }
-
-  const active = hover.active;
-  const activePoint = active === null ? undefined : series[active];
+  const gradientId = useId().replace(/:/g, "");
+  const points: BalancePoint[] = series.map((source) => ({
+    day: source.day,
+    value: usdcValue(source.units),
+    source,
+  }));
+  const last = points.at(-1);
+  const ticks = points
+    .filter((_, index) => index % 7 === 0 && index < points.length - 2)
+    .map((point) => point.day);
 
   return (
-    <div ref={host} className="relative mt-2" style={{ height: HEIGHT }}>
-      {width > 0 && count > 0 ? (
-        <svg
-          width={width}
-          height={HEIGHT}
-          viewBox={`0 0 ${String(width)} ${String(HEIGHT)}`}
-          role="img"
-          aria-label={ariaLabel}
-          tabIndex={0}
-          onKeyDown={onKeyDown}
-          onFocus={() => hover.show(last, anchorFor(last))}
-          onBlur={hover.hide}
-          className="block overflow-visible rounded-[4px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
+    <figure aria-label={ariaLabel} className="m-0 mt-2 min-w-0">
+      <ChartContainer config={CONFIG} className="aspect-auto h-[180px] w-full">
+        <AreaChart
+          accessibilityLayer
+          data={points}
+          margin={{ top: 10, right: 52, left: 0, bottom: 0 }}
         >
           <defs>
-            <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop
                 offset="0%"
-                stopColor="var(--color-brand-500)"
-                stopOpacity={0.16}
+                stopColor="var(--color-balance)"
+                stopOpacity={0.3}
               />
               <stop
                 offset="100%"
-                stopColor="var(--color-brand-500)"
+                stopColor="var(--color-balance)"
                 stopOpacity={0}
               />
             </linearGradient>
           </defs>
-          {ticks.map((tick) => (
-            <g key={tick}>
-              <line
-                x1={MARGIN.l}
-                x2={MARGIN.l + iw}
-                y1={y(tick)}
-                y2={y(tick)}
-                className={tick === 0 ? "stroke-gray-300" : "stroke-hairline"}
-              />
-              <text
-                x={MARGIN.l - 8}
-                y={y(tick)}
-                textAnchor="end"
-                dominantBaseline="middle"
-                className="fill-gray-500 text-[11px] tabular-nums"
-              >
-                {tick === 0 ? "0" : compact(tick)}
-              </text>
-            </g>
-          ))}
-          {series.map((point, index) =>
-            index % 7 === 0 && index < last - 1 ? (
-              <text
-                key={point.day}
-                x={x(index)}
-                y={HEIGHT - 4}
-                textAnchor="middle"
-                className="fill-gray-500 text-[11px]"
-              >
-                {dayMonth(point.day)}
-              </text>
-            ) : null,
-          )}
-          <path d={area} fill={`url(#${fillId})`} />
-          <path
-            d={line}
-            fill="none"
-            strokeWidth={2}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            className="stroke-brand-700"
+          <CartesianGrid vertical={false} />
+          <XAxis
+            dataKey="day"
+            ticks={ticks}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            tickFormatter={(day: string) => dayMonth(day)}
           />
-          <circle
-            cx={x(last)}
-            cy={y(end)}
-            r={4}
-            strokeWidth={2}
-            className="fill-brand-700 stroke-surface"
+          <YAxis
+            width={40}
+            domain={[0, "auto"]}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value: number) =>
+              value === 0 ? "0" : compact(value)
+            }
           />
-          <text
-            x={x(last) + 10}
-            y={y(end)}
-            dominantBaseline="middle"
-            className="fill-gray-900 text-xs font-(--w-ui) tabular-nums"
-          >
-            {compact(end)}
-          </text>
-          {active !== null ? (
-            <g className="pointer-events-none">
-              <line
-                x1={x(active)}
-                x2={x(active)}
-                y1={MARGIN.t}
-                y2={MARGIN.t + ih}
-                className="stroke-gray-400"
-              />
-              <circle
-                cx={x(active)}
-                cy={y(values[active] ?? 0)}
-                r={4}
-                strokeWidth={2}
-                className="fill-brand-700 stroke-surface"
-              />
-            </g>
-          ) : null}
-          <rect
-            x={MARGIN.l - 6}
-            y={0}
-            width={iw + 12}
-            height={HEIGHT - MARGIN.b}
-            fill="transparent"
-            onPointerMove={(event) => {
-              const rect =
-                event.currentTarget.ownerSVGElement?.getBoundingClientRect();
-              const offset = event.clientX - (rect?.left ?? 0) - MARGIN.l;
-              const index = Math.round((offset / Math.max(1, iw)) * last);
-              const clamped = Math.min(last, Math.max(0, index));
-              hover.show(clamped, {
-                x: (rect?.left ?? 0) + x(clamped),
-                y: (rect?.top ?? 0) + MARGIN.t + ih / 2,
-              });
+          <ChartTooltip
+            cursor
+            content={({ active, payload }) => {
+              const point = payload[0]?.payload as BalancePoint | undefined;
+              if (!active || !point) return null;
+              const { head, rows, foot } = tip(point.source);
+              return (
+                <div className="grid min-w-36 gap-1 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                  <p className="font-medium">{head}</p>
+                  {rows.map((row) => (
+                    <p key={row.key} className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">{row.label}</span>
+                      <span className="font-medium tabular-nums">
+                        {row.value}
+                      </span>
+                    </p>
+                  ))}
+                  {foot ? (
+                    <p className="text-muted-foreground tabular-nums">{foot}</p>
+                  ) : null}
+                </div>
+              );
             }}
-            onPointerLeave={hover.hide}
           />
-        </svg>
-      ) : (
-        <div role="img" aria-label={ariaLabel} />
-      )}
-      <ChartTip
-        content={activePoint ? tip(activePoint) : null}
-        anchor={hover.anchor}
-      />
-    </div>
+          <Area
+            dataKey="value"
+            type="stepAfter"
+            stroke="var(--color-balance)"
+            strokeWidth={2}
+            fill={`url(#${gradientId})`}
+          />
+          {last ? (
+            <ReferenceDot
+              x={last.day}
+              y={last.value}
+              r={4}
+              fill="var(--color-balance)"
+              stroke="var(--card)"
+              strokeWidth={2}
+              ifOverflow="visible"
+              label={{
+                value: compact(last.value),
+                position: "right",
+                offset: 8,
+                className: "fill-foreground text-xs tabular-nums",
+              }}
+            />
+          ) : null}
+        </AreaChart>
+      </ChartContainer>
+    </figure>
   );
 }

@@ -29,8 +29,8 @@ import { createPortal } from "react-dom";
 
 import type { StatusTone } from "./status-badge";
 import { TextLinkButton } from "./actions";
+import { EntityMark } from "./cells";
 import { StatusBadge } from "./status-badge";
-import { EntityMark } from "./table";
 
 export interface FilterOption {
   readonly value: string;
@@ -129,13 +129,16 @@ export function FilterChip({
                 open ? "border-brand-700" : "border-brand-100",
               )
             : open
-              ? "border-solid border-gray-900 bg-surface text-gray-900"
-              : "border-dashed border-gray-300 bg-surface text-gray-700 hover:not-disabled:border-solid hover:not-disabled:border-gray-400 hover:not-disabled:text-gray-900",
+              ? "border-solid border-gray-900 bg-card text-foreground"
+              : "border-dashed border-gray-300 bg-card text-secondary-foreground hover:not-disabled:border-solid hover:not-disabled:border-gray-400 hover:not-disabled:text-foreground",
         )}
       >
         <Icon
           aria-hidden="true"
-          className={cn("size-3.5", isSet ? "text-brand-700" : "text-gray-500")}
+          className={cn(
+            "size-3.5",
+            isSet ? "text-brand-700" : "text-muted-foreground",
+          )}
         />
         {isSet ? (
           <>
@@ -149,7 +152,7 @@ export function FilterChip({
             {label}
             <ChevronDownIcon
               aria-hidden="true"
-              className="size-3.5 text-gray-500"
+              className="size-3.5 text-muted-foreground"
             />
           </>
         )}
@@ -360,7 +363,7 @@ function FilterMenu({
             aria-label={searchPlaceholder}
             aria-controls={listId}
             autoComplete="off"
-            className="min-w-0 flex-1 border-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-500"
+            className="min-w-0 flex-1 border-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
         ) : null
       }
@@ -409,13 +412,13 @@ export function FilterMenuPanel({
       style={style}
       onKeyDown={onKeyDown}
       className={cn(
-        "z-45 flex flex-col overflow-hidden rounded-panel border border-gray-200 bg-surface text-sm shadow-menu motion-safe:animate-pop",
+        "z-45 flex flex-col overflow-hidden rounded-xl border border-border bg-card text-sm shadow-menu motion-safe:animate-pop",
         wide ? "w-74" : "max-h-85 w-66",
         inline ? "relative" : "fixed",
       )}
     >
       {search ? (
-        <label className="flex items-center gap-2 border-b border-hairline px-3 py-2.5 text-gray-500 focus-within:shadow-[inset_0_-2px_0_var(--color-brand-700)]">
+        <label className="flex items-center gap-2 border-b border-hairline px-3 py-2.5 text-muted-foreground focus-within:shadow-[inset_0_-2px_0_var(--color-brand-700)]">
           <SearchIcon aria-hidden="true" className="size-4" />
           {search}
         </label>
@@ -462,7 +465,7 @@ export function FilterOptionList({
       className="m-0 list-none overflow-y-auto p-1.5 focus:outline-none"
     >
       {options.length === 0 ? (
-        <li className="px-2 py-2.5 text-gray-500">No matches</li>
+        <li className="px-2 py-2.5 text-muted-foreground">No matches</li>
       ) : (
         options.map((option, index) => {
           const selected = option.value === current;
@@ -485,12 +488,12 @@ export function FilterOptionList({
                 highlighted && "bg-brand-50",
                 selected && "font-(--w-ui)",
                 option.value === ANY
-                  ? "text-gray-600"
+                  ? "text-muted-foreground"
                   : selected
-                    ? "text-gray-900"
+                    ? "text-foreground"
                     : highlighted
                       ? "text-brand-800"
-                      : "text-gray-700",
+                      : "text-secondary-foreground",
               )}
             >
               {option.mark ? (
@@ -501,7 +504,7 @@ export function FilterOptionList({
                 />
               ) : null}
               {OptionIcon ? (
-                <span className="inline-flex w-6 justify-center text-gray-500">
+                <span className="inline-flex w-6 justify-center text-muted-foreground">
                   <OptionIcon aria-hidden="true" className="size-4" />
                 </span>
               ) : null}
@@ -529,7 +532,7 @@ export function FilterLabel(): JSX.Element {
   return (
     <span
       aria-hidden="true"
-      className="mr-1 hidden items-center gap-1.5 text-xs leading-4 font-(--w-ui) text-gray-500 group-data-[stacked=true]/head:inline-flex"
+      className="mr-1 hidden items-center gap-1.5 text-xs leading-4 font-(--w-ui) text-muted-foreground group-data-[stacked=true]/head:inline-flex"
     >
       <SlidersHorizontalIcon className="size-3.5" />
       Filter

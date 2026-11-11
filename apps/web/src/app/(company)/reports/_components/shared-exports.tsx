@@ -11,12 +11,24 @@ import {
   Link2Icon,
   MailIcon,
 } from "lucide-react";
+import { useMemo } from "react";
 
 import type { ExportFile, ExportSummary } from "@expendi-business/shared";
 import { EXPORT_FILES, reportFilename } from "@expendi-business/shared";
 
 import type { ExportSortKey } from "./reports-display";
-import type { SortState } from "~/components/data/table";
+import type {
+  DataTableColumnDef,
+  SortState,
+} from "~/components/data/data-table";
+import { Mini, PhoneCard, RowMeta, RowTitle } from "~/components/data/cells";
+import {
+  DataTable,
+  DataTableColumnHeader,
+  pressedKey,
+  toSorting,
+  useDataTable,
+} from "~/components/data/data-table";
 import {
   Callout,
   DetailItem,
@@ -32,19 +44,6 @@ import {
 } from "~/components/data/results";
 import { EmptyState, ErrorState } from "~/components/data/states";
 import { StatusBadge } from "~/components/data/status-badge";
-import {
-  DataRow,
-  DataTable,
-  Mini,
-  PhoneCard,
-  PhoneCards,
-  RowMeta,
-  RowTitle,
-  SortHeader,
-  TableSkeletonRows,
-  Td,
-  Th,
-} from "~/components/data/table";
 import { Button } from "~/components/ui/button";
 import { describeApiError } from "~/lib/api";
 import { MAKE_LINKS_ID } from "./downloads";
@@ -81,6 +80,66 @@ function HowMade({ exported }: { exported: ExportSummary }): JSX.Element {
   );
 }
 
+const EXPORT_KEYS: readonly ExportSortKey[] = ["month", "made", "until"];
+
+function exportColumns(
+  now: Date,
+  onOpen: (id: string) => void,
+): DataTableColumnDef<ExportSummary>[] {
+  return [
+    {
+      id: "month",
+      accessorFn: (exported) => exported.month,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Export" />
+      ),
+      cell: ({ row }) => (
+        <>
+          <RowTitle onOpen={() => onOpen(row.original.id)}>
+            {monthLabel(row.original.month)} export
+          </RowTitle>
+          <RowMeta text={madeBy(row.original)}>
+            <HowMade exported={row.original} />
+          </RowMeta>
+        </>
+      ),
+      meta: { kind: "main", label: "Export" },
+    },
+    {
+      id: "made",
+      accessorFn: (exported) => exported.createdAt,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Made" />
+      ),
+      cell: ({ row }) => (
+        <>
+          {dayLabel(row.original.createdAt)}
+          <span className="block text-xs leading-4 text-muted-foreground">
+            {nairobiTime(row.original.createdAt)}
+          </span>
+        </>
+      ),
+      meta: { kind: "date", label: "Made" },
+    },
+    {
+      id: "until",
+      accessorFn: (exported) => exported.expiresAt,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Links work until" />
+      ),
+      cell: ({ row }) => dayLabel(row.original.expiresAt),
+      meta: { kind: "date", label: "Links work until" },
+    },
+    {
+      id: "links",
+      header: "Links",
+      enableSorting: false,
+      cell: ({ row }) => <LinksBadge exported={row.original} now={now} />,
+      meta: { label: "Links" },
+    },
+  ];
+}
+
 /** Exports made with links: the monthly email to accountants and any an admin shared. */
 export function SharedExports({
   exports,
@@ -101,6 +160,18 @@ export function SharedExports({
   openId: string | null;
   onOpen: (id: string) => void;
 }): JSX.Element {
+  const columns = useMemo(() => exportColumns(now, onOpen), [now, onOpen]);
+  const table = useDataTable({
+    data: sorted,
+    columns,
+    getRowId: (exported) => exported.id,
+    manual: { sorting: true },
+    paginate: false,
+    sorting: {
+      value: toSorting(sort),
+      onChange: (next) => onSort(pressedKey(next, sort, EXPORT_KEYS)),
+    },
+  });
   return (
     <ResultsPanel label="Shared exports">
       <ResultsBody busy={exports.isPending}>
@@ -135,86 +206,35 @@ export function SharedExports({
           </EmptyState>
         ) : (
           <>
-            <DataTable caption="Shared exports">
-              <thead>
-                <tr>
-                  <SortHeader
-                    label="Export"
-                    sortKey="month"
-                    sort={sort}
-                    onSort={onSort}
-                  />
-                  <SortHeader
-                    label="Made"
-                    sortKey="made"
-                    sort={sort}
-                    onSort={onSort}
-                  />
-                  <SortHeader
-                    label="Links work until"
-                    sortKey="until"
-                    sort={sort}
-                    onSort={onSort}
-                  />
-                  <Th>Links</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {exports.isPending ? (
-                  <TableSkeletonRows rows={4} columns={4} />
-                ) : (
-                  sorted.map((exported) => (
-                    <DataRow
-                      key={exported.id}
-                      open={openId === exported.id}
-                      onOpen={() => onOpen(exported.id)}
-                    >
-                      <Td kind="main">
-                        <RowTitle onOpen={() => onOpen(exported.id)}>
-                          {monthLabel(exported.month)} export
-                        </RowTitle>
-                        <RowMeta text={madeBy(exported)}>
-                          <HowMade exported={exported} />
-                        </RowMeta>
-                      </Td>
-                      <Td kind="date">
-                        {dayLabel(exported.createdAt)}
-                        <span className="block text-xs leading-4 text-gray-500">
-                          {nairobiTime(exported.createdAt)}
-                        </span>
-                      </Td>
-                      <Td kind="date">{dayLabel(exported.expiresAt)}</Td>
-                      <Td>
-                        <LinksBadge exported={exported} now={now} />
-                      </Td>
-                    </DataRow>
-                  ))
-                )}
-              </tbody>
-            </DataTable>
-            <PhoneCards label="Shared exports">
-              {sorted.map((exported) => (
+            <DataTable
+              table={table}
+              caption="Shared exports"
+              loading={exports.isPending}
+              skeletonRows={4}
+              onRowOpen={(exported) => onOpen(exported.id)}
+              openRowId={openId}
+              renderPhoneCard={(row) => (
                 <PhoneCard
-                  key={exported.id}
+                  key={row.id}
                   mark={
                     <span
                       aria-hidden="true"
-                      className="inline-flex size-8 items-center justify-center rounded-control border border-gray-200 bg-surface text-gray-700"
+                      className="inline-flex size-8 items-center justify-center rounded-control border border-border bg-card text-secondary-foreground"
                     >
-                      {exported.monthly ? (
+                      {row.original.monthly ? (
                         <MailIcon className="size-4" />
                       ) : (
                         <Link2Icon className="size-4" />
                       )}
                     </span>
                   }
-                  title={`${monthLabel(exported.month)} export`}
-                  sub={`${madeBy(exported)} · ${dayLabel(exported.createdAt)}`}
-                  flags={<LinksBadge exported={exported} now={now} />}
-                  onOpen={() => onOpen(exported.id)}
+                  title={`${monthLabel(row.original.month)} export`}
+                  sub={`${madeBy(row.original)} · ${dayLabel(row.original.createdAt)}`}
+                  flags={<LinksBadge exported={row.original} now={now} />}
+                  onOpen={() => onOpen(row.id)}
                 />
-              ))}
-            </PhoneCards>
+              )}
+            />
             {exports.isSuccess ? (
               <ResultsFoot>
                 <span className="whitespace-nowrap tabular-nums">
@@ -330,19 +350,19 @@ function ExportDetails({
             return (
               <li
                 key={file}
-                className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-control border border-gray-200 px-3 py-2.5"
+                className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-control border border-border px-3 py-2.5"
               >
                 <span
                   aria-hidden="true"
-                  className="inline-flex size-8 items-center justify-center rounded-control border border-gray-200 bg-surface text-gray-700"
+                  className="inline-flex size-8 items-center justify-center rounded-control border border-border bg-card text-secondary-foreground"
                 >
                   <Icon className="size-4" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block font-(--w-name) text-gray-900">
+                  <span className="block font-(--w-name) text-foreground">
                     {EXPORT_FILE_LABELS[file]}
                   </span>
-                  <span className="block text-xs leading-4 [overflow-wrap:anywhere] text-gray-500">
+                  <span className="block text-xs leading-4 [overflow-wrap:anywhere] text-muted-foreground">
                     {reportFilename(exported.month, file)}
                   </span>
                 </span>
@@ -370,7 +390,7 @@ function ExportDetails({
             );
           })}
         </ul>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           These are the files as they were on {dayLabel(exported.createdAt)}.
           For today&apos;s figures, download from Downloads above.
         </p>
@@ -385,7 +405,7 @@ function ExportDetails({
       {download.isSuccess ? (
         <p
           role="status"
-          className="flex items-center gap-2 text-sm text-gray-600"
+          className="flex items-center gap-2 text-sm text-muted-foreground"
         >
           <CircleCheckIcon
             aria-hidden="true"

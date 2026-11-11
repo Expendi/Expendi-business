@@ -103,7 +103,7 @@ function Note({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <p className="flex items-start gap-2 text-gray-600">
+    <p className="flex items-start gap-2 text-muted-foreground">
       <Icon
         aria-hidden="true"
         className={cn(
@@ -112,7 +112,7 @@ function Note({
             ? "text-success-700"
             : tone === "warn"
               ? "text-warn-600"
-              : "text-gray-500",
+              : "text-muted-foreground",
         )}
       />
       <span className="min-w-0">{children}</span>
@@ -123,7 +123,7 @@ function Note({
 /** A link the admin can copy, shown when an invite email didn't go out. */
 function InviteLink({ link }: { link: string }): JSX.Element {
   return (
-    <p className="mt-2 rounded-control border border-gray-200 bg-gray-50 px-2.5 py-2 [overflow-wrap:anywhere] text-gray-900">
+    <p className="mt-2 rounded-control border border-border bg-muted/60 px-2.5 py-2 [overflow-wrap:anywhere] text-foreground">
       {link}
     </p>
   );
@@ -151,7 +151,7 @@ export function CopyLinkButton({ link }: { link: string }): JSX.Element {
         {outcome === "copied" ? "Link copied." : ""}
       </span>
       {outcome === "failed" ? (
-        <span role="alert" className="basis-full text-xs text-gray-600">
+        <span role="alert" className="basis-full text-xs text-muted-foreground">
           Couldn&apos;t copy. Select the link and copy it.
         </span>
       ) : null}
@@ -212,7 +212,7 @@ export function InviteBanner({
 }
 
 const RADIO =
-  "m-0 mt-px inline-grid size-[18px] flex-none cursor-pointer appearance-none place-content-center rounded-full border border-gray-500 bg-surface transition-[border-color] duration-150 before:size-2 before:scale-0 before:rounded-full before:bg-brand-700 before:transition-transform before:duration-[120ms] before:ease-out-expo before:content-[''] checked:border-brand-700 checked:before:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--focus-ring) motion-reduce:transition-none motion-reduce:before:transition-none";
+  "m-0 mt-px inline-grid size-[18px] flex-none cursor-pointer appearance-none place-content-center rounded-full border border-gray-500 bg-card transition-[border-color] duration-150 before:size-2 before:scale-0 before:rounded-full before:bg-brand-700 before:transition-transform before:duration-[120ms] before:ease-out-expo before:content-[''] checked:border-brand-700 checked:before:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--focus-ring) motion-reduce:transition-none motion-reduce:before:transition-none";
 
 function RoleOption({
   name,
@@ -231,7 +231,7 @@ function RoleOption({
   return (
     <label
       htmlFor={id}
-      className="flex cursor-pointer items-start gap-3 rounded-control border border-control-border bg-surface px-3.5 py-3 transition-colors duration-150 hover:border-gray-400 has-[:checked]:border-brand-700 has-[:checked]:bg-brand-50"
+      className="flex cursor-pointer items-start gap-3 rounded-control border border-input bg-card px-3.5 py-3 transition-colors duration-150 hover:border-gray-400 has-[:checked]:border-brand-700 has-[:checked]:bg-brand-50"
     >
       <input
         id={id}
@@ -243,15 +243,15 @@ function RoleOption({
         className={RADIO}
       />
       <span className="min-w-0">
-        <span className="flex items-center gap-2 text-sm font-(--w-ui) text-gray-900">
+        <span className="flex items-center gap-2 text-sm font-(--w-ui) text-foreground">
           {ROLE_LABELS[role]}
           {current ? (
-            <span className="text-xs leading-4 font-normal text-gray-500">
+            <span className="text-xs leading-4 font-normal text-muted-foreground">
               Current
             </span>
           ) : null}
         </span>
-        <span className="mt-0.5 block text-xs leading-4 text-gray-500">
+        <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">
           {keepMpesaWhole(ROLE_DESCRIPTIONS[role])}
         </span>
       </span>
@@ -276,7 +276,7 @@ function RoleChoices({
 }): JSX.Element {
   return (
     <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
-      <legend className="mb-1.5 p-0 text-xs leading-4 font-(--w-ui) text-gray-600">
+      <legend className="mb-1.5 p-0 text-xs leading-4 font-(--w-ui) text-muted-foreground">
         {legend}
       </legend>
       {roles.map((role) => (

@@ -6,8 +6,8 @@ import { CogIcon, LifeBuoyIcon, UserXIcon } from "lucide-react";
 import type { ActivityEntry } from "@expendi-business/shared";
 
 import type { ActivityRow } from "./activity-display";
+import { EntityMark } from "~/components/data/cells";
 import { AmountStack, KesTotal, Money } from "~/components/data/money";
-import { EntityMark } from "~/components/data/table";
 import { amountOf, kesTotalOf } from "./activity-display";
 
 export function ActorMark({
@@ -29,8 +29,8 @@ export function ActorMark({
       aria-hidden="true"
       className={
         actor.type === "user"
-          ? "inline-flex size-8 flex-none items-center justify-center rounded-full border border-dashed border-gray-300 bg-surface text-gray-400"
-          : "inline-flex size-8 flex-none items-center justify-center rounded-full bg-brand-50 text-brand-700"
+          ? "inline-flex size-8 flex-none items-center justify-center rounded-full border border-dashed border-input bg-card text-muted-foreground/70"
+          : "inline-flex size-8 flex-none items-center justify-center rounded-full bg-accent text-accent-foreground"
       }
     >
       <Icon className="size-4" />

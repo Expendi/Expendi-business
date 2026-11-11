@@ -1,61 +1,49 @@
 "use client";
 
 import type { JSX } from "react";
-import { cn } from "cn";
 import {
   CircleCheckIcon,
   FilterXIcon,
   MailIcon,
   SmartphoneIcon,
-  TriangleAlertIcon,
   UserIcon,
   UserPlusIcon,
-  UserRoundIcon,
   UsersIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { InviteMemberResponse, Member } from "@expendi-business/shared";
 import { MEMBERSHIP_ROLES } from "@expendi-business/shared";
 
 import type { TeamSortKey, TeamView as View } from "./team-display";
+import type { SortState } from "~/components/data/data-table";
 import type { KindTab } from "~/components/data/kind-tabs";
-import type { SortState } from "~/components/data/table";
+import { TextLinkButton } from "~/components/data/actions";
 import { Banners } from "~/components/data/banner";
+import { EntityMark, Mini } from "~/components/data/cells";
+import {
+  DataTable,
+  DataTableToolbar,
+  sortFromTable,
+  toSorting,
+  useDataTable,
+} from "~/components/data/data-table";
 import { FilterChip } from "~/components/data/filter-chip";
 import { KindTabs } from "~/components/data/kind-tabs";
 import { PageHeader } from "~/components/data/page-header";
-import {
-  ResultsBody,
-  ResultsHead,
-  ResultsPanel,
-} from "~/components/data/results";
+import { ResultsBody, ResultsPanel } from "~/components/data/results";
 import {
   StatCard,
   StatCards,
   StatCardSkeleton,
 } from "~/components/data/stat-cards";
-import { EmptyState, ErrorState, Skel } from "~/components/data/states";
-import {
-  DataRow,
-  DataTable,
-  EntityMark,
-  Mini,
-  nextSort,
-  PhoneCard,
-  PhoneCards,
-  RowMeta,
-  RowTitle,
-  SortHeader,
-  Td,
-  Th,
-} from "~/components/data/table";
+import { EmptyState, ErrorState } from "~/components/data/states";
 import { useDeepLinkParams } from "~/components/data/use-deep-link-param";
 import { Button } from "~/components/ui/button";
 import { ROLE_LABELS } from "~/config/roles";
 import { useDashboard } from "~/contexts/dashboard-context";
 import { describeApiError } from "~/lib/api";
-import { formatNairobiDateTime } from "~/lib/nairobi-time";
+import { PayoutMini, teamColumns, YouMini } from "./columns";
 import {
   InviteBanner,
   InviteSheet,
@@ -69,7 +57,6 @@ import {
   nameOf,
   PAYOUT_LABELS,
   PAYOUT_STATES,
-  payoutOf,
   readTeamFilters,
   sortMembers,
   TEAM_VIEWS,
@@ -87,6 +74,10 @@ const PAYOUT_OPTIONS = PAYOUT_STATES.map((state) => ({
   value: state,
   label: PAYOUT_LABELS[state],
 }));
+
+const NO_MEMBERS: Member[] = [];
+
+const SORT_KEYS: readonly TeamSortKey[] = ["name", "role", "status"];
 
 const EMPTY: Record<View, { title: string; text: string }> = {
   all: {
@@ -141,7 +132,7 @@ function CompanyTeam({
   const [inviting, setInviting] = useState(false);
   const [invited, setInvited] = useState<InviteMemberResponse | null>(null);
 
-  const everyone = members.data ?? [];
+  const everyone = members.data ?? NO_MEMBERS;
   const rows = sortMembers(
     everyone.filter((member) => matchesFilters(member, filters)),
     sort,
@@ -153,7 +144,23 @@ function CompanyTeam({
   const justMe = everyone.length === 1 && everyone[0]?.id === myId && !anyChip;
   const open = (id: string) => setParams({ memberId: id });
   const clearChips = () => setParams({ memberRole: null, mpesa: null });
-  const onSort = (key: TeamSortKey) => setSort(nextSort(sort, key, "asc"));
+
+  const sorting = useMemo(() => toSorting(sort), [sort]);
+  const columns = useMemo(
+    () => teamColumns({ myId, onOpen: (id) => setParams({ memberId: id }) }),
+    [myId, setParams],
+  );
+  const table = useDataTable({
+    data: rows,
+    columns,
+    getRowId: (member) => member.id,
+    manual: true,
+    paginate: false,
+    sorting: {
+      value: sorting,
+      onChange: (next) => setSort((now) => sortFromTable(next, now, SORT_KEYS)),
+    },
+  });
 
   const inTabs = everyone.filter((member) =>
     matchesFilters(member, filters, true),
@@ -212,134 +219,95 @@ function CompanyTeam({
       )}
 
       <ResultsPanel label="Team">
-        <ResultsHead
-          tabs={
-            <KindTabs
-              label="Team"
-              tabs={tabs}
-              value={filters.view}
-              onChange={(view) =>
-                setParams({ view: view === "all" ? null : view })
-              }
-              controls="team-results"
-            />
-          }
-          chips={
-            <>
-              <FilterChip
-                label="Role"
-                icon={UserIcon}
-                options={ROLE_OPTIONS}
-                value={filters.role}
-                onChange={(memberRole) => setParams({ memberRole })}
-                anyLabel="Any role"
-              />
-              <FilterChip
-                label="M-Pesa number"
-                icon={SmartphoneIcon}
-                options={PAYOUT_OPTIONS}
-                value={filters.mpesa}
-                onChange={(mpesa) => setParams({ mpesa })}
-                anyLabel="Any"
-              />
-            </>
-          }
-          onClearAll={anyChip ? clearChips : undefined}
-        />
+        <DataTableToolbar table={table}>
+          <KindTabs
+            label="Team"
+            tabs={tabs}
+            value={filters.view}
+            onChange={(view) =>
+              setParams({ view: view === "all" ? null : view })
+            }
+            controls="team-results"
+          />
+          <FilterChip
+            label="Role"
+            icon={UserIcon}
+            options={ROLE_OPTIONS}
+            value={filters.role}
+            onChange={(memberRole) => setParams({ memberRole })}
+            anyLabel="Any role"
+          />
+          <FilterChip
+            label="M-Pesa number"
+            icon={SmartphoneIcon}
+            options={PAYOUT_OPTIONS}
+            value={filters.mpesa}
+            onChange={(mpesa) => setParams({ mpesa })}
+            anyLabel="Any"
+          />
+          {anyChip ? (
+            <TextLinkButton onClick={clearChips} className="text-sm">
+              Clear all
+            </TextLinkButton>
+          ) : null}
+        </DataTableToolbar>
         <ResultsBody id="team-results" busy={members.isPending}>
-          {members.isPending ? (
-            <TeamSkeleton />
-          ) : members.isError ? (
+          {members.isError ? (
             <ErrorState
               title="The team didn't load"
               onRetry={() => void members.refetch()}
             >
               {describeApiError(members.error)}
             </ErrorState>
-          ) : rows.length === 0 ? (
-            anyChip ? (
-              <EmptyState
-                icon={FilterXIcon}
-                title="No one matches these filters"
-                action={
-                  <Button variant="outline" size="md" onClick={clearChips}>
-                    Clear all
-                  </Button>
-                }
-              />
-            ) : (
-              <EmptyState
-                icon={filters.view === "invited" ? MailIcon : UsersIcon}
-                title={EMPTY[filters.view].title}
-                action={canAct ? inviteButton : null}
-              >
-                {EMPTY[filters.view].text}
-              </EmptyState>
-            )
           ) : (
             <>
-              <DataTable caption={CAPTIONS[filters.view]}>
-                <thead>
-                  <tr>
-                    <SortHeader
-                      label="Person"
-                      sortKey="name"
-                      sort={sort}
-                      onSort={onSort}
-                    />
-                    <SortHeader
-                      label="Role"
-                      sortKey="role"
-                      sort={sort}
-                      onSort={onSort}
-                    />
-                    <Th>M-Pesa number</Th>
-                    <SortHeader
-                      label="Status"
-                      sortKey="status"
-                      sort={sort}
-                      onSort={onSort}
-                    />
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((member) => (
-                    <MemberRow
-                      key={member.id}
-                      member={member}
-                      isMe={member.id === myId}
-                      open={member.id === openId}
-                      onOpen={() => open(member.id)}
-                    />
-                  ))}
-                </tbody>
-              </DataTable>
-              <PhoneCards label="Team">
-                {rows.map((member) => (
-                  <PhoneCard
-                    key={member.id}
-                    mark={<EntityMark name={nameOf(member)} kind="person" />}
-                    title={member.name ?? "No name yet"}
-                    sub={member.email}
-                    flags={
-                      <>
-                        <Mini
-                          icon={UserIcon}
-                          label={`Role: ${ROLE_LABELS[member.role]}`}
+              <DataTable
+                table={table}
+                caption={
+                  members.isPending
+                    ? "Loading the team…"
+                    : CAPTIONS[filters.view]
+                }
+                phoneLabel={members.isPending ? "Loading the team" : "Team"}
+                loading={members.isPending}
+                onRowOpen={(member) => open(member.id)}
+                openRowId={openId}
+                empty={
+                  anyChip ? (
+                    <EmptyState
+                      icon={FilterXIcon}
+                      title="No one matches these filters"
+                      action={
+                        <Button
+                          variant="outline"
+                          size="md"
+                          onClick={clearChips}
                         >
-                          {ROLE_LABELS[member.role]}
-                        </Mini>
-                        <PayoutMini member={member} />
-                        {member.id === myId ? <YouMini /> : null}
-                      </>
-                    }
-                    aside={<MemberStatusBadge member={member} />}
-                    onOpen={() => open(member.id)}
+                          Clear all
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={filters.view === "invited" ? MailIcon : UsersIcon}
+                      title={EMPTY[filters.view].title}
+                      action={canAct ? inviteButton : null}
+                    >
+                      {EMPTY[filters.view].text}
+                    </EmptyState>
+                  )
+                }
+                renderPhoneCard={(row) => (
+                  <MemberCard
+                    key={row.id}
+                    member={row.original}
+                    isMe={row.id === myId}
+                    onOpen={() => open(row.id)}
                   />
-                ))}
-              </PhoneCards>
+                )}
+              />
               {justMe ? (
-                <div className="border-t border-row-divider">
+                <div className="border-t border-border">
                   <EmptyState
                     icon={UserPlusIcon}
                     title="Just you so far"
@@ -422,144 +390,41 @@ function TeamStatCards({ members }: { members: Member[] }): JSX.Element {
   );
 }
 
-function MemberRow({
+function MemberCard({
   member,
   isMe,
-  open,
   onOpen,
 }: {
   member: Member;
   isMe: boolean;
-  open: boolean;
   onOpen: () => void;
 }): JSX.Element {
   return (
-    <DataRow open={open} onOpen={onOpen}>
-      <Td kind="main">
-        <span className="flex min-w-0 items-start gap-3">
-          <EntityMark name={nameOf(member)} kind="person" />
-          <span className="min-w-0">
-            <RowTitle onOpen={onOpen}>
-              {member.name ?? (
-                <span className="text-gray-600">No name yet</span>
-              )}
-            </RowTitle>
-            <RowMeta text={member.email}>{isMe ? <YouMini /> : null}</RowMeta>
+    <li className="flex items-start border-b border-border">
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={onOpen}
+        className="grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 border-0 bg-transparent px-4 py-3.5 text-left focus-visible:-outline-offset-2"
+      >
+        <EntityMark name={nameOf(member)} kind="person" />
+        <span className="min-w-0">
+          <span className="block truncate text-base leading-6 font-(--w-name) text-foreground">
+            {member.name ?? "No name yet"}
+          </span>
+          <span className="block truncate text-muted-foreground tabular-nums">
+            {member.email}
+          </span>
+          <span className="mt-1.5 flex flex-wrap items-center gap-1">
+            <Mini icon={UserIcon} label={`Role: ${ROLE_LABELS[member.role]}`}>
+              {ROLE_LABELS[member.role]}
+            </Mini>
+            <PayoutMini member={member} />
+            {isMe ? <YouMini /> : null}
           </span>
         </span>
-      </Td>
-      <Td className="whitespace-nowrap text-gray-600">
-        {ROLE_LABELS[member.role]}
-      </Td>
-      <Td>
-        <PayoutCell member={member} />
-      </Td>
-      <Td>
         <MemberStatusBadge member={member} />
-        {member.status === "invited" && member.invitedAt ? (
-          <span className="mt-1 block text-xs leading-4 whitespace-nowrap text-gray-500 tabular-nums">
-            Sent {formatNairobiDateTime(member.invitedAt)}
-          </span>
-        ) : null}
-      </Td>
-    </DataRow>
-  );
-}
-
-function PayoutCell({ member }: { member: Member }): JSX.Element {
-  const state = payoutOf(member);
-  const warn = state === "missing" && member.status === "active";
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 whitespace-nowrap",
-        state === "confirmed"
-          ? "text-gray-700"
-          : warn
-            ? "text-warn-700"
-            : "text-gray-500",
-      )}
-    >
-      {state === "confirmed" ? (
-        <CircleCheckIcon
-          aria-hidden="true"
-          className="size-3.5 text-success-700"
-        />
-      ) : warn ? (
-        <TriangleAlertIcon aria-hidden="true" className="size-3.5" />
-      ) : null}
-      {PAYOUT_LABELS[state]}
-    </span>
-  );
-}
-
-function PayoutMini({ member }: { member: Member }): JSX.Element {
-  const state = payoutOf(member);
-  return (
-    <Mini
-      icon={SmartphoneIcon}
-      label={`M-Pesa number: ${PAYOUT_LABELS[state].toLowerCase()}`}
-      warn={state === "missing" && member.status === "active"}
-    >
-      {PAYOUT_LABELS[state]}
-    </Mini>
-  );
-}
-
-function YouMini(): JSX.Element {
-  return (
-    <Mini icon={UserRoundIcon} label="You">
-      You
-    </Mini>
-  );
-}
-
-const skeletonCell = "border-b border-row-divider px-4 py-3";
-
-function TeamSkeleton(): JSX.Element {
-  return (
-    <>
-      <DataTable caption="Loading the team…">
-        <tbody>
-          {Array.from({ length: 6 }, (_, row) => (
-            <tr key={row} aria-hidden="true">
-              <td className={cn(skeletonCell, "w-full max-w-0")}>
-                <span className="flex items-center gap-3">
-                  <Skel width={32} height={32} className="rounded-full" />
-                  <span className="flex-1">
-                    <Skel width="45%" height={14} />
-                    <Skel width="30%" height={12} style={{ marginTop: 8 }} />
-                  </span>
-                </span>
-              </td>
-              <td className={skeletonCell}>
-                <Skel width={72} height={14} />
-              </td>
-              <td className={skeletonCell}>
-                <Skel width={80} height={14} />
-              </td>
-              <td className={skeletonCell}>
-                <Skel width={64} height={20} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </DataTable>
-      <PhoneCards label="Loading the team">
-        {Array.from({ length: 4 }, (_, row) => (
-          <li
-            key={row}
-            aria-hidden="true"
-            className="flex items-center gap-3 border-b border-row-divider p-4"
-          >
-            <Skel width={32} height={32} className="rounded-full" />
-            <span className="flex-1">
-              <Skel width="55%" height={14} />
-              <Skel width="40%" height={12} style={{ marginTop: 8 }} />
-            </span>
-          </li>
-        ))}
-      </PhoneCards>
-    </>
+      </button>
+    </li>
   );
 }

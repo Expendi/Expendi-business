@@ -66,7 +66,7 @@ function CompanyOverview({
   if (overview.isPending) return <OverviewSkeleton />;
   if (overview.isError) {
     return (
-      <div className="rounded-panel border border-gray-200 bg-surface shadow-panel">
+      <div className="rounded-xl border border-border bg-card shadow-xs">
         <ErrorState
           title="The overview didn't load"
           onRetry={() => void overview.refetch()}
@@ -84,7 +84,7 @@ function CompanyOverview({
     <>
       <div className="grid grid-cols-[minmax(0,1fr)_352px] items-start gap-x-12 gap-y-10 max-[1120px]:grid-cols-[minmax(0,1fr)]">
         <section aria-labelledby="inbox-title">
-          <p className="text-base leading-6 text-gray-600 motion-safe:animate-rise">
+          <p className="text-base leading-6 text-muted-foreground motion-safe:animate-rise">
             {greeting(nairobiHour(now), name)}
           </p>
           <h1
@@ -136,7 +136,7 @@ function OverviewSkeleton(): JSX.Element {
       <div>
         <Skel width={200} height={20} />
         <Skel width={280} height={36} style={{ marginTop: 8 }} />
-        <div className="mt-6 flex flex-col gap-5 rounded-panel border border-gray-200 bg-surface p-5">
+        <div className="mt-6 flex flex-col gap-5 rounded-xl border border-border bg-card p-5">
           {[0, 1, 2, 3].map((key) => (
             <div key={key} className="flex gap-3.5">
               <Skel width={36} height={36} />

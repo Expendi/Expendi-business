@@ -41,7 +41,7 @@ export function MonthChip({
         <>
           {monthLabel(month)}
           {month === thisMonth ? (
-            <span className="font-normal text-gray-500">so far</span>
+            <span className="font-normal text-muted-foreground">so far</span>
           ) : null}
         </>
       }
@@ -94,7 +94,7 @@ function AnotherMonth({
     <form noValidate onSubmit={onSubmit} className="flex flex-col gap-1.5">
       <label
         htmlFor={inputId}
-        className="text-xs leading-4 font-(--w-ui) text-gray-600"
+        className="text-xs leading-4 font-(--w-ui) text-muted-foreground"
       >
         Another month
       </label>
@@ -107,7 +107,7 @@ function AnotherMonth({
           defaultValue={month}
           aria-invalid={error !== null}
           aria-describedby={error ? errorId : undefined}
-          className="h-9 min-w-0 flex-1 rounded-control border border-control-border bg-surface px-3 text-sm text-gray-900 tabular-nums aria-invalid:border-error-700"
+          className="h-9 min-w-0 flex-1 rounded-control border border-input bg-card px-3 text-sm text-foreground tabular-nums aria-invalid:border-destructive"
         />
         <Button type="submit" variant="outline" size="md">
           Show
@@ -117,7 +117,7 @@ function AnotherMonth({
         <p
           id={errorId}
           role="alert"
-          className="flex items-center gap-1.5 text-xs leading-4 text-error-700"
+          className="flex items-center gap-1.5 text-xs leading-4 text-destructive"
         >
           <CircleAlertIcon aria-hidden="true" className="size-3.5" />
           {error}

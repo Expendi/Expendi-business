@@ -17,34 +17,30 @@ import {
   UserIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import type { ActivityEntry, ActivityPage } from "@expendi-business/shared";
 import { ACTIVITY_PAGE_SIZE } from "@expendi-business/shared";
 
 import type { ActivityFilters } from "./activity-api";
 import type { ActivityRow } from "./activity-display";
+import type { DataTableColumnDef } from "~/components/data/data-table";
 import type { FilterOption } from "~/components/data/filter-chip";
+import { TextLinkButton } from "~/components/data/actions";
+import { Mini, PhoneCard, RowMeta, RowTitle } from "~/components/data/cells";
+import {
+  DataTable,
+  DataTableToolbar,
+  useDataTable,
+} from "~/components/data/data-table";
 import { FilterChip } from "~/components/data/filter-chip";
 import { PageHeader } from "~/components/data/page-header";
 import {
   ResultsBody,
   ResultsFoot,
-  ResultsHead,
   ResultsPanel,
 } from "~/components/data/results";
-import { EmptyState, ErrorState, Skel } from "~/components/data/states";
-import {
-  DataRow,
-  DataTable,
-  Mini,
-  PhoneCard,
-  PhoneCards,
-  RowMeta,
-  RowTitle,
-  Td,
-  Th,
-} from "~/components/data/table";
+import { EmptyState, ErrorState } from "~/components/data/states";
 import { useDeepLinkParams } from "~/components/data/use-deep-link-param";
 import { Button } from "~/components/ui/button";
 import {
@@ -111,6 +107,86 @@ const NOT_PEOPLE: readonly FilterOption[] = [
   { value: "system", label: "Expendi (automatic)", icon: CogIcon },
   { value: "staff", label: "Expendi team", icon: LifeBuoyIcon },
 ];
+
+const NEWEST_FIRST = [{ id: "when", desc: true }];
+
+function activityColumns(
+  onOpen: (row: ActivityRow) => void,
+): DataTableColumnDef<ActivityRow>[] {
+  return [
+    {
+      id: "when",
+      header: () => (
+        <span
+          title="Newest first"
+          className="inline-flex items-center gap-1 text-foreground"
+        >
+          When
+          <ArrowDownIcon aria-hidden="true" className="size-3" />
+        </span>
+      ),
+      cell: ({ row }) => {
+        const [lead] = row.original.entries;
+        if (!lead) return null;
+        const at = new Date(lead.occurredAt);
+        return (
+          <span
+            title={`${NAIROBI_DAY.format(at)}, ${NAIROBI_CLOCK.format(at)}, Nairobi time`}
+          >
+            <span className="block text-foreground">
+              {NAIROBI_DAY.format(at)}
+            </span>
+            <span className="block text-muted-foreground">
+              {NAIROBI_CLOCK.format(at)}
+            </span>
+          </span>
+        );
+      },
+      meta: { kind: "date", label: "When", className: "w-px" },
+    },
+    {
+      id: "who",
+      header: "Who",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const [lead] = row.original.entries;
+        if (!lead) return null;
+        return (
+          <span className="flex min-w-[196px] items-center gap-2.5 @max-[960px]/results:min-w-[174px]">
+            <ActorMark actor={lead.actor} />
+            <span className="min-w-0 text-secondary-foreground">
+              {describeActor(lead.actor)}
+            </span>
+          </span>
+        );
+      },
+      meta: { label: "Who" },
+    },
+    {
+      id: "what",
+      header: "What",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <>
+          <RowTitle onOpen={() => onOpen(row.original)}>
+            {rowTitle(row.original)}
+          </RowTitle>
+          <RowMeta text={rowMeta(row.original)}>
+            <RowMarkers row={row.original} />
+          </RowMeta>
+        </>
+      ),
+      meta: { kind: "main", label: "What" },
+    },
+    {
+      id: "amount",
+      header: "Amount",
+      enableSorting: false,
+      cell: ({ row }) => <RowAmount row={row.original} />,
+      meta: { align: "end", label: "Amount" },
+    },
+  ];
+}
 
 /** The people and records seen so far, for the Person and Record menus. */
 interface Seen {
@@ -263,6 +339,18 @@ function CompanyActivity({
   const clearAll = () =>
     setParams({ area: null, person: null, record: null, from: null, to: null });
   const open = (row: ActivityRow) => setParams({ id: row.id });
+  const columns = useMemo(
+    () => activityColumns((row) => setParams({ id: row.id })),
+    [setParams],
+  );
+  const table = useDataTable({
+    data: rows,
+    columns,
+    getRowId: (row) => row.id,
+    manual: true,
+    paginate: false,
+    sorting: { value: NEWEST_FIRST },
+  });
 
   return (
     <section>
@@ -271,93 +359,107 @@ function CompanyActivity({
         subtitle="Every change to the company's money, people and settings, by whom and when, in Nairobi time. Nothing here can be edited or deleted."
       />
       <ResultsPanel label="Activity">
-        <ResultsHead
-          stacked
-          tabs={null}
-          chips={
-            <>
-              <FilterChip
-                label="Area"
-                icon={LayersIcon}
-                options={AREA_OPTIONS}
-                value={area?.prefix ?? null}
-                onChange={(value) => setParams({ area: value })}
-                anyLabel="Everything"
-              />
-              <FilterChip
-                label="Person"
-                icon={UserIcon}
-                options={people}
-                value={person}
-                valueLabel={
-                  person && !people.some((option) => option.value === person)
-                    ? "Someone"
-                    : undefined
-                }
-                onChange={(value) => setParams({ person: value })}
-                anyLabel="Everyone"
-                searchPlaceholder="Search people"
-              />
-              <FilterChip
-                label="Record"
-                icon={BoxIcon}
-                options={records}
-                value={record ? `${record.type}:${record.id}` : null}
-                valueLabel={
-                  record &&
-                  !records.some(
-                    (option) => option.value === `${record.type}:${record.id}`,
-                  )
-                    ? entityTypeOf(record.type).label
-                    : undefined
-                }
-                onChange={(value) => setParams({ record: value })}
-                anyLabel="Every record"
-                searchPlaceholder="Search records"
-              />
-              <FilterChip
-                label="Date"
-                icon={CalendarIcon}
-                options={[
-                  ...presets.map((preset) => ({
-                    value: preset.value,
-                    label: preset.label,
-                  })),
-                  { value: CUSTOM_DATES, label: "Custom dates" },
-                ]}
-                value={datePreset}
-                valueLabel={dateLabel ?? undefined}
-                onChange={(value) => {
-                  const preset = presets.find((p) => p.value === value);
-                  setParams({
-                    from: preset?.from ?? null,
-                    to: preset?.to ?? null,
-                  });
-                }}
-                anyLabel="Any time"
-                custom={{
-                  value: CUSTOM_DATES,
-                  render: ({ done, back }) => (
-                    <DateRangeForm
-                      from={from}
-                      to={to}
-                      today={presets[0]?.to ?? ""}
-                      onBack={back}
-                      onApply={(range) => {
-                        setParams(range);
-                        done();
-                      }}
-                    />
-                  ),
-                }}
-              />
-            </>
-          }
-          onClearAll={anyFilter ? clearAll : undefined}
-        />
+        <DataTableToolbar table={table}>
+          <FilterChip
+            label="Area"
+            icon={LayersIcon}
+            options={AREA_OPTIONS}
+            value={area?.prefix ?? null}
+            onChange={(value) => setParams({ area: value })}
+            anyLabel="Everything"
+          />
+          <FilterChip
+            label="Person"
+            icon={UserIcon}
+            options={people}
+            value={person}
+            valueLabel={
+              person && !people.some((option) => option.value === person)
+                ? "Someone"
+                : undefined
+            }
+            onChange={(value) => setParams({ person: value })}
+            anyLabel="Everyone"
+            searchPlaceholder="Search people"
+          />
+          <FilterChip
+            label="Record"
+            icon={BoxIcon}
+            options={records}
+            value={record ? `${record.type}:${record.id}` : null}
+            valueLabel={
+              record &&
+              !records.some(
+                (option) => option.value === `${record.type}:${record.id}`,
+              )
+                ? entityTypeOf(record.type).label
+                : undefined
+            }
+            onChange={(value) => setParams({ record: value })}
+            anyLabel="Every record"
+            searchPlaceholder="Search records"
+          />
+          <FilterChip
+            label="Date"
+            icon={CalendarIcon}
+            options={[
+              ...presets.map((preset) => ({
+                value: preset.value,
+                label: preset.label,
+              })),
+              { value: CUSTOM_DATES, label: "Custom dates" },
+            ]}
+            value={datePreset}
+            valueLabel={dateLabel ?? undefined}
+            onChange={(value) => {
+              const preset = presets.find((p) => p.value === value);
+              setParams({
+                from: preset?.from ?? null,
+                to: preset?.to ?? null,
+              });
+            }}
+            anyLabel="Any time"
+            custom={{
+              value: CUSTOM_DATES,
+              render: ({ done, back }) => (
+                <DateRangeForm
+                  from={from}
+                  to={to}
+                  today={presets[0]?.to ?? ""}
+                  onBack={back}
+                  onApply={(range) => {
+                    setParams(range);
+                    done();
+                  }}
+                />
+              ),
+            }}
+          />
+          {anyFilter ? (
+            <TextLinkButton onClick={clearAll} className="text-sm">
+              Clear all
+            </TextLinkButton>
+          ) : null}
+        </DataTableToolbar>
         <ResultsBody busy={result.isPending}>
           {stillLooking ? (
-            <ActivitySkeleton />
+            <>
+              <p className="sr-only">Loading activity…</p>
+              <DataTable
+                table={table}
+                caption="Loading activity"
+                phoneLabel="Loading activity"
+                loading
+                skeletonRows={8}
+                renderPhoneCard={(row) => (
+                  <ActivityCard
+                    key={row.id}
+                    row={row.original}
+                    onOpen={() => open(row.original)}
+                  />
+                )}
+              />
+            </>
           ) : result.isError && rows.length === 0 ? (
             <ErrorState
               title="Activity didn't load"
@@ -401,43 +503,20 @@ function CompanyActivity({
             )
           ) : (
             <>
-              <DataTable caption="Activity, newest first">
-                <thead>
-                  <tr>
-                    <Th aria-sort="descending" className="w-px">
-                      <span
-                        title="Newest first"
-                        className="inline-flex items-center gap-1 text-gray-900"
-                      >
-                        When
-                        <ArrowDownIcon aria-hidden="true" className="size-3" />
-                      </span>
-                    </Th>
-                    <Th>Who</Th>
-                    <Th>What</Th>
-                    <Th align="end">Amount</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <ActivityTableRow
-                      key={row.id}
-                      row={row}
-                      open={row === openRow}
-                      onOpen={() => open(row)}
-                    />
-                  ))}
-                </tbody>
-              </DataTable>
-              <PhoneCards label="Activity">
-                {rows.map((row) => (
+              <DataTable
+                table={table}
+                caption="Activity, newest first"
+                phoneLabel="Activity"
+                onRowOpen={open}
+                openRowId={openRow?.id}
+                renderPhoneCard={(row) => (
                   <ActivityCard
                     key={row.id}
-                    row={row}
-                    onOpen={() => open(row)}
+                    row={row.original}
+                    onOpen={() => open(row.original)}
                   />
-                ))}
-              </PhoneCards>
+                )}
+              />
               <ResultsFoot>
                 <span className="tabular-nums" aria-live="polite">
                   {hasNextPage
@@ -449,7 +528,7 @@ function CompanyActivity({
                     <>
                       <span
                         role="alert"
-                        className="inline-flex items-center gap-1.5 text-error-700"
+                        className="inline-flex items-center gap-1.5 text-destructive"
                       >
                         <CircleAlertIcon
                           aria-hidden="true"
@@ -541,48 +620,6 @@ function RowMarkers({ row }: { row: ActivityRow }): JSX.Element {
   );
 }
 
-function ActivityTableRow({
-  row,
-  open,
-  onOpen,
-}: {
-  row: ActivityRow;
-  open: boolean;
-  onOpen: () => void;
-}): JSX.Element | null {
-  const [lead] = row.entries;
-  if (!lead) return null;
-  const at = new Date(lead.occurredAt);
-  return (
-    <DataRow open={open} onOpen={onOpen}>
-      <Td
-        kind="date"
-        title={`${NAIROBI_DAY.format(at)}, ${NAIROBI_CLOCK.format(at)}, Nairobi time`}
-      >
-        <span className="block text-gray-900">{NAIROBI_DAY.format(at)}</span>
-        <span className="block text-gray-500">{NAIROBI_CLOCK.format(at)}</span>
-      </Td>
-      <Td>
-        <span className="flex min-w-[196px] items-center gap-2.5 @max-[960px]/results:min-w-[174px]">
-          <ActorMark actor={lead.actor} />
-          <span className="min-w-0 text-gray-700">
-            {describeActor(lead.actor)}
-          </span>
-        </span>
-      </Td>
-      <Td kind="main">
-        <RowTitle onOpen={onOpen}>{rowTitle(row)}</RowTitle>
-        <RowMeta text={rowMeta(row)}>
-          <RowMarkers row={row} />
-        </RowMeta>
-      </Td>
-      <Td align="end">
-        <RowAmount row={row} />
-      </Td>
-    </DataRow>
-  );
-}
-
 function ActivityCard({
   row,
   onOpen,
@@ -600,7 +637,7 @@ function ActivityCard({
       sub={`${NAIROBI_DAY_MONTH.format(at)}, ${NAIROBI_CLOCK.format(at)} · ${describeActor(lead.actor)}`}
       flags={
         <>
-          <span className="line-clamp-2 basis-full text-gray-500">
+          <span className="line-clamp-2 basis-full text-muted-foreground">
             {rowMeta(row)}
           </span>
           <RowMarkers row={row} />
@@ -609,56 +646,6 @@ function ActivityCard({
       aside={<RowAmount row={row} />}
       onOpen={onOpen}
     />
-  );
-}
-
-const skeletonCell = "border-b border-row-divider px-4 py-3";
-
-function ActivitySkeleton(): JSX.Element {
-  return (
-    <>
-      <p className="sr-only">Loading activity…</p>
-      <DataTable caption="Loading activity">
-        <tbody>
-          {Array.from({ length: 8 }, (_, row) => (
-            <tr key={row} aria-hidden="true">
-              <td className={skeletonCell}>
-                <Skel width={84} height={14} />
-                <Skel width={40} height={12} style={{ marginTop: 8 }} />
-              </td>
-              <td className={skeletonCell}>
-                <span className="flex items-center gap-2.5">
-                  <Skel width={32} height={32} className="rounded-full" />
-                  <Skel width={110} height={14} />
-                </span>
-              </td>
-              <td className={`${skeletonCell} w-full max-w-0`}>
-                <Skel width="45%" height={14} />
-                <Skel width="30%" height={12} style={{ marginTop: 8 }} />
-              </td>
-              <td className={skeletonCell}>
-                <Skel width={96} height={14} style={{ marginLeft: "auto" }} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </DataTable>
-      <PhoneCards label="Loading activity">
-        {Array.from({ length: 5 }, (_, row) => (
-          <li
-            key={row}
-            aria-hidden="true"
-            className="flex items-center gap-3 border-b border-row-divider p-4"
-          >
-            <Skel width={32} height={32} className="rounded-full" />
-            <span className="flex-1">
-              <Skel width="55%" height={14} />
-              <Skel width="40%" height={12} style={{ marginTop: 8 }} />
-            </span>
-          </li>
-        ))}
-      </PhoneCards>
-    </>
   );
 }
 

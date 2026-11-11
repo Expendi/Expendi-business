@@ -11,7 +11,7 @@ export function CurrencyCode({ code }: { code: string }): JSX.Element {
   return (
     <span
       data-ccy=""
-      className="text-[0.72em] font-(--w-ui) tracking-[0.04em] text-gray-500"
+      className="text-[0.72em] font-(--w-ui) tracking-[0.04em] text-muted-foreground"
     >
       {code}
     </span>
@@ -61,12 +61,12 @@ export function KesTotal({
   className?: string;
 }): JSX.Element {
   if (total === null) {
-    return <span className="text-gray-500">{unavailable}</span>;
+    return <span className="text-muted-foreground">{unavailable}</span>;
   }
   return (
     <span className={cn("whitespace-nowrap", className)}>
       {total.approximate ? (
-        <span className="font-(--w-ui) text-gray-500">≈ </span>
+        <span className="font-(--w-ui) text-muted-foreground">≈ </span>
       ) : null}
       <Money amount={total.kesCents} currency="KES" />
     </span>
@@ -105,7 +105,7 @@ export function AmountStack({
         {children}
       </span>
       {sub ? (
-        <span className="text-xs leading-4 font-normal tracking-normal whitespace-nowrap text-gray-500 tabular-nums">
+        <span className="text-xs leading-4 font-normal tracking-normal whitespace-nowrap text-muted-foreground tabular-nums">
           {sub}
         </span>
       ) : null}

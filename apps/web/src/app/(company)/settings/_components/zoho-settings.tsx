@@ -4,7 +4,6 @@ import type { JSX } from "react";
 import { InfoIcon } from "lucide-react";
 
 import type {
-  AccountingSyncSubjectType,
   CompanyZohoResponse,
   CompanyZohoStatus,
 } from "@expendi-business/shared";
@@ -14,6 +13,7 @@ import { Callout } from "~/components/data/detail-sheet";
 import { StatusBadge } from "~/components/data/status-badge";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiDateTime } from "~/lib/nairobi-time";
+import { failedColumns } from "./columns";
 import { useZohoStatus } from "./settings-api";
 import {
   KeyValue,
@@ -22,11 +22,9 @@ import {
   PanelError,
   PanelFoot,
   PanelSkeleton,
-  SettingsList,
   SettingsPanel,
-  SettingsRow,
-  Tag,
 } from "./settings-panel";
+import { SettingsTable } from "./settings-table";
 
 export const ZOHO_STATUS: Record<
   CompanyZohoStatus,
@@ -36,12 +34,6 @@ export const ZOHO_STATUS: Record<
   pending: { label: "Connecting", tone: "waiting" },
   active: { label: "Connected", tone: "paid" },
   needs_reconnect: { label: "Needs reconnecting", tone: "failed" },
-};
-
-const SUBJECT_LABELS: Record<AccountingSyncSubjectType, string> = {
-  expense: "Expense",
-  bill: "Bill",
-  payroll_run: "Payroll run",
 };
 
 const plural = (count: number, one: string, many: string) =>
@@ -119,21 +111,21 @@ function ZohoConnection({ zoho }: { zoho: CompanyZohoResponse }): JSX.Element {
         </KeyValue>
         <KeyValue label="Zoho organization">
           {zoho.organizationName ?? (
-            <span className="text-gray-500">Not chosen yet</span>
+            <span className="text-muted-foreground">Not chosen yet</span>
           )}
         </KeyValue>
         <KeyValue label="Connected">
           {zoho.connectedAt ? (
             formatNairobiDateTime(zoho.connectedAt)
           ) : (
-            <span className="text-gray-500">Not yet</span>
+            <span className="text-muted-foreground">Not yet</span>
           )}
         </KeyValue>
         <KeyValue label="Last synced">
           {zoho.lastSyncedAt ? (
             formatNairobiDateTime(zoho.lastSyncedAt)
           ) : (
-            <span className="text-gray-500">Nothing synced yet</span>
+            <span className="text-muted-foreground">Nothing synced yet</span>
           )}
         </KeyValue>
         <KeyValue label="Paid items">
@@ -146,33 +138,18 @@ function ZohoConnection({ zoho }: { zoho: CompanyZohoResponse }): JSX.Element {
         </KeyValue>
       </KeyValues>
       {zoho.failed.length > 0 ? (
-        <div className="border-t border-gray-200">
-          <p className="m-0 px-5 pt-4 pb-2 text-xs leading-4 font-(--w-ui) text-gray-500">
+        <div className="border-t border-border">
+          <p className="m-0 px-5 pt-4 pb-2 text-xs leading-4 font-(--w-ui) text-muted-foreground">
             {zoho.counts.failed > zoho.failed.length
               ? `Didn't reach Zoho: the latest ${String(zoho.failed.length)} of ${String(zoho.counts.failed)}`
               : `Didn't reach Zoho (${plural(zoho.failed.length, "item", "items")})`}
           </p>
-          <SettingsList label="Items that didn't reach Zoho Books">
-            {zoho.failed.map((item) => (
-              <SettingsRow key={item.id}>
-                <span className="min-w-0 flex-1">
-                  <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="min-w-0 truncate font-(--w-name)">
-                      {item.label ??
-                        `A ${SUBJECT_LABELS[item.subjectType].toLowerCase()}`}
-                    </span>
-                    <Tag>{SUBJECT_LABELS[item.subjectType]}</Tag>
-                  </span>
-                  <span className="mt-0.5 block text-gray-600">
-                    {item.reason ?? "Zoho Books didn't say why."}
-                  </span>
-                </span>
-                <span className="flex-none self-start pt-0.5 text-xs leading-4 whitespace-nowrap text-gray-500 tabular-nums">
-                  {formatNairobiDateTime(item.failedAt)}
-                </span>
-              </SettingsRow>
-            ))}
-          </SettingsList>
+          <SettingsTable
+            caption="Items that didn't reach Zoho Books"
+            data={zoho.failed}
+            columns={failedColumns}
+            getRowId={(item) => item.id}
+          />
         </div>
       ) : null}
       <PanelFoot icon={InfoIcon}>

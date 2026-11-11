@@ -9,10 +9,11 @@ import type { ActiveWallet } from "@expendi-business/shared";
 import { PageHeader } from "~/components/data/page-header";
 import { ErrorState, Skel } from "~/components/data/states";
 import { Button } from "~/components/ui/button";
+import { Card } from "~/components/ui/card";
 import { useDashboard } from "~/contexts/dashboard-context";
 import { describeApiError } from "~/lib/api";
 import { AddAddressSheet, AllowedAddresses } from "./allowed-addresses";
-import { BalanceCard, panelClass } from "./balance-card";
+import { BalanceCard } from "./balance-card";
 import { FundInSheet } from "./fund-in-sheet";
 import { DepositCard, PaidFromAccounts } from "./rail-cards";
 import { useCompanyWallet, useFinishWalletSetup } from "./wallet-api";
@@ -97,14 +98,14 @@ function CompanyAccounts({
       {wallet.isPending ? (
         <AccountsSkeleton />
       ) : wallet.isError ? (
-        <div className={`${panelClass} mt-6`}>
+        <Card className="mt-6 gap-0 py-0 shadow-xs">
           <ErrorState
             title="Accounts didn't load"
             onRetry={() => void wallet.refetch()}
           >
             {describeApiError(wallet.error)}
           </ErrorState>
-        </div>
+        </Card>
       ) : active ? (
         <ActiveAccounts
           organizationId={organizationId}
@@ -214,16 +215,16 @@ function AccountsSkeleton(): JSX.Element {
       aria-busy="true"
       className="mt-6 grid grid-cols-[minmax(0,1fr)_352px] items-start gap-4 max-[1120px]:grid-cols-1"
     >
-      <div className={`${panelClass} flex flex-col gap-3 p-6`}>
+      <Card className="gap-3 p-6 shadow-xs">
         <Skel width="30%" height={18} />
         <Skel width="45%" height={36} style={{ marginTop: 12 }} />
         <Skel width="100%" height={180} style={{ marginTop: 16 }} />
-      </div>
-      <div className={`${panelClass} flex flex-col gap-3 p-5`}>
+      </Card>
+      <Card className="gap-3 p-5 shadow-xs">
         <Skel width="50%" height={18} />
         <Skel width="100%" height={14} />
         <Skel width="100%" height={36} style={{ marginTop: 12 }} />
-      </div>
+      </Card>
     </div>
   );
 }
@@ -237,8 +238,8 @@ function WalletStillCreating({
 }): JSX.Element {
   const finish = useFinishWalletSetup(organizationId);
   return (
-    <div className={`${panelClass} mt-6 p-5 text-sm text-gray-700`}>
-      <p className="text-base leading-6 font-(--w-title) text-gray-900">
+    <Card className="mt-6 gap-0 p-5 text-sm text-secondary-foreground shadow-xs">
+      <p className="text-base leading-6 font-(--w-title) text-foreground">
         The wallet is still being set up
       </p>
       <p className="mt-1">
@@ -257,10 +258,10 @@ function WalletStillCreating({
         </Button>
       ) : null}
       {finish.isError ? (
-        <p role="alert" className="mt-3 text-sm text-error-700">
+        <p role="alert" className="mt-3 text-sm text-destructive">
           {describeApiError(finish.error)}
         </p>
       ) : null}
-    </div>
+    </Card>
   );
 }
