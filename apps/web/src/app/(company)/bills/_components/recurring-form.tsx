@@ -29,8 +29,8 @@ import {
 
 import type { RecurringDraft } from "~/features/recurring/recurring-draft";
 import { textLinkClass } from "~/components/data/actions";
+import { RowCheckbox } from "~/components/data/cells";
 import { Callout } from "~/components/data/detail-sheet";
-import { RowCheckbox } from "~/components/data/table";
 import { Button } from "~/components/ui/button";
 import {
   Field,
@@ -288,10 +288,10 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
             }
           />
           <span>
-            <span className="block text-sm font-(--w-ui) text-gray-900">
+            <span className="block text-sm font-(--w-ui) text-foreground">
               Variable amount
             </span>
-            <span className="block text-xs leading-4 text-gray-500">
+            <span className="block text-xs leading-4 text-muted-foreground">
               Entered on each bill, e.g. PAYE or electricity.
             </span>
           </span>
@@ -482,14 +482,14 @@ function SetOnce({ item }: { item: RecurringItem }): JSX.Element {
     ["How it’s paid", PAY_VIA_LABELS[item.payVia]],
   ] as const;
   return (
-    <div className="flex flex-col gap-3 rounded-control bg-gray-50 px-4 py-3.5">
+    <div className="flex flex-col gap-3 rounded-control bg-muted/60 px-4 py-3.5">
       <dl className="flex flex-col">
         {rows.map(([label, value]) => (
           <div
             key={label}
-            className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 border-t border-gray-200 py-[9px] first:border-t-0 first:pt-0 max-[600px]:grid-cols-[minmax(0,1fr)] max-[600px]:gap-0.5"
+            className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 border-t border-border py-[9px] first:border-t-0 first:pt-0 max-[600px]:grid-cols-[minmax(0,1fr)] max-[600px]:gap-0.5"
           >
-            <dt className="text-gray-500">{label}</dt>
+            <dt className="text-muted-foreground">{label}</dt>
             <dd className="[overflow-wrap:anywhere] tabular-nums">{value}</dd>
           </div>
         ))}
@@ -633,18 +633,18 @@ function ScheduleFields({
       {validDay && validStart ? (
         <div
           aria-live="polite"
-          className="flex items-start gap-2 rounded-control bg-gray-50 px-3 py-2.5"
+          className="flex items-start gap-2 rounded-control bg-muted/60 px-3 py-2.5"
         >
           <CalendarIcon
             aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-gray-500"
+            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
           />
           <div>
             <strong className="block font-(--w-ui)">
               Due: {describeSchedule(draft.schedule, day, startsOn)}
             </strong>
             {firstDue ? (
-              <span className="block text-xs leading-4 text-gray-500 tabular-nums">
+              <span className="block text-xs leading-4 text-muted-foreground tabular-nums">
                 First bill due {formatIsoDate(firstDue)}
               </span>
             ) : null}
@@ -697,7 +697,7 @@ function PayeeSelect({
 
   if (payees.isPending) {
     return (
-      <p role="status" className="text-gray-500">
+      <p role="status" className="text-muted-foreground">
         Loading payees…
       </p>
     );
@@ -772,7 +772,7 @@ function CategorySelect({
 
   if (categories.isPending) {
     return (
-      <p role="status" className="text-gray-500">
+      <p role="status" className="text-muted-foreground">
         Loading categories…
       </p>
     );

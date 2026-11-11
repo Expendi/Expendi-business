@@ -51,7 +51,7 @@ export function ReportStats({
   }
   if (summary.isError) {
     return (
-      <div className="mt-4 rounded-panel border border-gray-200 bg-surface">
+      <div className="mt-4 rounded-xl border border-border bg-card">
         <ErrorState
           title="The month's figures didn't load"
           onRetry={() => void summary.refetch()}

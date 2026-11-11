@@ -17,7 +17,7 @@ export function SelectionBar({
   return (
     <div
       aria-live="polite"
-      className="sticky bottom-0 z-5 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-gray-200 bg-surface px-4 py-3 text-sm shadow-selection-bar"
+      className="sticky bottom-0 z-5 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border bg-card px-4 py-3 text-sm shadow-selection-bar"
     >
       <div className="min-w-0 flex-[1_1_220px] [&_strong]:font-(--w-name)">
         <p>{summary}</p>

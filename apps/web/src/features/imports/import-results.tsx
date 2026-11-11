@@ -1,6 +1,9 @@
+import { useMemo } from "react";
+
 import type { ImportReport } from "@expendi-business/shared";
 
-import { cellClass, headCellClass, tableClass } from "~/components/styles";
+import { DataTable, useDataTable } from "~/components/data/data-table";
+import { resultColumns } from "./columns";
 
 export function ImportResults({
   rows,
@@ -9,59 +12,23 @@ export function ImportResults({
   rows: ImportReport["rows"];
   completed?: boolean;
 }) {
+  const columns = useMemo(() => resultColumns(completed), [completed]);
+  const table = useDataTable({
+    data: rows,
+    columns,
+    getRowId: (row) => String(row.row),
+    paginate: false,
+  });
   return (
-    <div className="max-h-96 overflow-auto rounded-lg border border-stone-200">
-      <table className={tableClass}>
-        <caption className="sr-only">
-          {completed
+    <div className="max-h-96 overflow-auto rounded-lg border border-border">
+      <DataTable
+        table={table}
+        caption={
+          completed
             ? "Completed import results"
-            : "Import preview by source row"}
-        </caption>
-        <thead>
-          <tr>
-            {["Source row", "Result", "Details", "Message"].map((label) => (
-              <th key={label} scope="col" className={headCellClass}>
-                {label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.row} className="border-t border-stone-200">
-              <td className={cellClass}>{row.row}</td>
-              <td className={cellClass}>
-                {row.status === "ready"
-                  ? completed
-                    ? "Imported"
-                    : "Ready"
-                  : row.status === "error"
-                    ? "Needs correction"
-                    : "Skipped"}
-              </td>
-              <td className={`${cellClass} min-w-48 break-words`}>
-                {Object.entries(row.values).map(([field, value]) => (
-                  <div key={field}>
-                    <span className="text-stone-500">{field}: </span>
-                    {value}
-                  </div>
-                ))}
-              </td>
-              <td className={`${cellClass} min-w-48`}>
-                {completed && row.status === "ready"
-                  ? "Imported successfully."
-                  : row.message}
-                {row.newRecords?.map((record) => (
-                  <p key={`${record.kind}:${record.name}`} className="mt-1">
-                    {completed ? "Created" : "Create new"} {record.kind}:{" "}
-                    {record.name}
-                  </p>
-                ))}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            : "Import preview by source row"
+        }
+      />
     </div>
   );
 }

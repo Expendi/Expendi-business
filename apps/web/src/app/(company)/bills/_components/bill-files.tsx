@@ -25,8 +25,11 @@ export function BillFiles({
 }): JSX.Element {
   if (files.length === 0) {
     return (
-      <div className="flex min-h-40 flex-col items-center justify-center gap-1.5 rounded-control border border-dashed border-control-border p-6 text-center text-gray-600">
-        <ImageOffIcon aria-hidden="true" className="size-6 text-gray-500" />
+      <div className="flex min-h-40 flex-col items-center justify-center gap-1.5 rounded-control border border-dashed border-input p-6 text-center text-muted-foreground">
+        <ImageOffIcon
+          aria-hidden="true"
+          className="size-6 text-muted-foreground"
+        />
         <p>No receipt attached.</p>
       </div>
     );
@@ -38,13 +41,13 @@ export function BillFiles({
         return (
           <figure
             key={file.id}
-            className="m-0 overflow-hidden rounded-control border border-gray-200 bg-gray-50"
+            className="m-0 overflow-hidden rounded-control border border-border bg-muted/60"
           >
             {file.kind === "pdf" ? (
               <iframe
                 title={caption}
                 src={file.url}
-                className="block h-80 w-full border-0 bg-white"
+                className="block h-80 w-full border-0 bg-card"
               />
             ) : (
               <div className="flex min-h-70 items-center justify-center p-5">
@@ -58,7 +61,7 @@ export function BillFiles({
                 />
               </div>
             )}
-            <figcaption className="flex items-center justify-between gap-2 border-t border-gray-200 bg-surface px-3 py-2 text-xs leading-4 text-gray-500">
+            <figcaption className="flex items-center justify-between gap-2 border-t border-border bg-card px-3 py-2 text-xs leading-4 text-muted-foreground">
               <span>{caption}</span>
               <a
                 href={file.url}

@@ -72,8 +72,8 @@ export function FileSheet({
       headerExtra={
         format ? (
           <>
-            <p className="mt-0.5 text-gray-600">{entry?.detail}</p>
-            <p className="mt-0.5 text-xs leading-4 [overflow-wrap:anywhere] text-gray-500">
+            <p className="mt-0.5 text-muted-foreground">{entry?.detail}</p>
+            <p className="mt-0.5 text-xs leading-4 [overflow-wrap:anywhere] text-muted-foreground">
               {reportFilename(month, format)}
             </p>
           </>
@@ -139,7 +139,7 @@ function Section({ children }: { children: ReactNode }): JSX.Element {
 }
 
 function Sub({ children }: { children: ReactNode }): JSX.Element {
-  return <p className="text-gray-600">{children}</p>;
+  return <p className="text-muted-foreground">{children}</p>;
 }
 
 function More({
@@ -153,14 +153,14 @@ function More({
 }): JSX.Element | null {
   if (total <= shown) return null;
   return (
-    <p className="text-xs leading-4 text-gray-500 tabular-nums">
+    <p className="text-xs leading-4 text-muted-foreground tabular-nums">
       And {total - shown} more {noun}.
     </p>
   );
 }
 
 function Note({ children }: { children: ReactNode }): JSX.Element {
-  return <p className="text-xs leading-4 text-gray-500">{children}</p>;
+  return <p className="text-xs leading-4 text-muted-foreground">{children}</p>;
 }
 
 function ColumnTags({ columns }: { columns: readonly string[] }): JSX.Element {
@@ -169,7 +169,7 @@ function ColumnTags({ columns }: { columns: readonly string[] }): JSX.Element {
       {columns.map((column) => (
         <span
           key={column}
-          className="inline-flex h-[22px] items-center rounded-full border border-gray-200 px-2 text-xs whitespace-nowrap text-gray-600"
+          className="inline-flex h-[22px] items-center rounded-full border border-border px-2 text-xs whitespace-nowrap text-muted-foreground"
         >
           {column}
         </span>
@@ -196,7 +196,7 @@ function PreviewTable({
               key={label}
               scope="col"
               className={cn(
-                "py-1.5 pr-2 text-left font-normal text-gray-500",
+                "py-1.5 pr-2 text-left font-normal text-muted-foreground",
                 column === last && "pr-0 text-right whitespace-nowrap",
               )}
             >
@@ -213,7 +213,7 @@ function PreviewTable({
                 key={`${String(column)}:${cell}`}
                 title={column === 2 ? cell : undefined}
                 className={cn(
-                  "border-t border-hairline py-1.5 pr-2 align-top",
+                  "border-t border-border py-1.5 pr-2 align-top",
                   column === last && "pr-0 text-right whitespace-nowrap",
                   column === 2 && "w-2/5 max-w-0 truncate",
                 )}
@@ -362,11 +362,11 @@ function Receipts({ summary }: { summary: ReportMonthSummary }): JSX.Element {
               return (
                 <li
                   key={name}
-                  className="flex min-w-0 items-center gap-2 text-xs leading-4 text-gray-600"
+                  className="flex min-w-0 items-center gap-2 text-xs leading-4 text-muted-foreground"
                 >
                   <Icon
                     aria-hidden="true"
-                    className="size-3.5 shrink-0 text-gray-400"
+                    className="size-3.5 shrink-0 text-muted-foreground/70"
                   />
                   <span className="min-w-0 truncate" title={name}>
                     {name}

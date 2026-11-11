@@ -1,17 +1,18 @@
 "use client";
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   importHistoryDetailSchema,
   importHistoryPageSchema,
 } from "@expendi-business/shared";
 
+import { DataTable, useDataTable } from "~/components/data/data-table";
 import { secondaryButton } from "~/components/styles";
 import { describeApiError } from "~/lib/api";
-import { formatNairobiDate } from "~/lib/dates";
 import { useApi } from "~/lib/use-api";
+import { historyColumns } from "./columns";
 import { ImportResults } from "./import-results";
 
 export function ImportHistory({ organizationId }: { organizationId: string }) {
@@ -36,10 +37,29 @@ export function ImportHistory({ organizationId }: { organizationId: string }) {
         importHistoryDetailSchema,
       ),
   });
-  const entries = history.data?.pages.flatMap((page) => page.imports) ?? [];
+  const entries = useMemo(
+    () => history.data?.pages.flatMap((page) => page.imports) ?? [],
+    [history.data],
+  );
+  const columns = useMemo(
+    () =>
+      historyColumns({
+        selected,
+        onToggle: (id) =>
+          setSelected((current) => (current === id ? null : id)),
+      }),
+    [selected],
+  );
+  const table = useDataTable({
+    data: entries,
+    columns,
+    getRowId: (entry) => entry.id,
+    paginate: false,
+  });
+  const selectedEntry = entries.find((entry) => entry.id === selected);
   return (
     <section
-      className="space-y-4 border-t border-stone-200 pt-6"
+      className="space-y-4 border-t border-border pt-6"
       aria-labelledby="import-history-title"
     >
       <h2 id="import-history-title" className="text-lg font-semibold">
@@ -59,54 +79,30 @@ export function ImportHistory({ organizationId }: { organizationId: string }) {
         </div>
       ) : null}
       {history.isSuccess && !entries.length ? (
-        <p className="text-sm text-stone-600">
+        <p className="text-sm text-muted-foreground">
           Your completed imports will appear here, with who imported them and
           the results.
         </p>
       ) : null}
-      <ul className="divide-y divide-stone-200">
-        {entries.map((entry) => (
-          <li key={entry.id} className="py-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="break-all font-medium">{entry.fileName}</h3>
-                <p className="text-sm text-stone-600">
-                  {entry.kind === "history"
-                    ? "Paid expenses"
-                    : entry.kind === "bill"
-                      ? "Unpaid bills"
-                      : entry.kind}{" "}
-                  · {entry.rowsImported} imported · {entry.rowsSkipped} skipped
-                </p>
-                <p className="text-sm text-stone-600">
-                  {entry.importedBy} · {formatNairobiDate(entry.createdAt)}
-                </p>
-              </div>
-              <button
-                type="button"
-                className={secondaryButton}
-                aria-expanded={selected === entry.id}
-                onClick={() =>
-                  setSelected(selected === entry.id ? null : entry.id)
-                }
-              >
-                {selected === entry.id ? "Hide results" : "View results"}
-              </button>
-            </div>
-            {selected === entry.id ? (
-              <div className="mt-4">
-                {detail.isPending ? (
-                  <p role="status">Loading results…</p>
-                ) : detail.isError ? (
-                  <p role="alert">{describeApiError(detail.error)}</p>
-                ) : (
-                  <ImportResults rows={detail.data.rows} completed />
-                )}
-              </div>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      {entries.length ? (
+        <div className="overflow-clip rounded-xl border border-border bg-card">
+          <DataTable table={table} caption="Import history" />
+        </div>
+      ) : null}
+      {selectedEntry ? (
+        <div>
+          <h3 className="mb-2 font-medium break-all">
+            {selectedEntry.fileName}
+          </h3>
+          {detail.isPending ? (
+            <p role="status">Loading results…</p>
+          ) : detail.isError ? (
+            <p role="alert">{describeApiError(detail.error)}</p>
+          ) : (
+            <ImportResults rows={detail.data.rows} completed />
+          )}
+        </div>
+      ) : null}
       {history.hasNextPage ? (
         <button
           type="button"

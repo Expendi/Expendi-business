@@ -26,10 +26,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import type {
-  Expense,
   ExpenseListKind,
   ExpenseSortKey,
   ExpensesSummary,
@@ -37,13 +36,13 @@ import type {
 import { ETIMS_STATUSES, EXPENSE_LIST_KINDS } from "@expendi-business/shared";
 
 import type { ExpenseFilters } from "./expense-filters";
+import type { SortState } from "~/components/data/data-table";
 import type { FilterOption } from "~/components/data/filter-chip";
 import type { KindTab } from "~/components/data/kind-tabs";
-import type { SortState } from "~/components/data/table";
 import type { ExpenseListParams } from "~/lib/customer-api";
 import { FilterChip } from "~/components/data/filter-chip";
 import { KindTabs } from "~/components/data/kind-tabs";
-import { AmountStack, Money } from "~/components/data/money";
+import { Money } from "~/components/data/money";
 import { PageHeader } from "~/components/data/page-header";
 import {
   ResultsBody,
@@ -57,33 +56,15 @@ import {
   StatCardSkeleton,
 } from "~/components/data/stat-cards";
 import { EmptyState, ErrorState } from "~/components/data/states";
-import { StatusBadge } from "~/components/data/status-badge";
-import {
-  DataRow,
-  DataTable,
-  EntityMark,
-  Mini,
-  nextSort,
-  PhoneCard,
-  PhoneCards,
-  RowMeta,
-  RowTitle,
-  SortHeader,
-  TableSkeletonRows,
-  Td,
-  Th,
-} from "~/components/data/table";
 import { useDeepLinkParam } from "~/components/data/use-deep-link-param";
 import { Button } from "~/components/ui/button";
 import { useAuth } from "~/contexts/auth-context";
 import { useDashboard } from "~/contexts/dashboard-context";
-import { formatIsoDate } from "~/lib/dates";
 import { queryKeys } from "~/lib/query-keys";
 import {
   DEFAULT_SORT,
   filtersFromParams,
   filtersToParams,
-  FIRST_DIRECTION,
   formatMonth,
   hasChipFilters,
   monthChoices,
@@ -93,14 +74,12 @@ import {
 import {
   ETIMS_LABELS,
   EXPENSE_STATUS,
-  KIND_LABELS,
   KIND_TAB_LABELS,
   personName,
   STATUS_ORDER,
-  WARNING_LABELS,
-  warningCodes,
 } from "./expense-labels";
 import { ExpenseSheet } from "./expense-sheet";
+import { ExpenseTable, ExpenseTableSkeleton } from "./expense-table";
 
 export const EXPENSES_PAGE_SIZE = 50;
 const RESULTS_ID = "expense-results";
@@ -171,7 +150,10 @@ function CompanyExpenses({
   }
   const clearChips = () => setFilters({ kind: filters.kind });
 
-  const rows = list.data?.pages.flatMap((page) => page.expenses) ?? [];
+  const rows = useMemo(
+    () => list.data?.pages.flatMap((page) => page.expenses) ?? [],
+    [list.data],
+  );
   const chipsSet = hasChipFilters(filters);
 
   return (
@@ -228,11 +210,7 @@ function CompanyExpenses({
           refreshing={list.isPlaceholderData}
         >
           {list.isPending ? (
-            <table className="w-full border-separate border-spacing-0">
-              <tbody>
-                <TableSkeletonRows rows={6} columns={4} />
-              </tbody>
-            </table>
+            <ExpenseTableSkeleton />
           ) : list.isError ? (
             <ErrorState
               title="Expenses didn't load"
@@ -254,9 +232,7 @@ function CompanyExpenses({
                 rows={rows}
                 openId={openId}
                 sort={sort}
-                onSort={(key) =>
-                  setSort(nextSort(sort, key, FIRST_DIRECTION[key]))
-                }
+                onSort={setSort}
                 onOpen={setOpenId}
               />
               <ResultsFoot>
@@ -531,7 +507,7 @@ function ChoicesError({
   return (
     <p
       role="alert"
-      className="flex items-center gap-1.5 border-b border-gray-200 bg-error-50 px-4 py-2 text-xs leading-4 text-error-700"
+      className="flex items-center gap-1.5 border-b border-border bg-error-50 px-4 py-2 text-xs leading-4 text-destructive"
     >
       <CircleAlertIcon aria-hidden="true" className="size-3.5 shrink-0" />
       Some filter choices couldn&apos;t load. Check your connection, then reload
@@ -593,197 +569,5 @@ function NoExpenses({
     >
       Reimbursements, petty cash and company spending show up here.
     </EmptyState>
-  );
-}
-
-/**
- * A row's markers: warnings, a missing receipt, and no eTIMS invoice
- * where the eTIMS column isn't showing (`collapsed`: only under a 900px
- * panel, where the column hides).
- */
-function Flags({
-  expense,
-  etims,
-}: {
-  expense: Expense;
-  etims: "always" | "collapsed";
-}): JSX.Element {
-  return (
-    <>
-      {warningCodes(expense.warnings).map((code) => (
-        <Mini
-          key={code}
-          icon={TriangleAlertIcon}
-          label={WARNING_LABELS[code]}
-          warn
-        >
-          {WARNING_LABELS[code]}
-        </Mini>
-      ))}
-      {expense.noReceipt ? (
-        <Mini icon={ImageOffIcon} label="No receipt">
-          No receipt
-        </Mini>
-      ) : null}
-      {expense.etimsStatus === "none" ? (
-        <span
-          className={
-            etims === "collapsed"
-              ? "hidden @max-[900px]/results:inline-flex"
-              : "inline-flex"
-          }
-        >
-          <Mini icon={FileWarningIcon} label="No eTIMS invoice">
-            No eTIMS
-          </Mini>
-        </span>
-      ) : null}
-    </>
-  );
-}
-
-function EtimsCell({ expense }: { expense: Expense }): JSX.Element {
-  if (expense.etimsStatus === "attached") {
-    return (
-      <span className="inline-flex items-center gap-1 whitespace-nowrap text-gray-700">
-        <CheckIcon aria-hidden="true" className="size-3.5 text-success-700" />
-        Attached
-      </span>
-    );
-  }
-  if (expense.etimsStatus === "none") {
-    return (
-      <span className="inline-flex items-center gap-1 whitespace-nowrap text-warn-700">
-        <TriangleAlertIcon aria-hidden="true" className="size-3.5" />
-        None
-      </span>
-    );
-  }
-  return <span className="whitespace-nowrap text-gray-500">Not required</span>;
-}
-
-/** One flat list, server-sorted; phone cards under a 720px panel. */
-export function ExpenseTable({
-  rows,
-  openId,
-  sort,
-  onSort,
-  onOpen,
-}: {
-  rows: readonly Expense[];
-  openId: string | null;
-  sort: SortState<ExpenseSortKey>;
-  onSort: (key: ExpenseSortKey) => void;
-  onOpen: (id: string) => void;
-}): JSX.Element {
-  return (
-    <>
-      <DataTable caption="Expenses">
-        <thead>
-          <tr>
-            <SortHeader
-              label="Date"
-              sortKey="date"
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortHeader
-              label="Person"
-              sortKey="person"
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortHeader
-              label="Expense"
-              sortKey="merchant"
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortHeader
-              label="Amount"
-              sortKey="amount"
-              align="end"
-              sort={sort}
-              onSort={onSort}
-            />
-            <Th collapse="md">eTIMS</Th>
-            <SortHeader
-              label="Status"
-              sortKey="status"
-              sort={sort}
-              onSort={onSort}
-            />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((expense) => {
-            const status = EXPENSE_STATUS[expense.status];
-            const person = personName(expense.member);
-            return (
-              <DataRow
-                key={expense.id}
-                open={expense.id === openId}
-                onOpen={() => onOpen(expense.id)}
-              >
-                <Td kind="date">{formatIsoDate(expense.spentOn)}</Td>
-                <Td>
-                  <span className="flex items-center gap-2.5 whitespace-nowrap">
-                    <EntityMark name={person} kind="person" />
-                    {person}
-                  </span>
-                </Td>
-                <Td kind="main">
-                  <RowTitle onOpen={() => onOpen(expense.id)}>
-                    {expense.merchant}
-                  </RowTitle>
-                  <RowMeta
-                    text={`${KIND_LABELS[expense.listKind]} · ${expense.category.name}`}
-                  >
-                    <Flags expense={expense} etims="collapsed" />
-                  </RowMeta>
-                </Td>
-                <Td align="end">
-                  <AmountStack>
-                    <Money amount={expense.amountKes} currency="KES" />
-                  </AmountStack>
-                </Td>
-                <Td collapse="md">
-                  <EtimsCell expense={expense} />
-                </Td>
-                <Td>
-                  <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-                </Td>
-              </DataRow>
-            );
-          })}
-        </tbody>
-      </DataTable>
-      <PhoneCards label="Expenses">
-        {rows.map((expense) => {
-          const status = EXPENSE_STATUS[expense.status];
-          const person = personName(expense.member);
-          return (
-            <PhoneCard
-              key={expense.id}
-              mark={<EntityMark name={person} kind="person" />}
-              title={expense.merchant}
-              sub={`${person} · ${formatIsoDate(expense.spentOn)}`}
-              flags={
-                <>
-                  <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-                  <Flags expense={expense} etims="always" />
-                </>
-              }
-              aside={
-                <AmountStack>
-                  <Money amount={expense.amountKes} currency="KES" />
-                </AmountStack>
-              }
-              onOpen={() => onOpen(expense.id)}
-            />
-          );
-        })}
-      </PhoneCards>
-    </>
   );
 }

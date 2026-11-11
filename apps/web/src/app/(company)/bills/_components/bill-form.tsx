@@ -22,8 +22,8 @@ import {
 
 import type { UploadedBillFile } from "./bill-files-input";
 import type { BillDraft } from "~/features/bills/bill-draft";
+import { RowCheckbox } from "~/components/data/cells";
 import { Callout } from "~/components/data/detail-sheet";
-import { RowCheckbox } from "~/components/data/table";
 import { Button } from "~/components/ui/button";
 import {
   Field,
@@ -273,10 +273,10 @@ export function BillForm({
               disabled={busy}
             />
             <span>
-              <span className="block text-sm font-(--w-ui) text-gray-900">
+              <span className="block text-sm font-(--w-ui) text-foreground">
                 Variable amount
               </span>
-              <span className="block text-xs leading-4 text-gray-500">
+              <span className="block text-xs leading-4 text-muted-foreground">
                 e.g. PAYE or electricity: save it now and enter the amount
                 before it&apos;s paid.
               </span>

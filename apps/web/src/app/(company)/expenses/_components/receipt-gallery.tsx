@@ -32,11 +32,14 @@ export function ReceiptGallery({
     return (
       <div
         className={cn(
-          "flex flex-col items-center justify-center gap-1.5 rounded-control border border-dashed border-control-border p-6 text-center text-gray-600",
+          "flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-input p-6 text-center text-muted-foreground",
           tall ? "min-h-[200px]" : "min-h-40",
         )}
       >
-        <ImageOffIcon aria-hidden="true" className="size-6 text-gray-500" />
+        <ImageOffIcon
+          aria-hidden="true"
+          className="size-6 text-muted-foreground"
+        />
         <p>No receipt attached.</p>
       </div>
     );
@@ -47,7 +50,7 @@ export function ReceiptGallery({
       {receipts.map((receipt) => (
         <figure
           key={receipt.id}
-          className="overflow-hidden rounded-control border border-gray-200 bg-gray-50"
+          className="overflow-hidden rounded-lg border border-border bg-muted/60"
         >
           <div
             className={cn(
@@ -56,7 +59,7 @@ export function ReceiptGallery({
             )}
           >
             {receipt.kind === "sms_text" ? (
-              <pre className="m-0 w-full max-w-[320px] rounded-[16px_16px_16px_4px] border border-gray-200 bg-surface px-4 py-3.5 font-sans text-sm leading-5 [overflow-wrap:anywhere] whitespace-pre-wrap">
+              <pre className="m-0 w-full max-w-[320px] rounded-[16px_16px_16px_4px] border border-border bg-card px-4 py-3.5 font-sans text-sm leading-5 [overflow-wrap:anywhere] whitespace-pre-wrap">
                 {receipt.text}
               </pre>
             ) : receipt.kind === "pdf" ? (
@@ -64,7 +67,7 @@ export function ReceiptGallery({
                 title={captionOf(receipt)}
                 src={receipt.url}
                 className={cn(
-                  "w-full rounded-[2px] border border-gray-200 bg-surface",
+                  "w-full rounded-[2px] border border-border bg-card",
                   stageHeight,
                 )}
               />
@@ -86,7 +89,7 @@ export function ReceiptGallery({
               </a>
             )}
           </div>
-          <figcaption className="flex items-center justify-between gap-2 border-t border-gray-200 bg-surface px-3 py-2 text-xs leading-4 text-gray-500">
+          <figcaption className="flex items-center justify-between gap-2 border-t border-border bg-card px-3 py-2 text-xs leading-4 text-muted-foreground">
             <span>{captionOf(receipt)}</span>
             {receipt.kind === "sms_text" ? null : (
               <a

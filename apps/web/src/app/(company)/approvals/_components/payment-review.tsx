@@ -9,13 +9,13 @@ import type { ClaimApproval } from "@expendi-business/shared";
 
 import type { PreviewValue } from "./payment";
 import { textLinkClass } from "~/components/data/actions";
+import { EntityMark } from "~/components/data/cells";
 import {
   Callout,
   DetailItem,
   DetailList,
 } from "~/components/data/detail-sheet";
 import { Money } from "~/components/data/money";
-import { EntityMark } from "~/components/data/table";
 import { PASSKEY_HINT } from "~/features/payment-ui";
 import { previewRows } from "./payment";
 
@@ -30,10 +30,10 @@ function Note({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <p className="flex items-start gap-2 text-gray-600">
+    <p className="flex items-start gap-2 text-muted-foreground">
       <Icon
         aria-hidden="true"
-        className="mt-0.5 size-4 shrink-0 text-gray-500"
+        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
       />
       <span>{children}</span>
     </p>
@@ -113,7 +113,7 @@ export function PaymentReview({
           <details
             key={preview.claimId}
             open={approval.claims.length <= OPEN_PREVIEWS_UP_TO}
-            className="group/preview rounded-control border border-gray-200"
+            className="group/preview rounded-control border border-border"
           >
             <summary className="grid cursor-pointer list-none grid-cols-[32px_minmax(0,1fr)_auto_16px] items-center gap-3 rounded-control px-3 py-2.5 [&::-webkit-details-marker]:hidden">
               <EntityMark name={preview.claimantName} kind="person" />
@@ -121,7 +121,7 @@ export function PaymentReview({
                 <span className="block truncate font-(--w-name)">
                   {preview.claimantName}
                 </span>
-                <span className="block truncate text-xs leading-4 text-gray-500">
+                <span className="block truncate text-xs leading-4 text-muted-foreground">
                   {merchantOf(preview.claimId)}
                 </span>
               </span>
@@ -130,10 +130,10 @@ export function PaymentReview({
               </span>
               <ChevronDownIcon
                 aria-hidden="true"
-                className="size-4 text-gray-500 transition-transform duration-200 ease-out-expo group-open/preview:rotate-180"
+                className="size-4 text-muted-foreground transition-transform duration-200 ease-out-expo group-open/preview:rotate-180"
               />
             </summary>
-            <div className="mr-3 mb-3 ml-14 border-t border-hairline pt-[9px] max-[600px]:ml-3">
+            <div className="mr-3 mb-3 ml-14 border-t border-border pt-[9px] max-[600px]:ml-3">
               <DetailList labelWidth="lg">
                 {previewRows(preview).map((row) => (
                   <DetailItem key={row.label} label={row.label}>
@@ -145,9 +145,9 @@ export function PaymentReview({
           </details>
         ))}
       </div>
-      <dl className="grid grid-cols-3 gap-3 rounded-control bg-gray-50 px-4 py-3.5 max-[600px]:grid-cols-1">
+      <dl className="grid grid-cols-3 gap-3 rounded-control bg-muted/60 px-4 py-3.5 max-[600px]:grid-cols-1">
         <div>
-          <dt className="text-xs leading-4 font-(--w-ui) text-gray-500">
+          <dt className="text-xs leading-4 font-(--w-ui) text-muted-foreground">
             They receive, in total
           </dt>
           <dd className="mt-1 text-base leading-6 font-(--w-amount)">
@@ -155,7 +155,7 @@ export function PaymentReview({
           </dd>
         </div>
         <div>
-          <dt className="text-xs leading-4 font-(--w-ui) text-gray-500">
+          <dt className="text-xs leading-4 font-(--w-ui) text-muted-foreground">
             Total, at most
           </dt>
           <dd className="mt-1 text-base leading-6 font-(--w-amount)">
@@ -165,7 +165,7 @@ export function PaymentReview({
           </dd>
         </div>
         <div>
-          <dt className="text-xs leading-4 font-(--w-ui) text-gray-500">
+          <dt className="text-xs leading-4 font-(--w-ui) text-muted-foreground">
             In the wallet
           </dt>
           <dd className="mt-1 text-base leading-6 font-(--w-amount)">

@@ -13,10 +13,14 @@ import type {
 
 import type { BarRow } from "./bar-list";
 import { textLinkClass } from "~/components/data/actions";
+import { EntityMark } from "~/components/data/cells";
 import { Money } from "~/components/data/money";
+import { MonthBars } from "~/components/data/month-bars";
 import { Skel } from "~/components/data/states";
-import { EntityMark } from "~/components/data/table";
+import { MiniTable, TableToggle } from "~/components/data/table-toggle";
 import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { compact, kesValue, niceScale, percentChange } from "~/lib/chart-scale";
 import { formatIsoDate } from "~/lib/dates";
 import {
   monthAbbr,
@@ -24,18 +28,7 @@ import {
   monthName,
   shiftMonth,
 } from "../../reports/_components/report-month";
-import { ColumnChart } from "../../reports/_components/viz/column-chart";
 import { MonthChip } from "../../reports/_components/viz/month-chip";
-import {
-  compact,
-  kesValue,
-  niceScale,
-  percentChange,
-} from "../../reports/_components/viz/scale";
-import {
-  MiniTable,
-  TableToggle,
-} from "../../reports/_components/viz/table-toggle";
 import { BarList } from "./bar-list";
 import {
   biggestRise,
@@ -53,7 +46,7 @@ function ShortKes({ value }: { value: number }): JSX.Element {
     <span className="whitespace-nowrap">
       <span
         data-ccy=""
-        className="text-[0.72em] font-(--w-ui) tracking-[0.04em] text-gray-500"
+        className="text-[0.72em] font-(--w-ui) tracking-[0.04em] text-muted-foreground"
       >
         KES
       </span>{" "}
@@ -62,7 +55,7 @@ function ShortKes({ value }: { value: number }): JSX.Element {
   );
 }
 
-function Card({
+function InsightCard({
   id,
   title,
   href,
@@ -80,45 +73,52 @@ function Card({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <article
+    <Card
+      role="article"
       aria-labelledby={id}
       style={{ animationDelay: `${String(140 + index * 70)}ms` }}
-      className="min-w-0 rounded-panel border border-gray-200 bg-surface p-5 shadow-panel motion-safe:animate-rise"
+      className="shadow-xs motion-safe:animate-rise"
     >
-      <h3>
-        <Link
-          id={id}
-          href={href}
-          className="group/title inline-flex items-center gap-1.5 rounded-[4px] text-lg leading-[26px] font-(--w-title) text-gray-900"
-        >
-          {title}
-          <ArrowRightIcon
-            aria-hidden="true"
-            className="size-4 text-gray-400 transition-[transform,color] duration-200 ease-out-expo group-hover/title:translate-x-[3px] group-hover/title:text-gray-700"
-          />
-        </Link>
-      </h3>
-      {insight ? (
-        <p className="mt-1 flex items-start gap-1.5 text-sm leading-5 text-gray-700">
-          <SparkleIcon
-            aria-hidden="true"
-            className="mt-0.5 size-3.5 shrink-0 text-brand-600"
-          />
-          <span>{insight}</span>
-        </p>
-      ) : null}
-      <dl className="my-[18px] grid grid-cols-2 gap-4">
-        {kpis.map(([label, value]) => (
-          <div key={label} className="min-w-0">
-            <dt className="text-xs leading-4 text-gray-500">{label}</dt>
-            <dd className="mt-1 text-2xl leading-8 font-(--w-figure) tracking-[-0.015em] [overflow-wrap:anywhere]">
-              {value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      {children}
-    </article>
+      <CardHeader>
+        <CardTitle role="heading" aria-level={3}>
+          <Link
+            id={id}
+            href={href}
+            className="group/title inline-flex items-center gap-1.5 rounded-[4px] text-lg leading-[26px] font-(--w-title) text-card-foreground"
+          >
+            {title}
+            <ArrowRightIcon
+              aria-hidden="true"
+              className="size-4 text-muted-foreground/70 transition-[transform,color] duration-200 ease-out-expo group-hover/title:translate-x-[3px] group-hover/title:text-secondary-foreground"
+            />
+          </Link>
+        </CardTitle>
+        {insight ? (
+          <p className="flex items-start gap-1.5 text-sm leading-5 text-secondary-foreground">
+            <SparkleIcon
+              aria-hidden="true"
+              className="mt-0.5 size-3.5 shrink-0 text-primary"
+            />
+            <span>{insight}</span>
+          </p>
+        ) : null}
+      </CardHeader>
+      <CardContent>
+        <dl className="mb-[18px] grid grid-cols-2 gap-4">
+          {kpis.map(([label, value]) => (
+            <div key={label} className="min-w-0">
+              <dt className="text-xs leading-4 text-muted-foreground">
+                {label}
+              </dt>
+              <dd className="mt-1 text-2xl leading-8 font-(--w-figure) tracking-[-0.015em] [overflow-wrap:anywhere]">
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        {children}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -126,7 +126,7 @@ function Legend({ children }: { children: ReactNode }): JSX.Element {
   return (
     <div
       aria-hidden="true"
-      className="mb-2 flex flex-wrap gap-x-4 gap-y-1.5 text-xs leading-4 text-gray-600"
+      className="mb-2 flex flex-wrap gap-x-4 gap-y-1.5 text-xs leading-4 text-muted-foreground"
     >
       {children}
     </div>
@@ -145,10 +145,10 @@ function LegendKey({
       <i
         className={cn(
           kind === "tick"
-            ? "h-3 w-0.5 rounded-[1px] bg-gray-600"
+            ? "h-3 w-0.5 rounded-[1px] bg-muted-foreground"
             : "size-2.5 rounded-[2px]",
-          kind === "selected" && "bg-brand-500",
-          kind === "context" && "bg-gray-300",
+          kind === "selected" && "bg-(--chart-1)",
+          kind === "context" && "bg-muted-foreground/40",
         )}
       />
       {children}
@@ -165,7 +165,7 @@ function ChartUnavailable({
 }): JSX.Element {
   if (trend.isError) {
     return (
-      <p className="py-6 text-sm text-gray-600" role="alert">
+      <p className="py-6 text-sm text-muted-foreground" role="alert">
         This chart didn&apos;t load.{" "}
         <button
           type="button"
@@ -271,7 +271,7 @@ function MoneyOutCard({
   const series = trend.data ? spendingSeries(trend.data) : null;
   const selected = series ? series.months.indexOf(data.month) : -1;
   return (
-    <Card
+    <InsightCard
       id="insight-money"
       index={0}
       title="Money out"
@@ -296,12 +296,12 @@ function MoneyOutCard({
       </Legend>
       {series ? (
         <>
-          <ColumnChart
+          <MonthBars
             labels={series.months.map(monthAbbr)}
             values={series.total}
             selected={selected}
-            height={200}
             axis
+            className="h-52"
             ariaLabel={`Money out by month, last ${String(series.months.length)} months. ${monthLabel(data.month)}: ${kes(series.total[selected] ?? 0)}. Use the arrow keys to read each month.`}
             tip={(index) => {
               const month = series.months[index] ?? data.month;
@@ -310,13 +310,8 @@ function MoneyOutCard({
               return {
                 head: monthLabel(month),
                 rows: [
+                  { value: kes(series.total[index] ?? 0), label: "Money out" },
                   {
-                    key: index === selected ? "selected" : "context",
-                    value: kes(series.total[index] ?? 0),
-                    label: "Money out",
-                  },
-                  {
-                    key: "none",
                     value: kes(series.outsidePayroll[index] ?? 0),
                     label: "Outside payroll",
                   },
@@ -351,7 +346,7 @@ function MoneyOutCard({
       ) : (
         <ChartUnavailable trend={trend} height={200} />
       )}
-    </Card>
+    </InsightCard>
   );
 }
 
@@ -397,7 +392,7 @@ function WhereItWentCard({
     };
   });
   return (
-    <Card
+    <InsightCard
       id="insight-categories"
       index={1}
       title="Where it went"
@@ -417,7 +412,7 @@ function WhereItWentCard({
     >
       {bars ? (
         bars.length === 0 ? (
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             Nothing paid outside payroll in {month} or {before}.
           </p>
         ) : (
@@ -436,7 +431,7 @@ function WhereItWentCard({
       ) : (
         <ChartUnavailable trend={trend} height={180} />
       )}
-    </Card>
+    </InsightCard>
   );
 }
 
@@ -462,7 +457,7 @@ function LargestPaymentsCard({
   const outside = outsidePayroll(data, "currentKes");
   const share = outside > 0 ? Math.round((total / outside) * 100) : null;
   return (
-    <Card
+    <InsightCard
       id="insight-largest"
       index={2}
       title="Largest payments"
@@ -485,7 +480,7 @@ function LargestPaymentsCard({
     >
       {payments ? (
         payments.length === 0 ? (
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             Nothing paid outside payroll in {monthName(data.month)}.
           </p>
         ) : (
@@ -493,9 +488,9 @@ function LargestPaymentsCard({
             {payments.map((payment, index) => (
               <li
                 key={payment.id}
-                className="grid grid-cols-[16px_32px_minmax(0,1fr)_auto] items-center gap-3 py-2.5 not-first:border-t not-first:border-hairline"
+                className="grid grid-cols-[16px_32px_minmax(0,1fr)_auto] items-center gap-3 py-2.5 not-first:border-t not-first:border-border"
               >
-                <span className="text-sm text-gray-500 tabular-nums">
+                <span className="text-sm text-muted-foreground tabular-nums">
                   {index + 1}
                 </span>
                 <EntityMark
@@ -506,7 +501,7 @@ function LargestPaymentsCard({
                   <p className="truncate text-base leading-6 font-(--w-name)">
                     {payment.name}
                   </p>
-                  <p className="truncate text-xs leading-4 text-gray-500">
+                  <p className="truncate text-xs leading-4 text-muted-foreground">
                     {[
                       payment.personName ?? categories.get(payment.categoryId),
                       formatIsoDate(payment.date).replace(/ \d{4}$/, ""),
@@ -525,7 +520,7 @@ function LargestPaymentsCard({
       ) : (
         <ChartUnavailable trend={trend} height={220} />
       )}
-    </Card>
+    </InsightCard>
   );
 }
 
@@ -558,7 +553,7 @@ function HeadingsCard({
         Math.abs(a.current / a.previous - 1),
     )[0];
   return (
-    <Card
+    <InsightCard
       id="insight-headings"
       index={3}
       title="By heading"
@@ -610,6 +605,6 @@ function HeadingsCard({
           };
         })}
       />
-    </Card>
+    </InsightCard>
   );
 }

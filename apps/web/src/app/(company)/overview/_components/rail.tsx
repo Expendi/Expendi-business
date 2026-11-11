@@ -18,10 +18,11 @@ import {
 } from "@expendi-business/shared";
 
 import { textLinkClass } from "~/components/data/actions";
+import { EntityMark } from "~/components/data/cells";
 import { Money } from "~/components/data/money";
 import { Skel } from "~/components/data/states";
-import { EntityMark } from "~/components/data/table";
 import { Button } from "~/components/ui/button";
+import { Card } from "~/components/ui/card";
 import { formatKes, formatUsdc } from "~/lib/money";
 import {
   cashLedger,
@@ -36,7 +37,7 @@ const COMING_UP_ROWS = 3;
 const FLOAT_ROWS = 3;
 
 const railTitleClass =
-  "flex items-center gap-1.5 text-lg leading-[26px] font-(--w-title) text-gray-900";
+  "flex items-center gap-1.5 text-lg leading-[26px] font-(--w-title) text-foreground";
 
 function RailLink({
   href,
@@ -67,14 +68,14 @@ function InfoTip({
         type="button"
         aria-label={label}
         aria-describedby={id}
-        className="rounded-[4px] p-0.5 text-gray-400 hover:text-gray-600"
+        className="rounded-[4px] p-0.5 text-muted-foreground/70 hover:text-muted-foreground"
       >
         <InfoIcon aria-hidden="true" className="size-4" />
       </button>
       <span
         id={id}
         role="tooltip"
-        className="pointer-events-none absolute top-full left-0 z-60 mt-1.5 hidden w-64 rounded-control border border-gray-200 bg-surface px-2.5 py-2 text-xs leading-4 font-normal text-gray-700 shadow-[0_12px_32px_-12px_rgb(16_24_40/0.22)] group-focus-within/tip:block group-hover/tip:block"
+        className="pointer-events-none absolute top-full left-0 z-60 mt-1.5 hidden w-64 rounded-control border border-border bg-card px-2.5 py-2 text-xs leading-4 font-normal text-secondary-foreground shadow-[0_12px_32px_-12px_rgb(16_24_40/0.22)] group-focus-within/tip:block group-hover/tip:block"
       >
         {children}
       </span>
@@ -88,9 +89,9 @@ function BigUsdc({ baseUnits }: { baseUnits: string }): JSX.Element {
     <p className="mt-2 flex items-baseline gap-1.5 tabular-nums">
       <span className="text-[32px] leading-10 font-(--w-display) tracking-[-0.025em]">
         {whole}
-        <span className="text-gray-400">.{cents}</span>
+        <span className="text-muted-foreground/70">.{cents}</span>
       </span>
-      <span className="text-sm font-(--w-ui) tracking-[0.04em] text-gray-500">
+      <span className="text-sm font-(--w-ui) tracking-[0.04em] text-muted-foreground">
         USDC
       </span>
     </p>
@@ -110,10 +111,12 @@ function LedgerRow({
     <div
       className={cn(
         "flex justify-between gap-3",
-        total && "border-t border-hairline pt-2.5 font-(--w-amount)",
+        total && "border-t border-border pt-2.5 font-(--w-amount)",
       )}
     >
-      <dt className={total ? "text-gray-900" : "text-gray-600"}>{label}</dt>
+      <dt className={total ? "text-foreground" : "text-muted-foreground"}>
+        {label}
+      </dt>
       <dd className="whitespace-nowrap tabular-nums">{children}</dd>
     </div>
   );
@@ -155,9 +158,10 @@ export function WalletCard({
   const { inProgressKes, leftOverKes } = cashLedger(cash);
   const outside = cashOutsideLine(cash);
   return (
-    <section
+    <Card
+      role="region"
       aria-labelledby="overview-wallet"
-      className="rounded-panel border border-gray-200 bg-surface p-5 shadow-panel [animation-delay:140ms] motion-safe:animate-rise"
+      className="gap-0 px-5 py-5 shadow-xs [animation-delay:140ms] motion-safe:animate-rise"
     >
       <h2 id="overview-wallet" className={railTitleClass}>
         USDC wallet
@@ -170,7 +174,7 @@ export function WalletCard({
         <RailLink href="/wallet">View account</RailLink>
       </h2>
       <BigUsdc baseUnits={cash.balanceUsdc} />
-      <p className="text-gray-500 tabular-nums">
+      <p className="text-muted-foreground tabular-nums">
         {cash.balanceKes === null ? (
           "KES rate unavailable"
         ) : (
@@ -190,7 +194,7 @@ export function WalletCard({
         </LedgerRow>
         {cash.status === "short" && cash.shortKes !== null ? (
           <LedgerRow label="Short by" total>
-            <span className="text-error-700">
+            <span className="text-destructive">
               <Money amount={cash.shortKes} currency="KES" />
             </span>
           </LedgerRow>
@@ -202,7 +206,7 @@ export function WalletCard({
       </dl>
       <CashPill cash={cash} />
       {cash.unknownAmounts > 0 || outside ? (
-        <p className="mt-2 text-xs leading-4 text-gray-500">
+        <p className="mt-2 text-xs leading-4 text-muted-foreground">
           {cash.unknownAmounts > 0
             ? `${String(cash.unknownAmounts)} ${cash.unknownAmounts === 1 ? "payment has" : "payments have"} no amount yet. `
             : null}
@@ -225,12 +229,12 @@ export function WalletCard({
           </Button>
         </div>
       ) : null}
-    </section>
+    </Card>
   );
 }
 
 const cardClass =
-  "rounded-panel border border-gray-200 bg-surface px-5 pt-[18px] pb-1.5 motion-safe:animate-rise";
+  "gap-0 px-5 pt-[18px] pb-1.5 shadow-xs motion-safe:animate-rise";
 
 /** Each open float: what's left of what was issued, low ones first. */
 export function FloatsCard({
@@ -239,7 +243,8 @@ export function FloatsCard({
   floats: UseQueryResult<FloatsResponse>;
 }): JSX.Element {
   return (
-    <section
+    <Card
+      role="region"
       aria-labelledby="overview-floats"
       className={cn(cardClass, "[animation-delay:210ms]")}
     >
@@ -254,7 +259,7 @@ export function FloatsCard({
           ))}
         </div>
       ) : floats.isError ? (
-        <p className="py-3 text-sm text-gray-600" role="alert">
+        <p className="py-3 text-sm text-muted-foreground" role="alert">
           Floats didn&apos;t load.{" "}
           <button
             type="button"
@@ -267,14 +272,16 @@ export function FloatsCard({
       ) : (
         <FloatList floats={floats.data} />
       )}
-    </section>
+    </Card>
   );
 }
 
 function FloatList({ floats }: { floats: FloatsResponse }): JSX.Element {
   const rows = floatRows(floats.floats).slice(0, FLOAT_ROWS);
   if (rows.length === 0) {
-    return <p className="py-3 text-sm text-gray-600">No open floats.</p>;
+    return (
+      <p className="py-3 text-sm text-muted-foreground">No open floats.</p>
+    );
   }
   return (
     <ul className="m-0 mt-1.5 list-none p-0">
@@ -283,13 +290,13 @@ function FloatList({ floats }: { floats: FloatsResponse }): JSX.Element {
         return (
           <li
             key={float.id}
-            className="grid grid-cols-[32px_minmax(0,1fr)] items-start gap-3 py-3 not-first:border-t not-first:border-hairline"
+            className="grid grid-cols-[32px_minmax(0,1fr)] items-start gap-3 py-3 not-first:border-t not-first:border-border"
           >
             <EntityMark name={name} kind="person" />
             <div className="min-w-0">
               <div className="flex justify-between gap-3 text-sm leading-5">
                 <span className="truncate font-(--w-name)">{name}</span>
-                <span className="whitespace-nowrap text-gray-600">
+                <span className="whitespace-nowrap text-muted-foreground">
                   <Money amount={float.leftKes} currency="KES" /> left
                 </span>
               </div>
@@ -302,17 +309,17 @@ function FloatList({ floats }: { floats: FloatsResponse }): JSX.Element {
                   0,
                   Number(BigInt(float.leftKes) / 100n),
                 )}
-                className="mt-2 h-1 overflow-hidden rounded-full bg-gray-100"
+                className="mt-2 h-1 overflow-hidden rounded-full bg-muted"
               >
                 <span
                   style={{ width: `${(Math.min(1, share) * 100).toFixed(1)}%` }}
                   className={cn(
                     "block h-full rounded-full",
-                    low ? "bg-warn-600" : "bg-gray-700",
+                    low ? "bg-warn-600" : "bg-secondary-foreground",
                   )}
                 />
               </div>
-              <p className="mt-1.5 flex justify-between gap-2 text-xs leading-4 text-gray-500 tabular-nums">
+              <p className="mt-1.5 flex justify-between gap-2 text-xs leading-4 text-muted-foreground tabular-nums">
                 <span>
                   {low ? (
                     <span className="inline-flex items-center gap-[3px] font-(--w-ui) text-warn-700">
@@ -347,7 +354,8 @@ export function ComingUpCard({
   const rows = comingUp(cash);
   const shown = rows.slice(0, COMING_UP_ROWS);
   return (
-    <section
+    <Card
+      role="region"
       aria-labelledby="overview-coming-up"
       className={cn(cardClass, "[animation-delay:280ms]")}
     >
@@ -358,7 +366,7 @@ export function ComingUpCard({
         ) : null}
       </h2>
       {shown.length === 0 ? (
-        <p className="py-3 text-sm text-gray-600">
+        <p className="py-3 text-sm text-muted-foreground">
           Nothing else due in the next 30 days.
         </p>
       ) : (
@@ -368,15 +376,15 @@ export function ComingUpCard({
             return (
               <li
                 key={`${row.kind}:${row.id}:${row.dueOn}`}
-                className="not-first:border-t not-first:border-hairline"
+                className="not-first:border-t not-first:border-border"
               >
                 <Link
                   href={obligationHref(row)}
-                  className="-mx-2 grid grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-3 rounded-control px-2 py-3 text-inherit no-underline hover:bg-gray-50"
+                  className="-mx-2 grid grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-3 rounded-control px-2 py-3 text-inherit no-underline hover:bg-muted/60"
                 >
                   <span
                     aria-label={dayMonth(row.dueOn)}
-                    className="flex size-10 flex-col items-center justify-center rounded-control border border-gray-200 bg-gray-25 tabular-nums"
+                    className="flex size-10 flex-col items-center justify-center rounded-control border border-border bg-muted/40 tabular-nums"
                   >
                     <span
                       aria-hidden="true"
@@ -386,7 +394,7 @@ export function ComingUpCard({
                     </span>
                     <span
                       aria-hidden="true"
-                      className="text-[11px] leading-3 font-(--w-ui) tracking-[0.06em] text-gray-500 uppercase"
+                      className="text-[11px] leading-3 font-(--w-ui) tracking-[0.06em] text-muted-foreground uppercase"
                     >
                       {monthOfDay}
                     </span>
@@ -395,13 +403,13 @@ export function ComingUpCard({
                     <span className="block truncate text-sm leading-5 font-(--w-name)">
                       {row.name}
                     </span>
-                    <span className="block truncate text-xs leading-4 text-gray-500">
+                    <span className="block truncate text-xs leading-4 text-muted-foreground">
                       {obligationWhat(row)}
                     </span>
                   </span>
                   <span className="text-sm font-(--w-amount)">
                     {row.amountKes === null ? (
-                      <span className="font-normal text-gray-500">
+                      <span className="font-normal text-muted-foreground">
                         Not entered
                       </span>
                     ) : (
@@ -414,6 +422,6 @@ export function ComingUpCard({
           })}
         </ul>
       )}
-    </section>
+    </Card>
   );
 }

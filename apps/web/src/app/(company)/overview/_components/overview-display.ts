@@ -6,8 +6,8 @@ import type {
   SpendingOverview,
 } from "@expendi-business/shared";
 
+import { kesValue } from "~/lib/chart-scale";
 import { formatIsoDate } from "~/lib/dates";
-import { kesValue } from "../../reports/_components/viz/scale";
 
 /** "Good morning, Wanjiru" by the hour in Nairobi. */
 export function greeting(hour: number, fullName: string | null): string {

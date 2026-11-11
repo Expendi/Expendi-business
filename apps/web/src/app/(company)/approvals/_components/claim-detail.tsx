@@ -26,6 +26,7 @@ import {
   warningKey,
 } from "~/app/(company)/expenses/_components/expense-labels";
 import { ReceiptGallery } from "~/app/(company)/expenses/_components/receipt-gallery";
+import { EntityMark, RowCheckbox } from "~/components/data/cells";
 import {
   Callout,
   DetailItem,
@@ -35,7 +36,6 @@ import {
 import { Money } from "~/components/data/money";
 import { Skel } from "~/components/data/states";
 import { StatusBadge } from "~/components/data/status-badge";
-import { EntityMark, RowCheckbox } from "~/components/data/table";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import { useAuth } from "~/contexts/auth-context";
@@ -72,7 +72,7 @@ export function ClaimDetailBody({
           <h2 className="text-lg leading-[26px] font-(--w-title) [overflow-wrap:anywhere]">
             {claim.merchant}
           </h2>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             {claim.submittedBy.name
               ? `${claim.submittedBy.name} · ${claim.submittedBy.email}`
               : claim.submittedBy.email}
@@ -113,7 +113,7 @@ export function ClaimDetailBody({
             </Callout>
           ) : null}
           {claim.description ? (
-            <p className="whitespace-pre-wrap text-gray-700">
+            <p className="whitespace-pre-wrap text-secondary-foreground">
               {claim.description}
             </p>
           ) : null}
@@ -232,7 +232,7 @@ export function ClaimActions({
         Reject
       </Button>
       {canPay && !blocked ? (
-        <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+        <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
           <RowCheckbox
             checked={selected}
             disabled={busy || (!selected && selectionFull)}
@@ -303,7 +303,7 @@ export function RejectForm({
       aria-label={`Reject ${claim.merchant}`}
       className="flex w-full flex-col gap-2"
     >
-      <label htmlFor={`${id}-reason`} className="text-sm text-gray-900">
+      <label htmlFor={`${id}-reason`} className="text-sm text-foreground">
         Why are you rejecting it? They&apos;ll see this.
       </label>
       <Textarea
@@ -322,7 +322,7 @@ export function RejectForm({
       />
       <div
         id={`${id}-meta`}
-        className="flex justify-between gap-2 text-xs leading-4 text-gray-500"
+        className="flex justify-between gap-2 text-xs leading-4 text-muted-foreground"
       >
         <span>{firstName(claim.submittedBy)} gets this in the app.</span>
         <span className="tabular-nums">
@@ -332,7 +332,7 @@ export function RejectForm({
       {error ? (
         <p
           role="alert"
-          className="flex items-center gap-1.5 text-xs leading-4 text-error-700"
+          className="flex items-center gap-1.5 text-xs leading-4 text-destructive"
         >
           <CircleAlertIcon aria-hidden="true" className="size-3.5 shrink-0" />
           {error}

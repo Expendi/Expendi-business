@@ -32,11 +32,11 @@ export interface TipAnchor {
 }
 
 const KEY_CLASSES: Record<TipKey, string> = {
-  selected: "h-2.5 rounded-[2px] bg-brand-500",
-  context: "h-2.5 rounded-[2px] bg-gray-300",
-  line: "border-t-2 border-brand-700",
-  dash: "border-t-2 border-dashed border-gray-500",
-  tick: "mx-[5px] h-3 w-0.5! rounded-[1px] bg-gray-600",
+  selected: "h-2.5 rounded-[2px] bg-primary",
+  context: "h-2.5 rounded-[2px] bg-muted-foreground/40",
+  line: "border-t-2 border-primary",
+  dash: "border-t-2 border-dashed border-muted-foreground",
+  tick: "mx-[5px] h-3 w-0.5! rounded-[1px] bg-muted-foreground",
   none: "",
 };
 
@@ -79,9 +79,9 @@ export function ChartTip({
           ? { left: place.left, top: place.top }
           : { left: 0, top: 0, visibility: "hidden" }
       }
-      className="pointer-events-none fixed z-60 min-w-42 rounded-control border border-gray-200 bg-surface px-2.5 py-2 text-xs leading-4 shadow-[0_12px_32px_-12px_rgb(16_24_40/0.22)]"
+      className="pointer-events-none fixed z-60 min-w-42 rounded-control border border-border bg-card px-2.5 py-2 text-xs leading-4 shadow-[0_12px_32px_-12px_rgb(16_24_40/0.22)]"
     >
-      <div className="mb-1.5 text-gray-500">{content.head}</div>
+      <div className="mb-1.5 text-muted-foreground">{content.head}</div>
       {content.rows.map((row) => (
         <div
           key={`${row.label}:${row.value}`}
@@ -91,14 +91,14 @@ export function ChartTip({
             aria-hidden="true"
             className={cn("w-3 flex-none", KEY_CLASSES[row.key ?? "none"])}
           />
-          <strong className="text-sm font-(--w-strong) text-gray-900 tabular-nums">
+          <strong className="text-sm font-(--w-strong) text-foreground tabular-nums">
             {row.value}
           </strong>
-          <span className="text-gray-500">{row.label}</span>
+          <span className="text-muted-foreground">{row.label}</span>
         </div>
       ))}
       {content.foot ? (
-        <div className="mt-1.5 border-t border-hairline pt-1.5 text-gray-600">
+        <div className="mt-1.5 border-t border-border pt-1.5 text-muted-foreground">
           {content.foot}
         </div>
       ) : null}

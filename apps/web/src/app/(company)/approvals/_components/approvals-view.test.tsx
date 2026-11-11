@@ -188,7 +188,7 @@ describe("the approval queue", () => {
       duplicateWarning: true,
       submittedBy: true,
       selectAll: true,
-      checkboxes: 3,
+      checkboxes: 4,
       approve: true,
       reject: true,
       addToSelection: true,

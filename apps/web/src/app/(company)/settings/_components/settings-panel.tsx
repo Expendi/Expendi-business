@@ -1,13 +1,19 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import type { JSX, MouseEvent, ReactNode } from "react";
-import { cn } from "cn";
+import type { JSX, ReactNode } from "react";
 import { PencilIcon } from "lucide-react";
 import { useState } from "react";
 
 import { ErrorState, Skel } from "~/components/data/states";
 import { Button } from "~/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 
 /**
  * One settings section: a panel with a title, a line of help, actions on
@@ -30,36 +36,38 @@ export function SettingsPanel({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <section
+    <Card
       id={id}
       aria-labelledby={`${id}-title`}
       aria-busy={busy || undefined}
-      className="@container/panel scroll-mt-6 overflow-clip rounded-panel border border-gray-200 bg-surface shadow-panel max-[900px]:scroll-mt-32 @max-[760px]/settings:scroll-mt-18"
+      className="@container/panel scroll-mt-6 gap-0 overflow-clip py-0 shadow-xs max-[900px]:scroll-mt-32 @max-[760px]/settings:scroll-mt-18"
     >
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 px-5 pt-5 pb-4 @max-[520px]/panel:px-4">
-        <div className="min-w-0 flex-[1_1_320px]">
+      <CardHeader className="gap-y-1 px-5 pt-5 pb-4 @max-[520px]/panel:px-4">
+        <CardTitle>
           <h2
             id={`${id}-title`}
             tabIndex={-1}
-            className="w-fit rounded-[4px] text-lg leading-[26px] font-(--w-title)"
+            className="w-fit rounded-[4px] outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             {title}
           </h2>
-          {sub ? (
-            <p className="mt-1 max-w-[70ch] text-gray-600">{sub}</p>
-          ) : null}
-        </div>
-        {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
-      </div>
+        </CardTitle>
+        {sub ? (
+          <CardDescription className="max-w-[70ch]">{sub}</CardDescription>
+        ) : null}
+        {actions ? (
+          <CardAction className="flex flex-wrap gap-2">{actions}</CardAction>
+        ) : null}
+      </CardHeader>
       {children}
-    </section>
+    </Card>
   );
 }
 
 /** Label and value rows, 180px labels; one column in a narrow panel. */
 export function KeyValues({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <dl className="m-0 divide-y divide-hairline border-t border-gray-200">
+    <dl className="m-0 divide-y divide-border border-t border-border">
       {children}
     </dl>
   );
@@ -74,7 +82,7 @@ export function KeyValue({
 }): JSX.Element {
   return (
     <div className="grid grid-cols-[180px_minmax(0,1fr)] gap-x-4 gap-y-0.5 px-5 py-3.5 @max-[520px]/panel:grid-cols-[minmax(0,1fr)] @max-[520px]/panel:px-4">
-      <dt className="text-gray-500">{label}</dt>
+      <dt className="text-muted-foreground">{label}</dt>
       <dd className="m-0 min-w-0 [overflow-wrap:anywhere] tabular-nums">
         {children}
       </dd>
@@ -91,72 +99,13 @@ export function PanelFoot({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <p className="m-0 flex items-start gap-2 border-t border-gray-200 bg-gray-25 px-5 py-3 text-gray-600 @max-[520px]/panel:px-4">
+    <p className="m-0 flex items-start gap-2 border-t border-border bg-muted/40 px-5 py-3 text-muted-foreground @max-[520px]/panel:px-4">
       <Icon
         aria-hidden="true"
-        className="mt-0.5 size-4 shrink-0 text-gray-500"
+        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
       />
       <span className="min-w-0">{children}</span>
     </p>
-  );
-}
-
-/** A panel's rows, e.g. its categories. */
-export function SettingsList({
-  id,
-  label,
-  compact = false,
-  children,
-}: {
-  id?: string;
-  label: string;
-  compact?: boolean;
-  children: ReactNode;
-}): JSX.Element {
-  return (
-    <ul
-      id={id}
-      aria-label={label}
-      data-compact={compact || undefined}
-      className="group/list m-0 list-none divide-y divide-row-divider p-0"
-    >
-      {children}
-    </ul>
-  );
-}
-
-function isInsideControl(target: EventTarget): boolean {
-  return target instanceof Element && target.closest("button, a") !== null;
-}
-
-/**
- * A row; when it can be edited, a click anywhere opens its form, and the
- * row's own Edit button is the keyboard way in.
- */
-export function SettingsRow({
-  open = false,
-  onOpen,
-  children,
-}: {
-  open?: boolean;
-  onOpen?: () => void;
-  children: ReactNode;
-}): JSX.Element {
-  return (
-    <li
-      onClick={(event: MouseEvent<HTMLLIElement>) => {
-        if (onOpen && !isInsideControl(event.target)) onOpen();
-      }}
-      className={cn(
-        "flex min-h-15 items-center gap-3 py-2.5 pr-3 pl-5 group-data-[compact=true]/list:min-h-13 group-data-[compact=true]/list:py-2 @max-[520px]/panel:pl-4",
-        onOpen && "cursor-pointer transition-colors duration-150",
-        open
-          ? "bg-gray-50 shadow-[inset_3px_0_0_var(--color-gray-900)]"
-          : onOpen && "hover:bg-gray-25",
-      )}
-    >
-      {children}
-    </li>
   );
 }
 
@@ -191,7 +140,7 @@ export function RowButton({
 /** A small outlined label after a row's name, e.g. "No invoice expected". */
 export function Tag({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <span className="inline-flex h-[22px] flex-none items-center rounded-full border border-gray-200 px-2 text-xs whitespace-nowrap text-gray-600">
+    <span className="inline-flex h-[22px] flex-none items-center rounded-full border border-border px-2 text-xs whitespace-nowrap text-muted-foreground">
       {children}
     </span>
   );
@@ -206,7 +155,7 @@ export function PanelEmpty({
   action?: ReactNode;
 }): JSX.Element {
   return (
-    <div className="mx-5 mt-4 mb-5 flex flex-col items-center gap-3 rounded-control border border-dashed border-control-border px-4 py-6 text-center text-gray-600">
+    <div className="mx-5 mt-4 mb-5 flex flex-col items-center gap-3 rounded-control border border-dashed border-input px-4 py-6 text-center text-muted-foreground">
       <p className="m-0">{children}</p>
       {action}
     </div>
@@ -224,7 +173,7 @@ export function PanelSkeleton({ lines }: { lines: number }): JSX.Element {
   return (
     <div
       aria-hidden="true"
-      className="divide-y divide-hairline border-t border-gray-200"
+      className="divide-y divide-border border-t border-border"
     >
       {Array.from({ length: lines }, (_, line) => {
         const [label, value] = SKELETON_WIDTHS[
@@ -251,7 +200,7 @@ export function PanelError({
   onRetry: () => void;
 }): JSX.Element {
   return (
-    <div className="border-t border-gray-200 [&>div]:py-8">
+    <div className="border-t border-border [&>div]:py-8">
       <ErrorState title={title} onRetry={onRetry}>
         {message}
       </ErrorState>

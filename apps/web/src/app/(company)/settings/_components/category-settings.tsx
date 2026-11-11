@@ -1,8 +1,8 @@
 "use client";
 
 import type { FormEvent, JSX } from "react";
-import { ArchiveIcon, ArchiveRestoreIcon, PlusIcon } from "lucide-react";
-import { useId, useState } from "react";
+import { ArchiveIcon, PlusIcon } from "lucide-react";
+import { useId, useMemo, useState } from "react";
 
 import type { Category } from "@expendi-business/shared";
 import {
@@ -10,17 +10,18 @@ import {
   createCategoryRequestSchema,
 } from "@expendi-business/shared";
 
+import { RowCheckbox } from "~/components/data/cells";
 import {
   Callout,
   DetailSheet,
   SheetActions,
 } from "~/components/data/detail-sheet";
 import { KindTabs } from "~/components/data/kind-tabs";
-import { RowCheckbox } from "~/components/data/table";
 import { Button } from "~/components/ui/button";
 import { Field, FieldError, FieldLabel } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { describeApiError } from "~/lib/api";
+import { categoryColumns } from "./columns";
 import {
   useActiveCategories,
   useArchivedCategories,
@@ -30,17 +31,12 @@ import {
   PanelEmpty,
   PanelError,
   PanelSkeleton,
-  RowButton,
   sameName,
-  SettingsList,
   SettingsPanel,
-  SettingsRow,
-  Tag,
   tidy,
   useSheetForm,
 } from "./settings-panel";
-
-export const NO_INVOICE_EXPECTED = "No invoice expected";
+import { SettingsTable } from "./settings-table";
 
 const CATEGORIES_SUB =
   "A category marked “no invoice expected” (e.g. air tickets, bank charges) records new spending in it as not needing an eTIMS invoice. An archived category can't be picked for new spending; what already has it keeps it.";
@@ -95,6 +91,20 @@ export function CategorySettings({
   );
 
   const list = tab === "archived" ? old : inUse;
+  const editable = canAct && tab === "active";
+  const columns = useMemo(
+    () =>
+      categoryColumns({
+        editable,
+        canAct,
+        restoringId,
+        restoreDisabled: restore.isPending,
+        onEdit: onOpen,
+        onRestore: (categoryId) =>
+          restore.mutate({ kind: "restore", categoryId }),
+      }),
+    [editable, canAct, restoringId, restore, onOpen],
+  );
 
   return (
     <SettingsPanel
@@ -160,59 +170,20 @@ export function CategorySettings({
             </div>
           ) : (
             <div id="categories-list" role="tabpanel">
-              <SettingsList
-                label={
+              <SettingsTable
+                caption={
                   tab === "archived"
                     ? "Archived categories"
                     : "Categories in use"
                 }
-                compact
-              >
-                {list.map((category) => {
-                  const editable = canAct && tab === "active";
-                  return (
-                    <SettingsRow
-                      key={category.id}
-                      open={editable && category.id === openId}
-                      onOpen={editable ? () => onOpen(category.id) : undefined}
-                    >
-                      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="min-w-0 truncate font-(--w-name)">
-                          {category.name}
-                        </span>
-                        {category.etimsNotRequired ? (
-                          <Tag>{NO_INVOICE_EXPECTED}</Tag>
-                        ) : null}
-                      </span>
-                      {editable ? (
-                        <RowButton
-                          label={`Edit ${category.name}`}
-                          aria-haspopup="dialog"
-                          onClick={() => onOpen(category.id)}
-                        >
-                          Edit
-                        </RowButton>
-                      ) : canAct ? (
-                        <RowButton
-                          icon={ArchiveRestoreIcon}
-                          label={`Restore ${category.name}`}
-                          disabled={restore.isPending}
-                          onClick={() =>
-                            restore.mutate({
-                              kind: "restore",
-                              categoryId: category.id,
-                            })
-                          }
-                        >
-                          {restoringId === category.id
-                            ? "Restoring…"
-                            : "Restore"}
-                        </RowButton>
-                      ) : null}
-                    </SettingsRow>
-                  );
-                })}
-              </SettingsList>
+                data={list}
+                columns={columns}
+                getRowId={(category) => category.id}
+                openId={openId}
+                onOpen={
+                  editable ? (category) => onOpen(category.id) : undefined
+                }
+              />
             </div>
           )}
         </>
@@ -461,10 +432,10 @@ function CategorySheet({
             }}
           />
           <span>
-            <span className="block text-sm font-(--w-ui) text-gray-900">
+            <span className="block text-sm font-(--w-ui) text-foreground">
               No eTIMS invoice expected
             </span>
-            <span className="block text-xs leading-4 text-gray-500">
+            <span className="block text-xs leading-4 text-muted-foreground">
               {subject
                 ? "e.g. air tickets, bank charges. Changing this applies to new spending; what's already recorded keeps its eTIMS status."
                 : "e.g. air tickets, bank charges. New spending in it is recorded as not needing an eTIMS invoice."}

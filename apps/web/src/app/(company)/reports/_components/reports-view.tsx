@@ -11,9 +11,9 @@ import type {
   ChangeContext,
   ExportSortKey,
 } from "./reports-display";
-import type { SortState } from "~/components/data/table";
+import type { SortState } from "~/components/data/data-table";
+import { nextSort } from "~/components/data/data-table";
 import { PageHeader } from "~/components/data/page-header";
-import { nextSort } from "~/components/data/table";
 import { useDeepLinkParam } from "~/components/data/use-deep-link-param";
 import { useDashboard } from "~/contexts/dashboard-context";
 import { useKesRate } from "~/features/bills/bills-api";
@@ -89,11 +89,13 @@ function Section({
         <div className="min-w-0">
           <h2
             id={id}
-            className="text-2xl leading-8 font-(--w-heading) tracking-[-0.02em] text-gray-900"
+            className="text-2xl leading-8 font-(--w-heading) tracking-[-0.02em] text-foreground"
           >
             {title}
           </h2>
-          <p className="mt-1 max-w-[70ch] text-sm text-gray-600">{sub}</p>
+          <p className="mt-1 max-w-[70ch] text-sm text-muted-foreground">
+            {sub}
+          </p>
         </div>
         {action}
       </div>
@@ -245,7 +247,7 @@ function CompanyReports({
             )
           }
           openCategoryId={categoryParam}
-          onOpenCategory={(id) => setCategoryParam(id)}
+          onOpenCategory={setCategoryParam}
         />
       </Section>
 
@@ -266,7 +268,7 @@ function CompanyReports({
           now={now}
           canAct={canAct}
           openId={exportParam}
-          onOpen={(id) => setExportParam(id)}
+          onOpen={setExportParam}
         />
       </Section>
 

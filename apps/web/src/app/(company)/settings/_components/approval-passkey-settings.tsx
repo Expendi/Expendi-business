@@ -92,11 +92,11 @@ export function ApprovalPasskeySettings(): JSX.Element {
           {enrol.data === "cancelled" ? (
             <p
               role="status"
-              className="m-0 flex items-start gap-2 px-5 pb-4 text-gray-600"
+              className="m-0 flex items-start gap-2 px-5 pb-4 text-muted-foreground"
             >
               <InfoIcon
                 aria-hidden="true"
-                className="mt-0.5 size-4 shrink-0 text-gray-500"
+                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
               />
               Cancelled. No passkey was set up.
             </p>

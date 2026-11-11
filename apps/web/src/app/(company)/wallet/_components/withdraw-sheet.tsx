@@ -173,7 +173,7 @@ export function WithdrawSheet({
     );
   } else if (list.length === 0) {
     body = (
-      <p className="rounded-control border border-dashed border-control-border p-4 text-center text-sm text-gray-600">
+      <p className="rounded-control border border-dashed border-input p-4 text-center text-sm text-muted-foreground">
         Withdrawals go only to addresses on the company&apos;s allowlist. Add
         one first.
       </p>
@@ -233,7 +233,7 @@ export function WithdrawSheet({
     headerExtra = (
       <p className="mt-1 text-2xl leading-8 font-(--w-heading) tracking-[-0.02em] tabular-nums">
         {formatUsdc(draft.amountUsdc)}{" "}
-        <span className="text-[0.6em] font-(--w-ui) tracking-[0.04em] text-gray-500">
+        <span className="text-[0.6em] font-(--w-ui) tracking-[0.04em] text-muted-foreground">
           USDC
         </span>
       </p>
@@ -249,17 +249,17 @@ export function WithdrawSheet({
           {kes ? <DetailItem label="About">KES {kes}</DetailItem> : null}
           <DetailItem label="Left after">{formatUsdc(left)} USDC</DetailItem>
         </DetailList>
-        <p className="flex items-start gap-2 text-sm text-gray-600">
+        <p className="flex items-start gap-2 text-sm text-muted-foreground">
           <InfoIcon
             aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-gray-500"
+            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
           />
           Expendi pays the gas, so exactly this amount arrives. Your browser
           asks for your approval passkey. To use the one on your phone, choose
           “use a phone or tablet”.
         </p>
         {withdraw.data?.status === "cancelled" ? (
-          <p role="status" className="text-sm text-gray-600">
+          <p role="status" className="text-sm text-muted-foreground">
             Cancelled. Nothing was sent.
           </p>
         ) : null}
@@ -322,14 +322,14 @@ export function WithdrawSheet({
           {formatUsdc(step.withdrawal.amountUsdc)} USDC to{" "}
           {step.withdrawal.label}
         </p>
-        <p className="max-w-[34ch] text-gray-600">{result.body}</p>
+        <p className="max-w-[34ch] text-muted-foreground">{result.body}</p>
         {step.withdrawal.failureReason ? (
-          <p className="max-w-[34ch] text-gray-600">
+          <p className="max-w-[34ch] text-muted-foreground">
             {step.withdrawal.failureReason}
           </p>
         ) : null}
         {step.withdrawal.txHash ? (
-          <p className="text-xs text-gray-500 tabular-nums">
+          <p className="text-xs text-muted-foreground tabular-nums">
             {shortAddress(step.withdrawal.txHash)}
           </p>
         ) : null}
@@ -383,7 +383,9 @@ function passkeyGate(
 ): ReactNode {
   if (status.isPending) {
     return (
-      <p className="text-sm text-gray-500">Checking your approval passkey…</p>
+      <p className="text-sm text-muted-foreground">
+        Checking your approval passkey…
+      </p>
     );
   }
   if (status.isError) {
@@ -451,13 +453,13 @@ function WithdrawForm({
       className="flex flex-col gap-5"
     >
       <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
-        <legend className="mb-2 p-0 text-xs leading-4 font-(--w-ui) text-gray-600">
+        <legend className="mb-2 p-0 text-xs leading-4 font-(--w-ui) text-muted-foreground">
           Send to
         </legend>
         {addresses.map((address) => (
           <label
             key={address.id}
-            className="relative grid cursor-pointer grid-cols-[32px_minmax(0,1fr)] items-center gap-3 rounded-control border border-gray-200 p-3 transition-colors duration-150 hover:border-gray-400 has-checked:border-brand-700 has-checked:bg-brand-50 has-checked:shadow-[inset_0_0_0_1px_var(--color-brand-700)] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-brand-700"
+            className="relative grid cursor-pointer grid-cols-[32px_minmax(0,1fr)] items-center gap-3 rounded-control border border-border p-3 transition-colors duration-150 hover:border-muted-foreground/50 has-checked:border-primary has-checked:bg-accent has-checked:shadow-[inset_0_0_0_1px_var(--primary)] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring"
           >
             <input
               type="radio"
@@ -469,7 +471,7 @@ function WithdrawForm({
             />
             <span
               aria-hidden="true"
-              className="inline-flex size-8 items-center justify-center rounded-control border border-gray-200 bg-surface text-gray-600"
+              className="inline-flex size-8 items-center justify-center rounded-control border border-border bg-card text-muted-foreground"
             >
               <LandmarkIcon className="size-4" />
             </span>
@@ -477,7 +479,7 @@ function WithdrawForm({
               <span className="block truncate text-sm leading-5 font-(--w-name)">
                 {address.label}
               </span>
-              <span className="block text-xs leading-4 text-gray-500 tabular-nums">
+              <span className="block text-xs leading-4 text-muted-foreground tabular-nums">
                 {shortAddress(address.address)}
               </span>
             </span>
@@ -487,14 +489,14 @@ function WithdrawForm({
       <div className="flex flex-col gap-2">
         <label
           htmlFor={amountId}
-          className="text-xs leading-4 font-(--w-ui) text-gray-600"
+          className="text-xs leading-4 font-(--w-ui) text-muted-foreground"
         >
           Amount
         </label>
         <div
           className={cn(
-            "flex h-14 items-center gap-2 rounded-control border bg-surface pr-2 pl-3.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-700",
-            error ? "border-error-700" : "border-control-border",
+            "flex h-14 items-center gap-2 rounded-control border bg-card pr-2 pl-3.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring",
+            error ? "border-destructive" : "border-input",
           )}
         >
           <input
@@ -507,9 +509,9 @@ function WithdrawForm({
             onChange={(event) => onAmount(event.target.value)}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? `${helpId} ${errorId}` : helpId}
-            className="min-w-0 flex-1 border-0 bg-transparent text-2xl leading-8 font-(--w-heading) tabular-nums outline-none placeholder:text-gray-300"
+            className="min-w-0 flex-1 border-0 bg-transparent text-2xl leading-8 font-(--w-heading) tabular-nums outline-none placeholder:text-muted-foreground/50"
           />
-          <span className="text-sm font-(--w-ui) tracking-[0.04em] text-gray-500">
+          <span className="text-sm font-(--w-ui) tracking-[0.04em] text-muted-foreground">
             USDC
           </span>
           <Button
@@ -523,7 +525,7 @@ function WithdrawForm({
         </div>
         <p
           id={helpId}
-          className="flex justify-between gap-2 text-xs leading-4 text-gray-500 tabular-nums"
+          className="flex justify-between gap-2 text-xs leading-4 text-muted-foreground tabular-nums"
         >
           <span>Available: {formatUsdc(balance)} USDC</span>
           {estimate ? <span>≈ KES {estimate}</span> : null}
@@ -532,7 +534,7 @@ function WithdrawForm({
           <p
             id={errorId}
             role="alert"
-            className="flex items-center gap-1.5 text-xs leading-4 text-error-700"
+            className="flex items-center gap-1.5 text-xs leading-4 text-destructive"
           >
             <CircleAlertIcon aria-hidden="true" className="size-3.5" />
             {error}

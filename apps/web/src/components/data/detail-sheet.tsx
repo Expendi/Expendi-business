@@ -140,14 +140,16 @@ export function DetailSheet({
           if (!dismissible) event.preventDefault();
         }}
         overlayClassName="bg-scrim duration-200 supports-backdrop-filter:backdrop-blur-none"
-        className="gap-0 bg-surface p-0 text-sm text-gray-900 shadow-[var(--shadow-sheet)] outline-none data-[side=right]:w-[min(560px,100%)] data-[side=right]:border-l-0 data-[side=right]:sm:max-w-none data-closed:duration-100 data-open:duration-[320ms] data-open:ease-out-expo data-[side=right]:data-open:slide-in-from-right-6"
+        className="gap-0 bg-card p-0 text-sm text-foreground shadow-[var(--shadow-sheet)] outline-none data-[side=right]:w-[min(560px,100%)] data-[side=right]:border-l-0 data-[side=right]:sm:max-w-none data-closed:duration-100 data-open:duration-[320ms] data-open:ease-out-expo data-[side=right]:data-open:slide-in-from-right-6"
       >
-        <div className="flex items-start gap-2 border-b border-gray-200 pt-5 pr-4 pb-[18px] pl-6 max-[600px]:pl-4">
+        <div className="flex items-start gap-2 border-b border-border pt-5 pr-4 pb-[18px] pl-6 max-[600px]:pl-4">
           <div className="min-w-0 flex-1">
             {eyebrow ? (
-              <p className="text-xs leading-4 text-gray-500">{eyebrow}</p>
+              <p className="text-xs leading-4 text-muted-foreground">
+                {eyebrow}
+              </p>
             ) : null}
-            <SheetTitle className="mt-0.5 text-lg leading-[26px] font-(--w-title) [overflow-wrap:anywhere] text-gray-900">
+            <SheetTitle className="mt-0.5 text-lg leading-[26px] font-(--w-title) [overflow-wrap:anywhere] text-foreground">
               {title}
             </SheetTitle>
             {headerExtra}
@@ -192,7 +194,7 @@ export function DetailSheet({
           {children}
         </div>
         {footer ? (
-          <div className="flex flex-wrap items-center gap-2 border-t border-gray-200 px-6 py-3.5 text-xs text-gray-600 max-[600px]:px-4">
+          <div className="flex flex-wrap items-center gap-2 border-t border-border px-6 py-3.5 text-xs text-muted-foreground max-[600px]:px-4">
             {footer}
           </div>
         ) : null}
@@ -211,7 +213,7 @@ export function SheetPosition({
 }): JSX.Element | null {
   if (index < 0) return null;
   return (
-    <span className="ml-auto text-xs text-gray-500 tabular-nums">
+    <span className="ml-auto text-xs text-muted-foreground tabular-nums">
       {index + 1} of {total}
     </span>
   );
@@ -251,7 +253,7 @@ export function ReadOnlyNote({
   return (
     <p
       className={cn(
-        "flex items-center gap-2 text-gray-500",
+        "flex items-center gap-2 text-muted-foreground",
         wide ? "basis-full text-xs" : "text-sm",
       )}
     >
@@ -297,11 +299,13 @@ export function DetailItem({
 }): JSX.Element {
   return (
     <div className="grid grid-cols-[var(--detail-label,9rem)_minmax(0,1fr)] gap-3 border-t border-hairline py-[9px] first:border-t-0 first:pt-0 max-[600px]:grid-cols-[minmax(0,1fr)] max-[600px]:gap-0.5">
-      <dt className="text-gray-500">{label}</dt>
+      <dt className="text-muted-foreground">{label}</dt>
       <dd className="[overflow-wrap:anywhere] tabular-nums">
         {children}
         {sub ? (
-          <span className="block text-xs leading-4 text-gray-500">{sub}</span>
+          <span className="block text-xs leading-4 text-muted-foreground">
+            {sub}
+          </span>
         ) : null}
       </dd>
     </div>
@@ -314,7 +318,9 @@ export function SectionLabel({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <p className="text-xs leading-4 font-(--w-ui) text-gray-500">{children}</p>
+    <p className="text-xs leading-4 font-(--w-ui) text-muted-foreground">
+      {children}
+    </p>
   );
 }
 
@@ -323,7 +329,7 @@ export type CalloutTone = "warn" | "error" | "neutral" | "success";
 const CALLOUT_TONES: Record<CalloutTone, string> = {
   warn: "bg-warn-50 text-warn-700",
   error: "bg-error-50 text-error-700",
-  neutral: "bg-gray-100 text-gray-700",
+  neutral: "bg-muted text-secondary-foreground",
   success: "bg-success-50 text-success-700",
 };
 

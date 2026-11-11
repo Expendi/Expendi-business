@@ -88,7 +88,7 @@ export function BillFilesInput({
 
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <span className="text-xs leading-4 font-(--w-ui) text-gray-600">
+      <span className="text-xs leading-4 font-(--w-ui) text-muted-foreground">
         {label}
       </span>
       <input
@@ -109,9 +109,9 @@ export function BillFilesInput({
         onDragOver={(event) => event.preventDefault()}
         onDrop={onDrop}
         className={cn(
-          "flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-control border border-dashed border-control-border bg-gray-50 p-3 text-center text-gray-600 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--focus-ring) hover:border-gray-400 hover:text-gray-900",
+          "flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-control border border-dashed border-input bg-muted/60 p-3 text-center text-muted-foreground peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--focus-ring) hover:border-muted-foreground/50 hover:text-foreground",
           blocked &&
-            "cursor-not-allowed opacity-50 hover:border-control-border hover:text-gray-600",
+            "cursor-not-allowed opacity-50 hover:border-input hover:text-muted-foreground",
         )}
       >
         <UploadIcon aria-hidden="true" className="size-4" />
@@ -125,11 +125,11 @@ export function BillFilesInput({
           {files.map((file) => (
             <li
               key={file.id}
-              className="flex items-center gap-2 rounded-control border border-gray-200 px-2.5 py-2"
+              className="flex items-center gap-2 rounded-control border border-border px-2.5 py-2"
             >
               <PaperclipIcon
                 aria-hidden="true"
-                className="size-3.5 shrink-0 text-gray-500"
+                className="size-3.5 shrink-0 text-muted-foreground"
               />
               <span className="min-w-0 flex-1 truncate">{file.name}</span>
               <TextLinkButton

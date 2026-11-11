@@ -52,15 +52,3 @@ export function percentChange(
   if (change === 0) return "Same";
   return `${change > 0 ? "+" : "−"}${String(Math.abs(change))}%`;
 }
-
-/** The path of a column with 4px rounded top corners and a square base. */
-export function columnPath(
-  x: number,
-  top: number,
-  width: number,
-  height: number,
-): string {
-  const radius = Math.min(4, width / 2, height);
-  const base = top + height;
-  return `M${x} ${base}V${top + radius}Q${x} ${top} ${x + radius} ${top}H${x + width - radius}Q${x + width} ${top} ${x + width} ${top + radius}V${base}Z`;
-}

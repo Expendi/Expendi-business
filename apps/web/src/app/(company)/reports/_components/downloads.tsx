@@ -28,8 +28,8 @@ import { reportFilename } from "@expendi-business/shared";
 import type { ReportRequest } from "./reports-api";
 import type { FactIcon } from "./reports-display";
 import { TextLinkButton } from "~/components/data/actions";
+import { Mini } from "~/components/data/cells";
 import { Callout } from "~/components/data/detail-sheet";
-import { Mini } from "~/components/data/table";
 import { Button } from "~/components/ui/button";
 import { describeApiError } from "~/lib/api";
 import {
@@ -126,7 +126,7 @@ export function DownloadFeedback({
     return (
       <p
         role="status"
-        className="flex items-center gap-2 text-sm text-gray-600"
+        className="flex items-center gap-2 text-sm text-muted-foreground"
       >
         <CircleCheckIcon
           aria-hidden="true"
@@ -167,7 +167,7 @@ export function DownloadsPanel({
     data !== null && data.moneyOut.rows === 0 && data.outstanding.rows === 0;
   const feedback = <DownloadFeedback download={download} month={month} />;
   return (
-    <div className="mt-4 overflow-clip rounded-panel border border-gray-200 bg-surface text-sm shadow-panel">
+    <div className="mt-4 overflow-clip rounded-xl border border-border bg-card text-sm shadow-xs">
       {data && (partial || empty) ? (
         <div className="flex flex-col gap-3 px-5 pt-4 max-[600px]:px-4">
           {partial ? (
@@ -202,21 +202,21 @@ export function DownloadsPanel({
             <li
               key={format}
               data-format={format}
-              className="grid grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-row-divider px-5 py-4 max-[600px]:grid-cols-[40px_minmax(0,1fr)] max-[600px]:px-4 max-[600px]:py-3.5"
+              className="grid grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-border px-5 py-4 max-[600px]:grid-cols-[40px_minmax(0,1fr)] max-[600px]:px-4 max-[600px]:py-3.5"
             >
               <span
                 aria-hidden="true"
-                className="inline-flex size-10 items-center justify-center self-start rounded-control border border-gray-200 bg-gray-25 text-gray-600"
+                className="inline-flex size-10 items-center justify-center self-start rounded-control border border-border bg-muted/40 text-muted-foreground"
               >
                 <Icon className="size-5" />
               </span>
               <div className="min-w-0">
-                <h3 className="text-base leading-6 font-(--w-name) text-gray-900">
+                <h3 className="text-base leading-6 font-(--w-name) text-foreground">
                   {title}
                 </h3>
-                <p className="text-gray-600">{detail}</p>
+                <p className="text-muted-foreground">{detail}</p>
                 <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="text-xs leading-4 [overflow-wrap:anywhere] text-gray-500">
+                  <span className="text-xs leading-4 [overflow-wrap:anywhere] text-muted-foreground">
                     {reportFilename(month, format)}
                   </span>
                   {data
@@ -254,7 +254,7 @@ export function DownloadsPanel({
       </ul>
       {download.variables?.month === month &&
       (download.isError || download.isSuccess) ? (
-        <div className="border-b border-row-divider px-5 py-3 max-[600px]:px-4">
+        <div className="border-b border-border px-5 py-3 max-[600px]:px-4">
           {feedback}
         </div>
       ) : null}
@@ -267,10 +267,10 @@ export function DownloadsPanel({
           disabled={summary.isPending}
         />
       ) : (
-        <p className="flex items-start gap-2 px-5 pt-3.5 pb-4 text-gray-600 max-[600px]:px-4">
+        <p className="flex items-start gap-2 px-5 pt-3.5 pb-4 text-muted-foreground max-[600px]:px-4">
           <MailIcon
             aria-hidden="true"
-            className="mt-0.5 size-4 text-gray-500"
+            className="mt-0.5 size-4 text-muted-foreground"
           />
           You also get last month&apos;s export by email on the 1st, with links
           that work for 30 days.
@@ -298,10 +298,10 @@ function ShareExport({
     <div className="px-5 pt-[18px] pb-5 max-[600px]:px-4">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-[1_1_360px]">
-          <h3 className="text-base leading-6 font-(--w-title) text-gray-900">
+          <h3 className="text-base leading-6 font-(--w-title) text-foreground">
             Share an export
           </h3>
-          <p className="mt-0.5 max-w-[72ch] text-gray-600">
+          <p className="mt-0.5 max-w-[72ch] text-muted-foreground">
             Makes the month&apos;s export with links that open for 30 days
             without signing in, for an accountant without a login. Accountants
             on the team also get last month&apos;s by email on the 1st.
@@ -355,24 +355,24 @@ function SharedLinks({
     [EXPORT_FILE_LABELS.receipts, exported.links.receipts],
   ] as const;
   return (
-    <div className="mt-4 rounded-control border border-gray-200 bg-gray-50 px-4 py-3.5">
-      <p className="font-(--w-title) text-gray-900">
+    <div className="mt-4 rounded-control border border-border bg-muted/60 px-4 py-3.5">
+      <p className="font-(--w-title) text-foreground">
         {monthLabel(exported.month)} export
       </p>
       <ul className="mt-2 flex list-none flex-col gap-1.5 p-0">
         {links.map(([label, href]) => (
           <li key={label} className="min-w-0">
-            <span className="text-gray-600">{label}: </span>
+            <span className="text-muted-foreground">{label}: </span>
             <a
               href={href}
-              className="text-xs leading-4 [overflow-wrap:anywhere] text-brand-800 underline decoration-brand-100 underline-offset-3 hover:decoration-current"
+              className="text-xs leading-4 [overflow-wrap:anywhere] text-accent-foreground underline decoration-accent underline-offset-3 hover:decoration-current"
             >
               {href}
             </a>
           </li>
         ))}
       </ul>
-      <p className="mt-2.5 text-gray-600">
+      <p className="mt-2.5 text-muted-foreground">
         These links work until {expiryLabel(exported.expiresAt)}. They&apos;re
         shown only now, so copy them before you leave.
       </p>
@@ -405,7 +405,9 @@ function CopyLinks({ text }: { text: string }): JSX.Element {
       </Button>
       <span
         role="status"
-        className={state === "failed" ? "text-error-700" : "text-gray-600"}
+        className={
+          state === "failed" ? "text-destructive" : "text-muted-foreground"
+        }
       >
         {state === "copied"
           ? "Copied"

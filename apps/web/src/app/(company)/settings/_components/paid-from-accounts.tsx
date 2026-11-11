@@ -1,17 +1,8 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
 import type { FormEvent, JSX } from "react";
-import {
-  ArchiveIcon,
-  BanknoteIcon,
-  CreditCardIcon,
-  LandmarkIcon,
-  PlusIcon,
-  SmartphoneIcon,
-  WalletIcon,
-} from "lucide-react";
-import { useId, useState } from "react";
+import { ArchiveIcon, PlusIcon } from "lucide-react";
+import { useId, useMemo, useState } from "react";
 
 import type {
   PaidFromAccount,
@@ -43,6 +34,7 @@ import {
   NativeSelectOption,
 } from "~/components/ui/native-select";
 import { describeApiError } from "~/lib/api";
+import { ACCOUNT_KIND_LABELS, accountColumns } from "./columns";
 import {
   useArchivedPaidFromAccounts,
   useChangePaidFromAccount,
@@ -52,30 +44,12 @@ import {
   PanelEmpty,
   PanelError,
   PanelSkeleton,
-  RowButton,
   sameName,
-  SettingsList,
   SettingsPanel,
-  SettingsRow,
   tidy,
   useSheetForm,
 } from "./settings-panel";
-
-export const ACCOUNT_KIND_LABELS: Record<PaidFromAccountKind, string> = {
-  bank: "Bank account",
-  card: "Card",
-  mobile_money: "Mobile money",
-  cash: "Cash",
-  other: "Other",
-};
-
-const KIND_ICONS: Record<PaidFromAccountKind, LucideIcon> = {
-  bank: LandmarkIcon,
-  card: CreditCardIcon,
-  mobile_money: SmartphoneIcon,
-  cash: BanknoteIcon,
-  other: WalletIcon,
-};
+import { SettingsTable } from "./settings-table";
 
 type AccountTab = "active" | "archived";
 
@@ -110,6 +84,11 @@ export function PaidFromAccounts({
     ? inUse.find((account) => account.id === openId)
     : undefined;
   const list = tab === "archived" ? old : inUse;
+  const editable = canAct && tab === "active";
+  const columns = useMemo(
+    () => accountColumns({ editable, onEdit: onOpen }),
+    [editable, onOpen],
+  );
 
   const addButton = (variant: "outline" | "default") => (
     <Button
@@ -175,49 +154,18 @@ export function PaidFromAccounts({
             </div>
           ) : (
             <div id="accounts-list" role="tabpanel">
-              <SettingsList
-                label={
+              <SettingsTable
+                caption={
                   tab === "archived"
                     ? "Archived accounts"
                     : "Paid-from accounts in use"
                 }
-              >
-                {list.map((account) => {
-                  const editable = canAct && tab === "active";
-                  const Icon = KIND_ICONS[account.kind];
-                  return (
-                    <SettingsRow
-                      key={account.id}
-                      open={editable && account.id === openId}
-                      onOpen={editable ? () => onOpen(account.id) : undefined}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="inline-flex size-8 flex-none items-center justify-center rounded-control border border-gray-200 bg-surface text-gray-600"
-                      >
-                        <Icon className="size-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-(--w-name)">
-                          {account.name}
-                        </span>
-                        <span className="block truncate text-xs leading-4 text-gray-500">
-                          {ACCOUNT_KIND_LABELS[account.kind]}
-                        </span>
-                      </span>
-                      {editable ? (
-                        <RowButton
-                          label={`Edit ${account.name}`}
-                          aria-haspopup="dialog"
-                          onClick={() => onOpen(account.id)}
-                        >
-                          Edit
-                        </RowButton>
-                      ) : null}
-                    </SettingsRow>
-                  );
-                })}
-              </SettingsList>
+                data={list}
+                columns={columns}
+                getRowId={(account) => account.id}
+                openId={openId}
+                onOpen={editable ? (account) => onOpen(account.id) : undefined}
+              />
             </div>
           )}
         </>

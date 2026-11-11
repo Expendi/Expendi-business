@@ -1,6 +1,8 @@
 import type { JSX, ReactNode } from "react";
 import { cn } from "cn";
 
+import { Badge } from "~/components/ui/badge";
+
 /**
  * A filled tint means it needs attention or money is moving; `quiet` is an
  * outline for something that is only a record.
@@ -18,7 +20,7 @@ const TONES: Record<StatusTone, string> = {
   overdue: "bg-error-50 text-error-700",
 };
 
-/** A colour tint and its label. Never colour alone, never a dot. */
+/** The template's badge in a status tint, with its label. Never colour alone, never a dot. */
 export function StatusBadge({
   tone,
   children,
@@ -29,15 +31,16 @@ export function StatusBadge({
   className?: string;
 }): JSX.Element {
   return (
-    <span
+    <Badge
+      variant="outline"
       data-tone={tone}
       className={cn(
-        "inline-flex h-6 shrink-0 items-center rounded-full border border-transparent px-2 text-xs font-(--w-ui) whitespace-nowrap",
+        "h-6 rounded-full border-transparent px-2 font-(--w-ui)",
         TONES[tone],
         className,
       )}
     >
       {children}
-    </span>
+    </Badge>
   );
 }

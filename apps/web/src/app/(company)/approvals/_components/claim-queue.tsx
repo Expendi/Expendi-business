@@ -1,25 +1,32 @@
 "use client";
 
+import type { RowSelectionState } from "@tanstack/react-table";
 import type { LucideIcon } from "lucide-react";
 import type { JSX, KeyboardEvent, ReactNode } from "react";
 import { cn } from "cn";
 import { CircleCheckIcon, LockIcon, TriangleAlertIcon } from "lucide-react";
+import { useMemo } from "react";
 
 import type { Claim } from "@expendi-business/shared";
 import { CLAIM_APPROVAL_MAX_CLAIMS } from "@expendi-business/shared";
 
 import type { QueueTab } from "./claim-detail";
+import type {
+  DataTableColumnDef,
+  DataTableRow,
+} from "~/components/data/data-table";
 import {
   personName,
   WARNING_LABELS,
   warningCodes,
 } from "~/app/(company)/expenses/_components/expense-labels";
 import { TextLinkButton } from "~/components/data/actions";
+import { EntityMark, RowCheckbox } from "~/components/data/cells";
+import { DataTable, useDataTable } from "~/components/data/data-table";
 import { Money } from "~/components/data/money";
 import { SelectionBar } from "~/components/data/selection-bar";
-import { EmptyState, ErrorState, Skel } from "~/components/data/states";
+import { EmptyState, ErrorState } from "~/components/data/states";
 import { StatusBadge } from "~/components/data/status-badge";
-import { EntityMark, RowCheckbox } from "~/components/data/table";
 import { Button } from "~/components/ui/button";
 import { formatIsoDate } from "~/lib/dates";
 import { sumUnits } from "~/lib/money";
@@ -42,7 +49,9 @@ function Flag({
       className={cn(
         "inline-flex h-[22px] flex-none items-center gap-1 rounded-full pr-2 text-xs font-(--w-ui) whitespace-nowrap",
         Icon ? "pl-1.5" : "pl-2",
-        warn ? "bg-warn-50 text-warn-700" : "bg-gray-100 text-gray-700",
+        warn
+          ? "bg-warn-50 text-warn-700"
+          : "bg-muted text-secondary-foreground",
       )}
     >
       {Icon ? <Icon aria-hidden="true" className="size-[13px]" /> : null}
@@ -77,6 +86,95 @@ function ClaimFlags({
       {blocked ? <Flag icon={LockIcon}>Can&apos;t be paid yet</Flag> : null}
       {noReceipt ? <Flag>No receipt</Flag> : null}
     </span>
+  );
+}
+
+function toggled(selected: readonly string[], claimId: string): string[] {
+  if (selected.includes(claimId)) {
+    return selected.filter((id) => id !== claimId);
+  }
+  return selected.length < MAX ? [...selected, claimId] : [...selected];
+}
+
+function moveWithArrows(
+  event: KeyboardEvent<HTMLButtonElement>,
+  claims: readonly Claim[],
+  from: Claim,
+  onActivate: (claimId: string) => void,
+) {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  event.preventDefault();
+  const next =
+    claims[claims.indexOf(from) + (event.key === "ArrowDown" ? 1 : -1)];
+  if (!next) return;
+  event.currentTarget
+    .closest("ul, table")
+    ?.querySelector<HTMLButtonElement>(`[data-claim-id="${next.id}"]`)
+    ?.focus();
+  onActivate(next.id);
+}
+
+function PickBox({
+  claim,
+  checked,
+  disabled,
+  full,
+  phone = false,
+  onToggle,
+}: {
+  claim: Claim;
+  checked: boolean;
+  disabled: boolean;
+  full: boolean;
+  phone?: boolean;
+  onToggle: (claimId: string) => void;
+}): JSX.Element {
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer items-start justify-center",
+        phone && "pt-[22px] pl-2",
+      )}
+      title={
+        !checked && full
+          ? `One passkey approves up to ${String(MAX)} reimbursements.`
+          : undefined
+      }
+    >
+      <RowCheckbox
+        aria-label={`Select ${claim.merchant}, ${personName(claim.submittedBy)}`}
+        checked={checked}
+        disabled={disabled}
+        onChange={() => onToggle(claim.id)}
+      />
+    </label>
+  );
+}
+
+function ClaimButton({
+  claim,
+  active,
+  onActivate,
+  onKeyDown,
+  children,
+}: {
+  claim: Claim;
+  active: boolean;
+  onActivate: (claimId: string) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      data-claim-id={claim.id}
+      aria-current={active || undefined}
+      onClick={() => onActivate(claim.id)}
+      onKeyDown={onKeyDown}
+      className="block max-w-full truncate rounded-[4px] border-0 bg-transparent p-0 text-left text-base leading-6 font-(--w-name) text-foreground hover:underline hover:decoration-border hover:underline-offset-3"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -123,29 +221,113 @@ export function ClaimQueue({
   /** The selection's Approve & pay is working out the cost. */
   preparing: boolean;
 }): JSX.Element {
-  if (queue.isPending) {
-    return (
-      <div aria-busy="true">
-        <div className="flex min-h-[52px] items-center border-b border-hairline px-4 py-2.5">
-          <Skel width="40%" height={14} />
-        </div>
-        {Array.from({ length: 5 }, (_, row) => (
-          <div
-            key={row}
-            aria-hidden="true"
-            className="grid grid-cols-[32px_minmax(0,1fr)_72px] gap-3 border-b border-hairline p-4"
-          >
-            <Skel width={32} height={32} className="rounded-full" />
-            <div>
-              <Skel width="70%" height={14} />
-              <Skel width="50%" height={12} style={{ marginTop: 8 }} />
+  const selectable = canPay && tab === "waiting";
+  const selectionFull = selected.length >= MAX;
+
+  const columns = useMemo<DataTableColumnDef<Claim>[]>(() => {
+    const pick: DataTableColumnDef<Claim>[] = selectable
+      ? [
+          {
+            id: "select",
+            enableSorting: false,
+            enableHiding: false,
+            meta: { kind: "checkbox", label: "Select" },
+            header: () => <span className="sr-only">Select</span>,
+            cell: ({ row }) =>
+              blockedReason(row.original) === null ? (
+                <PickBox
+                  claim={row.original}
+                  checked={selected.includes(row.original.id)}
+                  disabled={
+                    busy ||
+                    (!selected.includes(row.original.id) && selectionFull)
+                  }
+                  full={selectionFull}
+                  onToggle={(claimId) =>
+                    onSelectedChange(toggled(selected, claimId))
+                  }
+                />
+              ) : null,
+          },
+        ]
+      : [];
+
+    return [
+      ...pick,
+      {
+        id: "reimbursement",
+        enableSorting: false,
+        enableHiding: false,
+        meta: { kind: "main", label: "Reimbursement" },
+        header: () => <span>Reimbursement</span>,
+        cell: ({ row }) => {
+          const claim = row.original;
+          const person = personName(claim.submittedBy);
+          return (
+            <div className="grid grid-cols-[32px_minmax(0,1fr)] items-start gap-3">
+              <EntityMark name={person} kind="person" />
+              <span className="min-w-0">
+                <ClaimButton
+                  claim={claim}
+                  active={claim.id === activeId}
+                  onActivate={onActivate}
+                  onKeyDown={(event) =>
+                    moveWithArrows(event, claims, claim, onActivate)
+                  }
+                >
+                  {claim.merchant}
+                </ClaimButton>
+                <span className="block truncate text-muted-foreground">
+                  {person} · {formatIsoDate(claim.spentOn)}
+                </span>
+                <ClaimFlags claim={claim} tab={tab} />
+              </span>
             </div>
-            <Skel width="100%" height={14} />
-          </div>
-        ))}
-      </div>
-    );
-  }
+          );
+        },
+      },
+      {
+        id: "amount",
+        enableSorting: false,
+        enableHiding: false,
+        meta: { align: "end", label: "Amount" },
+        header: () => <span>Amount</span>,
+        cell: ({ row }) => (
+          <span className="font-(--w-amount) whitespace-nowrap">
+            <Money amount={row.original.amountKes} currency="KES" />
+          </span>
+        ),
+      },
+    ];
+  }, [
+    activeId,
+    busy,
+    claims,
+    onActivate,
+    onSelectedChange,
+    selectable,
+    selected,
+    selectionFull,
+    tab,
+  ]);
+
+  const rowSelection = useMemo(() => {
+    const ticked: RowSelectionState = {};
+    for (const id of selected) ticked[id] = true;
+    return ticked;
+  }, [selected]);
+
+  const table = useDataTable({
+    data: claims,
+    columns,
+    getRowId: (claim) => claim.id,
+    manual: true,
+    paginate: false,
+    rowSelection: { value: rowSelection },
+    enableRowSelection: (row) =>
+      selectable && blockedReason(row.original) === null,
+  });
+
   if (queue.isError) {
     return (
       <ErrorState
@@ -156,7 +338,7 @@ export function ClaimQueue({
       </ErrorState>
     );
   }
-  if (claims.length === 0) {
+  if (!queue.isPending && claims.length === 0) {
     return (
       <EmptyState icon={CircleCheckIcon} title="Nothing to approve">
         New reimbursements show up here.
@@ -164,7 +346,6 @@ export function ClaimQueue({
     );
   }
 
-  const selectable = canPay && tab === "waiting";
   const payable = claims.filter((claim) => blockedReason(claim) === null);
   const chosen = claims.filter((claim) => selected.includes(claim.id));
   const allChosen =
@@ -173,135 +354,112 @@ export function ClaimQueue({
   const totalKes =
     total?.totalKes ?? sumUnits(claims.map((claim) => claim.amountKes));
 
-  function toggle(claimId: string) {
-    if (selected.includes(claimId)) {
-      onSelectedChange(selected.filter((id) => id !== claimId));
-    } else if (selected.length < MAX) {
-      onSelectedChange([...selected, claimId]);
-    }
-  }
-
-  function onRowKeyDown(event: KeyboardEvent<HTMLButtonElement>, at: number) {
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    event.preventDefault();
-    const next = claims[at + (event.key === "ArrowDown" ? 1 : -1)];
-    if (!next) return;
-    const list = event.currentTarget.closest("ul");
-    list
-      ?.querySelector<HTMLButtonElement>(`[data-claim-id="${next.id}"]`)
-      ?.focus();
-    onActivate(next.id);
+  function renderPhoneCard(row: DataTableRow<Claim>) {
+    const claim = row.original;
+    const active = claim.id === activeId;
+    const checked = selected.includes(claim.id);
+    const blocked = blockedReason(claim);
+    const person = personName(claim.submittedBy);
+    return (
+      <li
+        key={claim.id}
+        className={cn(
+          "grid border-b border-border transition-colors duration-150",
+          selectable
+            ? "grid-cols-[40px_minmax(0,1fr)]"
+            : "grid-cols-[minmax(0,1fr)]",
+          checked ? "bg-accent" : active ? "bg-muted" : "hover:bg-muted/40",
+          active &&
+            (checked
+              ? "shadow-[inset_3px_0_0_var(--primary)]"
+              : "shadow-[inset_3px_0_0_var(--foreground)]"),
+        )}
+      >
+        {selectable && blocked !== null ? <span /> : null}
+        {selectable && blocked === null ? (
+          <PickBox
+            claim={claim}
+            checked={checked}
+            disabled={busy || (!checked && selectionFull)}
+            full={selectionFull}
+            onToggle={(claimId) => onSelectedChange(toggled(selected, claimId))}
+            phone
+          />
+        ) : null}
+        <button
+          type="button"
+          data-claim-id={claim.id}
+          aria-current={active || undefined}
+          onClick={() => onActivate(claim.id)}
+          onKeyDown={(event) =>
+            moveWithArrows(event, claims, claim, onActivate)
+          }
+          className={cn(
+            "grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 border-0 bg-transparent py-3.5 pr-4 text-left focus-visible:-outline-offset-2",
+            selectable ? "pl-2" : "pl-4",
+          )}
+        >
+          <EntityMark name={person} kind="person" />
+          <span className="min-w-0">
+            <span className="block truncate text-base leading-6 font-(--w-name)">
+              {claim.merchant}
+            </span>
+            <span className="block truncate text-muted-foreground">
+              {person} · {formatIsoDate(claim.spentOn)}
+            </span>
+            <ClaimFlags claim={claim} tab={tab} />
+          </span>
+          <span className="text-base leading-6 font-(--w-amount) whitespace-nowrap">
+            <Money amount={claim.amountKes} currency="KES" />
+          </span>
+        </button>
+      </li>
+    );
   }
 
   return (
     <>
-      <div className="flex min-h-[52px] items-center gap-3 border-b border-hairline px-4 py-2.5">
-        {selectable ? (
-          <label className="inline-flex flex-1 cursor-pointer items-center gap-2.5 text-gray-600">
-            <RowCheckbox
-              aria-label={`Select every reimbursement that can be paid, up to ${String(MAX)}`}
-              checked={allChosen}
-              disabled={busy || payable.length === 0}
-              onChange={() =>
-                onSelectedChange(
-                  allChosen
-                    ? []
-                    : payable.slice(0, MAX).map((claim) => claim.id),
-                )
-              }
-            />
-            <span>Select all</span>
-          </label>
-        ) : (
-          <span className="flex-1 text-gray-600">
-            {tab === "failed"
-              ? "Paid but didn't arrive. Retry each one."
-              : `${String(count)} ${count === 1 ? "reimbursement" : "reimbursements"} waiting`}
+      {queue.isPending ? null : (
+        <div className="flex min-h-[52px] items-center gap-3 border-b border-border px-4 py-2.5">
+          {selectable ? (
+            <label className="inline-flex flex-1 cursor-pointer items-center gap-2.5 text-muted-foreground">
+              <RowCheckbox
+                aria-label={`Select every reimbursement that can be paid, up to ${String(MAX)}`}
+                checked={allChosen}
+                disabled={busy || payable.length === 0}
+                onChange={() =>
+                  onSelectedChange(
+                    allChosen
+                      ? []
+                      : payable.slice(0, MAX).map((claim) => claim.id),
+                  )
+                }
+              />
+              <span>Select all</span>
+            </label>
+          ) : (
+            <span className="flex-1 text-muted-foreground">
+              {tab === "failed"
+                ? "Paid but didn't arrive. Retry each one."
+                : `${String(count)} ${count === 1 ? "reimbursement" : "reimbursements"} waiting`}
+            </span>
+          )}
+          <span className="text-xs leading-4 whitespace-nowrap text-muted-foreground tabular-nums">
+            {count} · <Money amount={totalKes} currency="KES" />
           </span>
-        )}
-        <span className="text-xs leading-4 whitespace-nowrap text-gray-500 tabular-nums">
-          {count} · <Money amount={totalKes} currency="KES" />
-        </span>
-      </div>
-      <ul
-        aria-label={
-          tab === "waiting" ? "Waiting for approval" : "Payment failed"
-        }
-        className="m-0 list-none p-0"
-      >
-        {claims.map((claim, at) => {
-          const active = claim.id === activeId;
-          const checked = selected.includes(claim.id);
-          const blocked = blockedReason(claim);
-          const person = personName(claim.submittedBy);
-          return (
-            <li
-              key={claim.id}
-              className={cn(
-                "grid border-b border-row-divider transition-colors duration-150",
-                selectable
-                  ? "grid-cols-[40px_minmax(0,1fr)]"
-                  : "grid-cols-[minmax(0,1fr)]",
-                checked
-                  ? "bg-brand-50"
-                  : active
-                    ? "bg-gray-50"
-                    : "hover:bg-gray-25",
-                active &&
-                  (checked
-                    ? "shadow-[inset_3px_0_0_var(--color-brand-700)]"
-                    : "shadow-[inset_3px_0_0_var(--color-gray-900)]"),
-              )}
-            >
-              {selectable && blocked !== null ? <span /> : null}
-              {selectable && blocked === null ? (
-                <label
-                  className="flex cursor-pointer items-start justify-center pt-[22px] pl-2"
-                  title={
-                    !checked && selected.length >= MAX
-                      ? `One passkey approves up to ${String(MAX)} reimbursements.`
-                      : undefined
-                  }
-                >
-                  <RowCheckbox
-                    aria-label={`Select ${claim.merchant}, ${person}`}
-                    checked={checked}
-                    disabled={busy || (!checked && selected.length >= MAX)}
-                    onChange={() => toggle(claim.id)}
-                  />
-                </label>
-              ) : null}
-              <button
-                type="button"
-                data-claim-id={claim.id}
-                aria-current={active || undefined}
-                onClick={() => onActivate(claim.id)}
-                onKeyDown={(event) => onRowKeyDown(event, at)}
-                className={cn(
-                  "grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 border-0 bg-transparent py-3.5 pr-4 text-left focus-visible:-outline-offset-2",
-                  selectable ? "pl-2" : "pl-4",
-                )}
-              >
-                <EntityMark name={person} kind="person" />
-                <span className="min-w-0">
-                  <span className="block truncate text-base leading-6 font-(--w-name)">
-                    {claim.merchant}
-                  </span>
-                  <span className="block truncate text-gray-500">
-                    {person} · {formatIsoDate(claim.spentOn)}
-                  </span>
-                  <ClaimFlags claim={claim} tab={tab} />
-                </span>
-                <span className="text-base leading-6 font-(--w-amount) whitespace-nowrap">
-                  <Money amount={claim.amountKes} currency="KES" />
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+        </div>
+      )}
+      <DataTable
+        table={table}
+        caption={tab === "waiting" ? "Waiting for approval" : "Payment failed"}
+        onRowOpen={(claim) => onActivate(claim.id)}
+        openRowId={activeId}
+        loading={queue.isPending}
+        skeletonRows={5}
+        renderPhoneCard={renderPhoneCard}
+      />
       {queue.hasNextPage ? (
-        <div className="border-b border-hairline px-4 py-3">
+        <div className="border-b border-border px-4 py-3">
           <Button
             variant="outline"
             size="md"
@@ -338,7 +496,7 @@ export function ClaimQueue({
                   Clear selection
                 </TextLinkButton>
                 {chosen.length >= MAX ? (
-                  <span className="text-gray-500">
+                  <span className="text-muted-foreground">
                     {MAX} selected, the most one passkey approves. Pay these,
                     then select the rest.
                   </span>

@@ -127,7 +127,7 @@ interface SheetParts {
 }
 
 const LIST_SUBTITLE = (
-  <p className="mt-0.5 text-gray-600">
+  <p className="mt-0.5 text-muted-foreground">
     Set up once. Each one&apos;s next bill is always ready in To pay.
   </p>
 );

@@ -14,7 +14,7 @@ import {
   UsersIcon,
   WalletIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import type {
   PayrollRun,
@@ -45,7 +45,6 @@ import {
   StatCardSkeleton,
 } from "~/components/data/stat-cards";
 import { EmptyState, ErrorState } from "~/components/data/states";
-import { DataTable, TableSkeletonRows } from "~/components/data/table";
 import { useDeepLinkParams } from "~/components/data/use-deep-link-param";
 import { Button } from "~/components/ui/button";
 import { useDashboard } from "~/contexts/dashboard-context";
@@ -72,7 +71,11 @@ import { formatIsoDate } from "~/lib/dates";
 import { sumUnits } from "~/lib/money";
 import { useApprovalPasskeyStatus } from "~/lib/use-approval";
 import { CapSheet } from "./cap-sheet";
-import { RunsTable, SalariesTable } from "./payroll-tables";
+import {
+  PayrollTableSkeleton,
+  RunsTable,
+  SalariesTable,
+} from "./payroll-tables";
 import { RunSheet } from "./run-sheet";
 import { SalarySheet } from "./salary-sheet";
 
@@ -162,18 +165,27 @@ function CompanyPayroll({
   const anyFilter = FILTERS.some((name) => filters[name] !== null);
   const loading = runs.isPending || salaries.isPending || margin.isPending;
   const failed = runs.isError || salaries.isError || margin.isError;
-  const allRuns = runs.data ?? [];
-  const allSalaries = salaries.data ?? [];
+  const allRuns = useMemo(() => runs.data ?? [], [runs.data]);
+  const allSalaries = useMemo(() => salaries.data ?? [], [salaries.data]);
 
-  const runRows = sortRuns(
-    allRuns.filter(
-      (run) => filters.status === null || run.status === filters.status,
-    ),
-    runSort,
+  const { status, payday, method, category } = filters;
+  const runRows = useMemo(
+    () =>
+      sortRuns(
+        allRuns.filter((run) => status === null || run.status === status),
+        runSort,
+      ),
+    [allRuns, status, runSort],
   );
-  const salaryRows = sortSalaries(
-    allSalaries.filter((salary) => matchesSalary(salary, filters)),
-    salarySort,
+  const salaryRows = useMemo(
+    () =>
+      sortSalaries(
+        allSalaries.filter((salary) =>
+          matchesSalary(salary, { status, payday, method, category }),
+        ),
+        salarySort,
+      ),
+    [allSalaries, status, payday, method, category, salarySort],
   );
   const runIds = (
     tab === "runs" ? runRows : sortRuns(allRuns, DEFAULT_RUN_SORT)
@@ -293,11 +305,7 @@ function CompanyPayroll({
         />
         <ResultsBody id="payroll-results" busy={loading}>
           {loading ? (
-            <DataTable caption="Loading payroll">
-              <tbody>
-                <TableSkeletonRows rows={6} columns={4} />
-              </tbody>
-            </DataTable>
+            <PayrollTableSkeleton />
           ) : failed ? (
             <ErrorState title="Payroll didn't load" onRetry={retry} />
           ) : (tab === "runs" ? runRows : salaryRows).length === 0 ? (

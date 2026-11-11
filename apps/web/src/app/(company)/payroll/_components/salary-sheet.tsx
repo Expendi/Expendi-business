@@ -248,7 +248,7 @@ export function SalarySheet({
             <p>{describeApiError(payees.error ?? categories.error)}</p>
           </Callout>
         ) : eligible.length === 0 ? (
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Everyone who can be paid a salary is already on payroll. Add
             employees or other personnel under{" "}
             <Link href="/payees" className={textLinkClass}>
@@ -590,7 +590,7 @@ export function SalarySheet({
         <>
           <p className="mt-0.5 text-2xl leading-8 font-(--w-heading) tracking-[-0.02em]">
             <Money amount={salary.amountKes} currency="KES" />
-            <span className="text-sm leading-5 tracking-normal text-gray-500">
+            <span className="text-sm leading-5 tracking-normal text-muted-foreground">
               {" "}
               a month
             </span>

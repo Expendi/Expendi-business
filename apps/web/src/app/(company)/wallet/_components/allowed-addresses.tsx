@@ -28,7 +28,7 @@ import { Input } from "~/components/ui/input";
 import { describeApiError } from "~/lib/api";
 import { describeApprovalError } from "~/lib/approval";
 import { useApprovalPasskeyStatus } from "~/lib/use-approval";
-import { railCardClass, RailRow, RailTitle } from "./rail-cards";
+import { RailCard, RailRow, RailTitle } from "./rail-cards";
 import { shortAddress } from "./usdc-amount";
 import { useChangeAllowlist, useWithdrawalAddresses } from "./wallet-api";
 import { dayMonth, nairobiDay } from "./wallet-display";
@@ -62,16 +62,16 @@ export function AllowedAddresses({
   }
 
   return (
-    <section aria-labelledby="addresses-title" className={railCardClass}>
+    <RailCard titleId="addresses-title">
       <RailTitle id="addresses-title">
         Allowed addresses
         {addresses.data ? (
-          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-100 px-1.5 text-xs font-(--w-ui) text-gray-700 tabular-nums">
+          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-xs font-(--w-ui) text-secondary-foreground tabular-nums">
             {addresses.data.length}
           </span>
         ) : null}
       </RailTitle>
-      <p className="mt-0.5 text-sm text-gray-600">
+      <p className="mt-0.5 text-sm text-muted-foreground">
         Withdrawals can only go to these Base addresses.
       </p>
       {addresses.isPending ? (
@@ -97,7 +97,7 @@ export function AllowedAddresses({
           </Callout>
         </div>
       ) : addresses.data.length === 0 ? (
-        <p className="mt-3 rounded-control border border-dashed border-control-border p-4 text-center text-sm text-gray-600">
+        <p className="mt-3 rounded-control border border-dashed border-input p-4 text-center text-sm text-muted-foreground">
           No addresses yet.{canChange ? " Add one to withdraw." : ""}
         </p>
       ) : (
@@ -131,7 +131,7 @@ export function AllowedAddresses({
         </ul>
       )}
       {change.data?.status === "cancelled" ? (
-        <p role="status" className="mt-2 text-sm text-gray-600">
+        <p role="status" className="mt-2 text-sm text-muted-foreground">
           Cancelled. Nothing changed.
         </p>
       ) : null}
@@ -152,13 +152,13 @@ export function AllowedAddresses({
         </Button>
       ) : null}
       {canAct && !canChange && passkey.data ? (
-        <p className="mt-3 text-sm text-gray-600">
+        <p className="mt-3 text-sm text-muted-foreground">
           Set up your approval passkey in the Expendi Business app to change
           this list.
         </p>
       ) : null}
       {canAct ? (
-        <p className="mt-3.5 flex items-start gap-2 text-xs leading-4 text-gray-500">
+        <p className="mt-3.5 flex items-start gap-2 text-xs leading-4 text-muted-foreground">
           <ShieldCheckIcon
             aria-hidden="true"
             className="mt-px size-3.5 shrink-0 text-success-700"
@@ -173,7 +173,7 @@ export function AllowedAddresses({
           </ReadOnlyNote>
         </div>
       )}
-    </section>
+    </RailCard>
   );
 }
 
@@ -292,7 +292,7 @@ export function AddAddressSheet({
         </Field>
       </form>
       {change.data?.status === "cancelled" ? (
-        <p role="status" className="text-sm text-gray-600">
+        <p role="status" className="text-sm text-muted-foreground">
           Cancelled. Nothing changed.
         </p>
       ) : null}

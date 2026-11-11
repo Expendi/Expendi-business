@@ -9,7 +9,7 @@ import type {
 } from "@expendi-business/shared";
 import { expenseListQuerySchema } from "@expendi-business/shared";
 
-import type { SortDirection, SortState } from "~/components/data/table";
+import type { SortDirection, SortState } from "~/components/data/data-table";
 
 /**
  * The Expenses filters (spec §6.14), kept in the page's URL so other pages

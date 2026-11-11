@@ -1,72 +1,48 @@
 "use client";
 
 import type { JSX } from "react";
-import {
-  PencilIcon,
-  PlusIcon,
-  TriangleAlertIcon,
-  UsersIcon,
-} from "lucide-react";
+import { TriangleAlertIcon, UsersIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { PayrollRun, Salary } from "@expendi-business/shared";
 
-import type { SortState } from "~/components/data/table";
+import type { SortState } from "~/components/data/data-table";
 import type {
   RunSortKey,
   SalarySortKey,
 } from "~/features/payroll/payroll-display";
+import { EntityMark, Mini, PhoneCard } from "~/components/data/cells";
+import {
+  DataTable,
+  DataTablePagination,
+  sortFromTable,
+  toSorting,
+  useDataTable,
+} from "~/components/data/data-table";
 import { AmountStack, Money } from "~/components/data/money";
 import { StatusBadge } from "~/components/data/status-badge";
 import {
-  DataRow,
-  DataTable,
-  EntityMark,
-  Mini,
-  nextSort,
-  PhoneCard,
-  PhoneCards,
-  RowMeta,
-  RowTitle,
-  SortHeader,
-  Td,
-  Th,
-} from "~/components/data/table";
-import { KIND_LABELS, METHOD_LABELS } from "~/features/payees/payee-display";
-import {
-  payDayInWords,
-  RUN_SORT_FIRST,
   RUN_STATUS_LABELS,
   runMeta,
-  SALARY_SORT_FIRST,
   SALARY_STATE_LABELS,
   UNCONFIRMED_NUMBER,
 } from "~/features/payroll/payroll-display";
 import { progressInWords } from "~/features/payroll/payroll-payment";
 import { formatIsoDate } from "~/lib/dates";
+import {
+  RUN_SORT_KEYS,
+  runColumns,
+  RunMarks,
+  SALARY_SORT_KEYS,
+  salaryColumns,
+} from "./columns";
 
-/** How the draft changed: "2 changed for this run" and one-offs. */
-function RunMarks({ run }: { run: PayrollRun }): JSX.Element | null {
-  if (run.adjusted === 0 && run.oneOffs === 0) return null;
-  return (
-    <>
-      {run.adjusted > 0 ? (
-        <Mini
-          icon={PencilIcon}
-          label={`${String(run.adjusted)} changed for this run`}
-        >
-          {run.adjusted}
-        </Mini>
-      ) : null}
-      {run.oneOffs > 0 ? (
-        <Mini
-          icon={PlusIcon}
-          label={`${String(run.oneOffs)} one-off ${run.oneOffs === 1 ? "payment" : "payments"}`}
-        >
-          {run.oneOffs}
-        </Mini>
-      ) : null}
-    </>
-  );
+function useStableOpen(onOpen: (id: string) => void): (id: string) => void {
+  const latest = useRef(onOpen);
+  useEffect(() => {
+    latest.current = onOpen;
+  });
+  return useCallback((id: string) => latest.current(id), []);
 }
 
 /** Payroll runs, latest pay day first; each opens its sheet. */
@@ -85,88 +61,39 @@ export function RunsTable({
   onOpen: (runId: string) => void;
   today: string;
 }): JSX.Element {
-  const sortBy = (key: RunSortKey) =>
-    onSort(nextSort(sort, key, RUN_SORT_FIRST[key]));
+  const open = useStableOpen(onOpen);
+  const columns = useMemo(
+    () => runColumns({ today, onOpen: open }),
+    [today, open],
+  );
+  const table = useDataTable({
+    data: rows,
+    columns,
+    getRowId: (run) => run.id,
+    manual: { sorting: true },
+    sorting: {
+      value: toSorting(sort),
+      onChange: (next) => onSort(sortFromTable(next, sort, RUN_SORT_KEYS)),
+    },
+  });
   return (
     <>
-      <DataTable caption="Payroll runs, latest pay day first">
-        <thead>
-          <tr>
-            <SortHeader
-              label="Pay day"
-              sortKey="payDate"
-              sort={sort}
-              onSort={sortBy}
-            />
-            <Th collapse="md">Payments</Th>
-            <SortHeader
-              label="Total"
-              sortKey="total"
-              align="end"
-              sort={sort}
-              onSort={sortBy}
-            />
-            <SortHeader
-              label="Status"
-              sortKey="status"
-              sort={sort}
-              onSort={sortBy}
-            />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((run) => {
-            const status = RUN_STATUS_LABELS[run.status];
-            const progress = progressInWords(run);
-            return (
-              <DataRow
-                key={run.id}
-                open={run.id === openId}
-                onOpen={() => onOpen(run.id)}
-              >
-                <Td kind="main">
-                  <RowTitle onOpen={() => onOpen(run.id)}>
-                    <span className="tabular-nums">
-                      {formatIsoDate(run.payDate)}
-                    </span>
-                  </RowTitle>
-                  <RowMeta text={runMeta(run, today)}>
-                    <RunMarks run={run} />
-                  </RowMeta>
-                </Td>
-                <Td
-                  collapse="md"
-                  className={
-                    progress
-                      ? "whitespace-nowrap text-gray-600 tabular-nums"
-                      : "whitespace-nowrap text-gray-500"
-                  }
-                >
-                  {progress ?? "Not approved yet"}
-                </Td>
-                <Td align="end">
-                  <AmountStack>
-                    <Money amount={run.totalKes} currency="KES" />
-                  </AmountStack>
-                </Td>
-                <Td>
-                  <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-                </Td>
-              </DataRow>
-            );
-          })}
-        </tbody>
-      </DataTable>
-      <PhoneCards label="Payroll runs">
-        {rows.map((run) => {
+      <DataTable
+        table={table}
+        caption="Payroll runs, latest pay day first"
+        phoneLabel="Payroll runs"
+        onRowOpen={(run) => onOpen(run.id)}
+        openRowId={openId}
+        renderPhoneCard={(row) => {
+          const run = row.original;
           const status = RUN_STATUS_LABELS[run.status];
           return (
             <PhoneCard
-              key={run.id}
+              key={row.id}
               mark={
                 <span
                   aria-hidden="true"
-                  className="inline-flex size-8 flex-none items-center justify-center rounded-control border border-gray-200 bg-surface text-gray-600"
+                  className="inline-flex size-8 flex-none items-center justify-center rounded-lg border border-border bg-card text-muted-foreground"
                 >
                   <UsersIcon className="size-4" />
                 </span>
@@ -187,25 +114,10 @@ export function RunsTable({
               onOpen={() => onOpen(run.id)}
             />
           );
-        })}
-      </PhoneCards>
+        }}
+      />
+      <DataTablePagination table={table} noun="runs" />
     </>
-  );
-}
-
-function SalaryMeta({ salary }: { salary: Salary }): JSX.Element {
-  if (salary.payee.payoutPhoneConfirmed === false && salary.state !== "ended") {
-    return (
-      <span className="flex min-w-0 items-center gap-1.5 text-warn-700">
-        <TriangleAlertIcon aria-hidden="true" className="size-3.5 flex-none" />
-        <span className="min-w-0 truncate">{UNCONFIRMED_NUMBER}</span>
-      </span>
-    );
-  }
-  return (
-    <RowMeta
-      text={`${KIND_LABELS[salary.payee.kind]} · ${salary.category.name}`}
-    />
   );
 }
 
@@ -223,96 +135,35 @@ export function SalariesTable({
   openId: string | null;
   onOpen: (salaryId: string) => void;
 }): JSX.Element {
-  const sortBy = (key: SalarySortKey) =>
-    onSort(nextSort(sort, key, SALARY_SORT_FIRST[key]));
+  const open = useStableOpen(onOpen);
+  const columns = useMemo(() => salaryColumns({ onOpen: open }), [open]);
+  const table = useDataTable({
+    data: rows,
+    columns,
+    getRowId: (salary) => salary.id,
+    manual: { sorting: true },
+    sorting: {
+      value: toSorting(sort),
+      onChange: (next) => onSort(sortFromTable(next, sort, SALARY_SORT_KEYS)),
+    },
+  });
   return (
     <>
-      <DataTable caption="Salaries, monthly net pay">
-        <thead>
-          <tr>
-            <SortHeader
-              label="Person"
-              sortKey="person"
-              sort={sort}
-              onSort={sortBy}
-            />
-            <Th collapse="lg">Paid by</Th>
-            <SortHeader
-              label="Next pay date"
-              sortKey="next"
-              sort={sort}
-              onSort={sortBy}
-            />
-            <SortHeader
-              label="Net pay"
-              sortKey="amount"
-              align="end"
-              sort={sort}
-              onSort={sortBy}
-            />
-            <SortHeader
-              label="Status"
-              sortKey="status"
-              sort={sort}
-              onSort={sortBy}
-            />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((salary) => {
-            const state = SALARY_STATE_LABELS[salary.state];
-            return (
-              <DataRow
-                key={salary.id}
-                open={salary.id === openId}
-                onOpen={() => onOpen(salary.id)}
-              >
-                <Td kind="main">
-                  <span className="flex min-w-0 items-start gap-3">
-                    <EntityMark name={salary.payee.name} kind="person" />
-                    <span className="min-w-0">
-                      <RowTitle onOpen={() => onOpen(salary.id)}>
-                        {salary.payee.name}
-                      </RowTitle>
-                      <SalaryMeta salary={salary} />
-                    </span>
-                  </span>
-                </Td>
-                <Td collapse="lg" className="whitespace-nowrap text-gray-600">
-                  {salary.payee.method
-                    ? METHOD_LABELS[salary.payee.method]
-                    : "Not set"}
-                </Td>
-                <Td kind="date">
-                  {salary.nextPayDate ? formatIsoDate(salary.nextPayDate) : ""}
-                  <span className="mt-0.5 block text-xs leading-4 text-gray-500">
-                    {salary.state === "ended" && salary.endsOn
-                      ? `Ended ${formatIsoDate(salary.endsOn)}`
-                      : payDayInWords(salary.payDay)}
-                  </span>
-                </Td>
-                <Td align="end">
-                  <AmountStack>
-                    <Money amount={salary.amountKes} currency="KES" />
-                  </AmountStack>
-                </Td>
-                <Td>
-                  <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
-                </Td>
-              </DataRow>
-            );
-          })}
-        </tbody>
-      </DataTable>
-      <PhoneCards label="Salaries">
-        {rows.map((salary) => {
+      <DataTable
+        table={table}
+        caption="Salaries, monthly net pay"
+        phoneLabel="Salaries"
+        onRowOpen={(salary) => onOpen(salary.id)}
+        openRowId={openId}
+        renderPhoneCard={(row) => {
+          const salary = row.original;
           const state = SALARY_STATE_LABELS[salary.state];
           const unconfirmed =
             salary.payee.payoutPhoneConfirmed === false &&
             salary.state !== "ended";
           return (
             <PhoneCard
-              key={salary.id}
+              key={row.id}
               mark={<EntityMark name={salary.payee.name} kind="person" />}
               title={salary.payee.name}
               sub={
@@ -342,8 +193,25 @@ export function SalariesTable({
               onOpen={() => onOpen(salary.id)}
             />
           );
-        })}
-      </PhoneCards>
+        }}
+      />
+      <DataTablePagination table={table} noun="salaries" />
     </>
   );
+}
+
+const NO_ROWS: readonly PayrollRun[] = [];
+
+export function PayrollTableSkeleton(): JSX.Element {
+  const columns = useMemo(
+    () => runColumns({ today: "", onOpen: () => undefined }),
+    [],
+  );
+  const table = useDataTable({
+    data: NO_ROWS,
+    columns,
+    getRowId: (run) => run.id,
+    paginate: false,
+  });
+  return <DataTable table={table} caption="Loading payroll" loading />;
 }

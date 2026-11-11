@@ -36,7 +36,7 @@ export function GroupedAddress({ address }: { address: string }): JSX.Element {
   const [prefix, ...groups] = addressGroups(address);
   return (
     <span className="flex flex-wrap gap-x-[7px] gap-y-0.5 tracking-[0.02em] tabular-nums">
-      <span className="text-gray-500">{prefix}</span>
+      <span className="text-muted-foreground">{prefix}</span>
       {groups.map((group, index) => (
         <span key={`${String(index)}-${group}`}>{group}</span>
       ))}
@@ -249,7 +249,7 @@ function TxBody({
             {payout ? (
               <DetailItem label="In KES">
                 <span className="tabular-nums">
-                  <span className="text-[0.72em] font-(--w-ui) tracking-[0.04em] text-gray-500">
+                  <span className="text-[0.72em] font-(--w-ui) tracking-[0.04em] text-muted-foreground">
                     KES
                   </span>{" "}
                   {formatKes(payout.amountKesCents)}
@@ -292,10 +292,10 @@ function TxBody({
 
 function Note({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <p className="flex items-start gap-2 text-sm text-gray-600">
+    <p className="flex items-start gap-2 text-sm text-muted-foreground">
       <InfoIcon
         aria-hidden="true"
-        className="mt-0.5 size-4 shrink-0 text-gray-500"
+        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
       />
       <span>{children}</span>
     </p>
@@ -371,18 +371,19 @@ function PaymentSteps({ item }: { item: WalletHistoryItem }): JSX.Element {
               "before:absolute before:top-[22px] before:bottom-0.5 before:left-[9px] before:w-0.5 before:rounded-[1px]",
             index < steps.length - 1 &&
               (step.state === "done"
-                ? "before:bg-gray-700"
-                : "before:bg-gray-200"),
+                ? "before:bg-muted-foreground"
+                : "before:bg-border"),
           )}
         >
           <span
             aria-hidden="true"
             className={cn(
               "inline-flex size-5 items-center justify-center rounded-full border-2",
-              step.state === "done" && "border-gray-900 bg-gray-900 text-white",
+              step.state === "done" &&
+                "border-foreground bg-foreground text-background",
               step.state === "current" &&
-                "border-brand-700 bg-surface after:size-2 after:rounded-full after:bg-brand-700",
-              step.state === "pending" && "border-gray-300 bg-surface",
+                "border-primary bg-card after:size-2 after:rounded-full after:bg-primary",
+              step.state === "pending" && "border-input bg-card",
               step.state === "failed" &&
                 "border-warn-600 bg-warn-50 text-warn-700",
             )}
@@ -396,7 +397,7 @@ function PaymentSteps({ item }: { item: WalletHistoryItem }): JSX.Element {
           <span
             className={cn(
               "text-sm leading-5",
-              step.state === "pending" && "text-gray-500",
+              step.state === "pending" && "text-muted-foreground",
               step.state === "failed" && "font-(--w-ui) text-warn-700",
             )}
           >
@@ -409,11 +410,11 @@ function PaymentSteps({ item }: { item: WalletHistoryItem }): JSX.Element {
                   : ""}
             </span>
           </span>
-          <span className="text-xs leading-5 text-gray-500 tabular-nums">
+          <span className="text-xs leading-5 text-muted-foreground tabular-nums">
             {step.time ?? ""}
           </span>
           {step.sub ? (
-            <p className="col-start-2 col-end-4 -mt-0.5 text-xs leading-4 text-gray-600">
+            <p className="col-start-2 col-end-4 -mt-0.5 text-xs leading-4 text-muted-foreground">
               {step.sub}
             </p>
           ) : null}

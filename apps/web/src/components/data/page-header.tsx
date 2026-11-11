@@ -13,11 +13,13 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 motion-safe:animate-rise">
       <div className="min-w-0">
-        <h1 className="text-2xl leading-8 font-(--w-heading) tracking-[-0.02em] text-gray-900">
+        <h1 className="text-2xl leading-8 font-(--w-heading) tracking-[-0.02em] text-foreground">
           {title}
         </h1>
         {subtitle ? (
-          <p className="mt-1 max-w-[70ch] text-sm text-gray-600">{subtitle}</p>
+          <p className="mt-1 max-w-[70ch] text-sm text-muted-foreground">
+            {subtitle}
+          </p>
         ) : null}
       </div>
       {actions ? (

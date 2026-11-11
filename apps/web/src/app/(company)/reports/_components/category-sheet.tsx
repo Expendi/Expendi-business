@@ -17,6 +17,7 @@ import {
   SheetPosition,
 } from "~/components/data/detail-sheet";
 import { Money } from "~/components/data/money";
+import { MonthBars } from "~/components/data/month-bars";
 import { dayLabel, monthAbbr, monthLabel, monthName } from "./report-month";
 import {
   changeLine,
@@ -25,7 +26,6 @@ import {
   largestFor,
   paymentWho,
 } from "./reports-display";
-import { ColumnChart } from "./viz/column-chart";
 
 const kesText = (value: number) => `KES ${value.toLocaleString("en-KE")}`;
 
@@ -74,7 +74,7 @@ export function CategorySheet({
             <p className="mt-0.5 text-2xl leading-8 font-(--w-heading) tracking-[-0.02em]">
               <Money amount={row.currentKes} currency="KES" />
             </p>
-            <p className="mt-0.5 text-gray-600">
+            <p className="mt-0.5 text-muted-foreground">
               {changeLine(row.current, row.previous, context)}
             </p>
           </>
@@ -94,12 +94,12 @@ export function CategorySheet({
         <>
           <div className="flex flex-col gap-2">
             <SectionLabel>Last {months.length} months</SectionLabel>
-            <ColumnChart
+            <MonthBars
               labels={months.map((entry) => monthAbbr(entry.month))}
               values={row.trend}
               selected={selected}
-              height={180}
               axis
+              className="h-48"
               ariaLabel={`${row.name} by month. ${monthLabel(month)}: ${kesText(row.current)}. Use the arrow keys to read each month.`}
               tip={(at) => {
                 const entry = months[at];
@@ -108,11 +108,7 @@ export function CategorySheet({
                     ? `${monthLabel(entry.month)}${entry.month === thisMonth ? " (so far)" : ""}`
                     : "",
                   rows: [
-                    {
-                      key: entry?.month === month ? "selected" : "context",
-                      value: kesText(row.trend[at] ?? 0),
-                      label: row.name,
-                    },
+                    { value: kesText(row.trend[at] ?? 0), label: row.name },
                   ],
                 };
               }}
@@ -137,13 +133,13 @@ export function CategorySheet({
                 {largest.map((payment) => (
                   <li
                     key={payment.id}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-hairline py-2.5 first:border-t-0 first:pt-0"
+                    className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-border py-2.5 first:border-t-0 first:pt-0"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate font-(--w-name) text-gray-900">
+                      <span className="block truncate font-(--w-name) text-foreground">
                         {payment.name}
                       </span>
-                      <span className="block text-xs leading-4 text-gray-500 tabular-nums">
+                      <span className="block text-xs leading-4 text-muted-foreground tabular-nums">
                         {dayLabel(payment.date)} · {paymentWho(payment)}
                       </span>
                     </span>
@@ -152,12 +148,12 @@ export function CategorySheet({
                 ))}
               </ul>
             ) : (
-              <p className="text-xs leading-4 text-gray-500">
+              <p className="text-xs leading-4 text-muted-foreground">
                 Nothing in {monthName(month)}.
               </p>
             )}
             {row.payments > largest.length ? (
-              <p className="text-xs leading-4 text-gray-500">
+              <p className="text-xs leading-4 text-muted-foreground">
                 Every payment is in the {monthName(month)} export.
               </p>
             ) : null}

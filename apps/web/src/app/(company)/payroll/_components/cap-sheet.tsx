@@ -107,7 +107,7 @@ export function CapSheet({
         )
       }
     >
-      <p className="text-gray-600">
+      <p className="text-muted-foreground">
         A payroll run can pay at most the salaries drafted into it plus this
         margin, so a mistake or a misuse can’t pay far more than the payroll
         that’s set up.

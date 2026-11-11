@@ -7,11 +7,11 @@ import {
   ClockIcon,
   FilterXIcon,
   LayersIcon,
-  PaperclipIcon,
   RepeatIcon,
   TagIcon,
   WalletIcon,
 } from "lucide-react";
+import { useMemo } from "react";
 
 import type {
   Bill,
@@ -26,6 +26,8 @@ import {
   BILL_PAYMENT_MAX_BILLS,
 } from "@expendi-business/shared";
 
+import type { BillSelection } from "./columns";
+import type { DataTableRow } from "~/components/data/data-table";
 import type { FilterOption } from "~/components/data/filter-chip";
 import type { KindTab } from "~/components/data/kind-tabs";
 import type {
@@ -34,40 +36,22 @@ import type {
   BillSortKey,
 } from "~/features/bills/bill-list";
 import { TextLinkButton } from "~/components/data/actions";
+import { EntityMark, PhoneCard } from "~/components/data/cells";
+import {
+  DataTable,
+  DataTablePagination,
+  DataTableToolbar,
+  useDataTable,
+} from "~/components/data/data-table";
 import { FilterChip } from "~/components/data/filter-chip";
 import { KindTabs } from "~/components/data/kind-tabs";
 import { KesTotal } from "~/components/data/money";
-import {
-  ResultsBody,
-  ResultsHead,
-  ResultsPanel,
-} from "~/components/data/results";
+import { ResultsBody, ResultsPanel } from "~/components/data/results";
 import { SelectionBar } from "~/components/data/selection-bar";
-import { EmptyState, ErrorState, Skel } from "~/components/data/states";
-import {
-  DataRow,
-  DataTable,
-  EntityMark,
-  Mini,
-  PhoneCard,
-  PhoneCards,
-  RowCheckbox,
-  RowMeta,
-  RowTitle,
-  SortHeader,
-  TableSkeletonRows,
-  Td,
-  Th,
-} from "~/components/data/table";
+import { EmptyState, ErrorState } from "~/components/data/states";
 import { Button } from "~/components/ui/button";
 import { storedAmount } from "~/features/bills/bill-amount";
-import {
-  anyFilterSet,
-  dueHint,
-  rowDate,
-  statusesOf,
-} from "~/features/bills/bill-list";
-import { isPayable } from "~/features/bills/bill-payment";
+import { anyFilterSet, rowDate, statusesOf } from "~/features/bills/bill-list";
 import {
   BILL_STATUSES,
   BillAmount,
@@ -77,6 +61,13 @@ import {
 import { METHOD_LABELS } from "~/features/payees/payee-display";
 import { formatIsoDate } from "~/lib/dates";
 import { approxKesTotal, totalsByCurrency } from "~/lib/money";
+import {
+  BillCheckbox,
+  billColumns,
+  canSelect,
+  isBillSortKey,
+  Markers,
+} from "./columns";
 
 const VIEW_LABELS: Readonly<Record<BillListView, string>> = {
   open: "To pay",
@@ -120,65 +111,6 @@ const SOURCE_OPTIONS: readonly FilterOption[] = [
   { value: "recurring", label: "Recurring" },
   { value: "one_off", label: "One-off" },
 ];
-
-/** Selected together for Pay all; a failed payment is retried on its own. */
-export const canSelect = (bill: Bill): boolean =>
-  isPayable(bill) && bill.status !== "payout_failed";
-
-export interface BillSelection {
-  readonly selected: readonly string[];
-  /** A payment is being prepared or reviewed. */
-  readonly busy: boolean;
-  readonly preparing: boolean;
-  readonly onToggle: (billId: string) => void;
-  readonly onSelect: (billIds: string[]) => void;
-  readonly onPay: () => void;
-}
-
-/** "In 3 days" under a due date: red when late, amber today. */
-function DueHintLine({
-  bill,
-  today,
-}: {
-  bill: Bill;
-  today: string;
-}): JSX.Element | null {
-  const hint = dueHint(bill, today);
-  if (!hint) return null;
-  const tone =
-    hint.tone === "late"
-      ? "font-(--w-ui) text-error-700"
-      : hint.tone === "today"
-        ? "font-(--w-ui) text-warn-700"
-        : "text-gray-500";
-  return (
-    <span className={`mt-0.5 block text-xs leading-4 ${tone}`}>
-      {hint.text}
-    </span>
-  );
-}
-
-function Markers({ bill }: { bill: Bill }): JSX.Element {
-  const files = bill.fileCount;
-  return (
-    <>
-      {bill.recurringItemId ? (
-        <Mini icon={RepeatIcon} label="Recurring" />
-      ) : null}
-      {files > 0 ? (
-        <Mini
-          icon={PaperclipIcon}
-          label={`${String(files)} ${files === 1 ? "file" : "files"}`}
-        >
-          {files}
-        </Mini>
-      ) : null}
-    </>
-  );
-}
-
-const metaOf = (bill: Bill): string =>
-  [bill.reference, bill.category.name].filter(Boolean).join(" · ");
 
 /**
  * The tabs and filter chips, then one flat sortable list of bills (phone
@@ -252,82 +184,108 @@ export function BillsResults({
     (category) => ({ value: category.id, label: category.name }),
   );
   const filtered = anyFilterSet(filters);
+  const settled = view === "history";
+
+  const columns = useMemo(
+    () => billColumns({ view, rate, today, selection, onOpen }),
+    [view, rate, today, selection, onOpen],
+  );
+  const selectedRows = useMemo(() => {
+    const ticked: Record<string, true> = {};
+    for (const billId of selection?.selected ?? []) ticked[billId] = true;
+    return ticked;
+  }, [selection?.selected]);
+  const table = useDataTable({
+    data: rows,
+    columns,
+    getRowId: (bill) => bill.id,
+    manual: { sorting: true, filtering: true },
+    sorting: {
+      value: [{ id: sort.key, desc: sort.dir === "desc" }],
+      onChange: ([next]) => {
+        if (next && isBillSortKey(next.id)) onSort(next.id);
+      },
+    },
+    rowSelection: { value: selectedRows },
+  });
 
   return (
     <ResultsPanel label="Bills">
-      <ResultsHead
-        tabs={
-          <KindTabs
-            label="Bills"
-            tabs={tabs}
-            value={view}
-            onChange={onView}
-            controls="bills-results"
+      <div className="overflow-x-auto border-b border-border px-4 py-3">
+        <KindTabs
+          label="Bills"
+          tabs={tabs}
+          value={view}
+          onChange={onView}
+          controls="bills-results"
+        />
+      </div>
+      <DataTableToolbar
+        table={table}
+        actions={
+          filtered ? (
+            <TextLinkButton onClick={onClearAll}>Clear all</TextLinkButton>
+          ) : null
+        }
+      >
+        <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:w-full max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:pb-1">
+          {view === "paying" ? null : (
+            <FilterChip
+              label="Status"
+              icon={ClockIcon}
+              options={statusOptions}
+              value={filters.status}
+              onChange={(value) => onFilter("status", value)}
+              anyLabel="Any status"
+            />
+          )}
+          <FilterChip
+            label="Payee"
+            icon={Building2Icon}
+            options={payeeOptions}
+            value={filters.payeeId}
+            onChange={(value) => onFilter("payeeId", value)}
+            anyLabel="Every payee"
+            searchPlaceholder="Search payees"
           />
-        }
-        chips={
-          <>
-            {view === "paying" ? null : (
-              <FilterChip
-                label="Status"
-                icon={ClockIcon}
-                options={statusOptions}
-                value={filters.status}
-                onChange={(value) => onFilter("status", value)}
-                anyLabel="Any status"
-              />
-            )}
-            <FilterChip
-              label="Payee"
-              icon={Building2Icon}
-              options={payeeOptions}
-              value={filters.payeeId}
-              onChange={(value) => onFilter("payeeId", value)}
-              anyLabel="Every payee"
-              searchPlaceholder="Search payees"
-            />
-            <FilterChip
-              label="Category"
-              icon={TagIcon}
-              options={categoryOptions}
-              value={filters.categoryId}
-              onChange={(value) => onFilter("categoryId", value)}
-              anyLabel="All categories"
-            />
-            <FilterChip
-              label="Heading"
-              icon={LayersIcon}
-              options={HEADING_OPTIONS}
-              value={filters.heading}
-              onChange={(value) => onFilter("heading", value)}
-              anyLabel="Every heading"
-            />
-            <FilterChip
-              label="Paid by"
-              icon={WalletIcon}
-              options={METHOD_OPTIONS}
-              value={filters.method}
-              onChange={(value) => onFilter("method", value)}
-              anyLabel="Any method"
-            />
-            <FilterChip
-              label="Source"
-              icon={RepeatIcon}
-              options={SOURCE_OPTIONS}
-              value={filters.source}
-              onChange={(value) => onFilter("source", value)}
-              anyLabel="Any source"
-            />
-          </>
-        }
-        onClearAll={filtered ? onClearAll : undefined}
-      />
+          <FilterChip
+            label="Category"
+            icon={TagIcon}
+            options={categoryOptions}
+            value={filters.categoryId}
+            onChange={(value) => onFilter("categoryId", value)}
+            anyLabel="All categories"
+          />
+          <FilterChip
+            label="Heading"
+            icon={LayersIcon}
+            options={HEADING_OPTIONS}
+            value={filters.heading}
+            onChange={(value) => onFilter("heading", value)}
+            anyLabel="Every heading"
+          />
+          <FilterChip
+            label="Paid by"
+            icon={WalletIcon}
+            options={METHOD_OPTIONS}
+            value={filters.method}
+            onChange={(value) => onFilter("method", value)}
+            anyLabel="Any method"
+          />
+          <FilterChip
+            label="Source"
+            icon={RepeatIcon}
+            options={SOURCE_OPTIONS}
+            value={filters.source}
+            onChange={(value) => onFilter("source", value)}
+            anyLabel="Any source"
+          />
+        </div>
+      </DataTableToolbar>
       <ResultsBody id="bills-results" busy={loading} refreshing={refreshing}>
-        {loading ? (
-          <LoadingRows />
-        ) : failed ? (
+        {failed ? (
           <ErrorState title="Bills didn't load" onRetry={onRetry} />
-        ) : rows.length === 0 ? (
+        ) : !loading && rows.length === 0 ? (
           filtered ? (
             <EmptyState
               icon={FilterXIcon}
@@ -344,205 +302,77 @@ export function BillsResults({
             </EmptyState>
           )
         ) : (
-          <BillRows
-            view={view}
-            rows={rows}
-            sort={sort}
-            onSort={onSort}
-            rate={rate}
-            today={today}
-            openId={openId}
-            onOpen={onOpen}
-            selection={selection}
+          <DataTable
+            table={table}
+            caption={loading ? "Loading bills" : CAPTIONS[view]}
+            phoneLabel={loading ? "Loading bills" : "Bills"}
+            loading={loading}
+            onRowOpen={(bill) => onOpen(bill.id)}
+            openRowId={openId}
+            renderPhoneCard={(row) => (
+              <BillPhoneCard
+                key={row.id}
+                row={row}
+                settled={settled}
+                view={view}
+                rate={rate}
+                selection={selection}
+                onOpen={onOpen}
+              />
+            )}
           />
         )}
         {selection && !loading && !failed && rows.length > 0 ? (
           <PayBar rows={rows} selection={selection} rate={rate} />
         ) : null}
       </ResultsBody>
+      {loading || failed || rows.length === 0 ? null : (
+        <DataTablePagination table={table} noun="bills" />
+      )}
     </ResultsPanel>
   );
 }
 
-function LoadingRows(): JSX.Element {
-  return (
-    <>
-      <DataTable caption="Loading bills">
-        <tbody>
-          <TableSkeletonRows rows={6} columns={4} />
-        </tbody>
-      </DataTable>
-      <PhoneCards label="Loading bills">
-        {[0, 1, 2, 3].map((row) => (
-          <li
-            key={row}
-            aria-hidden="true"
-            className="flex items-start gap-3 border-b border-row-divider px-4 py-3.5"
-          >
-            <Skel width={32} height={32} />
-            <div className="flex-1">
-              <Skel width="55%" height={14} />
-              <Skel width="35%" height={12} style={{ marginTop: 8 }} />
-            </div>
-          </li>
-        ))}
-      </PhoneCards>
-    </>
-  );
-}
-
-function BillRows({
+function BillPhoneCard({
+  row,
+  settled,
   view,
-  rows,
-  sort,
-  onSort,
   rate,
-  today,
-  openId,
-  onOpen,
   selection,
+  onOpen,
 }: {
+  row: DataTableRow<Bill>;
+  settled: boolean;
   view: BillListView;
-  rows: readonly Bill[];
-  sort: BillSort;
-  onSort: (key: BillSortKey) => void;
   rate: string | null;
-  today: string;
-  openId: string | null;
-  onOpen: (billId: string) => void;
   selection: BillSelection | null;
+  onOpen: (billId: string) => void;
 }): JSX.Element {
-  const settled = view === "history";
-
-  function checkbox(bill: Bill) {
-    if (!selection || !canSelect(bill)) return null;
-    const checked = selection.selected.includes(bill.id);
-    const atLimit =
-      !checked && selection.selected.length >= BILL_PAYMENT_MAX_BILLS;
-    return (
-      <RowCheckbox
-        aria-label={`Select ${bill.payee.name}`}
-        checked={checked}
-        disabled={selection.busy || atLimit}
-        title={
-          atLimit
-            ? `Pay up to ${String(BILL_PAYMENT_MAX_BILLS)} bills at a time.`
-            : undefined
-        }
-        onChange={() => selection.onToggle(bill.id)}
-      />
-    );
-  }
-
+  const bill = row.original;
   return (
-    <>
-      <DataTable caption={CAPTIONS[view]}>
-        <thead>
-          <tr>
-            {selection ? (
-              <Th checkbox>
-                <span className="sr-only">Select</span>
-              </Th>
-            ) : null}
-            <SortHeader
-              label={settled ? "Settled" : "Due"}
-              sortKey="date"
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortHeader
-              label="Payee"
-              sortKey="payee"
-              sort={sort}
-              onSort={onSort}
-            />
-            <Th collapse="lg">Paid by</Th>
-            <SortHeader
-              label="Amount"
-              sortKey="amount"
-              align="end"
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortHeader
-              label="Status"
-              sortKey="status"
-              sort={sort}
-              onSort={onSort}
-            />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((bill) => (
-            <DataRow
-              key={bill.id}
-              open={bill.id === openId}
-              selected={selection?.selected.includes(bill.id) ?? false}
-              onOpen={() => onOpen(bill.id)}
-            >
-              {selection ? <Td kind="checkbox">{checkbox(bill)}</Td> : null}
-              <Td kind="date">
-                {formatIsoDate(rowDate(bill, view))}
-                {settled ? null : <DueHintLine bill={bill} today={today} />}
-              </Td>
-              <Td kind="main">
-                <span className="flex min-w-0 items-start gap-3">
-                  <EntityMark name={bill.payee.name} />
-                  <span className="min-w-0">
-                    <RowTitle onOpen={() => onOpen(bill.id)}>
-                      {bill.payee.name}
-                    </RowTitle>
-                    <RowMeta text={metaOf(bill)}>
-                      <Markers bill={bill} />
-                    </RowMeta>
-                  </span>
-                </span>
-              </Td>
-              <Td
-                collapse="lg"
-                className={
-                  bill.payee.method
-                    ? "whitespace-nowrap text-gray-600"
-                    : "whitespace-nowrap text-gray-500"
-                }
-              >
-                {bill.payee.method
-                  ? METHOD_LABELS[bill.payee.method]
-                  : "Not set"}
-              </Td>
-              <Td align="end">
-                <BillAmount bill={bill} rate={rate} />
-              </Td>
-              <Td>
-                <BillStatusBadge status={bill.status} />
-              </Td>
-            </DataRow>
-          ))}
-        </tbody>
-      </DataTable>
-      <PhoneCards label="Bills">
-        {rows.map((bill) => (
-          <PhoneCard
-            key={bill.id}
-            mark={<EntityMark name={bill.payee.name} />}
-            title={bill.payee.name}
-            sub={`${settled ? "Settled" : "Due"} ${formatIsoDate(rowDate(bill, view))}`}
-            flags={
-              <>
-                <BillStatusBadge status={bill.status} />
-                <Markers bill={bill} />
-              </>
-            }
-            aside={<BillAmount bill={bill} rate={rate} />}
-            onOpen={() => onOpen(bill.id)}
-            check={
-              selection ? (checkbox(bill) ?? <span aria-hidden="true" />) : null
-            }
-            selected={selection?.selected.includes(bill.id) ?? false}
-          />
-        ))}
-      </PhoneCards>
-    </>
+    <PhoneCard
+      mark={<EntityMark name={bill.payee.name} />}
+      title={bill.payee.name}
+      sub={`${settled ? "Settled" : "Due"} ${formatIsoDate(rowDate(bill, view))}`}
+      flags={
+        <>
+          <BillStatusBadge status={bill.status} />
+          <Markers bill={bill} />
+        </>
+      }
+      aside={<BillAmount bill={bill} rate={rate} />}
+      onOpen={() => onOpen(bill.id)}
+      check={
+        selection ? (
+          canSelect(bill) ? (
+            <BillCheckbox bill={bill} selection={selection} />
+          ) : (
+            <span aria-hidden="true" />
+          )
+        ) : null
+      }
+      selected={row.getIsSelected()}
+    />
   );
 }
 

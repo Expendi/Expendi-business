@@ -56,7 +56,7 @@ export function CopyButton({
       </Button>
       <span
         role="status"
-        className="text-xs leading-4 text-gray-600 empty:hidden"
+        className="text-xs leading-4 text-muted-foreground empty:hidden"
       >
         {state === "failed"
           ? "Couldn't copy. Select it and copy it instead."

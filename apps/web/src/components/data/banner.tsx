@@ -12,7 +12,7 @@ const ICONS: Record<BannerTone, LucideIcon> = {
 };
 
 const ICON_TONES: Record<BannerTone, string> = {
-  neutral: "text-gray-500",
+  neutral: "text-muted-foreground",
   success: "text-success-700",
   warn: "text-warn-600",
 };
@@ -49,7 +49,7 @@ export function Banner({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-start gap-3 rounded-panel border border-gray-200 bg-surface px-4 py-3.5 text-sm",
+        "flex flex-wrap items-start gap-3 rounded-xl border border-border bg-card px-4 py-3.5 text-sm",
         className,
       )}
       {...props}
@@ -58,7 +58,7 @@ export function Banner({
         aria-hidden="true"
         className={cn("mt-px size-5 shrink-0", ICON_TONES[tone])}
       />
-      <div className="min-w-0 flex-[1_1_280px] [&>p+p]:mt-0.5 [&>p+p]:text-gray-600">
+      <div className="min-w-0 flex-[1_1_280px] [&>p+p]:mt-0.5 [&>p+p]:text-muted-foreground">
         <p className="font-(--w-title)">{title}</p>
         {typeof children === "string" ? <p>{children}</p> : children}
       </div>

@@ -264,7 +264,7 @@ function SectionNav({
     <nav
       ref={navRef}
       aria-label="Settings sections"
-      className="sticky top-6 flex flex-col gap-0.5 [scrollbar-width:none] max-[900px]:top-14 max-[900px]:z-20 max-[900px]:flex-row max-[900px]:gap-1 max-[900px]:overflow-x-auto max-[900px]:border-b max-[900px]:border-gray-200 max-[900px]:bg-background max-[900px]:py-2 @max-[760px]/settings:z-20 @max-[760px]/settings:flex-row @max-[760px]/settings:gap-1 @max-[760px]/settings:overflow-x-auto @max-[760px]/settings:border-b @max-[760px]/settings:border-gray-200 @max-[760px]/settings:bg-background @max-[760px]/settings:py-2 min-[901px]:@max-[760px]/settings:top-0 [&::-webkit-scrollbar]:hidden"
+      className="sticky top-6 flex flex-col gap-0.5 [scrollbar-width:none] max-[900px]:top-14 max-[900px]:z-20 max-[900px]:flex-row max-[900px]:gap-1 max-[900px]:overflow-x-auto max-[900px]:border-b max-[900px]:border-border max-[900px]:bg-background max-[900px]:py-2 @max-[760px]/settings:z-20 @max-[760px]/settings:flex-row @max-[760px]/settings:gap-1 @max-[760px]/settings:overflow-x-auto @max-[760px]/settings:border-b @max-[760px]/settings:border-border @max-[760px]/settings:bg-background @max-[760px]/settings:py-2 min-[901px]:@max-[760px]/settings:top-0 [&::-webkit-scrollbar]:hidden"
     >
       {sections.map((section) => {
         const flag = flags[section.id];
@@ -279,11 +279,11 @@ function SectionNav({
               event.preventDefault();
               go(section.id);
             }}
-            className="group/link flex h-9 flex-none items-center gap-2.5 rounded-control px-2.5 whitespace-nowrap text-gray-700 no-underline transition-colors duration-150 hover:bg-gray-100 aria-[current=true]:bg-brand-50 aria-[current=true]:font-(--w-ui) aria-[current=true]:text-brand-800"
+            className="group/link flex h-9 flex-none items-center gap-2.5 rounded-control px-2.5 whitespace-nowrap text-secondary-foreground no-underline transition-colors duration-150 hover:bg-muted aria-[current=true]:bg-brand-50 aria-[current=true]:font-(--w-ui) aria-[current=true]:text-brand-800"
           >
             <Icon
               aria-hidden="true"
-              className="size-4 text-gray-400 group-aria-[current=true]/link:text-brand-700"
+              className="size-4 text-muted-foreground/70 group-aria-[current=true]/link:text-brand-700"
             />
             {section.label}
             {flag ? (
@@ -325,7 +325,7 @@ function CompanyDetails({
             <KeyValue label="Name">{details.data.name}</KeyValue>
             <KeyValue label="KRA PIN">
               {details.data.kraPin ?? (
-                <span className="text-gray-500">Not given</span>
+                <span className="text-muted-foreground">Not given</span>
               )}
             </KeyValue>
             <KeyValue label="Your role">

@@ -70,7 +70,7 @@ export function PayeeReview({
 
   return (
     <>
-      <p className="text-gray-600">
+      <p className="text-muted-foreground">
         Check every character. This is exactly what your passkey confirms.
       </p>
       <DetailList>
