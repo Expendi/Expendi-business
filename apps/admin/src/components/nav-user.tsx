@@ -1,15 +1,16 @@
 "use client";
 
-import { EllipsisVerticalIcon, LogOutIcon } from "lucide-react";
+import { EllipsisVerticalIcon } from "lucide-react";
 
+import type { Account } from "~/components/shell/account-menu";
+import {
+  accountInitials,
+  AccountMenuItems,
+} from "~/components/shell/account-menu";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import {
@@ -19,15 +20,8 @@ import {
   useSidebar,
 } from "~/components/ui/sidebar";
 
-export function NavUser({
-  email,
-  role,
-  onSignOut,
-}: {
-  email: string;
-  role: string;
-  onSignOut: () => void;
-}) {
+/** The staff member signed in, at the foot of the sidebar; opens Sign out. */
+export function NavUser({ account }: { account: Account }) {
   const { isMobile } = useSidebar();
   return (
     <SidebarMenu>
@@ -36,37 +30,32 @@ export function NavUser({
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              aria-label={`Account menu for ${email}`}
+              aria-label={`Account menu for ${account.email}`}
+              className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
             >
-              <Avatar>
-                <AvatarFallback>
-                  {email.slice(0, 2).toUpperCase()}
+              <Avatar className="size-8 rounded-lg">
+                <AvatarFallback className="rounded-lg">
+                  {accountInitials(account)}
                 </AvatarFallback>
               </Avatar>
-              <div className="grid min-w-0 flex-1 gap-0.5 text-left">
-                <span className="truncate font-medium" title={email}>
-                  {email}
+              <span className="grid min-w-0 flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-medium" title={account.email}>
+                  {account.email}
                 </span>
-                <span className="text-xs text-muted-foreground">{role}</span>
-              </div>
-              <EllipsisVerticalIcon aria-hidden="true" />
+                <span className="truncate text-xs text-muted-foreground">
+                  {account.role}
+                </span>
+              </span>
+              <EllipsisVerticalIcon aria-hidden="true" className="ml-auto" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="min-w-56"
+            className="min-w-56 rounded-lg"
             side={isMobile ? "bottom" : "right"}
             align="end"
+            sideOffset={4}
           >
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>{role}</DropdownMenuLabel>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={onSignOut}>
-                <LogOutIcon />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
+            <AccountMenuItems account={account} />
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

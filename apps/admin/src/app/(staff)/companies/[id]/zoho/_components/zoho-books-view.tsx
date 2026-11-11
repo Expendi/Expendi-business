@@ -12,6 +12,7 @@ import type {
 } from "@expendi-business/shared";
 import { ZOHO_REQUIRED_CURRENCY } from "@expendi-business/shared";
 
+import { PageHeader } from "~/components/data/page-header";
 import { PageError, PageLoading } from "~/components/page-state";
 import {
   dangerButton,
@@ -42,17 +43,17 @@ export function ZohoBooksView({ companyId }: { companyId: string }) {
       <p className="text-sm">
         <Link
           href="/zoho-books"
-          className="text-stone-600 underline-offset-4 hover:underline"
+          className="text-muted-foreground underline-offset-4 hover:underline"
         >
           Zoho Books
         </Link>
       </p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight">Zoho Books</h1>
-      <p className="mt-1 text-sm break-all text-stone-600">
-        Company {companyId}
-      </p>
+      <PageHeader
+        title="Zoho Books"
+        subtitle={<span className="break-all">Company {companyId}</span>}
+      />
       {canAct ? null : (
-        <p className="mt-2 text-sm text-stone-500">
+        <p className="mt-2 text-sm text-muted-foreground">
           You can look but not change anything: that needs an ops admin.
         </p>
       )}
@@ -186,25 +187,25 @@ function StatusPanel({ connection }: { connection: ZohoConnection | null }) {
   return (
     <Panel title="Status">
       <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-[12rem_minmax(0,1fr)] [&>dd]:break-words">
-        <dt className="text-stone-500">Connection</dt>
+        <dt className="text-muted-foreground">Connection</dt>
         <dd className="font-medium">{statusLabel(connection)}</dd>
         {connection ? (
           <>
-            <dt className="text-stone-500">Organization</dt>
+            <dt className="text-muted-foreground">Organization</dt>
             <dd>
               {connection.organization
                 ? `${connection.organization.name} (${connection.organization.id})`
                 : "Not chosen"}
             </dd>
-            <dt className="text-stone-500">Last sign-in</dt>
+            <dt className="text-muted-foreground">Last sign-in</dt>
             <dd>
               {connection.connectedAt
                 ? formatNairobiTime(connection.connectedAt)
                 : "Never"}
             </dd>
-            <dt className="text-stone-500">Zoho data centre</dt>
+            <dt className="text-muted-foreground">Zoho data centre</dt>
             <dd>{connection.apiDomain ?? "Not known until sign-in"}</dd>
-            <dt className="text-stone-500">Connect link</dt>
+            <dt className="text-muted-foreground">Connect link</dt>
             <dd>
               {connection.connectLink
                 ? `${connection.connectLink.expired ? "Expired" : "Unused, expires"} ${formatNairobiTime(connection.connectLink.expiresAt)}`
@@ -252,7 +253,7 @@ function ConnectLinkPanel({
 
   return (
     <Panel title="Connect link">
-      <p className="text-stone-600">
+      <p className="text-muted-foreground">
         Send the link to whoever owns the company&apos;s Zoho login, usually the
         accountant. It works once and expires after 7 days.
         {reconnecting
@@ -280,7 +281,7 @@ function ConnectLinkPanel({
             >
               {copied ? "Copied" : "Copy link"}
             </button>
-            <span className="text-stone-500">
+            <span className="text-muted-foreground">
               Expires {formatNairobiTime(link.expiresAt)}
             </span>
           </div>
@@ -341,18 +342,18 @@ function OrganizationPanel({
   return (
     <Panel title="Zoho organization">
       {organizations.isPending ? (
-        <p className="text-stone-500">Loading the organizations…</p>
+        <p className="text-muted-foreground">Loading the organizations…</p>
       ) : organizations.isError ? (
         <ErrorText error={organizations.error} />
       ) : organizations.data.length === 0 ? (
-        <p className="text-stone-600">
+        <p className="text-muted-foreground">
           The Zoho login that signed in can&apos;t see any Zoho Books
           organization.
         </p>
       ) : (
         <form onSubmit={onSubmit}>
           <fieldset disabled={!canAct || choose.isPending}>
-            <legend className="text-stone-600">
+            <legend className="text-muted-foreground">
               Only an organization whose base currency is{" "}
               {ZOHO_REQUIRED_CURRENCY} can be connected.
             </legend>
@@ -375,7 +376,7 @@ function OrganizationPanel({
                     />
                     <span>
                       {organization.name}{" "}
-                      <span className="text-stone-500">
+                      <span className="text-muted-foreground">
                         ({organization.currencyCode})
                       </span>
                       {isKes ? null : (
@@ -391,7 +392,7 @@ function OrganizationPanel({
               })}
             </div>
             {switching ? (
-              <p className="mt-3 text-stone-600">
+              <p className="mt-3 text-muted-foreground">
                 Switching organization clears the account mapping below.
               </p>
             ) : null}
@@ -503,7 +504,7 @@ function MappingPanel({
   if (accounts.isPending) {
     return (
       <Panel title="Account mapping">
-        <p className="text-stone-500">Loading the chart of accounts…</p>
+        <p className="text-muted-foreground">Loading the chart of accounts…</p>
       </Panel>
     );
   }
@@ -530,7 +531,7 @@ function MappingPanel({
         <fieldset disabled={!canAct || save.isPending} className="space-y-4">
           <label className="block">
             Paid Through account
-            <span className="block text-stone-500">
+            <span className="block text-muted-foreground">
               Where the money came from, e.g. a bank account called
               &ldquo;Expendi Wallet&rdquo;.
             </span>
@@ -548,7 +549,7 @@ function MappingPanel({
           </label>
           <label className="block">
             Default expense account
-            <span className="block text-stone-500">
+            <span className="block text-muted-foreground">
               For categories without their own account.
             </span>
             <NativeSelect
@@ -565,7 +566,7 @@ function MappingPanel({
           </label>
           <label className="block">
             Petty cash account
-            <span className="block text-stone-500">
+            <span className="block text-muted-foreground">
               The Paid Through account for spending from petty cash floats, e.g.
               a cash account called &ldquo;Petty Cash&rdquo;.
             </span>
@@ -582,7 +583,7 @@ function MappingPanel({
           </label>
           <label className="block">
             Salaries account
-            <span className="block text-stone-500">
+            <span className="block text-muted-foreground">
               Each payroll run posts here as one expense for its total.
             </span>
             <NativeSelect
@@ -598,7 +599,7 @@ function MappingPanel({
           <div>
             <p className="font-medium">Categories</p>
             {connection.categoryAccounts.length === 0 ? (
-              <p className="mt-1 text-stone-500">
+              <p className="mt-1 text-muted-foreground">
                 This company has no categories yet.
               </p>
             ) : (
@@ -629,11 +630,11 @@ function MappingPanel({
 
           <div>
             <p className="font-medium">Paid-from accounts</p>
-            <p className="mt-1 text-stone-500">
+            <p className="mt-1 text-muted-foreground">
               Where company spending, and bills paid outside Expendi, came from.
             </p>
             {connection.paidFromAccounts.length === 0 ? (
-              <p className="mt-1 text-stone-500">
+              <p className="mt-1 text-muted-foreground">
                 This company has no paid-from accounts yet.
               </p>
             ) : (
@@ -674,7 +675,7 @@ function MappingPanel({
         </fieldset>
         {save.isError ? <ErrorText error={save.error} /> : null}
         {save.isSuccess ? (
-          <p role="status" className="mt-3 text-stone-600">
+          <p role="status" className="mt-3 text-muted-foreground">
             Mapping saved.
           </p>
         ) : null}
@@ -703,7 +704,7 @@ function DisconnectPanel({ companyId }: { companyId: string }) {
 
   return (
     <Panel title="Disconnect">
-      <p className="text-stone-600">
+      <p className="text-muted-foreground">
         Revokes Expendi&apos;s access in Zoho and forgets the stored token.
         Nothing already in Zoho changes. Reconnecting needs a new connect link.
       </p>

@@ -35,7 +35,7 @@ export function SecondConfirmation({
     <div
       role="region"
       aria-label={title}
-      className="rounded-xl border border-amber-300 bg-amber-50 p-4 sm:p-6"
+      className="rounded-xl border border-warn-600 bg-warn-50 p-4 sm:p-6"
     >
       <h3 className="text-sm font-semibold">{title}</h3>
       {children}
@@ -50,7 +50,7 @@ export function SecondConfirmation({
       <p className="mt-3 text-sm">
         <span className="font-medium">Your reason:</span> {reason}
       </p>
-      <p className="mt-1 text-xs text-stone-600">
+      <p className="mt-1 text-xs text-muted-foreground">
         This confirmation expires at {formatNairobiTime(expiresAt)}.
       </p>
       {error ? <PageError>{error}</PageError> : null}

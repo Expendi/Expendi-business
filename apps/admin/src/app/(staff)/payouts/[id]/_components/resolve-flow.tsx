@@ -122,7 +122,7 @@ export function ResolveFlow({ payoutId }: { payoutId: string }) {
             />
             <span>
               <span className="font-medium">{option.label}</span>
-              <span className="block text-stone-600">{option.hint}</span>
+              <span className="block text-muted-foreground">{option.hint}</span>
             </span>
           </label>
         ))}
@@ -168,9 +168,11 @@ export function ResolveFlow({ payoutId }: { payoutId: string }) {
 function EvidenceSummary({ evidence }: { evidence: PayoutEvidence }) {
   return (
     <dl className="mt-4 grid grid-cols-1 gap-x-4 gap-y-3 text-sm sm:grid-cols-[12rem_minmax(0,1fr)]">
-      <dt className="text-stone-600">Paycrest says</dt>
+      <dt className="text-muted-foreground">Paycrest says</dt>
       <dd>{evidence.paycrestStatus ?? "— (no Paycrest order)"}</dd>
-      <dt className="text-stone-600">Transfers to the deposit address</dt>
+      <dt className="text-muted-foreground">
+        Transfers to the deposit address
+      </dt>
       <dd>
         {!evidence.fundingStarted
           ? "None: funding never started"
@@ -185,7 +187,7 @@ function EvidenceSummary({ evidence }: { evidence: PayoutEvidence }) {
                 </span>
               ))}
       </dd>
-      <dt className="text-stone-600">Ledger debit</dt>
+      <dt className="text-muted-foreground">Ledger debit</dt>
       <dd>
         {evidence.ledgerDebits.length === 0
           ? "None yet"
@@ -193,7 +195,7 @@ function EvidenceSummary({ evidence }: { evidence: PayoutEvidence }) {
               .map((debit) => formatUsdc(debit.usdcAmount))
               .join(", ")}
       </dd>
-      <dt className="text-stone-600">Refunds received</dt>
+      <dt className="text-muted-foreground">Refunds received</dt>
       <dd>
         {evidence.refunds.length === 0
           ? "None"

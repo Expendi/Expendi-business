@@ -10,9 +10,9 @@ import {
 } from "./ui/table";
 
 const ROW_STYLES: Record<DiffKind, string> = {
-  added: "bg-emerald-50",
+  added: "bg-success-50",
   removed: "bg-error-50",
-  changed: "bg-amber-50",
+  changed: "bg-warn-50",
   unchanged: "",
 };
 
@@ -33,7 +33,7 @@ export function JsonDiff({
   const rows = diffJson(before, after);
 
   if (rows.length === 0) {
-    return <p className="text-sm text-stone-500">No values recorded.</p>;
+    return <p className="text-sm text-muted-foreground">No values recorded.</p>;
   }
 
   return (

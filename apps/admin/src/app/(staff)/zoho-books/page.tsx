@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { PageHeader } from "~/components/data/page-header";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -37,13 +38,12 @@ export default function ZohoBooksPage() {
   }
 
   return (
-    <section className="max-w-xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Zoho Books</h1>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Send a company&apos;s accountant a connect link, pick the Zoho
-        organization and map categories to Zoho accounts.
-      </p>
-      <Card className="mt-6">
+    <section className="flex max-w-xl flex-col gap-6">
+      <PageHeader
+        title="Zoho Books"
+        subtitle="Send a company's accountant a connect link, pick the Zoho organization and map categories to Zoho accounts."
+      />
+      <Card>
         <CardHeader>
           <CardTitle>
             <h2>Open a company connection</h2>

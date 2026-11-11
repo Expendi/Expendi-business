@@ -188,6 +188,40 @@ function deriveStatus({
   return "checking";
 }
 
+/**
+ * A session that is always signed in as the given staff member over the
+ * given API, with no Privy: the dev preview (`app/dev/preview`) renders pages
+ * with sample data in it.
+ */
+export function StaticStaffAuthProvider({
+  api,
+  staff,
+  children,
+}: {
+  api: InternalApi;
+  staff: StaffMeResponse;
+  children: ReactNode;
+}) {
+  const value = useMemo<StaffAuthContextValue>(
+    () => ({
+      status: "signed-in",
+      staff,
+      notice: null,
+      error: null,
+      api,
+      signIn: () => undefined,
+      signOut: () => Promise.resolve(),
+      retry: () => undefined,
+    }),
+    [api, staff],
+  );
+  return (
+    <StaffAuthContext.Provider value={value}>
+      {children}
+    </StaffAuthContext.Provider>
+  );
+}
+
 export function useStaffAuth(): StaffAuthContextValue {
   const context = useContext(StaffAuthContext);
   if (!context) {
