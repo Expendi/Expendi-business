@@ -7,11 +7,14 @@ import type {
 } from "@expendi-business/shared";
 
 import {
+  cashExplanation,
+  cashFigure,
   cashFootnote,
   cashHeadline,
   cashOutsideLine,
   obligationAction,
   obligationAmount,
+  kesCentsToUsdcCents,
   obligationTarget,
   openFloatLeft,
   shiftMonth,
@@ -155,5 +158,105 @@ describe("month and float helpers", () => {
 
     // #then
     expect(openFloatLeft(floats)).toBe("9007199254741000");
+  });
+});
+
+describe("kesCentsToUsdcCents", () => {
+  it("divides by the rate and rounds towards zero", () => {
+    // #when
+    const usdc = kesCentsToUsdcCents("12128282", "129.00");
+
+    // #then
+    expect(usdc).toBe("94017");
+  });
+
+  it("accepts a whole-number rate", () => {
+    // #when
+    const usdc = kesCentsToUsdcCents("12900", "129");
+
+    // #then
+    expect(usdc).toBe("100");
+  });
+
+  it.each(["", "abc", "0", "0.00", "-129"])(
+    "is null for the unusable rate %j",
+    (rate) => {
+      // #when
+      const usdc = kesCentsToUsdcCents("12900", rate);
+
+      // #then
+      expect(usdc).toBeNull();
+    },
+  );
+});
+
+describe("cashFigure", () => {
+  it("shows what's available in KES when the cash is covered", () => {
+    // #when
+    const figure = cashFigure(cash({ availableKes: "12128282" }), "KES");
+
+    // #then
+    expect(figure).toEqual({
+      label: "Available",
+      code: "KES",
+      value: "121,282.82",
+    });
+  });
+
+  it("converts what's available to USDC at the overview's rate", () => {
+    // #when
+    const figure = cashFigure(
+      cash({ availableKes: "12128282", rate: "129.00" }),
+      "USDC",
+    );
+
+    // #then
+    expect(figure).toEqual({ label: "Available", code: "USDC", value: "940.17" });
+  });
+
+  it("shows the shortfall when the cash is short", () => {
+    // #when
+    const figure = cashFigure(
+      cash({ status: "short", shortKes: "1500050", availableKes: "-1500050" }),
+      "KES",
+    );
+
+    // #then
+    expect(figure).toEqual({ label: "Short by", code: "KES", value: "15,000.50" });
+  });
+
+  it("falls back to the wallet's USDC when today's rate is missing", () => {
+    // #when
+    const figure = cashFigure(
+      cash({
+        status: "unknown",
+        rate: null,
+        availableKes: null,
+        balanceKes: null,
+        balanceUsdc: "3412580000",
+      }),
+      "KES",
+    );
+
+    // #then
+    expect(figure).toEqual({
+      label: "In the wallet",
+      code: "USDC",
+      value: "3,412.58",
+    });
+  });
+});
+
+describe("cashExplanation", () => {
+  it("uses a human date and counts payments with no amount", () => {
+    // #when
+    const text = cashExplanation(
+      cash({ totalKes: "31894000", through: "2026-12-10", unknownAmounts: 1 }),
+    );
+
+    // #then
+    expect(text).toBe(
+      "KES 318,940.00 to pay through Expendi by 10 Dec, overdue included. Not counting 1 payment with no amount yet. Paycrest's fees and bills paid outside Expendi aren't counted.",
+    );
   });
 });

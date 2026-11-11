@@ -22,6 +22,17 @@ export function ApiProvider({
   return <ApiContext.Provider value={api}>{children}</ApiContext.Provider>;
 }
 
+/** Supplies a ready-made client, e.g. the read-only fixtures in dev previews. */
+export function ApiClientProvider({
+  client,
+  children,
+}: {
+  client: ApiClient;
+  children: ReactNode;
+}): JSX.Element {
+  return <ApiContext.Provider value={client}>{children}</ApiContext.Provider>;
+}
+
 export function useApi(): ApiClient {
   const api = useContext(ApiContext);
   if (!api) throw new Error("useApi must be used inside ApiProvider");

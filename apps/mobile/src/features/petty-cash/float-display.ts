@@ -83,8 +83,8 @@ export function overspendNotice(
   if (claimedKes === 0n) return null;
   const claimed = kes(claimedKes.toString());
   return fromFloatKes === 0n
-    ? `Nothing is left on your float, so ${claimed} will be submitted as a claim for an admin to approve.`
-    : `${kes(fromFloatKes.toString())} comes from your float and ${claimed} will be submitted as a claim for an admin to approve.`;
+    ? `Nothing is left on your float, so ${claimed} will be submitted as a reimbursement for an admin to approve.`
+    : `${kes(fromFloatKes.toString())} comes from your float and ${claimed} will be submitted as a reimbursement for an admin to approve.`;
 }
 
 /** Who can hold a float: active admins and employees with a confirmed M-Pesa number. */

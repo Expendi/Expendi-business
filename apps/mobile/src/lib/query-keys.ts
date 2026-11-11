@@ -11,6 +11,11 @@ export const queryKeys = {
   withdrawalAddresses: (organizationId: string) =>
     ["organizations", organizationId, "withdrawal-addresses"] as const,
   approvalPasskey: ["approval-passkey"] as const,
+  /** `month` is `YYYY-MM`, or "" for the current month. */
+  overview: (organizationId: string, month: string) =>
+    ["organizations", organizationId, "overview", month] as const,
+  /** Whether Home shows balances; per phone, not per company. */
+  hideBalances: ["hide-balances"] as const,
   members: (organizationId: string) =>
     ["organizations", organizationId, "members"] as const,
   organization: (organizationId: string) =>

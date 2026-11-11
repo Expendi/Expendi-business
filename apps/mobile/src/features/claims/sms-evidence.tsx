@@ -28,17 +28,20 @@ export function SmsEvidence({
   organizationId,
   attached,
   disabled = false,
+  startOpen = false,
   onAttach,
   onRemove,
 }: {
   organizationId: string;
   attached: AttachedSms | null;
   disabled?: boolean;
+  /** Opens the paste box straight away. */
+  startOpen?: boolean;
   onAttach: (sms: AttachedSms, prefill: Prefill) => void;
   onRemove: () => void;
 }): JSX.Element {
   const register = useRegisterSms(organizationId);
-  const [pasting, setPasting] = useState(false);
+  const [pasting, setPasting] = useState(startOpen);
   const [text, setText] = useState("");
   const [readError, setReadError] = useState<string | null>(null);
 
