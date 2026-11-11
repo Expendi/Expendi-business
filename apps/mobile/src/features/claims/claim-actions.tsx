@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
+import { CircleAlert, ScanFace } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
 
@@ -9,22 +10,25 @@ import {
   REJECTION_REASON_MIN_LENGTH,
 } from "@expendi-business/shared";
 
-import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ConfirmSheet } from "~/components/confirm-sheet";
-import { Text } from "~/components/text";
+import { CappedText, Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { describeApiError } from "~/lib/api";
-import { formatIsoDate, localIsoDate } from "./dates";
+import { colors } from "~/theme/colors";
+import { formatShortDate, localIsoDate } from "./dates";
 import { useRejectClaim } from "./use-claim-approval";
 
 const claimantOf = (claim: ClaimDetail): string =>
   claim.submittedBy.name ?? claim.submittedBy.email;
 
 const dayOf = (dateTime: string): string =>
-  formatIsoDate(localIsoDate(new Date(dateTime)));
+  formatShortDate(
+    localIsoDate(new Date(dateTime)),
+    localIsoDate(new Date()),
+  );
 
-/** What happens to the employee's money once a claim is approved (spec §5). */
+/** What happens to the employee's money once a reimbursement is approved (spec §5). */
 const PAYMENT_NOTES: Partial<Record<ClaimDetail["status"], string>> = {
   paying:
     "Approved. The money is on its way to your M-Pesa and usually arrives within a few minutes.",
@@ -44,9 +48,9 @@ export function PaymentNote({
   return (
     <View
       accessibilityRole="summary"
-      className={`rounded-xl px-4 py-3 ${claim.status === "payout_failed" ? "border border-amber-200 bg-amber-50" : "bg-gray-50"}`}
+      className={`rounded-2xl p-4 ${claim.status === "payout_failed" ? "bg-error-50" : "bg-gray-50"}`}
     >
-      <Text className="text-base text-gray-900">{note}</Text>
+      <Text className="text-[15px] leading-[21px] text-gray-900">{note}</Text>
     </View>
   );
 }
@@ -61,9 +65,18 @@ export function ApprovalDetails({
   return (
     <View className="gap-2">
       {claim.selfApproved ? (
-        <Badge label="Self-approved" tone="warning" />
+        <View className="self-start rounded-full bg-error-50 px-3 py-1">
+          <CappedText
+            size={13}
+            lineHeight={18}
+            maxScale={1.3}
+            className="font-semibold text-error-700"
+          >
+            Self-approved
+          </CappedText>
+        </View>
       ) : null}
-      <Text className="text-sm text-gray-600">
+      <Text className="text-[14px] text-gray-600">
         Approved {dayOf(claim.approvedAt)}
         {claim.paidAt ? ` · Paid ${dayOf(claim.paidAt)}` : ""}
       </Text>
@@ -72,8 +85,64 @@ export function ApprovalDetails({
 }
 
 /**
- * The admin's actions on a claim (spec §6.7, §6.8): Approve & pay or reject
- * one waiting for approval, retry one whose payment failed.
+ * What blocks or went wrong with paying, shown in the page above the
+ * footer's actions: a failed payment's reason, or a missing payout number.
+ */
+export function AdminClaimNotice({
+  claim,
+}: {
+  claim: ClaimDetail;
+}): JSX.Element | null {
+  if (claim.status === "payout_failed") {
+    return (
+      <View
+        accessibilityRole="summary"
+        className="flex-row items-start gap-3 rounded-2xl bg-error-50 p-4"
+      >
+        <CircleAlert
+          size={20}
+          strokeWidth={1.75}
+          color={colors.error}
+          accessible={false}
+        />
+        <View className="min-w-0 flex-1 gap-1">
+          <Text className="text-[15px] font-semibold text-gray-900">
+            The payment failed
+          </Text>
+          <Text selectable className="text-[15px] leading-[21px] text-gray-900">
+            {claim.payout?.failureReason ??
+              "No money reached M-Pesa. You can retry it."}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+  if (claim.status === "submitted" && !claim.submittedBy.payoutPhoneConfirmed) {
+    return (
+      <View
+        accessibilityRole="summary"
+        className="flex-row items-start gap-3 rounded-2xl bg-brand-50 p-4"
+      >
+        <CircleAlert
+          size={20}
+          strokeWidth={1.75}
+          color={colors.brandStrong}
+          accessible={false}
+        />
+        <Text className="min-w-0 flex-1 text-[15px] leading-[21px] text-gray-900">
+          {claimantOf(claim)} hasn’t confirmed an M-Pesa number yet. Approve and
+          pay is blocked until they do.
+        </Text>
+      </View>
+    );
+  }
+  return null;
+}
+
+/**
+ * The admin's actions on a reimbursement (spec §6.7, §6.8): Approve and pay
+ * or return one waiting for approval, retry one whose payment failed. Fills
+ * the screen's fixed footer.
  */
 export function AdminClaimActions({
   organizationId,
@@ -86,16 +155,7 @@ export function AdminClaimActions({
 
   if (claim.status === "payout_failed") {
     return (
-      <View className="gap-4">
-        <View className="gap-1 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <Text className="text-sm font-semibold text-amber-800">
-            The payment failed
-          </Text>
-          <Text className="text-base text-gray-900">
-            {claim.payout?.failureReason ??
-              "No money reached M-Pesa. You can retry it."}
-          </Text>
-        </View>
+      <ActionFooter>
         <Button
           label="Retry payment"
           onPress={() =>
@@ -105,38 +165,51 @@ export function AdminClaimActions({
             })
           }
         />
-      </View>
+      </ActionFooter>
     );
   }
   if (claim.status !== "submitted") return null;
 
-  const canPay = claim.submittedBy.payoutPhoneConfirmed;
+  return (
+    <ActionFooter>
+      <View className="flex-row gap-3">
+        <ReturnClaim organizationId={organizationId} claim={claim} />
+        <Button
+          className="flex-1"
+          label="Approve and pay"
+          disabled={!claim.submittedBy.payoutPhoneConfirmed}
+          onPress={() =>
+            router.push({
+              pathname: "/approvals/[claimId]/pay",
+              params: { claimId: claim.id },
+            })
+          }
+        />
+      </View>
+    </ActionFooter>
+  );
+}
+
+function ActionFooter({ children }: { children: JSX.Element }): JSX.Element {
   return (
     <View className="gap-3">
-      {canPay ? null : (
-        <View className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <Text className="text-base text-amber-900">
-            {claimantOf(claim)} hasn’t confirmed an M-Pesa number yet. Approve &
-            pay is blocked until they do.
-          </Text>
-        </View>
-      )}
-      <Button
-        label="Approve & pay"
-        disabled={!canPay}
-        onPress={() =>
-          router.push({
-            pathname: "/approvals/[claimId]/pay",
-            params: { claimId: claim.id },
-          })
-        }
-      />
-      <RejectClaim organizationId={organizationId} claim={claim} />
+      <View className="flex-row items-center justify-center gap-1.5">
+        <ScanFace
+          size={16}
+          strokeWidth={1.75}
+          color={colors.muted}
+          accessible={false}
+        />
+        <Text className="text-[13px] text-gray-600">
+          You’ll confirm with your passkey
+        </Text>
+      </View>
+      {children}
     </View>
   );
 }
 
-function RejectClaim({
+function ReturnClaim({
   organizationId,
   claim,
 }: {
@@ -155,7 +228,7 @@ function RejectClaim({
     reject.reset();
   }
 
-  function handleReject(): void {
+  function handleReturn(): void {
     const trimmed = reason.trim();
     if (trimmed.length < REJECTION_REASON_MIN_LENGTH) {
       setError("Say why in a few words, so they know what to fix.");
@@ -168,25 +241,26 @@ function RejectClaim({
   return (
     <>
       <Button
-        label="Reject"
+        className="w-[116px]"
+        label="Return"
         variant="secondary"
         onPress={() => setOpen(true)}
       />
       <ConfirmSheet
         visible={open}
-        title="Reject this claim?"
-        message={`${claimantOf(claim)} sees your reason, and can fix the claim and resubmit it.`}
-        confirmLabel="Reject claim"
-        dismissLabel="Keep claim"
+        title="Return this reimbursement?"
+        message={`${claimantOf(claim)} sees your reason, and can fix the reimbursement and resubmit it.`}
+        confirmLabel="Return reimbursement"
+        dismissLabel="Keep it"
         busy={reject.isPending}
         error={
           error ?? (reject.isError ? describeApiError(reject.error) : null)
         }
-        onConfirm={handleReject}
+        onConfirm={handleReturn}
         onCancel={close}
       >
         <TextField
-          label="Why are you rejecting it?"
+          label="Why are you returning it?"
           value={reason}
           onChangeText={setReason}
           placeholder="The receipt is unreadable"

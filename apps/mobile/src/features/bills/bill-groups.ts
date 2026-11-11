@@ -35,7 +35,7 @@ export function groupOpenBills(bills: readonly Bill[]): BillGroup[] {
 }
 
 /** The day a settled bill was settled: paid, or cancelled; its due date otherwise. */
-function settledOn(bill: Bill): string {
+export function settledOn(bill: Bill): string {
   return bill.paidOn ?? bill.cancelledAt?.slice(0, 10) ?? bill.dueOn;
 }
 

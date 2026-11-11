@@ -39,8 +39,8 @@ export function PushPrePrompt({
             Know when your claims move
           </Text>
           <Text className="text-base text-gray-600">
-            We’ll tell you when a claim is paid or rejected, and tell admins
-            when a claim is waiting for them. Nothing else.
+            We’ll tell you when a reimbursement is paid or returned, and tell admins
+            when a reimbursement is waiting for them. Nothing else.
           </Text>
           <Button
             label="Turn on notifications"

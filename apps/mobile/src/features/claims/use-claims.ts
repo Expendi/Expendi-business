@@ -13,8 +13,10 @@ import {
 
 import type {
   CategoriesResponse,
+  Claim,
   ClaimDetail,
   ClaimsPage,
+  ExpenseStatus,
   ReceiptSmsRequest,
   ReceiptSmsResponse,
   SubmitClaimRequest,
@@ -27,6 +29,7 @@ import {
   receiptSmsResponseSchema,
 } from "@expendi-business/shared";
 
+import type { ApiClient } from "~/lib/api";
 import { queryKeys } from "~/lib/query-keys";
 import { useApi } from "~/providers/api-provider";
 
@@ -52,6 +55,65 @@ export function useClaimList(
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
+  });
+}
+
+const STATUS_PAGE_SIZE = 50;
+const STATUS_MAX_PAGES = 20;
+
+async function claimsWithStatus(
+  api: ApiClient,
+  organizationId: string,
+  status: ExpenseStatus,
+  allPages: boolean,
+): Promise<{ claims: Claim[]; complete: boolean }> {
+  const claims: Claim[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < STATUS_MAX_PAGES; page += 1) {
+    const query: string =
+      `?status=${status}&limit=${String(STATUS_PAGE_SIZE)}` +
+      (cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`);
+    const result: ClaimsPage = await api.get(
+      `${claimsPath(organizationId)}${query}`,
+      claimsPageSchema,
+    );
+    claims.push(...result.claims);
+    cursor = result.nextCursor;
+    if (!allPages) return { claims, complete: cursor === null };
+    if (cursor === null) return { claims, complete: true };
+  }
+  return { claims, complete: false };
+}
+
+/**
+ * Claims in any of `statuses`, newest first. `allPages` follows every cursor,
+ * so a total over them is exact; otherwise only the newest page is read.
+ * `complete` is false only if the page cap stopped the read.
+ */
+export function useClaimsByStatus(
+  organizationId: string,
+  statuses: readonly ExpenseStatus[],
+  { allPages }: { allPages: boolean },
+): UseQueryResult<{ claims: Claim[]; complete: boolean }> {
+  const api = useApi();
+  return useQuery({
+    queryKey: [
+      ...queryKeys.claims(organizationId),
+      "by-status",
+      allPages ? "all" : "newest",
+      statuses.join(","),
+    ],
+    queryFn: async () => {
+      const results = await Promise.all(
+        statuses.map((status) =>
+          claimsWithStatus(api, organizationId, status, allPages),
+        ),
+      );
+      return {
+        claims: results.flatMap((result) => result.claims),
+        complete: results.every((result) => result.complete),
+      };
+    },
   });
 }
 

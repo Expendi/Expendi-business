@@ -217,7 +217,7 @@ export function readScannedQr(payload: string): ScannedQr {
     return {
       payload,
       prefill: {},
-      note: "Couldn’t read this QR code. It’s kept with the claim; type the invoice number printed on the receipt.",
+      note: "Couldn’t read this QR code. It’s kept with the reimbursement; type the invoice number printed on the receipt.",
     };
   }
   const { qr } = parsed;

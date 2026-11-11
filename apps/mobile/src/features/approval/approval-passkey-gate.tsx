@@ -5,6 +5,7 @@ import { isSupported as isPasskeySupported } from "react-native-passkeys";
 
 import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
+import { LoadError } from "~/components/load-error";
 import { Text } from "~/components/text";
 import { useAuth } from "~/features/auth/auth-provider";
 import { describeApiError } from "~/lib/api";
@@ -45,15 +46,11 @@ export function ApprovalPasskeyGate({
   }
   if (status.isError) {
     return (
-      <View className="gap-4">
-        <ErrorMessage message={describeApiError(status.error)} />
-        <Button
-          label="Try again"
-          variant="secondary"
-          loading={status.isFetching}
-          onPress={() => void status.refetch()}
-        />
-      </View>
+      <LoadError
+        message={describeApiError(status.error)}
+        retrying={status.isFetching}
+        onRetry={() => void status.refetch()}
+      />
     );
   }
   if (!status.data.enrolled) return <SetUpApprovalPasskey copy={setupCopy} />;
@@ -83,10 +80,12 @@ export function SetUpApprovalPasskey({
   return (
     <View
       accessibilityRole="summary"
-      className="gap-4 rounded-2xl border border-gray-200 p-5"
+      className="gap-4 rounded-3xl bg-gray-50 p-5"
     >
       <View className="gap-1">
-        <Text className="text-lg font-bold text-gray-900">{copy.title}</Text>
+        <Text className="text-[18px] font-semibold text-gray-900">
+          {copy.title}
+        </Text>
         <Text className="text-base text-gray-600">
           {supported
             ? copy.description

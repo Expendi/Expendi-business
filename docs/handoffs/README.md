@@ -14,6 +14,8 @@ The expense MVP is built across several sessions. Each phase has a handoff docum
 
 **Starting a new session?** Read [next-session.md](next-session.md) first: every QA checklist still owed, the setup steps, the remaining tasks and the open issues, in one place.
 
+**Mobile redesign?** Start from [mobile-k1-redesign.md](mobile-k1-redesign.md): the chosen K1 design, the prototype to match, and the screen-by-screen build plan.
+
 **Sources of truth:**
 
 - [Spec](../expense-mvp-spec.md): what we're building and why. Section references like "§7" point here.
