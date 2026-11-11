@@ -1,7 +1,11 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { Effect } from "effect";
 
-import type { WalletTransactionType } from "@expendi-business/shared";
+import type {
+  PayeeChain,
+  WalletChain,
+  WalletTransactionType,
+} from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
 import type { Payout } from "../../db/schema/index.js";
@@ -23,6 +27,7 @@ export interface WalletHistoryPayout {
   readonly method: Payout["method"];
   readonly recipientName: string;
   readonly recipientDetail: string;
+  readonly recipientChain: PayeeChain | null;
   readonly amountKesCents: bigint;
   readonly status: Payout["status"];
   readonly subjectId: string;
@@ -38,6 +43,7 @@ export interface WalletHistoryItem {
   readonly id: string;
   readonly type: WalletTransactionType;
   readonly usdcAmount: bigint;
+  readonly chain: WalletChain;
   readonly txHash: string | null;
   readonly counterpartyAddress: string | null;
   readonly createdAt: Date;
@@ -110,6 +116,7 @@ export function walletHistory(input: {
           id: entry.id,
           type: entry.type,
           usdcAmount: entry.usdcAmount,
+          chain: entry.chain,
           txHash: entry.txHash,
           counterpartyAddress: entry.counterpartyAddress,
           createdAt: entry.createdAt,
@@ -119,6 +126,10 @@ export function walletHistory(input: {
             method: payout.method,
             recipientName: payout.recipient.accountName,
             recipientDetail: describeRecipient(payout.recipient),
+            recipientChain:
+              payout.recipient.method === "usdc"
+                ? payout.recipient.chain
+                : null,
             amountKesCents: payout.amountKes,
             status: payout.status,
             subjectId: payout.subjectId,

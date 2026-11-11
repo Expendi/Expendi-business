@@ -9,7 +9,10 @@ import type {
   ResolveOutcome,
   ResolvePrepared,
 } from "@expendi-business/shared";
-import { STAFF_REASON_MIN_LENGTH } from "@expendi-business/shared";
+import {
+  PAYEE_CHAIN_NAMES,
+  STAFF_REASON_MIN_LENGTH,
+} from "@expendi-business/shared";
 
 import { PageError } from "~/components/page-state";
 import { SecondConfirmation } from "~/components/second-confirmation";
@@ -178,7 +181,8 @@ function EvidenceSummary({ evidence }: { evidence: PayoutEvidence }) {
             ? "None found on chain"
             : evidence.depositTransfers.map((transfer) => (
                 <span key={transfer.txHash} className="block">
-                  {formatUsdc(transfer.usdcAmount)} in{" "}
+                  {formatUsdc(transfer.usdcAmount)} on{" "}
+                  {PAYEE_CHAIN_NAMES[transfer.chain]} in{" "}
                   <span className="font-mono text-xs break-all">
                     {transfer.txHash}
                   </span>

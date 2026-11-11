@@ -26,12 +26,9 @@ export function compareBaseUnits(a: string, b: string): -1 | 0 | 1 {
 
 /**
  * "12.5" → "12500000". Accepts a comma as the decimal mark; refuses more
- * than 6 decimals, zero, and anything above `availableBaseUnits`.
+ * than 6 decimals and zero.
  */
-export function parseUsdcAmount(
-  input: string,
-  availableBaseUnits: string,
-): UsdcAmountResult {
+export function toUsdcBaseUnits(input: string): UsdcAmountResult {
   const match = AMOUNT.exec(input.trim().replace(",", "."));
   const whole = match?.[1] ?? "";
   const fraction = match?.[2] ?? "";
@@ -47,15 +44,17 @@ export function parseUsdcAmount(
   if (baseUnits === "0") {
     return { ok: false, error: "Enter an amount above zero." };
   }
-  if (compareBaseUnits(baseUnits, availableBaseUnits) > 0) {
-    return { ok: false, error: "That's more than the wallet holds." };
-  }
   return { ok: true, baseUnits };
 }
 
-/** `0x1234…abcd`: enough to recognise an address at a glance. */
-export function shortAddress(address: string): string {
-  return address.length > 12
-    ? `${address.slice(0, 6)}…${address.slice(-4)}`
-    : address;
+/** As `toUsdcBaseUnits`, and refuses anything above `availableBaseUnits`. */
+export function parseUsdcAmount(
+  input: string,
+  availableBaseUnits: string,
+): UsdcAmountResult {
+  const parsed = toUsdcBaseUnits(input);
+  if (parsed.ok && compareBaseUnits(parsed.baseUnits, availableBaseUnits) > 0) {
+    return { ok: false, error: "That's more than the wallet holds." };
+  }
+  return parsed;
 }

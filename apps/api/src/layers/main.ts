@@ -9,8 +9,13 @@ import type { ApprovalSettings } from "../services/approval/passkeys.js";
 import type { AuditLog } from "../services/audit/audit-log.js";
 import type { PrivyAuth } from "../services/auth/privy-auth.js";
 import type { BaseRpc } from "../services/chain/base-rpc.js";
+import type { FastNear } from "../services/chain/fast-near.js";
+import type { NearRelayer } from "../services/chain/near-relayer.js";
+import type { NearRpc } from "../services/chain/near-rpc.js";
+import type { NearChain } from "../services/chain/near.js";
 import type { EmailSender } from "../services/email/email-sender.js";
 import type { ReceiptExtractor } from "../services/extraction/receipt-extractor.js";
+import type { OneClick } from "../services/intents/one-click.js";
 import type { Lithic } from "../services/lithic/lithic-client.js";
 import type { PushSender } from "../services/notification/push-sender.js";
 import type { Paycrest } from "../services/paycrest/paycrest-client.js";
@@ -28,8 +33,13 @@ import { ApprovalSettingsLive } from "../services/approval/passkeys.js";
 import { AuditLogLive } from "../services/audit/audit-log.js";
 import { PrivyAuthLive } from "../services/auth/privy-auth.js";
 import { BaseRpcLive } from "../services/chain/base-rpc.js";
+import { FastNearLive } from "../services/chain/fast-near.js";
+import { NearRelayerLive } from "../services/chain/near-relayer.js";
+import { NearRpcLive } from "../services/chain/near-rpc.js";
+import { NearChainLive } from "../services/chain/near.js";
 import { EmailSenderLive } from "../services/email/email-sender.js";
 import { ReceiptExtractorLive } from "../services/extraction/receipt-extractor.js";
+import { OneClickLive } from "../services/intents/one-click.js";
 import { LithicLive } from "../services/lithic/lithic-client.js";
 import { PushSenderLive } from "../services/notification/push-sender.js";
 import { PaycrestLive } from "../services/paycrest/paycrest-client.js";
@@ -50,6 +60,11 @@ export type AppDeps =
   | WalletSettings
   | AlchemyWebhook
   | BaseRpc
+  | NearChain
+  | NearRpc
+  | NearRelayer
+  | FastNear
+  | OneClick
   | Paycrest
   | Lithic
   | ApprovalSettings
@@ -70,6 +85,17 @@ export interface ExternalLayers {
   readonly walletSettings: Layer.Layer<WalletSettings, AppLayerError>;
   readonly alchemyWebhook: Layer.Layer<AlchemyWebhook, AppLayerError>;
   readonly baseRpc: Layer.Layer<BaseRpc, AppLayerError>;
+  readonly nearChain: Layer.Layer<NearChain, AppLayerError>;
+  readonly nearRpc: Layer.Layer<NearRpc, AppLayerError, NearChain>;
+  /** Signs with the Privy wallets and talks to the chain given here. */
+  readonly nearRelayer: Layer.Layer<
+    NearRelayer,
+    AppLayerError,
+    PrivyWallets | NearRpc | NearChain
+  >;
+  /** The transfers indexer the deposit watcher reads. */
+  readonly fastNear: Layer.Layer<FastNear, AppLayerError, NearChain>;
+  readonly oneClick: Layer.Layer<OneClick, AppLayerError>;
   readonly paycrest: Layer.Layer<Paycrest, AppLayerError>;
   readonly lithic: Layer.Layer<Lithic, AppLayerError>;
   readonly approvalSettings: Layer.Layer<ApprovalSettings, AppLayerError>;
@@ -87,6 +113,11 @@ export const LiveExternalLayers: ExternalLayers = {
   walletSettings: WalletSettingsLive,
   alchemyWebhook: AlchemyWebhookLive,
   baseRpc: BaseRpcLive,
+  nearChain: NearChainLive,
+  nearRpc: NearRpcLive,
+  nearRelayer: NearRelayerLive,
+  fastNear: FastNearLive,
+  oneClick: OneClickLive,
   paycrest: PaycrestLive,
   lithic: LithicLive,
   approvalSettings: ApprovalSettingsLive,
@@ -101,6 +132,12 @@ export const LiveExternalLayers: ExternalLayers = {
 export function makeAppLayer(
   external: ExternalLayers,
 ): Layer.Layer<AppDeps, AppLayerError> {
+  const nearRpc = external.nearRpc.pipe(Layer.provide(external.nearChain));
+  const nearRelayer = external.nearRelayer.pipe(
+    Layer.provide(
+      Layer.mergeAll(external.privyWallets, nearRpc, external.nearChain),
+    ),
+  );
   return Layer.mergeAll(
     DatabaseLive,
     AuditLogLive,
@@ -111,6 +148,11 @@ export function makeAppLayer(
     external.walletSettings,
     external.alchemyWebhook,
     external.baseRpc,
+    external.nearChain,
+    nearRpc,
+    nearRelayer,
+    external.fastNear.pipe(Layer.provide(external.nearChain)),
+    external.oneClick,
     external.paycrest,
     external.lithic,
     external.approvalSettings,

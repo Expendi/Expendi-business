@@ -10,6 +10,7 @@ import {
   matchesSearch,
 } from "./payee-display";
 import {
+  changeDetailValue,
   detailFields,
   detailsToValues,
   EMPTY_DETAIL_VALUES,
@@ -19,6 +20,9 @@ import {
 } from "./payee-fields";
 
 const ADDRESS = "0x1234567890abcdef1234567890abcdef12345678";
+const NEAR_IMPLICIT =
+  "8f3a5b2c9d1e4f7a6b0c3d2e1f9a8b7c6d5e4c218f3a5b2c9d1e4f7a6b0c3d2e";
+const SOLANA = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU";
 
 describe("lastFour", () => {
   it.each([
@@ -68,7 +72,18 @@ describe("listSummary", () => {
       },
       "Bank account · KCBLKENX •••• 7890",
     ],
-    [{ method: "usdc", address: ADDRESS }, "USDC wallet · 0x1234…5678"],
+    [
+      { method: "usdc", chain: "base", address: ADDRESS },
+      "USDC wallet · 0x1234…5678 on Base",
+    ],
+    [
+      { method: "usdc", chain: "near", address: "acme.near" },
+      "USDC wallet · acme.near on NEAR",
+    ],
+    [
+      { method: "usdc", chain: "solana", address: SOLANA },
+      "USDC wallet · 7xKXtg…gAsU on Solana",
+    ],
     [{ method: "outside" }, "Paid outside Expendi"],
   ])("shows %j as %j", (details, expected) => {
     // #when
@@ -194,15 +209,19 @@ describe("detailRows", () => {
     ]);
   });
 
-  it("keeps a Base address whole", () => {
+  it("names the payee chain and keeps the address whole, as written", () => {
     // #when
     const rows = detailRows(
-      { method: "usdc", address: ADDRESS },
+      { method: "usdc", chain: "solana", address: SOLANA },
       { mask: true, bankName: null, payoutPhoneConfirmed: null },
     );
 
     // #then
-    expect(rows).toContainEqual({ label: "Base address", value: ADDRESS });
+    expect(rows).toEqual([
+      { label: "Paid by", value: "USDC wallet" },
+      { label: "Payee chain", value: "Solana" },
+      { label: "Address", value: SOLANA },
+    ]);
   });
 
   it("explains an employee's M-Pesa number instead of showing one", () => {
@@ -271,7 +290,7 @@ describe("detailFields", () => {
       ["paybillNumber", "accountReference", "accountName"],
     ],
     ["bank", "employee", ["bankCode", "accountNumber", "accountName"]],
-    ["usdc", "supplier", ["address"]],
+    ["usdc", "supplier", ["chain", "address"]],
     ["outside", "vendor", []],
   ] as const)("asks %s for a %s for %j", (method, kind, expected) => {
     // #then
@@ -314,6 +333,24 @@ describe("detailsToValues", () => {
   it("starts empty when there are no details", () => {
     // #then
     expect(detailsToValues(null)).toEqual(EMPTY_DETAIL_VALUES);
+  });
+});
+
+describe("changeDetailValue", () => {
+  it("clears the address when another payee chain is chosen, and only then", () => {
+    // #given
+    const values = { ...EMPTY_DETAIL_VALUES, chain: "base", address: ADDRESS };
+
+    // #then
+    expect([
+      changeDetailValue(values, "chain", "solana"),
+      changeDetailValue(values, "chain", "base"),
+      changeDetailValue(values, "accountName", "Figma"),
+    ]).toEqual([
+      { ...values, chain: "solana", address: "" },
+      values,
+      { ...values, accountName: "Figma" },
+    ]);
   });
 });
 
@@ -416,18 +453,65 @@ describe("validateDetails", () => {
     });
   });
 
-  it("refuses a malformed Base address", () => {
+  it("takes NEAR as the payee chain until another is chosen", () => {
     // #given
-    const values = { ...EMPTY_DETAIL_VALUES, address: "0x123" };
+    const values = { ...EMPTY_DETAIL_VALUES, address: "acme.near" };
 
     // #when
     const result = validateDetails("usdc", "supplier", values);
 
     // #then
     expect(result).toEqual({
-      ok: false,
-      errors: { address: "That isn't a Base address." },
+      ok: true,
+      details: { method: "usdc", chain: "near", address: "acme.near" },
     });
+  });
+
+  it.each([
+    ["near", NEAR_IMPLICIT],
+    ["base", ADDRESS],
+    ["solana", SOLANA],
+  ] as const)("sends a %s address with its payee chain", (chain, address) => {
+    // #when
+    const result = validateDetails("usdc", "supplier", {
+      ...EMPTY_DETAIL_VALUES,
+      chain,
+      address,
+    });
+
+    // #then
+    expect(result).toEqual({
+      ok: true,
+      details: { method: "usdc", chain, address },
+    });
+  });
+
+  it.each([
+    [
+      "near",
+      "Acme.near",
+      "That isn't a NEAR account. Enter one like acme.near, or the 64-character account ID, in lowercase.",
+    ],
+    [
+      "base",
+      "0x123",
+      "That isn't a Base address. Enter 0x followed by 40 characters.",
+    ],
+    [
+      "solana",
+      ADDRESS,
+      "That isn't a Solana address. Check it for typos, or paste it again.",
+    ],
+  ])("refuses an address %s can't pay", (chain, address, message) => {
+    // #when
+    const result = validateDetails("usdc", "supplier", {
+      ...EMPTY_DETAIL_VALUES,
+      chain,
+      address,
+    });
+
+    // #then
+    expect(result).toEqual({ ok: false, errors: { address: message } });
   });
 
   it("needs nothing to pay outside Expendi", () => {

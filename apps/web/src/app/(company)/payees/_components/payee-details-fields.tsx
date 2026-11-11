@@ -3,7 +3,12 @@
 import type { JSX } from "react";
 import Link from "next/link";
 
-import type { PayeeKind, PayeeMethod } from "@expendi-business/shared";
+import type {
+  PayeeChain,
+  PayeeKind,
+  PayeeMethod,
+} from "@expendi-business/shared";
+import { PAYEE_CHAIN_NAMES, PAYEE_CHAINS } from "@expendi-business/shared";
 
 import type {
   DetailField,
@@ -18,10 +23,10 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "~/components/ui/native-select";
+import { ADDRESS_LABELS, shortAddress } from "~/features/chain-display";
 import {
   METHOD_DESCRIPTIONS,
   METHOD_LABELS,
-  shortAddress,
 } from "~/features/payees/payee-display";
 import {
   detailFields,
@@ -57,8 +62,8 @@ export const detailFieldId = (field: DetailField | "method"): string =>
 
 /**
  * The payment method and its details (spec §6.19). Banks come from
- * Paycrest's list; a USDC payee can only be an address already on the
- * company's allowlist.
+ * Paycrest's list; a USDC payee has a payee chain and can only be an
+ * address already on the company's allowlist for that chain.
  */
 export function PayeeDetailsFields({
   organizationId,
@@ -123,11 +128,37 @@ export function PayeeDetailsFields({
             />
           );
         }
+        if (field === "chain") {
+          return (
+            <FormField
+              key={field}
+              id={detailFieldId(field)}
+              label={fieldLabel(method, field)}
+              help="The chain they receive USDC on."
+              error={errors.chain}
+            >
+              <NativeSelect
+                id={detailFieldId(field)}
+                className="w-full"
+                value={payeeChain(values.chain)}
+                disabled={disabled}
+                onChange={(event) => onValueChange("chain", event.target.value)}
+              >
+                {PAYEE_CHAINS.map((candidate) => (
+                  <NativeSelectOption key={candidate} value={candidate}>
+                    {PAYEE_CHAIN_NAMES[candidate]}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </FormField>
+          );
+        }
         if (field === "address") {
           return (
             <AllowlistedAddressPicker
               key={field}
               organizationId={organizationId}
+              chain={payeeChain(values.chain)}
               value={values.address}
               onChange={(address) => onValueChange("address", address)}
               error={errors.address}
@@ -166,6 +197,11 @@ export function PayeeDetailsFields({
       ) : null}
     </>
   );
+}
+
+/** The chosen payee chain; NEAR until one is chosen. */
+function payeeChain(value: string): PayeeChain {
+  return PAYEE_CHAINS.find((candidate) => candidate === value) ?? "near";
 }
 
 /** Paycrest's Kenyan banks, A to Z. */
@@ -235,15 +271,20 @@ function BankPicker({
   );
 }
 
-/** USDC payees are paid only to an address on the company's allowlist (spec §6.19). */
+/**
+ * USDC payees are paid only to an address on the company's allowlist (spec
+ * §6.19), on the payee chain chosen above. Addresses are kept as written.
+ */
 function AllowlistedAddressPicker({
   organizationId,
+  chain,
   value,
   onChange,
   error,
   disabled,
 }: {
   organizationId: string;
+  chain: PayeeChain;
   value: string;
   onChange: (address: string) => void;
   error: string | undefined;
@@ -253,7 +294,7 @@ function AllowlistedAddressPicker({
   const id = detailFieldId("address");
   if (addresses.isError) {
     return (
-      <FormField label="Base address">
+      <FormField label={ADDRESS_LABELS[chain]}>
         <div role="alert">
           <Callout
             tone="error"
@@ -273,12 +314,13 @@ function AllowlistedAddressPicker({
       </FormField>
     );
   }
-  const options = addresses.data ?? [];
-  const current = value.toLowerCase();
+  const options = (addresses.data ?? []).filter(
+    (option) => option.chain === chain,
+  );
   return (
     <FormField
       id={id}
-      label="Base address"
+      label={ADDRESS_LABELS[chain]}
       error={error}
       help={
         <>
@@ -293,7 +335,7 @@ function AllowlistedAddressPicker({
       <NativeSelect
         id={id}
         className="w-full"
-        value={current}
+        value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled || addresses.isPending}
         aria-invalid={error ? true : undefined}
@@ -302,13 +344,12 @@ function AllowlistedAddressPicker({
           {addresses.isPending
             ? "Loading the allowlist…"
             : options.length === 0
-              ? "No addresses on the allowlist yet"
+              ? `No ${PAYEE_CHAIN_NAMES[chain]} addresses on the allowlist yet`
               : "Choose an allowlisted address"}
         </NativeSelectOption>
-        {current !== "" &&
-        !options.some((option) => option.address === current) ? (
-          <NativeSelectOption value={current}>
-            {shortAddress(current)}
+        {value !== "" && !options.some((option) => option.address === value) ? (
+          <NativeSelectOption value={value}>
+            {shortAddress(value)}
           </NativeSelectOption>
         ) : null}
         {options.map((option) => (

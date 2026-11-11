@@ -5,8 +5,8 @@ import type {
 } from "@expendi-business/shared";
 
 import type { StatusTone } from "~/components/data/status-badge";
+import { shortAddress } from "~/features/chain-display";
 import { formatKes, formatUsdc } from "~/lib/money";
-import { shortAddress } from "./usdc-amount";
 
 /**
  * How the Accounts page words and groups the wallet's ledger. The wording
@@ -319,9 +319,3 @@ export const PAID_FROM_KIND_LABELS: Record<PaidFromAccountKind, string> = {
   cash: "Cash",
   other: "Other",
 };
-
-/** A Base address in groups of four after "0x", as the mock shows it. */
-export function addressGroups(address: string): string[] {
-  const body = address.startsWith("0x") ? address.slice(2) : address;
-  return ["0x", ...(body.match(/.{1,4}/g) ?? [])];
-}

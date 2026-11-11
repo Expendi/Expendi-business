@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
 import type { StaffPayoutDetail } from "@expendi-business/shared";
+import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
 import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import { PayoutStatusBadge } from "~/components/payout-status";
@@ -25,6 +26,16 @@ import { ResolveFlow } from "./resolve-flow";
 
 const time = (iso: string | null) => (iso ? formatNairobiTime(iso) : "—");
 const usdc = (units: string | null) => (units ? formatUsdc(units) : "—");
+
+/**
+ * The payout's transaction hash exactly as recorded (a NEAR hash is
+ * case-sensitive), with the chain it is on.
+ */
+function transactionHash(payout: StaffPayoutDetail): string {
+  return payout.txHash
+    ? `${payout.txHash} (${PAYEE_CHAIN_NAMES[payout.chain]})`
+    : "—";
+}
 
 /** One payout, with what's needed to check it against Paycrest and the chain. */
 export function PayoutView({ payoutId }: { payoutId: string }) {
@@ -111,7 +122,7 @@ export function PayoutView({ payoutId }: { payoutId: string }) {
                 ["Amount to send", usdc(payout.amountToTransferUsdc)],
                 ["Most it may debit", usdc(payout.maxDebitUsdc)],
                 ["Rate", payout.rate ?? "—"],
-                ["Transaction hash", payout.txHash ?? "—"],
+                ["Transaction hash", transactionHash(payout)],
                 ["Privy transaction", payout.privyTransactionId ?? "—"],
                 ["M-Pesa or bank reference", payout.providerReference ?? "—"],
                 ["Created", time(payout.createdAt)],
@@ -150,6 +161,9 @@ export function PayoutView({ payoutId }: { payoutId: string }) {
                   Amount
                 </th>
                 <th scope="col" className={headCellClass}>
+                  Chain
+                </th>
+                <th scope="col" className={headCellClass}>
                   Transaction
                 </th>
               </tr>
@@ -165,6 +179,7 @@ export function PayoutView({ payoutId }: { payoutId: string }) {
                   <td className={`${cellClass} tabular-nums whitespace-nowrap`}>
                     {formatUsdc(row.usdcAmount)}
                   </td>
+                  <td className={cellClass}>{PAYEE_CHAIN_NAMES[row.chain]}</td>
                   <td
                     className={`${cellClass} min-w-48 max-w-80 font-mono text-xs break-all`}
                   >
@@ -251,9 +266,20 @@ function PayoutActions({
           ) : null}
         </div>
       ) : null}
-      {payout.status === "needs_review" ? (
+      {payout.status !== "needs_review" ? null : payout.heldByIntentQuoteId ? (
+        <p className="text-sm">
+          This payout waits on a NEAR Intents quote, which decides where its
+          money is.{" "}
+          <Link
+            href={`/intent-quotes/${payout.heldByIntentQuoteId}`}
+            className={linkClass}
+          >
+            Resolve the quote
+          </Link>
+        </p>
+      ) : (
         <ResolveFlow payoutId={payout.id} />
-      ) : null}
+      )}
     </div>
   );
 }

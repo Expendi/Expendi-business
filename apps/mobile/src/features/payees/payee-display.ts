@@ -7,8 +7,13 @@ import type {
 import { PAYEE_CHANGE_HOLD_HOURS } from "@expendi-business/shared";
 
 import type { DetailField } from "./payee-fields";
-import { shortAddress } from "../wallet/usdc-amount";
-import { detailValues, fieldLabel, methodFields } from "./payee-fields";
+import { addressOnChain } from "../wallet/chain-display";
+import {
+  detailValues,
+  displayValue,
+  fieldLabel,
+  methodFields,
+} from "./payee-fields";
 
 export const KIND_LABELS: Record<PayeeKind, string> = {
   employee: "Employee",
@@ -40,7 +45,7 @@ export const METHOD_DESCRIPTIONS: Record<PayeeMethod, string> = {
   mpesa_till: "Buy Goods: a business Till number.",
   mpesa_paybill: "A business number and an account number.",
   bank: "A Kenyan bank account.",
-  usdc: "USDC on Base, to an address on the company's allowlist.",
+  usdc: "USDC on NEAR, Base or Solana, to an address on the company's allowlist.",
   outside: "Paid by card or elsewhere. Expendi only sends reminders.",
 };
 
@@ -86,7 +91,7 @@ function maskedDetail(
     case "bank":
       return `${bankName ?? details.bankCode} ${lastFour(details.accountNumber)}`;
     case "usdc":
-      return shortAddress(details.address);
+      return addressOnChain(details.chain, details.address);
     case "outside":
       return null;
   }
@@ -136,7 +141,7 @@ interface DetailRowOptions {
 /**
  * The details as labelled rows. Unmasked for the review the admin confirms
  * with their passkey; masked everywhere else. Till and Paybill business
- * numbers and Base addresses are public, so they're never masked.
+ * numbers and USDC addresses are public, so they're never masked.
  */
 export function detailRows(
   details: PayeeDetails,
@@ -147,7 +152,9 @@ export function detailRows(
     const value = values[field];
     if (value === undefined) return confirmedNumber(payoutPhoneConfirmed);
     if (field === "bankCode") return bankName ?? value;
-    return mask && MASKED_FIELDS.has(field) ? lastFour(value) : value;
+    return mask && MASKED_FIELDS.has(field)
+      ? lastFour(value)
+      : displayValue(field, value);
   };
   return [
     { label: "Paid by", value: METHOD_LABELS[details.method] },

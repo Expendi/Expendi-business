@@ -18,6 +18,10 @@ import type {
   AllowlistChange,
   ApprovalChallenge,
   CreateWithdrawalRequest,
+  FundIn,
+  FundInRequest,
+  FundInStatus,
+  PayeeChain,
   WalletHistoryItem,
   WalletHistoryResponse,
   WalletResponse,
@@ -28,6 +32,8 @@ import type {
 } from "@expendi-business/shared";
 import {
   approvalChallengeSchema,
+  fundInSchema,
+  fundInsResponseSchema,
   walletHistoryResponseSchema,
   walletResponseSchema,
   walletSetupSchema,
@@ -62,6 +68,10 @@ export const walletKeys = {
     ["wallet", organizationId, "history", "balance"] as const,
   addresses: (organizationId: string) =>
     ["wallet", organizationId, "addresses"] as const,
+  fundIns: (organizationId: string) =>
+    ["wallet", organizationId, "fund-ins"] as const,
+  fundIn: (organizationId: string, fundInId: string) =>
+    ["wallet", organizationId, "fund-ins", fundInId] as const,
 };
 
 const walletPath = (organizationId: string) =>
@@ -206,6 +216,88 @@ export function useChangeAllowlist(
   });
 }
 
+const fundInsPath = (organizationId: string) =>
+  `${walletPath(organizationId)}/fund-ins` as const;
+
+/** A fund-in in one of these has stopped changing. */
+const FINAL_FUND_IN_STATUSES: readonly FundInStatus[] = [
+  "completed",
+  "refunded",
+  "failed",
+  "expired",
+];
+
+export function isFinalFundIn(status: FundInStatus): boolean {
+  return FINAL_FUND_IN_STATUSES.includes(status);
+}
+
+const FUND_IN_POLL_MS = 5000;
+
+/** How long until a fund-in is asked about again; false once it's final. */
+export function fundInPollInterval(fundIn: FundIn | undefined): number | false {
+  return fundIn && isFinalFundIn(fundIn.status) ? false : FUND_IN_POLL_MS;
+}
+
+/** The company's fund-ins from other chains, newest first. */
+export function useFundIns(organizationId: string): UseQueryResult<FundIn[]> {
+  const api = useApi();
+  return useQuery({
+    queryKey: walletKeys.fundIns(organizationId),
+    queryFn: () => api.get(fundInsPath(organizationId), fundInsResponseSchema),
+  });
+}
+
+/**
+ * One fund-in, asked about again every few seconds until it's final. When
+ * it completes the wallet's balance and history are fetched again.
+ */
+export function useFundIn(
+  organizationId: string,
+  fundInId: string,
+): UseQueryResult<FundIn> {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const fundIn = useQuery({
+    queryKey: walletKeys.fundIn(organizationId, fundInId),
+    queryFn: () =>
+      api.get(`${fundInsPath(organizationId)}/${fundInId}`, fundInSchema),
+    refetchInterval: (query) => fundInPollInterval(query.state.data),
+  });
+  const status = fundIn.data?.status;
+  useEffect(() => {
+    if (status !== "completed") return;
+    void queryClient.invalidateQueries({
+      queryKey: walletKeys.summary(organizationId),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: walletKeys.history(organizationId),
+    });
+  }, [status, organizationId, queryClient]);
+  return fundIn;
+}
+
+/** Asks for a one-time deposit address on another chain. */
+export function useStartFundIn(
+  organizationId: string,
+): UseMutationResult<FundIn, Error, FundInRequest> {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request) =>
+      api.post(fundInsPath(organizationId), request, fundInSchema),
+    onSuccess: (fundIn) => {
+      queryClient.setQueryData(
+        walletKeys.fundIn(organizationId, fundIn.id),
+        fundIn,
+      );
+      return queryClient.invalidateQueries({
+        queryKey: walletKeys.fundIns(organizationId),
+        exact: true,
+      });
+    },
+  });
+}
+
 export class WithdrawalMismatchError extends Error {
   override readonly name = "WithdrawalMismatchError";
 
@@ -216,16 +308,33 @@ export class WithdrawalMismatchError extends Error {
   }
 }
 
+/**
+ * Whether the withdrawal the API prepared is the one the admin reviewed, so
+ * only that is signed. Addresses are compared as written: a NEAR account or
+ * a Solana address has no other case.
+ */
+export function isReviewedWithdrawal(
+  prepared: Pick<Withdrawal, "chain" | "address" | "amountUsdc">,
+  reviewed: Pick<Withdrawal, "chain" | "address" | "amountUsdc">,
+): boolean {
+  return (
+    prepared.amountUsdc === reviewed.amountUsdc &&
+    prepared.chain === reviewed.chain &&
+    prepared.address === reviewed.address
+  );
+}
+
 export type WithdrawVariables = CreateWithdrawalRequest & {
-  /** The allowlisted address the admin reviewed. */
+  /** The allowlisted address the admin reviewed, and its payee chain. */
+  readonly chain: PayeeChain;
   readonly address: string;
 };
 
 /**
  * Withdraws to an allowlisted address, as the app does
  * (`apps/mobile/src/features/wallet/use-withdraw.ts`): the API prepares the
- * withdrawal and a challenge bound to its address and amount, the browser
- * signs it, and the API sends it once. The same `requestId` is always the
+ * withdrawal and a challenge bound to its payee chain, address and amount,
+ * the browser signs it, and the API sends it once. The same `requestId` is always the
  * same withdrawal.
  */
 export function useWithdraw(
@@ -236,16 +345,18 @@ export function useWithdraw(
   const path = `/organizations/${organizationId}/withdrawals` as const;
   return usePasskeyApproval<WithdrawVariables, WithdrawalChallenge, Withdrawal>(
     {
-      request: async ({ address, ...request }) => {
+      request: async ({ chain, address, ...request }) => {
         const challenge = await api.post(
           path,
           request,
           withdrawalChallengeSchema,
         );
-        // Sign only what the admin reviewed.
         if (
-          challenge.withdrawal.amountUsdc !== request.amountUsdc ||
-          challenge.withdrawal.address !== address.toLowerCase()
+          !isReviewedWithdrawal(challenge.withdrawal, {
+            chain,
+            address,
+            amountUsdc: request.amountUsdc,
+          })
         ) {
           throw new WithdrawalMismatchError();
         }

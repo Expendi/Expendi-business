@@ -8,8 +8,11 @@ import type { ApprovalSettings } from "../approval/passkeys.js";
 import type { AuditLog } from "../audit/audit-log.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
 import type { PrivyWallets } from "../wallet/privy-wallets.js";
+import type { FundDeps } from "./fund.js";
+import type { OnchainDeps } from "./onchain.js";
 import type { PayoutRejected } from "./payout-errors.js";
 import { approvePayouts } from "./approve.js";
+import { planBaseHops } from "./base-hop.js";
 import { fundPayout } from "./fund.js";
 
 export { requestPayoutApproval } from "./approve.js";
@@ -22,7 +25,13 @@ export type {
 } from "./prepare.js";
 
 export type PayoutEngineDeps =
-  DatabaseService | AuditLog | ApprovalSettings | Paycrest | PrivyWallets;
+  | DatabaseService
+  | AuditLog
+  | ApprovalSettings
+  | Paycrest
+  | PrivyWallets
+  | OnchainDeps
+  | FundDeps;
 
 export interface FundingResult {
   readonly payoutId: string;
@@ -48,6 +57,20 @@ export function approveAndPay(input: {
 > {
   return Effect.gen(function* () {
     const approved = yield* approvePayouts(input);
+    // Cash-outs approved together share Base hops (a payroll run hops once
+    // for its total), so they are planned as a batch before any is funded.
+    const planned = yield* Effect.exit(
+      planBaseHops({
+        organizationId: input.organizationId,
+        payoutIds: approved.map((payout) => payout.id),
+      }),
+    );
+    if (Exit.isFailure(planned)) {
+      console.error(
+        "[payout] planning the batch's Base hops broke",
+        Cause.pretty(planned.cause),
+      );
+    }
     const results: FundingResult[] = [];
     for (const payout of approved) {
       const exit = yield* Effect.exit(

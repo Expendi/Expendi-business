@@ -299,7 +299,7 @@ const allow = Effect.gen(function* () {
   if (!address || !label) {
     return yield* Effect.dieMessage("Pass --address and --label");
   }
-  const change = { action: "add", address, label } as const;
+  const change = { action: "add", chain: "base", address, label } as const;
   const challenge = yield* requestAllowlistChange({
     organizationId,
     userId,

@@ -1,6 +1,8 @@
 import { and, eq, ne } from "drizzle-orm";
 import { Effect } from "effect";
 
+import type { PayeeChain } from "@expendi-business/shared";
+
 import type { DatabaseService } from "../../db/client.js";
 import type { Payout } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
@@ -13,6 +15,7 @@ import { query, withScope } from "../../db/scope.js";
 import { isAllowlisted } from "../allowlist/allowlist.js";
 import { canonicalJson } from "../approval/passkeys.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { normalisePayeeAddress } from "../chain/address.js";
 import { ceilDiv, fromMicro, kesCentsFor } from "../paycrest/amounts.js";
 import { Paycrest } from "../paycrest/paycrest-client.js";
 import { quoteKesPayout } from "../paycrest/quote.js";
@@ -25,10 +28,14 @@ import { PayoutRejected } from "./payout-errors.js";
 
 export { PAYOUT_MEMO } from "../paycrest/recipient.js";
 
+const USDC_ADDRESS_KINDS: Readonly<Record<PayeeChain, string>> = {
+  near: "a NEAR account",
+  base: "a Base address",
+  solana: "a Solana address",
+};
+
 /** Paycrest's marginal rate, used to value a USDC payout in KES. */
 const RATE_PROBE_USDC = "1";
-
-const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
 /**
  * Room above the quote for Paycrest's fee and a small rate move before
@@ -73,17 +80,20 @@ export type PrepareError =
 const reject = (reason: PayoutRejected["reason"], message: string) =>
   Effect.fail(new PayoutRejected({ reason, message }));
 
-/** A request with its recipient normalised, as it will be stored. */
+/**
+ * A request with its recipient normalised, as it will be stored. An address
+ * that isn't one on its payee chain is left as it is, for pricing to reject.
+ */
 function normalise(request: PayoutRequest): PayoutRequest {
-  return isUsdcRequest(request)
-    ? {
-        ...request,
-        recipient: {
-          ...request.recipient,
-          address: request.recipient.address.toLowerCase(),
-        },
-      }
-    : request;
+  if (!isUsdcRequest(request)) return request;
+  const { chain, address } = request.recipient;
+  return {
+    ...request,
+    recipient: {
+      ...request.recipient,
+      address: normalisePayeeAddress(chain, address) ?? address,
+    },
+  };
 }
 
 const sameRequest = (payout: Payout, request: PayoutRequest): boolean =>
@@ -206,18 +216,21 @@ export function preparePayouts(input: {
 
     const priceUsdc = (request: UsdcPayoutRequest) =>
       Effect.gen(function* () {
-        const { address, accountName } = request.recipient;
-        if (!EVM_ADDRESS.test(address) || accountName.trim().length === 0) {
+        const { chain, address, accountName } = request.recipient;
+        if (
+          normalisePayeeAddress(chain, address) !== address ||
+          accountName.trim().length === 0
+        ) {
           return yield* reject(
             "invalid_recipient",
-            "A USDC payee needs a Base address and a name.",
+            `A USDC payee needs ${USDC_ADDRESS_KINDS[chain]} and a name.`,
           );
         }
         if (request.amountUsdc <= 0n) {
           return yield* reject("invalid_amount", "Enter an amount to pay.");
         }
         const listed = yield* withScope(scope, (tx) =>
-          isAllowlisted(tx, organizationId, address),
+          isAllowlisted(tx, organizationId, { chain, address }),
         );
         if (!listed) {
           return yield* reject(

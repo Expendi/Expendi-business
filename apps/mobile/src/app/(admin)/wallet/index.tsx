@@ -1,10 +1,17 @@
 import type { JSX } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowUpRight, History, MapPin, Wallet } from "lucide-react-native";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  History,
+  MapPin,
+  Wallet,
+} from "lucide-react-native";
 import { ActivityIndicator, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 
-import type { ActiveWallet } from "@expendi-business/shared";
+import type { ActiveWallet, WalletChain } from "@expendi-business/shared";
+import { MAIN_CHAIN, PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
 import type { Company } from "~/features/company/company-provider";
 import { Button } from "~/components/button";
@@ -52,12 +59,12 @@ function WalletScreen({ company }: { company: Company }): JSX.Element {
             {company.name} is ready
           </Text>
           <Text className="text-base text-gray-600">
-            Deposit USDC to start paying claims.
+            Fund in with USDC to start paying claims.
           </Text>
         </View>
       ) : null}
 
-      <BaseOnlyWarning />
+      <OneChainWarning chain={activeWallet?.chain ?? MAIN_CHAIN} />
 
       {wallet.isPending ? (
         <ActivityIndicator accessibilityLabel="Loading the wallet" />
@@ -87,17 +94,19 @@ function WalletScreen({ company }: { company: Company }): JSX.Element {
   );
 }
 
-function BaseOnlyWarning(): JSX.Element {
+function OneChainWarning({ chain }: { chain: WalletChain }): JSX.Element {
   return (
     <View
       accessibilityRole="alert"
       className="gap-1 rounded-xl border border-amber-300 bg-amber-50 p-4"
     >
       <Text className="text-base font-semibold text-amber-900">
-        Send USDC on Base only
+        Send USDC on {PAYEE_CHAIN_NAMES[chain]} only
       </Text>
       <Text className="text-sm text-amber-900">
-        Other tokens, or USDC sent on any other network, can be lost for good.
+        Other tokens, or USDC sent to this address on any other chain, can be
+        lost for good. To send USDC from another chain, use Fund in from another
+        chain.
       </Text>
     </View>
   );
@@ -118,7 +127,7 @@ function FinishSetup({
           Your wallet isn’t ready yet
         </Text>
         <Text className="text-base text-gray-600">
-          Setting it up didn’t finish. You can deposit once it’s done.
+          Setting it up didn’t finish. You can fund in once it’s done.
         </Text>
       </View>
       {stillCreating ? (
@@ -142,13 +151,16 @@ function FinishSetup({
 
 function WalletDetails({ wallet }: { wallet: ActiveWallet }): JSX.Element {
   const router = useRouter();
+  const chainName = PAYEE_CHAIN_NAMES[wallet.chain];
+  const addressLabel =
+    wallet.chain === "near" ? "NEAR account" : `${chainName} address`;
   return (
     <View className="gap-8">
       <View className="gap-3 rounded-2xl border border-gray-200 bg-white p-5">
         <View className="flex-row items-center gap-2">
           <Wallet size={18} color={colors.brandStrong} accessible={false} />
           <Text className="text-sm font-medium text-gray-600">
-            Company wallet · Base
+            Company wallet · {chainName}
           </Text>
         </View>
         <Text
@@ -173,6 +185,12 @@ function WalletDetails({ wallet }: { wallet: ActiveWallet }): JSX.Element {
           onPress={() => router.push("/wallet/history")}
         />
         <ListRow
+          title="Fund in from another chain"
+          icon={ArrowDownLeft}
+          subtitle="Send USDC from Base, Ethereum, Arbitrum or Solana"
+          onPress={() => router.push("/wallet/fund-in")}
+        />
+        <ListRow
           title="Withdraw"
           icon={ArrowUpRight}
           subtitle="Send USDC to an allowlisted address"
@@ -191,14 +209,18 @@ function WalletDetails({ wallet }: { wallet: ActiveWallet }): JSX.Element {
           accessibilityRole="header"
           className="text-lg font-semibold text-gray-900"
         >
-          Deposit address · Base
+          Fund in · {addressLabel}
+        </Text>
+        <Text className="text-base text-gray-600">
+          Send USDC on {chainName} to the company wallet from an exchange or
+          another wallet.
         </Text>
         <View className="items-center rounded-2xl border border-gray-200 bg-white p-6">
           <QRCode value={wallet.address} size={180} />
         </View>
         <Text
           selectable
-          accessibilityLabel={`Deposit address ${wallet.address}`}
+          accessibilityLabel={`${addressLabel} ${wallet.address}`}
           className="rounded-xl border border-gray-200 bg-white p-4 font-mono text-sm leading-5 text-gray-900"
         >
           {wallet.address}

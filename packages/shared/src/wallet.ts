@@ -1,10 +1,21 @@
 import { z } from "zod";
 
-export const WALLET_CHAINS = ["base"] as const;
+/**
+ * The chain a company wallet is on. NEAR is the main chain and what every
+ * new wallet gets; `base` remains for wallets made before the move
+ * (docs/decisions/near-main-chain.md).
+ */
+export const WALLET_CHAINS = ["base", "near"] as const;
 export const walletChainSchema = z.enum(WALLET_CHAINS);
 export type WalletChain = z.infer<typeof walletChainSchema>;
 
-/** `creating` until both the Privy policy and the wallet exist. */
+/** The chain a new company wallet is created on. */
+export const MAIN_CHAIN: WalletChain = "near";
+
+/**
+ * `creating` until the company wallet and its transit wallet both exist and
+ * the company wallet's account is usable on chain.
+ */
 export const WALLET_STATUSES = ["creating", "active"] as const;
 export const walletStatusSchema = z.enum(WALLET_STATUSES);
 export type WalletStatus = z.infer<typeof walletStatusSchema>;

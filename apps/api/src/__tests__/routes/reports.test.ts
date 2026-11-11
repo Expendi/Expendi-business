@@ -273,6 +273,7 @@ describe("the month's money out", () => {
           method: "usdc",
           recipient: {
             method: "usdc",
+            chain: "base",
             address: `0x${"b".repeat(40)}`,
             accountName: "Vercel",
           },

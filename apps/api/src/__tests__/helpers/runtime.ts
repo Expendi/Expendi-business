@@ -22,6 +22,9 @@ import {
   TestApprovalSettings,
   TestWalletSettings,
 } from "./fakes.js";
+import { makeFakeFastNear } from "./fast-near.js";
+import { makeFakeNearRelayer, makeFakeNearRpc, TestNearChain } from "./near.js";
+import { makeFakeOneClick } from "./one-click.js";
 import { makeFakePushSender } from "./push.js";
 
 const TOKEN_PREFIX = "test-token:";
@@ -108,6 +111,11 @@ export function makeTestRuntime(
     walletSettings: TestWalletSettings,
     alchemyWebhook: makeFakeAlchemyWebhook().layer,
     baseRpc: makeFakeBaseRpc().layer,
+    nearChain: TestNearChain,
+    nearRpc: makeFakeNearRpc().layer,
+    nearRelayer: makeFakeNearRelayer().layer,
+    fastNear: makeFakeFastNear().layer,
+    oneClick: makeFakeOneClick().layer,
     paycrest: makeFakePaycrest().layer,
     lithic: makeFakeLithic().layer,
     approvalSettings: TestApprovalSettings,

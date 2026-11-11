@@ -1,18 +1,31 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
-import { Data, Effect } from "effect";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { Cause, Data, Effect, Exit } from "effect";
 
 import type { DatabaseService } from "../../db/client.js";
+import type { IntentQuote } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { AuditActor } from "../audit/audit-log.js";
 import type { BaseRpcError } from "../chain/base-rpc.js";
 import type { TransactionReceipt, UsdcTransfer } from "../chain/base.js";
+import type { OneClick } from "../intents/one-click.js";
 import type { GatewayOrderInfo } from "../paycrest/gateway.js";
-import { payouts, walletTransactions } from "../../db/schema/index.js";
+import {
+  intentQuotes,
+  organizations,
+  payouts,
+  UNSETTLED_INTENT_QUOTE_STATUSES,
+  walletTransactions,
+} from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
+import { raiseAlert } from "../alerts/ops-alerts.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { BaseRpc } from "../chain/base-rpc.js";
 import { USDC_BASE_ADDRESS, usdcTransfersIn } from "../chain/base.js";
+import {
+  quotesToRecheck,
+  refreshQuoteStatus,
+} from "../intents/quote-status.js";
 import {
   decodeGatewayOrderInfo,
   gatewayOrderInfoCalldata,
@@ -26,9 +39,24 @@ export class ReceiptUnavailable extends Data.TaggedError("ReceiptUnavailable")<{
   readonly txHash: string;
 }> {}
 
+/**
+ * A Base hop may be arriving at a transit wallet, or a sweep's refund coming
+ * back to it, but 1Click doesn't list the transaction yet: the caller should
+ * retry later, when it will be known whether this is the company's own
+ * money or something nobody expected.
+ */
+export class HopArrivalUnconfirmed extends Data.TaggedError(
+  "HopArrivalUnconfirmed",
+)<{
+  readonly txHash: string;
+}> {}
+
 interface DepositWallet extends Record<string, unknown> {
   readonly wallet_id: string;
   readonly organization_id: string;
+  readonly chain: string;
+  /** `company`: the company wallet itself. `transit`: its transit wallet. */
+  readonly kind: "company" | "transit";
   readonly address: string;
 }
 
@@ -50,7 +78,7 @@ function activeWalletsByAddress(
   return withScope({}, (tx) =>
     query(() =>
       tx.execute<DepositWallet>(
-        sql`SELECT wallet_id, organization_id, address FROM active_wallets_by_address(ARRAY[${list}]::text[])`,
+        sql`SELECT wallet_id, organization_id, chain, kind, address FROM wallets_by_receiving_address(ARRAY[${list}]::text[])`,
       ),
     ),
   ).pipe(
@@ -188,12 +216,24 @@ function refundedFromGateway(
   });
 }
 
+type CreditOutcome = "credited" | "already_credited" | "not_a_refund";
+
+/**
+ * Credits one transfer into a wallet on Base. At a company wallet made
+ * before NEAR became the main chain it is a refund or a deposit. At a
+ * transit wallet only a Paycrest refund is ever credited: anything else
+ * gives `not_a_refund` and writes nothing.
+ */
 function creditDeposit(
   wallet: DepositWallet,
   receipt: TransactionReceipt,
   transfer: UsdcTransfer,
   actor: AuditActor,
-): Effect.Effect<boolean, DatabaseError, DatabaseService | AuditLog | BaseRpc> {
+): Effect.Effect<
+  CreditOutcome,
+  DatabaseError,
+  DatabaseService | AuditLog | BaseRpc
+> {
   // A failed Paycrest order's USDC comes back either from the deposit
   // address we paid (T10) or from Paycrest's Gateway, which names the
   // on-chain order in the same receipt. Either way it is the payout's
@@ -221,6 +261,9 @@ function creditDeposit(
                 onChain,
               )
             : undefined;
+        if (wallet.kind === "transit" && !refunded) {
+          return "not_a_refund" as const;
+        }
         const [credit] = yield* query(() =>
           tx
             .insert(walletTransactions)
@@ -238,7 +281,7 @@ function creditDeposit(
             .onConflictDoNothing()
             .returning({ id: walletTransactions.id }),
         );
-        if (!credit) return false;
+        if (!credit) return "already_credited" as const;
         if (fromGateway && !refunded) {
           console.warn(
             gatewayOrderId
@@ -263,26 +306,177 @@ function creditDeposit(
             from: transfer.from,
           },
         });
-        return true;
+        return "credited" as const;
       }),
     );
   });
 }
 
 /**
- * Credits the USDC that the given Base transactions sent to company
- * wallets. A notification only says where to look: every amount, sender,
- * recipient and log index comes from the transaction receipt, so only real,
- * successful USDC transfers on Base are ever credited (spec §6.9). Each
- * transfer log is credited at most once, however often it's reported.
+ * Whether one of the company's Base hops or sweeps lists `transfer`'s
+ * transaction anywhere in its 1Click record: a hop's delivery, or a sweep's
+ * deposit coming back to the transit wallet it was sent from.
+ */
+function isOwnQuoteTransfer(
+  organizationId: string,
+  transfer: UsdcTransfer,
+): Effect.Effect<boolean, DatabaseError, DatabaseService> {
+  return withScope({ organizationId }, (tx) =>
+    query(() =>
+      tx
+        .select({ id: intentQuotes.id })
+        .from(intentQuotes)
+        .where(
+          and(
+            eq(intentQuotes.organizationId, organizationId),
+            inArray(intentQuotes.purpose, [...TRANSIT_QUOTE_PURPOSES]),
+            sql`EXISTS (SELECT 1 FROM unnest(${intentQuotes.originChainTxHashes} || ${intentQuotes.destinationChainTxHashes} || ${intentQuotes.nearTxHashes}) AS hash WHERE lower(hash) = ${transfer.txHash})`,
+          ),
+        )
+        .limit(1),
+    ),
+  ).pipe(Effect.map((rows) => rows.length > 0));
+}
+
+/** The quotes that move a company's USDC into or back to its transit wallet. */
+const TRANSIT_QUOTE_PURPOSES = ["base_hop", "sweep"] as const;
+
+const isUnsettled = (quote: IntentQuote): boolean =>
+  UNSETTLED_INTENT_QUOTE_STATUSES.some((status) => status === quote.status);
+
+/**
+ * Whether `quote` could still turn out to be why `amount` reached the
+ * transit wallet, once 1Click lists the transaction. A hop delivers exactly
+ * its `amountOut`. A sweep that 1Click refunds returns what was deposited,
+ * at most its `amountIn`, to the transit wallet; one that succeeded returns
+ * nothing. `asked` is false when 1Click couldn't be asked about the quote
+ * just now, so nothing rules it out.
+ */
+function couldExplain(
+  quote: IntentQuote,
+  amount: bigint,
+  asked: boolean,
+): boolean {
+  if (quote.purpose === "base_hop") {
+    return quote.amountOut === amount && (!asked || isUnsettled(quote));
+  }
+  return (
+    amount <= quote.amountIn &&
+    (!asked ||
+      isUnsettled(quote) ||
+      quote.status === "refunded" ||
+      quote.status === "failed")
+  );
+}
+
+type TransitOutcome = "internal" | "flagged";
+
+/**
+ * USDC at a transit wallet that isn't a Paycrest refund. It is the
+ * company's own money when one of its Base hops or sweeps lists the
+ * transaction (a hop arriving, or a sweep 1Click refunded); that is
+ * internal and never a ledger entry. Otherwise nobody expected it: it is
+ * raised for review and never credited (docs/decisions/near-main-chain.md,
+ * "The ledger").
+ *
+ * 1Click can list a transaction a little after it lands. So while a hop or
+ * sweep could still explain this amount, or one that could wasn't
+ * answerable, the answer is "not yet" rather than an alert.
+ */
+function settleTransitTransfer(
+  wallet: DepositWallet,
+  transfer: UsdcTransfer,
+): Effect.Effect<
+  TransitOutcome,
+  HopArrivalUnconfirmed | DatabaseError,
+  DatabaseService | OneClick
+> {
+  const organizationId = wallet.organization_id;
+  return Effect.gen(function* () {
+    if (yield* isOwnQuoteTransfer(organizationId, transfer)) return "internal";
+
+    let stillPossible = false;
+    for (const quote of yield* quotesToRecheck(
+      organizationId,
+      TRANSIT_QUOTE_PURPOSES,
+    )) {
+      const exit = yield* Effect.exit(refreshQuoteStatus(quote));
+      if (Exit.isFailure(exit)) {
+        console.warn(
+          `[deposits] quote ${quote.id} not refreshed`,
+          Cause.pretty(exit.cause),
+        );
+      }
+      stillPossible ||= Exit.isSuccess(exit)
+        ? couldExplain(exit.value, transfer.amount, true)
+        : couldExplain(quote, transfer.amount, false);
+    }
+    if (yield* isOwnQuoteTransfer(organizationId, transfer)) return "internal";
+    if (stillPossible) {
+      return yield* Effect.fail(
+        new HopArrivalUnconfirmed({ txHash: transfer.txHash }),
+      );
+    }
+
+    const [company] = yield* withScope({ organizationId }, (tx) =>
+      query(() =>
+        tx
+          .select({ name: organizations.name })
+          .from(organizations)
+          .where(eq(organizations.id, organizationId))
+          .limit(1),
+      ),
+    );
+    const companyName = company?.name ?? organizationId;
+    console.warn(
+      `[deposits] unexpected USDC at the transit wallet of company ${organizationId} in ${transfer.txHash} (log ${transfer.logIndex}); not credited`,
+    );
+    yield* raiseAlert({
+      kind: "unexpected_transit_transfer",
+      subjectKey: `${transfer.txHash}:${transfer.logIndex}`,
+      organizationId,
+      title: `Unexpected USDC at the transit wallet of ${companyName}`,
+      details: [
+        { label: "Company", value: companyName },
+        { label: "Transit wallet", value: wallet.address },
+        {
+          label: "Amount (USDC base units)",
+          value: transfer.amount.toString(),
+        },
+        { label: "From", value: transfer.from },
+        { label: "Base transaction", value: transfer.txHash },
+        { label: "Log index", value: String(transfer.logIndex) },
+        {
+          label: "What it means",
+          value:
+            "USDC reached this transit wallet and it is neither a Paycrest refund nor one of the company's Base hops or sweeps. It has not been added to the company's balance. Find out who sent it, then credit or return it by hand.",
+        },
+      ],
+    });
+    return "flagged";
+  });
+}
+
+/**
+ * Credits the USDC that the given Base transactions sent to a company's
+ * wallet on Base: its transit wallet, or the company wallet itself if it
+ * was made before NEAR became the main chain. A notification only says where
+ * to look: every amount, sender, recipient and log index comes from the
+ * transaction receipt, so only real, successful USDC transfers on Base are
+ * ever credited (spec §6.9). Each transfer log is credited at most once,
+ * however often it's reported.
+ *
+ * At a transit wallet only a Paycrest refund is credited. A Base hop
+ * arriving is the company's own money and is left alone; anything else is
+ * raised for review.
  */
 export function creditUsdcDeposits(
   txHashes: readonly string[],
   actor: AuditActor,
 ): Effect.Effect<
   DepositSummary,
-  ReceiptUnavailable | BaseRpcError | DatabaseError,
-  BaseRpc | DatabaseService | AuditLog
+  ReceiptUnavailable | HopArrivalUnconfirmed | BaseRpcError | DatabaseError,
+  BaseRpc | DatabaseService | AuditLog | OneClick
 > {
   return Effect.gen(function* () {
     const rpc = yield* BaseRpc;
@@ -302,10 +496,14 @@ export function creditUsdcDeposits(
       ]);
       for (const transfer of transfers) {
         const wallet = walletsByAddress.get(transfer.to);
-        if (!wallet) continue;
-        if (yield* creditDeposit(wallet, receipt, transfer, actor))
-          credited += 1;
-        else alreadyCredited += 1;
+        // A company wallet on NEAR has no address on Base to receive at.
+        if (!wallet || (wallet.kind === "company" && wallet.chain !== "base")) {
+          continue;
+        }
+        const outcome = yield* creditDeposit(wallet, receipt, transfer, actor);
+        if (outcome === "credited") credited += 1;
+        else if (outcome === "already_credited") alreadyCredited += 1;
+        else yield* settleTransitTransfer(wallet, transfer);
       }
     }
 

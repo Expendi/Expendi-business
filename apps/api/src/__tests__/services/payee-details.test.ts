@@ -4,9 +4,13 @@ import { describe, expect, it } from "vitest";
 import type { PayeeDetails, PayeeKind } from "@expendi-business/shared";
 import { payeeDetailsSchema } from "@expendi-business/shared";
 
+import type { PayeeRow } from "../../db/schema/index.js";
 import {
   checkBank,
   checkDetailsForKind,
+  describeDetails,
+  detailColumns,
+  detailsOf,
   maskDetails,
   normaliseDetails,
 } from "../../services/payees/details.js";
@@ -33,6 +37,30 @@ const forKind = (kind: PayeeKind, details: PayeeDetails) =>
   outcomeOf(Effect.runSyncExit(checkDetailsForKind(kind, details)));
 
 const accountName = "Jane Wanjiku";
+const SOLANA_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+/** A payee row with no payment details yet. */
+const BLANK_ROW: PayeeRow = {
+  id: "0a9d1f0e-5b0c-4c58-9d0e-3f0f2a6f7b11",
+  organizationId: "7c1f3a52-0d0b-4f7e-8a57-1d2c3b4a5f66",
+  kind: "vendor",
+  name: "Cloud host",
+  membershipId: null,
+  method: null,
+  phone: null,
+  tillNumber: null,
+  paybillNumber: null,
+  accountReference: null,
+  bankCode: null,
+  bankAccountNumber: null,
+  accountName: null,
+  usdcChain: null,
+  usdcAddress: null,
+  detailsChangedAt: null,
+  archived: false,
+  createdAt: new Date("2026-11-10T00:00:00.000Z"),
+  updatedAt: new Date("2026-11-10T00:00:00.000Z"),
+};
 
 describe("payee payment details", () => {
   describe("M-Pesa number", () => {
@@ -254,6 +282,7 @@ describe("payee payment details", () => {
       // #when
       const result = validate({
         method: "usdc",
+        chain: "base",
         address: "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
       });
 
@@ -261,6 +290,7 @@ describe("payee payment details", () => {
       expect(result).toEqual({
         ok: {
           method: "usdc",
+          chain: "base",
           address: "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed",
         },
       });
@@ -270,6 +300,7 @@ describe("payee payment details", () => {
       // #when one letter's case is flipped
       const result = validate({
         method: "usdc",
+        chain: "base",
         address: "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAEd",
       });
 
@@ -283,10 +314,103 @@ describe("payee payment details", () => {
       ["0xzz"],
     ])("rejects %j", (address) => {
       // #when
-      const result = validate({ method: "usdc", address });
+      const result = validate({ method: "usdc", chain: "base", address });
 
       // #then
       expect(result).toBe("rejected by schema");
+    });
+
+    it.each([
+      ["a NEAR implicit account", "near", "ab".repeat(32)],
+      ["a named NEAR account", "near", "treasury.acme.near"],
+      ["a Solana address", "solana", SOLANA_ADDRESS],
+    ] as const)("keeps %s exactly as given", (_case, chain, address) => {
+      // #when
+      const result = validate({
+        method: "usdc",
+        chain,
+        address: ` ${address} `,
+      });
+
+      // #then
+      expect(result).toEqual({ ok: { method: "usdc", chain, address } });
+    });
+
+    it.each([
+      ["a NEAR account with a capital letter", "near", "Acme.near"],
+      ["a Solana address on NEAR", "near", SOLANA_ADDRESS],
+      ["a Solana address in lowercase", "solana", SOLANA_ADDRESS.toLowerCase()],
+      ["a Base address on Solana", "solana", `0x${"ab".repeat(20)}`],
+      ["a NEAR account on Base", "base", "acme.near"],
+    ] as const)("rejects %s", (_case, chain, address) => {
+      // #when
+      const result = validate({ method: "usdc", chain, address });
+
+      // #then
+      expect(result).toBe("rejected by schema");
+    });
+
+    it("rejects an address without its chain", () => {
+      // #when
+      const result = validate({
+        method: "usdc",
+        address: "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed",
+      });
+
+      // #then
+      expect(result).toBe("rejected by schema");
+    });
+
+    it.each([
+      ["near", "treasury.acme.near", "USDC on NEAR to treasury.acme.near"],
+      ["solana", SOLANA_ADDRESS, `USDC on Solana to ${SOLANA_ADDRESS}`],
+      [
+        "base",
+        "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed",
+        "USDC on Base to 0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed",
+      ],
+    ] as const)(
+      "names the payee chain %s in the admins' email",
+      (chain, address, line) => {
+        // #when
+        const described = describeDetails(
+          { method: "usdc", chain, address },
+          null,
+        );
+
+        // #then
+        expect(described).toBe(line);
+      },
+    );
+
+    it.each([
+      ["near", "treasury.acme.near"],
+      ["solana", SOLANA_ADDRESS],
+    ] as const)(
+      "stores a %s payee's chain and reads it back",
+      (chain, address) => {
+        // #given
+        const details = { method: "usdc", chain, address } as const;
+
+        // #when
+        const columns = detailColumns(details);
+
+        // #then
+        expect(columns).toMatchObject({
+          method: "usdc",
+          usdcChain: chain,
+          usdcAddress: address,
+        });
+        expect(detailsOf({ ...BLANK_ROW, ...columns })).toEqual(details);
+      },
+    );
+
+    it("clears the chain when a payee stops being paid in USDC", () => {
+      // #when
+      const columns = detailColumns({ method: "outside" });
+
+      // #then
+      expect(columns).toMatchObject({ usdcChain: null, usdcAddress: null });
     });
   });
 
@@ -335,7 +459,11 @@ describe("payee payment details", () => {
       accountNumber: "0123456789",
       accountName,
     },
-    { method: "usdc", address: "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed" },
+    {
+      method: "usdc",
+      chain: "base",
+      address: "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed",
+    },
     { method: "outside" },
   ])("normalises $method to itself, so its hash is stable", (details) => {
     // #when
@@ -389,6 +517,7 @@ describe("payee payment details", () => {
         "employee",
         {
           method: "usdc",
+          chain: "base",
           address: "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed",
         },
       ],

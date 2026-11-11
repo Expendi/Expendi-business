@@ -2,6 +2,7 @@ import type {
   AccountingSyncsQuery,
   AuditSearchQuery,
   CompanySearchQuery,
+  IntentQuoteQueueQuery,
   PayoutQueueQuery,
 } from "@expendi-business/shared";
 
@@ -17,6 +18,12 @@ export const queryKeys = {
   payoutQueue: (query: PayoutQueueQuery) =>
     ["internal", "payouts", query] as const,
   payout: (payoutId: string) => ["internal", "payout", payoutId] as const,
+  intentQuoteQueue: (query: IntentQuoteQueueQuery) =>
+    ["internal", "intent-quotes", query] as const,
+  intentQuote: (quoteId: string) =>
+    ["internal", "intent-quote", quoteId] as const,
+  intentQuoteEvidence: (quoteId: string) =>
+    ["internal", "intent-quote", quoteId, "evidence"] as const,
   controls: () => ["internal", "controls"] as const,
   zoho: (companyId: string) => ["internal", "zoho", companyId] as const,
   zohoOrganizations: (companyId: string) =>

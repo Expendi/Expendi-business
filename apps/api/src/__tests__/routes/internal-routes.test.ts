@@ -115,6 +115,11 @@ describe("internal routes", () => {
         "POST /internal/payouts/:payoutId/refetch",
         "POST /internal/payouts/:payoutId/resolve/prepare",
         "POST /internal/payouts/:payoutId/resolve/confirm",
+        "GET /internal/intent-quotes",
+        "GET /internal/intent-quotes/:quoteId",
+        "GET /internal/intent-quotes/:quoteId/evidence",
+        "POST /internal/intent-quotes/:quoteId/resolve/prepare",
+        "POST /internal/intent-quotes/:quoteId/resolve/confirm",
         "GET /internal/controls",
         "POST /internal/controls/pause/prepare",
         "POST /internal/controls/pause/confirm",
@@ -242,6 +247,8 @@ describe("the code behind the internal routes", () => {
         "routes/internal/payouts.ts",
         "services/staff/resolve.ts",
         "services/payout/sync.ts",
+        "services/staff/intent-quote-resolve.ts",
+        "services/intents/quote-settle.ts",
       ]),
     );
   });

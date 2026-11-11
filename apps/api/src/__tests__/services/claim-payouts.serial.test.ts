@@ -291,7 +291,12 @@ describe("the claim's hooks on USDC payouts", () => {
             subjectType: "claim",
             subjectId: claimId,
             idempotencyKey: `claim:${claimId}:1`,
-            recipient: { method: "usdc", address, accountName: "Jane" },
+            recipient: {
+              method: "usdc",
+              chain: "base",
+              address,
+              accountName: "Jane",
+            },
             amountUsdc: 12n * USDC,
           },
         ],

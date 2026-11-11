@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  INVALID_PAYEE_ADDRESS,
   normaliseBaseAddress,
+  normalisePayeeAddress,
   toChecksumAddress,
 } from "../../services/chain/address.js";
 
@@ -64,4 +66,67 @@ describe("Base addresses", () => {
       expect(address).toBeNull();
     },
   );
+});
+
+describe("addresses on a payee chain", () => {
+  const SOLANA_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+  it("lowercases a Base address once its checksum holds", () => {
+    // #when
+    const address = normalisePayeeAddress(
+      "base",
+      ` ${EIP55_VECTORS[1] ?? ""} `,
+    );
+
+    // #then
+    expect(address).toBe("0xfb6916095ca1df60bb79ce92ce3ea74c37c5d359");
+  });
+
+  it.each([
+    ["a NEAR implicit account", "near", "ab".repeat(32)],
+    ["a named NEAR account", "near", "treasury.acme.near"],
+    ["a Solana address", "solana", SOLANA_ADDRESS],
+  ] as const)("keeps %s exactly as given", (_name, chain, raw) => {
+    // #when
+    const address = normalisePayeeAddress(chain, `  ${raw}\n`);
+
+    // #then
+    expect(address).toBe(raw);
+  });
+
+  it.each([
+    [
+      "a Base address with a bad checksum",
+      "base",
+      "0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5D359",
+    ],
+    ["a NEAR account on Base", "base", "acme.near"],
+    ["a NEAR account with a capital letter", "near", "Acme.near"],
+    ["a NEAR implicit account in capitals", "near", "AB".repeat(32)],
+    ["a Solana address on NEAR", "near", SOLANA_ADDRESS],
+    ["a Solana address in lowercase", "solana", SOLANA_ADDRESS.toLowerCase()],
+    [
+      "base58 that stands for 31 bytes",
+      "solana",
+      "3guQgf9mkU1JiELnxmxNhoxCPZpy6n4YUcwuWp8av8",
+    ],
+    [
+      "a Base address on Solana",
+      "solana",
+      "0xfb6916095ca1df60bb79ce92ce3ea74c37c5d359",
+    ],
+    ["nothing", "near", "   "],
+  ] as const)("refuses %s", (_name, chain, raw) => {
+    // #when
+    const address = normalisePayeeAddress(chain, raw);
+
+    // #then
+    expect(address).toBeNull();
+  });
+
+  it("says which chain an address isn't valid on", () => {
+    expect(INVALID_PAYEE_ADDRESS.near).toContain("NEAR account");
+    expect(INVALID_PAYEE_ADDRESS.base).toContain("Base address");
+    expect(INVALID_PAYEE_ADDRESS.solana).toContain("Solana address");
+  });
 });

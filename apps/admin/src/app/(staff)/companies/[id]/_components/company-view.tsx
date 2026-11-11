@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
 import type { CompanyDetail } from "@expendi-business/shared";
+import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
 import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import { PauseFlow } from "~/components/pause-flow";
@@ -115,7 +116,7 @@ export function CompanyView({ companyId }: { companyId: string }) {
       </div>
       {company.wallet?.address ? (
         <p className="mt-2 text-sm text-stone-600">
-          Wallet{" "}
+          Company wallet on {PAYEE_CHAIN_NAMES[company.wallet.chain]}{" "}
           <span className="font-mono text-xs break-all">
             {company.wallet.address}
           </span>{" "}

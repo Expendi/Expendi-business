@@ -297,7 +297,7 @@ describe("resolvePayeeRecipient", () => {
     const payee = await add({
       kind: "vendor",
       name: "Cloud host",
-      details: { method: "usdc", address },
+      details: { method: "usdc", chain: "base", address },
     });
 
     // #when
@@ -305,7 +305,7 @@ describe("resolvePayeeRecipient", () => {
 
     // #then
     expect(outcome).toEqual({
-      ok: { method: "usdc", address, accountName: "Cloud host" },
+      ok: { method: "usdc", chain: "base", address, accountName: "Cloud host" },
     });
   });
 

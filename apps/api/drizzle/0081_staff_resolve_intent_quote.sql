@@ -1,0 +1,1 @@
+ALTER TYPE "public"."staff_confirmation_purpose" ADD VALUE 'resolve_intent_quote';

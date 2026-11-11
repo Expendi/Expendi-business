@@ -26,7 +26,7 @@ export const CONFIRMATION_TTL_MS = 5 * 60_000;
 
 export interface ConfirmationIntent {
   readonly purpose: StaffConfirmationPurpose;
-  /** The payout's ID, the company's ID, or `platform`. */
+  /** The payout's or quote's ID, the company's ID, or `platform`. */
   readonly target: string;
   readonly params: Readonly<Record<string, string>>;
 }

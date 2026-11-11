@@ -17,6 +17,7 @@ import {
 
 import type { PayoutRecipient } from "../../services/paycrest/recipient.js";
 import { timestamps } from "./columns.js";
+import { intentQuotes } from "./intent-quotes.js";
 import { organizations } from "./organizations.js";
 import { payrollRuns } from "./payroll-runs.js";
 import { users } from "./users.js";
@@ -149,6 +150,17 @@ export const payouts = pgTable(
      * links the refund to this payout. Set once by sync, never changed.
      */
     gatewayOrderId: text("gateway_order_id"),
+    /**
+     * The Base hop quote that moved this cash-out's USDC to the transit
+     * wallet. A payroll run hops once for its total, so its payouts share
+     * one.
+     */
+    baseHopQuoteId: uuid("base_hop_quote_id"),
+    /**
+     * The quote that delivered a USDC payout to a payee on Base or Solana.
+     * Null for a NEAR payee, who is paid straight from the company wallet.
+     */
+    deliveryQuoteId: uuid("delivery_quote_id"),
     failureReason: text("failure_reason"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     ...timestamps,
@@ -164,6 +176,27 @@ export const payouts = pgTable(
       columns: [table.payrollRunId, table.organizationId],
       foreignColumns: [payrollRuns.id, payrollRuns.organizationId],
     }),
+    foreignKey({
+      name: "payouts_base_hop_quote_organization_fk",
+      columns: [table.baseHopQuoteId, table.organizationId],
+      foreignColumns: [intentQuotes.id, intentQuotes.organizationId],
+    }),
+    foreignKey({
+      name: "payouts_delivery_quote_organization_fk",
+      columns: [table.deliveryQuoteId, table.organizationId],
+      foreignColumns: [intentQuotes.id, intentQuotes.organizationId],
+    }),
+    index("payouts_base_hop_quote_id_idx").on(table.baseHopQuoteId),
+    // One quote delivers one payout.
+    uniqueIndex("payouts_delivery_quote_id_unique").on(table.deliveryQuoteId),
+    check(
+      "payouts_base_hop_is_for_a_cash_out",
+      sql`${table.baseHopQuoteId} IS NULL OR ${table.provider} = 'paycrest'`,
+    ),
+    check(
+      "payouts_delivery_quote_is_for_usdc",
+      sql`${table.deliveryQuoteId} IS NULL OR ${table.provider} = 'onchain'`,
+    ),
     // Target of bills' composite foreign key.
     unique("payouts_id_organization_id_unique").on(
       table.id,

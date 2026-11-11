@@ -42,3 +42,10 @@ export function isPaused(
     return !company || company.paused || (platform?.paused ?? true);
   });
 }
+
+/**
+ * The company wallet send key of a USDC payout paid on NEAR. One payout has
+ * one key, so however often it is retried, at most one send for it is ever
+ * live (services/wallet/company-wallet-send.ts).
+ */
+export const payoutSendKey = (payoutId: string): string => `payout-${payoutId}`;

@@ -7,7 +7,11 @@ import {
   payoutStatusSchema,
   payoutSubjectTypeSchema,
 } from "./wallet-history.js";
-import { walletStatusSchema, walletTransactionTypeSchema } from "./wallet.js";
+import {
+  walletChainSchema,
+  walletStatusSchema,
+  walletTransactionTypeSchema,
+} from "./wallet.js";
 
 /**
  * The internal admin app's companies, payout queue and payout pause (spec
@@ -62,6 +66,13 @@ export type CompanySearchResponse = z.infer<typeof companySearchResponseSchema>;
 export const staffPayoutSummarySchema = z.object({
   id: z.uuid(),
   organization: z.object({ id: z.uuid(), name: z.string() }),
+  /**
+   * The chain the payout's money leaves from, which `txHash` is on: NEAR
+   * for a USDC payout from a company wallet on NEAR, Base for a cash-out
+   * (funded from the transit wallet) and for every payout of a company
+   * wallet made before the move.
+   */
+  chain: walletChainSchema,
   subjectType: payoutSubjectTypeSchema,
   subjectId: z.uuid(),
   /** Set when the payout is one person's pay in a payroll run. */
@@ -75,6 +86,10 @@ export const staffPayoutSummarySchema = z.object({
   amountToTransferUsdc: digits.nullable(),
   providerOrderId: z.string().nullable(),
   depositAddress: z.string().nullable(),
+  /**
+   * The transaction that sent the money: a 0x hash on Base, a base58 hash
+   * on NEAR. A NEAR hash is case-sensitive.
+   */
   txHash: z.string().nullable(),
   /** The M-Pesa or bank receipt, or the tx hash for a USDC payout. */
   providerReference: z.string().nullable(),
@@ -111,6 +126,8 @@ export const companyDetailSchema = z.object({
   /** Null before sign-up's wallet step has run. */
   wallet: z
     .object({
+      /** The chain the company wallet, and `address`, is on. */
+      chain: walletChainSchema,
       status: walletStatusSchema,
       address: z.string().nullable(),
       /** The ledger balance, USDC base units. */
@@ -169,6 +186,8 @@ export const ledgerEntrySchema = z.object({
   type: walletTransactionTypeSchema,
   /** Signed USDC base units. */
   usdcAmount: integerString,
+  /** The chain the money moved on; says how to read `txHash`. */
+  chain: walletChainSchema,
   txHash: z.string().nullable(),
   createdAt: z.iso.datetime(),
 });
@@ -189,6 +208,12 @@ export const staffPayoutDetailSchema = staffPayoutSummarySchema.extend({
   approvedAt: z.iso.datetime().nullable(),
   paidAt: z.iso.datetime().nullable(),
   walletAddress: z.string().nullable(),
+  /**
+   * The NEAR Intents quote the payout waits on (its Base hop, or its
+   * delivery to another chain). While it does, staff resolve the quote,
+   * not the payout.
+   */
+  heldByIntentQuoteId: z.uuid().nullable(),
   /** The payout's ledger rows: its debit and any refund. */
   ledger: z.array(ledgerEntrySchema),
   /** The payout's audit entries, newest first. */
@@ -211,7 +236,7 @@ export type PayoutRefetchResponse = z.infer<typeof payoutRefetchResponseSchema>;
 export const STAFF_REASON_MIN_LENGTH = 10;
 export const STAFF_REASON_MAX_LENGTH = 500;
 
-const reasonSchema = z
+export const staffReasonSchema = z
   .string({ error: "Write why." })
   .trim()
   .min(
@@ -241,13 +266,16 @@ export type ResolveOutcome = z.infer<typeof resolveOutcomeSchema>;
 /** `POST /internal/payouts/:id/resolve/prepare`. */
 export const resolvePrepareRequestSchema = z.object({
   outcome: resolveOutcomeSchema,
-  reason: reasonSchema,
+  reason: staffReasonSchema,
 });
 
 export type ResolvePrepareRequest = z.input<typeof resolvePrepareRequestSchema>;
 
 const transferSchema = z.object({
+  /** The chain the transfer is on; says how to read `txHash`. */
+  chain: walletChainSchema,
   txHash: z.string(),
+  /** Where the transfer sits in its transaction. */
   logIndex: z.number().int(),
   blockNumber: digits,
   usdcAmount: digits,
@@ -301,7 +329,7 @@ export const pausePrepareRequestSchema = z
   .object({
     scope: z.enum(PAUSE_SCOPES, { error: "Choose all companies or one." }),
     organizationId: z.uuid("Choose a company.").optional(),
-    reason: reasonSchema,
+    reason: staffReasonSchema,
   })
   .refine(
     (request) => (request.scope === "company") === !!request.organizationId,

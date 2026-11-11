@@ -67,6 +67,7 @@ import {
   RECENTLY_CHANGED_LABEL,
 } from "~/features/payees/payee-display";
 import {
+  changeDetailValue,
   detailsToValues,
   EMPTY_DETAIL_VALUES,
   methodsForKind,
@@ -589,7 +590,7 @@ export function PayeeSheet({
             onValueChange={(field, value) =>
               setDraft({
                 ...draft,
-                values: { ...draft.values, [field]: value },
+                values: changeDetailValue(draft.values, field, value),
               })
             }
             errors={errors.details}
@@ -695,7 +696,7 @@ export function PayeeSheet({
             onValueChange={(field, value) =>
               setDraft({
                 ...draft,
-                values: { ...draft.values, [field]: value },
+                values: changeDetailValue(draft.values, field, value),
               })
             }
             errors={errors.details}

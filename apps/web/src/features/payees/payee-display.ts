@@ -10,7 +10,13 @@ import {
 } from "@expendi-business/shared";
 
 import type { DetailField } from "./payee-fields";
-import { detailValues, fieldLabel, methodFields } from "./payee-fields";
+import { addressOnChain } from "~/features/chain-display";
+import {
+  detailValues,
+  displayValue,
+  fieldLabel,
+  methodFields,
+} from "./payee-fields";
 
 /**
  * From `apps/mobile/src/features/payees/payee-display.ts`. The dashboard
@@ -48,7 +54,7 @@ export const METHOD_DESCRIPTIONS: Record<PayeeMethod, string> = {
   mpesa_till: "Buy Goods: a business Till number.",
   mpesa_paybill: "A business number and an account number.",
   bank: "A Kenyan bank account.",
-  usdc: "USDC on Base, to an address on the company's allowlist.",
+  usdc: "USDC on NEAR, Base or Solana, to an address on the company's allowlist.",
   outside: "Paid by card or elsewhere. Expendi only sends reminders.",
 };
 
@@ -58,13 +64,6 @@ export const CHANGE_WARNING =
 export const RECENTLY_CHANGED_LABEL = "Details changed in the last 24 hours";
 
 const HOLD_MS = PAYEE_CHANGE_HOLD_HOURS * 60 * 60_000;
-
-/** `0x1234…abcd`: enough to recognise an address at a glance. */
-export function shortAddress(address: string): string {
-  return address.length > 12
-    ? `${address.slice(0, 6)}…${address.slice(-4)}`
-    : address;
-}
 
 /** Employee payees are paid to the number they confirmed in the app. */
 function confirmedNumber(payoutPhoneConfirmed: boolean | null): string {
@@ -89,7 +88,7 @@ export function detailSummary(
     case "bank":
       return `${bankName ?? details.bankCode} ${details.accountNumber}`;
     case "usdc":
-      return shortAddress(details.address);
+      return addressOnChain(details.chain, details.address);
     case "outside":
       return null;
   }
@@ -141,7 +140,9 @@ export function detailRows(
   const display = (field: DetailField): string => {
     const value = values[field];
     if (value === undefined) return confirmedNumber(payoutPhoneConfirmed);
-    return field === "bankCode" ? (bankName ?? value) : value;
+    return field === "bankCode"
+      ? (bankName ?? value)
+      : displayValue(field, value);
   };
   return [
     { label: "Paid by", value: METHOD_LABELS[details.method] },

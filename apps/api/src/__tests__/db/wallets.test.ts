@@ -1,5 +1,6 @@
+import type { SQL } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -18,6 +19,7 @@ import {
   createIsolationFixture,
   expectTableIsolation,
 } from "../helpers/isolation.js";
+import { randomNearAccount, randomNearTxHash } from "../helpers/near.js";
 import { makeTestRuntime } from "../helpers/runtime.js";
 import { TEST_DATABASE_URL_MIGRATE } from "../setup/test-database.js";
 
@@ -45,9 +47,35 @@ function deposit(
   };
 }
 
+/** A USDC transfer into the wallet on NEAR, named the way the watcher names it. */
+function nearDeposit(
+  wallet: TestWallet,
+  organizationId: string,
+  overrides: Partial<NewWalletTransaction> = {},
+): NewWalletTransaction {
+  return {
+    organizationId,
+    walletId: wallet.id,
+    type: "deposit",
+    chain: "near",
+    usdcAmount: 20_000_000n,
+    txHash: randomNearTxHash(),
+    receiptId: randomNearTxHash(),
+    logIndex: 0,
+    transferIndex: 0,
+    blockNumber: 150_000_000n,
+    ...overrides,
+  };
+}
+
 const insertAs = (organizationId: string, row: NewWalletTransaction) =>
   runInScope(db, { organizationId }, (tx) =>
     tx.insert(walletTransactions).values(row),
+  );
+
+const savedAs = (organizationId: string, where: SQL) =>
+  runInScope(db, { organizationId }, (tx) =>
+    tx.select().from(walletTransactions).where(where),
   );
 
 beforeAll(async () => {
@@ -121,6 +149,88 @@ describe("wallets", () => {
       cause: { constraint: "wallets_active_is_complete" },
     });
   });
+
+  it.each([
+    ["its transit wallet", { transitPrivyWalletId: null }],
+    ["its transit address", { transitAddress: null }],
+    ["its transit wallet's policy", { privyPolicyId: null }],
+    ["its account being usable on chain", { onchainActivatedAt: null }],
+  ])("refuses to mark a NEAR wallet active without %s", async (_name, gap) => {
+    // #given
+    const fresh = await createIsolationFixture(db);
+
+    // #when
+    const activate = runInScope(
+      db,
+      { organizationId: fresh.companyA.organizationId },
+      (tx) =>
+        tx.insert(wallets).values({
+          organizationId: fresh.companyA.organizationId,
+          perTransactionMaxUsdc: 1n,
+          status: "active",
+          privyWalletId: `wallet-${randomUUID()}`,
+          address: randomNearAccount(),
+          privyPolicyId: `policy-${randomUUID()}`,
+          transitPrivyWalletId: `transit-${randomUUID()}`,
+          transitAddress: randomAddress(),
+          onchainActivatedAt: new Date(),
+          ...gap,
+        }),
+    );
+
+    // #then
+    await expect(activate).rejects.toMatchObject({
+      cause: { constraint: "wallets_active_is_complete" },
+    });
+  });
+
+  it("puts a new wallet on NEAR unless told otherwise", async () => {
+    // #given
+    const fresh = await createIsolationFixture(db);
+
+    // #when
+    const [created] = await runInScope(
+      db,
+      { organizationId: fresh.companyA.organizationId },
+      (tx) =>
+        tx
+          .insert(wallets)
+          .values({
+            organizationId: fresh.companyA.organizationId,
+            perTransactionMaxUsdc: 1n,
+          })
+          .returning({ chain: wallets.chain }),
+    );
+
+    // #then
+    expect(created?.chain).toBe("near");
+  });
+
+  it("gives no two companies the same transit address, whatever its case", async () => {
+    // #given
+    const fresh = await createIsolationFixture(db);
+    const transitAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+    const insertWith = (organizationId: string, address: string) =>
+      runInScope(db, { organizationId }, (tx) =>
+        tx.insert(wallets).values({
+          organizationId,
+          perTransactionMaxUsdc: 1n,
+          transitAddress: address,
+        }),
+      );
+    await insertWith(fresh.companyA.organizationId, transitAddress);
+
+    // #when
+    const second = insertWith(
+      fresh.companyB.organizationId,
+      transitAddress.toLowerCase(),
+    );
+
+    // #then
+    await expect(second).rejects.toMatchObject({
+      cause: { constraint: "wallets_transit_address_unique" },
+    });
+  });
 });
 
 describe("active_wallets_by_address", () => {
@@ -190,8 +300,207 @@ describe("wallet_transactions", () => {
 
     // #then
     await expect(again).rejects.toMatchObject({
-      cause: { constraint: "wallet_transactions_tx_log_unique" },
+      cause: { constraint: "wallet_transactions_base_transfer_unique" },
     });
+  });
+
+  it("files a row under Base unless it says otherwise", async () => {
+    // #given
+    const { companyA } = fixture;
+    const txHash = randomTxHash();
+
+    // #when
+    await insertAs(
+      companyA.organizationId,
+      deposit(walletA, companyA.organizationId, { txHash }),
+    );
+
+    // #then
+    const rows = await savedAs(
+      companyA.organizationId,
+      eq(walletTransactions.txHash, txHash),
+    );
+    expect(rows.map((row) => row.chain)).toEqual(["base"]);
+  });
+
+  it("keeps a NEAR transaction hash exactly as given", async () => {
+    // #given
+    const { companyA } = fixture;
+    const transfer = nearDeposit(walletA, companyA.organizationId, {
+      txHash: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin",
+    });
+
+    // #when
+    await insertAs(companyA.organizationId, transfer);
+
+    // #then
+    const rows = await savedAs(
+      companyA.organizationId,
+      eq(walletTransactions.receiptId, transfer.receiptId ?? ""),
+    );
+    expect(rows.map((row) => row.txHash)).toEqual([
+      "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin",
+    ]);
+  });
+
+  it("credits one NEAR transfer only once, even to another company", async () => {
+    // #given
+    const { companyA, companyB } = fixture;
+    const transfer = nearDeposit(walletA, companyA.organizationId);
+    await insertAs(companyA.organizationId, transfer);
+
+    // #when the same transfer is reported in another transaction's name
+    const again = insertAs(
+      companyB.organizationId,
+      nearDeposit(walletB, companyB.organizationId, {
+        receiptId: transfer.receiptId,
+        logIndex: transfer.logIndex,
+        transferIndex: transfer.transferIndex,
+      }),
+    );
+
+    // #then
+    await expect(again).rejects.toMatchObject({
+      cause: { constraint: "wallet_transactions_near_transfer_unique" },
+    });
+  });
+
+  it.each([
+    ["in another receipt", { receiptId: randomNearTxHash() }],
+    ["in another log of the receipt", { logIndex: 1 }],
+    ["further along the same event", { transferIndex: 1 }],
+  ])("credits a second NEAR transfer %s", async (_name, position) => {
+    // #given
+    const { companyA } = fixture;
+    const first = nearDeposit(walletA, companyA.organizationId);
+    await insertAs(companyA.organizationId, first);
+
+    // #when
+    const second = insertAs(
+      companyA.organizationId,
+      nearDeposit(walletA, companyA.organizationId, {
+        txHash: first.txHash,
+        receiptId: first.receiptId,
+        ...position,
+      }),
+    );
+
+    // #then
+    await expect(second).resolves.toBeDefined();
+  });
+
+  it("tells two NEAR receipts apart by case alone", async () => {
+    // #given two base58 IDs that differ only in the case of a letter
+    const { companyA } = fixture;
+    const receiptId = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";
+    const otherReceiptId = "9XQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";
+    await insertAs(
+      companyA.organizationId,
+      nearDeposit(walletA, companyA.organizationId, { receiptId }),
+    );
+
+    // #when
+    const other = insertAs(
+      companyA.organizationId,
+      nearDeposit(walletA, companyA.organizationId, {
+        receiptId: otherReceiptId,
+      }),
+    );
+
+    // #then
+    await expect(other).resolves.toBeDefined();
+  });
+
+  it("doesn't mistake a NEAR transfer for the Base one at the same position", async () => {
+    // #given a Base transfer and a NEAR one that share a log index
+    const { companyA } = fixture;
+    await insertAs(
+      companyA.organizationId,
+      deposit(walletA, companyA.organizationId, { logIndex: 0 }),
+    );
+
+    // #when
+    const near = insertAs(
+      companyA.organizationId,
+      nearDeposit(walletA, companyA.organizationId, { logIndex: 0 }),
+    );
+
+    // #then
+    await expect(near).resolves.toBeDefined();
+  });
+
+  it.each([
+    [
+      "a NEAR deposit without its receipt",
+      { receiptId: null, transferIndex: null },
+      "wallet_transactions_near_deposit_has_receipt",
+    ],
+    [
+      "a receipt without the transfer's position in its event",
+      { transferIndex: null },
+      "wallet_transactions_receipt_is_near",
+    ],
+    [
+      "a receipt without the log's position",
+      { type: "refund" as const, logIndex: null },
+      "wallet_transactions_receipt_is_near",
+    ],
+    [
+      "a receipt on a Base row",
+      { chain: "base" as const, txHash: randomTxHash() },
+      "wallet_transactions_receipt_is_near",
+    ],
+    [
+      "a negative position",
+      { transferIndex: -1 },
+      "wallet_transactions_positions_not_negative",
+    ],
+    [
+      "a 0x hash filed under NEAR",
+      { txHash: randomTxHash() },
+      "wallet_transactions_near_hashes_are_base58",
+    ],
+    [
+      "a NEAR hash with a letter base58 doesn't have",
+      { txHash: "9xqewvg816bux9epjhmat23yvvm2zwbrrpzb9pusvfil" },
+      "wallet_transactions_near_hashes_are_base58",
+    ],
+    [
+      "a receipt ID that isn't base58",
+      { receiptId: `0x${"ab".repeat(32)}` },
+      "wallet_transactions_near_hashes_are_base58",
+    ],
+  ])("rejects %s", async (_name, overrides, constraint) => {
+    // #given
+    const { companyA } = fixture;
+
+    // #when
+    const insert = insertAs(
+      companyA.organizationId,
+      nearDeposit(walletA, companyA.organizationId, overrides),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({ cause: { constraint } });
+  });
+
+  it("lets a NEAR row that isn't a deposit name only its transaction", async () => {
+    // #given
+    const { companyA } = fixture;
+
+    // #when
+    const row = insertAs(companyA.organizationId, {
+      organizationId: companyA.organizationId,
+      walletId: walletA.id,
+      type: "topup",
+      chain: "near",
+      usdcAmount: 1_000_000n,
+      txHash: randomNearTxHash(),
+      blockNumber: 150_000_000n,
+    });
+
+    // #then
+    await expect(row).resolves.toBeDefined();
   });
 
   it("can't record a row against another company's wallet", async () => {

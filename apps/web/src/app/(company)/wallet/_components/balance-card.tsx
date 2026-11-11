@@ -5,6 +5,7 @@ import { InfoIcon } from "lucide-react";
 import { useId } from "react";
 
 import type { ActiveWallet } from "@expendi-business/shared";
+import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
 import {
   MiniTable,
@@ -91,7 +92,7 @@ export function BalanceCard({
           USDC wallet
         </h2>
         <span className="inline-flex h-[22px] items-center rounded-full bg-gray-100 px-2 text-xs font-(--w-ui) text-gray-700">
-          On Base
+          On {PAYEE_CHAIN_NAMES[wallet.chain]}
         </span>
       </div>
       <p className="flex items-center gap-1.5 text-sm font-(--w-ui) text-gray-600">

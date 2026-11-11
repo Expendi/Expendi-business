@@ -256,6 +256,7 @@ function recipientOf<E>(
       case "usdc":
         return {
           method: "usdc",
+          chain: details.chain,
           address: details.address,
           accountName: row.name,
         };

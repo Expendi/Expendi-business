@@ -19,13 +19,15 @@ type Outcome =
   | { readonly status: 400 | 401; readonly reason: string };
 
 /**
- * Alchemy Address Activity deliveries for company wallets on Base. A
+ * Alchemy Address Activity deliveries for transit wallets on Base (and for
+ * company wallets made on Base before NEAR became the main chain). A
  * delivery only names transactions to look at; `creditUsdcDeposits` reads
  * each receipt and credits what actually happened on chain.
  *
- * 200 for anything accepted (credited, ignored or already credited), 401
- * for a bad signature, 400 for malformed JSON, 500 when a receipt or the
- * database is unavailable, so Alchemy retries the delivery.
+ * 200 for anything accepted (credited, ignored, raised for review or
+ * already credited), 401 for a bad signature, 400 for malformed JSON, 500
+ * when a receipt or the database is unavailable or a Base hop's arrival
+ * can't be confirmed yet, so Alchemy retries the delivery.
  */
 function handleDelivery(
   rawBody: string,

@@ -296,25 +296,27 @@ describe("POST /organizations", () => {
 });
 
 describe("company wallet at sign-up", () => {
-  it("creates the wallet, watches it for deposits, and shows its address and a zero balance", async () => {
+  it("creates the company wallet on NEAR, watches its transit address, and shows its address and a zero balance", async () => {
     // #when
     const company = await signedUp(
       await signUp({ name: "Wallet Ltd", kraPin: VALID_PIN }),
     );
 
     // #then
-    const [privyWallet] = [...privy.state.wallets.values()];
+    const [privyWallet] = [...privy.state.nearWallets.values()];
+    const [transitWallet] = [...privy.state.wallets.values()];
     expect(privyWallet?.input.externalId).toBe(company.id);
     expect(company.wallet).toEqual({
       status: "active",
       address: privyWallet?.address,
     });
-    expect(alchemy.state.watched).toContain(privyWallet?.address);
+    expect(alchemy.state.watched).toContain(transitWallet?.address);
     const wallet = await get(`/organizations/${company.id}/wallet`);
     expect(await wallet.json()).toMatchObject({
       data: {
         status: "active",
         address: privyWallet?.address,
+        chain: "near",
         usdcBalance: "0",
       },
     });
@@ -322,10 +324,17 @@ describe("company wallet at sign-up", () => {
 
   it.each([
     [
-      "Privy fails to create the wallet",
+      "Privy fails to create the company wallet",
+      () => privy.state.failNext("createNearWallet"),
+    ],
+    [
+      "Privy fails to create the transit wallet",
       () => privy.state.failNext("createWallet"),
     ],
-    ["Alchemy fails to watch the address", () => alchemy.state.failNext(1)],
+    [
+      "Alchemy fails to watch the transit address",
+      () => alchemy.state.failNext(1),
+    ],
   ])(
     "keeps the company when %s, and POST /wallet resumes the setup",
     async (_label, breakProvider) => {
@@ -348,14 +357,17 @@ describe("company wallet at sign-up", () => {
       const resumed = await postWallet(company.id);
 
       // #then
-      const [privyWallet, ...extra] = [...privy.state.wallets.values()];
-      expect(extra).toEqual([]);
+      const [privyWallet, ...extra] = [...privy.state.nearWallets.values()];
+      const [transitWallet, ...extraTransit] = [
+        ...privy.state.wallets.values(),
+      ];
+      expect([...extra, ...extraTransit]).toEqual([]);
       expect(privy.state.policies.size).toBe(1);
       expect(await resumed.json()).toEqual({
         success: true,
         data: { status: "active", address: privyWallet?.address },
       });
-      expect(alchemy.state.watched).toContain(privyWallet?.address);
+      expect(alchemy.state.watched).toContain(transitWallet?.address);
       expect(
         await (await get(`/organizations/${company.id}/wallet`)).json(),
       ).toMatchObject({
@@ -378,7 +390,10 @@ describe("company wallet at sign-up", () => {
       success: true,
       data: company.wallet,
     });
-    expect(privy.state.calls.createWallet).toBe(1);
+    expect({
+      companyWallets: privy.state.calls.createNearWallet,
+      transitWallets: privy.state.calls.createWallet,
+    }).toEqual({ companyWallets: 1, transitWallets: 1 });
   });
 
   it("refuses an employee", async () => {

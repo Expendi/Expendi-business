@@ -92,7 +92,7 @@ const program = Effect.gen(function* () {
   const wallet = yield* ensureCompanyWallet({ organizationId, actor: ACTOR });
   console.log(`Wallet ${wallet.status}: ${wallet.address ?? "(none yet)"}
 Per-transaction max: ${wallet.perTransactionMaxUsdc} USDC base units
-Send a small amount of USDC on Base to that address; the deposit should
+Send a small amount of USDC on NEAR to that account; the deposit should
 appear in GET /organizations/${organizationId}/wallet within a minute.`);
 });
 

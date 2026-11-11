@@ -6,6 +6,7 @@ import { CheckIcon, InfoIcon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 
 import type { WalletHistoryItem } from "@expendi-business/shared";
+import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
 import type { SheetStepper } from "~/components/data/detail-sheet";
 import {
@@ -17,11 +18,10 @@ import {
 } from "~/components/data/detail-sheet";
 import { StatusBadge } from "~/components/data/status-badge";
 import { Button } from "~/components/ui/button";
+import { addressGroups, shortAddress } from "~/features/chain-display";
 import { formatKes } from "~/lib/money";
 import { approxKes, SignedUsdc } from "./balance-card";
-import { shortAddress } from "./usdc-amount";
 import {
-  addressGroups,
   approvedAlongside,
   happenedAt,
   nairobiTime,
@@ -31,12 +31,15 @@ import {
   txTitle,
 } from "./wallet-display";
 
-/** A Base address in groups of four, so it can be checked by eye. */
+/**
+ * An address set out so it can be checked by eye: a Base address or a
+ * 64-character NEAR account in groups of four, a named account whole.
+ */
 export function GroupedAddress({ address }: { address: string }): JSX.Element {
-  const [prefix, ...groups] = addressGroups(address);
+  const { prefix, groups } = addressGroups(address);
   return (
-    <span className="flex flex-wrap gap-x-[7px] gap-y-0.5 tracking-[0.02em] tabular-nums">
-      <span className="text-gray-500">{prefix}</span>
+    <span className="flex flex-wrap gap-x-[7px] gap-y-0.5 tracking-[0.02em] [overflow-wrap:anywhere] tabular-nums">
+      {prefix ? <span className="text-gray-500">{prefix}</span> : null}
       {groups.map((group, index) => (
         <span key={`${String(index)}-${group}`}>{group}</span>
       ))}
@@ -94,7 +97,7 @@ export function TxSheet({
       }
     >
       {item ? (
-        <TxBody item={item} items={items} today={today} rate={rate} />
+        <TxDetails item={item} items={items} today={today} rate={rate} />
       ) : null}
     </DetailSheet>
   );
@@ -156,7 +159,8 @@ function subjectLinks(item: WalletHistoryItem): ReactNode {
   ));
 }
 
-function TxBody({
+/** What the sheet says about one movement, by its kind. */
+export function TxDetails({
   item,
   items,
   today,
@@ -170,7 +174,9 @@ function TxBody({
   const payout = item.payout;
   const when = happenedAt(item.createdAt, today);
   const transaction = item.txHash ? (
-    <DetailItem label="Transaction">{shortAddress(item.txHash)}</DetailItem>
+    <DetailItem label={`${PAYEE_CHAIN_NAMES[item.chain]} transaction`}>
+      {shortAddress(item.txHash)}
+    </DetailItem>
   ) : null;
   switch (txKind(item)) {
     case "deposit":
@@ -183,7 +189,7 @@ function TxBody({
               <GroupedAddress address={item.counterpartyAddress} />
             </DetailItem>
           ) : null}
-          <DetailItem label="Network">Base</DetailItem>
+          <DetailItem label="Chain">{PAYEE_CHAIN_NAMES[item.chain]}</DetailItem>
           <DetailItem label="Received">{when}</DetailItem>
           {kes ? (
             <DetailItem label="About">
@@ -204,8 +210,10 @@ function TxBody({
               "An allowed address"
             )}
           </DetailItem>
-          <DetailItem label="Network">Base</DetailItem>
-          <DetailItem label="Gas">Paid by Expendi</DetailItem>
+          <DetailItem label="Payee chain">
+            {PAYEE_CHAIN_NAMES[payout?.recipientChain ?? item.chain]}
+          </DetailItem>
+          <DetailItem label="Network fee">Paid by Expendi</DetailItem>
           <DetailItem label="Sent">{when}</DetailItem>
           {payout?.approvedAt ? (
             <DetailItem label="Approved">
@@ -260,7 +268,18 @@ function TxBody({
               <DetailItem label="Rate">KES {payout.rate} per USDC</DetailItem>
             ) : null}
             {payout ? (
-              <DetailItem label="Paid to">{payout.recipientDetail}</DetailItem>
+              <DetailItem label="Paid to">
+                {payout.method === "usdc" ? (
+                  <GroupedAddress address={payout.recipientDetail} />
+                ) : (
+                  payout.recipientDetail
+                )}
+              </DetailItem>
+            ) : null}
+            {payout?.recipientChain ? (
+              <DetailItem label="Payee chain">
+                {PAYEE_CHAIN_NAMES[payout.recipientChain]}
+              </DetailItem>
             ) : null}
             {payoutPurpose(item) ? (
               <DetailItem label="For">{payoutPurpose(item)}</DetailItem>

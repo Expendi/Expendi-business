@@ -4,10 +4,16 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
-import type { PayeeKind, PayeeMethod } from "@expendi-business/shared";
+import type {
+  PayeeChain,
+  PayeeKind,
+  PayeeMethod,
+} from "@expendi-business/shared";
 import {
   PAYBILL_ACCOUNT_REFERENCE_MAX_LENGTH,
   PAYEE_ACCOUNT_NAME_MAX_LENGTH,
+  PAYEE_CHAIN_NAMES,
+  PAYEE_CHAINS,
 } from "@expendi-business/shared";
 
 import type {
@@ -22,7 +28,7 @@ import { ErrorMessage } from "~/components/error-message";
 import { OptionPicker } from "~/components/option-picker";
 import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
-import { shortAddress } from "~/features/wallet/usdc-amount";
+import { shortAddress } from "~/features/wallet/chain-display";
 import { useWithdrawalAddresses } from "~/features/wallet/use-withdrawal-addresses";
 import { describeApiError } from "~/lib/api";
 import {
@@ -122,11 +128,26 @@ export function PayeeDetailsFields({
             />
           );
         }
+        if (field === "chain") {
+          return (
+            <View key={field} className="gap-2">
+              <OptionPicker
+                label={label}
+                options={CHAIN_OPTIONS}
+                value={payeeChain(values.chain)}
+                onChange={onChange}
+                disabled={disabled}
+              />
+              <ErrorMessage message={error} />
+            </View>
+          );
+        }
         if (field === "address") {
           return (
             <AllowlistedAddressPicker
               key={field}
               organizationId={organizationId}
+              chain={payeeChain(values.chain)}
               value={values.address}
               onChange={onChange}
               error={error}
@@ -151,6 +172,16 @@ export function PayeeDetailsFields({
       <ErrorMessage message={errors.form ?? null} />
     </View>
   );
+}
+
+const CHAIN_OPTIONS: PickerOption<PayeeChain>[] = PAYEE_CHAINS.map((chain) => ({
+  value: chain,
+  label: PAYEE_CHAIN_NAMES[chain],
+}));
+
+/** The chosen payee chain; NEAR until one is chosen. */
+function payeeChain(value: string): PayeeChain {
+  return PAYEE_CHAINS.find((candidate) => candidate === value) ?? "near";
 }
 
 function ConfirmedNumberNote({
@@ -273,15 +304,17 @@ function BankPicker({
 
 /**
  * USDC payees are paid only to an address on the company's allowlist (spec
- * §6.19, §7). Adding one needs its own passkey step under Wallet.
+ * §6.19, §7), on the payee chain chosen above. Adding one needs its own
+ * passkey step under Wallet.
  */
 function AllowlistedAddressPicker({
   organizationId,
+  chain,
   value,
   onChange,
   error,
   disabled,
-}: PickerFieldProps): JSX.Element {
+}: PickerFieldProps & { chain: PayeeChain }): JSX.Element {
   const router = useRouter();
   const addresses = useWithdrawalAddresses(organizationId);
   const openAllowlist = () => router.push("/wallet/addresses");
@@ -302,12 +335,14 @@ function AllowlistedAddressPicker({
       </View>
     );
   }
-  if (addresses.data.length === 0) {
+  const onChain = addresses.data.filter((address) => address.chain === chain);
+  if (onChain.length === 0) {
     return (
       <View className="gap-3">
         <Text className="text-base text-gray-600">
-          USDC payees are paid only to an address on the company’s allowlist.
-          Add one under Wallet → Allowed addresses first.
+          USDC payees are paid only to an address on the company’s allowlist,
+          and it has none on {PAYEE_CHAIN_NAMES[chain]} yet. Add one under
+          Wallet → Withdrawal addresses first.
         </Text>
         <ErrorMessage message={error} />
         <Button
@@ -319,7 +354,7 @@ function AllowlistedAddressPicker({
     );
   }
 
-  const options: PickerOption<string>[] = addresses.data.map((address) => ({
+  const options: PickerOption<string>[] = onChain.map((address) => ({
     value: address.address,
     label: address.label,
     description: shortAddress(address.address),

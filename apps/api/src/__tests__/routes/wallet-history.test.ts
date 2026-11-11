@@ -98,6 +98,10 @@ async function refund(payout: Payout, amount: bigint) {
   );
 }
 
+/**
+ * A withdrawal as a company wallet on Base sent it, before NEAR became the
+ * main chain: approved through the API, then recorded as sent and debited.
+ */
 async function withdraw(amount: bigint): Promise<string> {
   const address = randomAddress();
   const addressId = await allowlistAddress(runtime, paying, address, "Ops");
@@ -117,6 +121,33 @@ async function withdraw(amount: bigint): Promise<string> {
       challengeId: challenge.challengeId,
       response: paying.passkey.sign(challenge.options, TEST_ORIGIN),
     }),
+  );
+  const txHash = randomTxHash();
+  await runInScope(
+    db,
+    { organizationId: paying.company.organizationId },
+    async (tx) => {
+      await tx
+        .update(payouts)
+        .set({
+          status: "paying",
+          failureReason: null,
+          fundingStartedAt: new Date(),
+          depositAddress: address,
+          amountToTransferUsdc: amount,
+          txHash,
+        })
+        .where(eq(payouts.id, withdrawal.id));
+      await tx.insert(walletTransactions).values({
+        organizationId: paying.company.organizationId,
+        walletId: paying.wallet.id,
+        type: "withdrawal",
+        usdcAmount: -amount,
+        txHash,
+        counterpartyAddress: address,
+        payoutId: withdrawal.id,
+      });
+    },
   );
   return withdrawal.id;
 }
@@ -145,6 +176,62 @@ describe("GET /organizations/:id/wallet/history", () => {
       "payout",
       "deposit",
     ]);
+  });
+
+  it("says which chain each row moved on, and a withdrawal's payee chain", async () => {
+    // #given
+    await seedHistory();
+
+    // #when
+    const page = await historyPage();
+
+    // #then
+    expect(
+      page.items.map((item) => ({
+        type: item.type,
+        chain: item.chain,
+        recipientChain: item.payout?.recipientChain,
+      })),
+    ).toEqual([
+      { type: "withdrawal", chain: "base", recipientChain: "base" },
+      { type: "refund", chain: "base", recipientChain: null },
+      { type: "payout", chain: "base", recipientChain: null },
+      { type: "deposit", chain: "base", recipientChain: undefined },
+    ]);
+  });
+
+  it("shows a NEAR deposit with its hash exactly as the chain gave it", async () => {
+    // #given
+    const txHash = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";
+    await runInScope(
+      db,
+      { organizationId: paying.company.organizationId },
+      (tx) =>
+        tx.insert(walletTransactions).values({
+          organizationId: paying.company.organizationId,
+          walletId: paying.wallet.id,
+          type: "deposit",
+          chain: "near",
+          usdcAmount: 3n * USDC,
+          txHash,
+          receiptId: "6ZMcXvGrmnEBcZLTU4wbBBmbHvNUmWUm4ou2ipVbdC1D",
+          logIndex: 0,
+          transferIndex: 0,
+          blockNumber: 150_000_000n,
+          counterpartyAddress: "funder.near",
+        }),
+    );
+
+    // #when
+    const page = await historyPage();
+
+    // #then
+    expect(page.items[0]).toMatchObject({
+      type: "deposit",
+      chain: "near",
+      txHash,
+      counterpartyAddress: "funder.near",
+    });
   });
 
   it("signs amounts: money in is positive, money out negative", async () => {
@@ -177,6 +264,7 @@ describe("GET /organizations/:id/wallet/history", () => {
       method: "mpesa_phone",
       recipientName: "Jane Wanjiku",
       recipientDetail: "•••• 5678",
+      recipientChain: null,
       amountKesCents: "150000",
       status: "paying",
       subjectId: claim.subjectId,

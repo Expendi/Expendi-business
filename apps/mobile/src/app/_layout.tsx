@@ -76,6 +76,10 @@ function RootNavigator(): JSX.Element {
           options={withHeader("Wallet history")}
         />
         <Stack.Screen
+          name="(admin)/wallet/fund-in"
+          options={withHeader("Fund in")}
+        />
+        <Stack.Screen
           name="(admin)/wallet/withdraw"
           options={withHeader("Withdraw")}
         />

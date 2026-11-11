@@ -67,7 +67,7 @@ const R = {
   billCanva: record("bill", "Canva, October"),
 } as const;
 
-const SENDER = "0x71c9a2b4d6e8f0a1b3c5d7e9f2a4b6c8d0e28b2e";
+const SENDER = "mwangaza-treasury.near";
 const kes = (shillings: number) => String(Math.round(shillings * 100));
 
 /** Nairobi wall-clock time, 3 hours ahead of UTC, to the API's microseconds. */
@@ -258,8 +258,8 @@ export const ACTIVITY_ENTRIES: ActivityEntry[] = [
     after: {
       amountUsdc: "6000000000",
       from: SENDER,
-      txHash:
-        "0x4f1a9c22d7e0b3a5c8f6e1d2b4a7c9e0f3d5b8a1c2e4f6a8b0d2c4e6f8a1b3c5",
+      chain: "near",
+      txHash: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin",
     },
   }),
   entry("2026-11-05 11:10", "system", "expense.paid", R.expParking, paid()),
@@ -304,6 +304,7 @@ export const ACTIVITY_ENTRIES: ActivityEntry[] = [
       kind: "withdrawal",
       amountUsdc: "2000000000",
       to: "0x12ab7c3e9f04d5b6a8c1e2f3d4b5a6c7e8f99f3c",
+      chain: "base",
     },
   }),
   entry("2026-11-03 11:00", "km", "expense.recorded", R.expRubisFloat, {

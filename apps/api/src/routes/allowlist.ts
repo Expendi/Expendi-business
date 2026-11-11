@@ -3,6 +3,8 @@ import { Effect } from "effect";
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { payeeChainSchema } from "@expendi-business/shared";
+
 import type { TenantVariables } from "../middleware/tenant.js";
 import type { AppRuntime } from "../runtime.js";
 import type { AllowlistChange } from "../services/allowlist/allowlist.js";
@@ -18,6 +20,7 @@ import {
 const changeSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("add"),
+    chain: payeeChainSchema,
     address: z.string(),
     label: z.string(),
   }),

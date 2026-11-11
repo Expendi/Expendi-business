@@ -9,7 +9,12 @@ import type {
   PaycrestError,
   PaycrestOrder,
 } from "../paycrest/paycrest-client.js";
-import { payouts, walletTransactions } from "../../db/schema/index.js";
+import {
+  intentQuotes,
+  payouts,
+  UNSETTLED_INTENT_QUOTE_STATUSES,
+  walletTransactions,
+} from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { GATEWAY_ORDER_ID } from "../paycrest/gateway.js";
@@ -341,17 +346,20 @@ export function payoutForOrder(
 /**
  * Settles what an approval left behind without an order: never sends, never
  * orders. An approval that never requested an order is released; a request
- * whose answer never came is for a person to check.
+ * whose answer never came is for a person to check. `waitedSince` is when
+ * the approval could first have been funded: for a cash-out that had to
+ * wait for a Base hop, when the hop settled.
  */
 function settleOrderlessApproval(
   payout: Payout,
   now: number,
+  waitedSince: Date | null = payout.approvedAt,
 ): Effect.Effect<boolean, DatabaseError, DatabaseService | AuditLog> {
   let transition: Transition | null = null;
   if (
     !payout.orderRequestedAt &&
-    payout.approvedAt &&
-    now - payout.approvedAt.getTime() > APPROVAL_LAPSE_MS
+    waitedSince &&
+    now - waitedSince.getTime() > APPROVAL_LAPSE_MS
   ) {
     transition = {
       status: "failed",
@@ -402,6 +410,40 @@ function settleOrderlessApproval(
       });
       yield* applyPayoutOutcome(tx, updated);
       return true;
+    }),
+  );
+}
+
+/**
+ * An approved cash-out that is waiting for its Base hop
+ * (docs/decisions/near-main-chain.md). While the hop's quote is unsettled
+ * the hop may still be moving its USDC, so the approval is left alone: the
+ * hop job funds, fails or hands it to a person once the quote settles.
+ * After that it lapses like any approval that never started funding, with
+ * its USDC in one of the company's own wallets.
+ */
+function settleApprovalAfterHop(
+  payout: Payout,
+  baseHopQuoteId: string,
+  now: number,
+): Effect.Effect<boolean, DatabaseError, DatabaseService | AuditLog> {
+  return withScope({ organizationId: payout.organizationId }, (tx) =>
+    query(() =>
+      tx
+        .select({
+          status: intentQuotes.status,
+          settledAt: intentQuotes.settledAt,
+        })
+        .from(intentQuotes)
+        .where(eq(intentQuotes.id, baseHopQuoteId)),
+    ),
+  ).pipe(
+    Effect.flatMap(([hop]) => {
+      if (!hop) return settleOrderlessApproval(payout, now);
+      const unsettled: readonly string[] = UNSETTLED_INTENT_QUOTE_STATUSES;
+      return unsettled.includes(hop.status)
+        ? Effect.succeed(false)
+        : settleOrderlessApproval(payout, now, hop.settledAt);
     }),
   );
 }
@@ -509,9 +551,14 @@ export function reconcilePaycrestPayouts(
           );
           if (!payout) return false;
           if (!payout.providerOrderId) {
-            return payout.status === "approved"
-              ? yield* settleOrderlessApproval(payout, Date.now())
-              : false;
+            if (payout.status !== "approved") return false;
+            return payout.baseHopQuoteId !== null && !payout.orderRequestedAt
+              ? yield* settleApprovalAfterHop(
+                  payout,
+                  payout.baseHopQuoteId,
+                  Date.now(),
+                )
+              : yield* settleOrderlessApproval(payout, Date.now());
           }
           const fetched = yield* Effect.either(
             paycrest.getOrder(payout.providerOrderId),

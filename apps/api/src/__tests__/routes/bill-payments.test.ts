@@ -30,17 +30,15 @@ import { expenses, organizations, payouts } from "../../db/schema/index.js";
 import { runInScope, withScope } from "../../db/scope.js";
 import { nairobiDate } from "../../services/bills/status.js";
 import { kesCentsFor, usdcCovering } from "../../services/paycrest/amounts.js";
-import { confirmOnchainPayouts } from "../../services/payout/onchain.js";
 import { maxDebitFor } from "../../services/payout/prepare.js";
 import { applyPayoutOutcome } from "../../services/payout/subjects.js";
 import { insertBill, insertPayee, readBill } from "../helpers/bills.js";
-import { randomTxHash, transferReceipt } from "../helpers/chain.js";
+import { randomTxHash } from "../helpers/chain.js";
 import { addCategory, sendJson } from "../helpers/claims.js";
 import { addMember, createUser } from "../helpers/db.js";
 import {
   makeFakeBaseRpc,
   makeFakePaycrest,
-  makeFakePrivyWallets,
   randomAddress,
   signPaycrestBody,
   TEST_ORIGIN,
@@ -49,6 +47,12 @@ import {
   createIsolationFixture,
   expectRouteIsolation,
 } from "../helpers/isolation.js";
+import {
+  createNearUsdcPayingCompany,
+  followPayout,
+  makeNearUsdcFakes,
+  registeredNearAccount,
+} from "../helpers/near-usdc-payouts.js";
 import { ageDetailsChange } from "../helpers/payees.js";
 import {
   allowlistAddress,
@@ -62,7 +66,8 @@ import { bearer, makeTestRuntime } from "../helpers/runtime.js";
 import { createStaff } from "../helpers/staff.js";
 import { TEST_DATABASE_URL_MIGRATE } from "../setup/test-database.js";
 
-const privy = makeFakePrivyWallets();
+const near = makeNearUsdcFakes();
+const { privy } = near;
 const paycrest = makeFakePaycrest();
 const rpc = makeFakeBaseRpc();
 let runtime: AppRuntime;
@@ -82,7 +87,7 @@ const HOUR_MS = 60 * 60_000;
 
 beforeAll(async () => {
   runtime = makeTestRuntime({
-    privyWallets: privy.layer,
+    ...near.layers,
     paycrest: paycrest.layer,
     baseRpc: rpc.layer,
   });
@@ -144,6 +149,26 @@ async function usdcPayee(): Promise<{ payeeId: string; address: string }> {
   const payeeId = await insertPayee(db, paying.company, {
     name: "Vercel Inc",
     method: "usdc",
+    usdcChain: "base",
+    usdcAddress: address,
+    detailsChangedAt: OLD_CHANGE,
+  });
+  return { payeeId, address };
+}
+
+/**
+ * Moves the test to a company whose wallet is on NEAR, with a supplier paid
+ * in USDC to a NEAR account on its allowlist.
+ */
+async function nearUsdcPayee(): Promise<{ payeeId: string; address: string }> {
+  paying = await createNearUsdcPayingCompany(runtime, db, near);
+  categoryId = await addCategory(db, paying.company, "Utilities");
+  const address = registeredNearAccount(near);
+  await allowlistAddress(runtime, paying, address, "Vercel", "near");
+  const payeeId = await insertPayee(db, paying.company, {
+    name: "Vercel Inc",
+    method: "usdc",
+    usdcChain: "near",
     usdcAddress: address,
     detailsChangedAt: OLD_CHANGE,
   });
@@ -693,7 +718,7 @@ describe("POST /organizations/:id/bills/payment", () => {
   describe("USD bills to payees paid in USDC (spec §6.19)", () => {
     it("pays exactly the USDC to the allowlisted address, with no Paycrest order", async () => {
       // #given USD 60.50
-      const { payeeId, address } = await usdcPayee();
+      const { payeeId, address } = await nearUsdcPayee();
       const billId = await bill(payeeId, {
         currency: "usd",
         amountKes: null,
@@ -705,7 +730,6 @@ describe("POST /organizations/:id/bills/payment", () => {
       const result = await paid(payment);
 
       // #then
-      const [send] = privy.state.sends;
       expect(payment.bills[0]).toMatchObject({
         currency: "usd",
         billedKes: null,
@@ -718,22 +742,21 @@ describe("POST /organizations/:id/bills/payment", () => {
         paidTo: { method: "usdc" },
       });
       expect({
-        to: send?.to,
-        amount: send?.amount,
-        ...moneyMoved(),
+        received: near.chain.state.usdcBalanceOf(address),
+        left: near.chain.state.usdcBalanceOf(paying.wallet.address),
+        orders: paycrest.state.created.length,
         bill: result.bills[0]?.status,
       }).toEqual({
-        to: address,
-        amount: 60_500_000n,
+        received: 60_500_000n,
+        left: 100n * USDC - 60_500_000n,
         orders: 0,
-        sends: 1,
         bill: "paying",
       });
     });
 
     it("is paid once the transfer is confirmed on chain", async () => {
       // #given
-      const { payeeId, address } = await usdcPayee();
+      const { payeeId } = await nearUsdcPayee();
       const billId = await bill(payeeId, {
         currency: "usd",
         amountKes: null,
@@ -741,16 +764,9 @@ describe("POST /organizations/:id/bills/payment", () => {
       });
       const [payout] = await pay([billId]);
       if (!payout?.txHash) throw new Error("no hash");
-      rpc.state.receipts.set(
-        payout.txHash,
-        transferReceipt(
-          [{ from: paying.wallet.address, to: address, amount: 25n * USDC }],
-          { txHash: payout.txHash },
-        ),
-      );
 
       // #when
-      await runtime.runPromise(confirmOnchainPayouts(500));
+      await followPayout(runtime, payout);
 
       // #then
       const row = await readBill(db, paying.company, billId);

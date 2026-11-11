@@ -23,11 +23,16 @@ import {
 } from "lucide-react";
 
 import type { ActivityEntry } from "@expendi-business/shared";
+import {
+  FUND_IN_CHAIN_NAMES,
+  PAYEE_CHAIN_NAMES,
+} from "@expendi-business/shared";
 
 import type { MoneyCurrency } from "~/components/data/money";
 import type { StatusTone } from "~/components/data/status-badge";
 import type { ApproxKesTotal } from "~/lib/money";
 import { ROLE_LABELS } from "~/config/roles";
+import { shortAddress } from "~/features/chain-display";
 import { formatIsoDate } from "~/lib/dates";
 import { formatKes, sumUnits } from "~/lib/money";
 import { formatNairobiDateTime } from "~/lib/nairobi-time";
@@ -359,8 +364,14 @@ const MONTHS = [
   "December",
 ];
 
-const shortHash = (value: string) =>
-  value.length > 12 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
+const CHAIN_NAMES: Readonly<Record<string, string>> = {
+  ...PAYEE_CHAIN_NAMES,
+  ...FUND_IN_CHAIN_NAMES,
+};
+
+/** "NEAR" for "near"; a chain this page doesn't know stays as recorded. */
+const chainName = (value: Json): string | null =>
+  typeof value === "string" ? (CHAIN_NAMES[value] ?? value) : null;
 
 const yesNo = (value: Json) =>
   value === true ? "Yes" : value === false ? "No" : null;
@@ -380,7 +391,12 @@ function paymentDetails(value: Json): string | null {
     case "bank":
       return `${text("bankName")}, account ending ${text("accountNumber").slice(-4)}`;
     case "usdc":
-      return `USDC wallet ${shortHash(text("address"))}`;
+      return [
+        `USDC wallet ${shortAddress(text("address"))}`,
+        chainName(details.chain ?? null),
+      ]
+        .filter((part) => part !== null)
+        .join(" on ");
     default:
       return null;
   }
@@ -517,7 +533,8 @@ const FIELDS: Readonly<Record<string, FieldFormat>> = {
   to: { label: "To" },
   from: {
     label: "From",
-    show: (value) => text(typeof value === "string" ? shortHash(value) : null),
+    show: (value) =>
+      text(typeof value === "string" ? shortAddress(value) : null),
   },
   phone: { label: "M-Pesa number" },
   type: {
@@ -573,13 +590,14 @@ const FIELDS: Readonly<Record<string, FieldFormat>> = {
   paidThroughAccount: { label: "Paid through account" },
   dayOfMonth: { label: "Day of the month" },
   device: { label: "Device" },
-  chain: { label: "Network" },
+  chain: { label: "Chain", show: (value) => text(chainName(value)) },
   last4: { label: "Last 4 digits" },
   kraPin: { label: "KRA PIN" },
   refundOf: { label: "Refund of" },
   txHash: {
     label: "Transaction",
-    show: (value) => text(typeof value === "string" ? shortHash(value) : null),
+    show: (value) =>
+      text(typeof value === "string" ? shortAddress(value) : null),
   },
 };
 

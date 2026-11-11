@@ -29,6 +29,8 @@ const KIND_LABELS: Record<OpsAlertKind, string> = {
   low_company_balance: "Low company balance",
   zoho_sync_failing: "Zoho sync failing",
   card_close_failed: "Card close failed",
+  unexpected_transit_transfer: "Unexplained transfer to a transit wallet",
+  deposits_held: "Deposits held",
 };
 
 /** Where staff look into an alert's cause. */
@@ -39,6 +41,8 @@ function causeLink(alert: OpsAlert): { href: string; label: string } | null {
       return { href: `/payouts/${alert.subjectKey}`, label: "Open the payout" };
     case "low_company_balance":
     case "card_close_failed":
+    case "unexpected_transit_transfer":
+    case "deposits_held":
       return alert.organization
         ? {
             href: `/companies/${alert.organization.id}`,

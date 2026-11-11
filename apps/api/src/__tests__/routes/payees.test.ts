@@ -305,7 +305,12 @@ describe("adding a payee", () => {
       requestAllowlistChange({
         organizationId: paying.company.organizationId,
         userId: paying.company.admin.id,
-        change: { action: "add", address: randomAddress(), label: "Ops" },
+        change: {
+          action: "add",
+          chain: "base",
+          address: randomAddress(),
+          label: "Ops",
+        },
       }),
     );
 
@@ -461,7 +466,11 @@ describe("validation", () => {
     ["a missing account name", { ...bank, accountName: " " }],
     [
       "a Base address with a bad checksum",
-      { method: "usdc", address: "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAEd" },
+      {
+        method: "usdc",
+        chain: "base",
+        address: "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAEd",
+      },
     ],
   ])("rejects %s", async (_case, details) => {
     // #when
@@ -489,13 +498,22 @@ describe("validation", () => {
   });
 });
 
+const SOLANA_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+/**
+ * Valid on two chains at once: lowercase base58 that decodes to 32 bytes is
+ * a Solana address, and also a NEAR named account.
+ */
+const SOLANA_AND_NEAR = "kar457p4ye36ts5g6t48f4r4f39jsa8kc7dp754extm";
+/** Another valid Solana address: the same letters, some in another case. */
+const SOLANA_OTHER_CASE = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1V";
+
 describe("USDC payees", () => {
   it("refuses an address that isn't on the allowlist, and says how to add it", async () => {
     // #when
     const response = await send("POST", base(), {
       kind: "vendor",
       name: "Cloud host",
-      details: { method: "usdc", address: randomAddress() },
+      details: { method: "usdc", chain: "base", address: randomAddress() },
     });
 
     // #then
@@ -515,14 +533,121 @@ describe("USDC payees", () => {
     const payee = await create({
       kind: "vendor",
       name: "Cloud host",
-      details: { method: "usdc", address: checksummed },
+      details: { method: "usdc", chain: "base", address: checksummed },
     });
 
     // #then
     expect(payee.details).toEqual({
       method: "usdc",
+      chain: "base",
       address: checksummed.toLowerCase(),
     });
+  });
+
+  it.each([
+    ["a NEAR account", "near", "treasury.acme.near"],
+    ["a Solana address", "solana", SOLANA_ADDRESS],
+  ] as const)(
+    "pays %s on its own chain, exactly as allowlisted",
+    async (_name, chain, address) => {
+      // #given
+      await allowlistAddress(runtime, paying, address, "Treasury", chain);
+
+      // #when
+      const payee = await create({
+        kind: "vendor",
+        name: "Cloud host",
+        details: { method: "usdc", chain, address },
+      });
+
+      // #then
+      expect(payee.details).toEqual({ method: "usdc", chain, address });
+      const [row] = await runInScope(
+        db,
+        { organizationId: paying.company.organizationId },
+        (tx) =>
+          tx
+            .select({ chain: payees.usdcChain, address: payees.usdcAddress })
+            .from(payees)
+            .where(eq(payees.id, payee.id)),
+      );
+      expect(row).toEqual({ chain, address });
+    },
+  );
+
+  it("refuses an address that is allowlisted on another chain only", async () => {
+    // #given an address that is valid on Solana and on NEAR
+    const address = SOLANA_AND_NEAR;
+    await allowlistAddress(runtime, paying, address, "Treasury", "solana");
+
+    // #when
+    const response = await send("POST", base(), {
+      kind: "vendor",
+      name: "Cloud host",
+      details: { method: "usdc", chain: "near", address },
+    });
+
+    // #then
+    expect(response.status).toBe(409);
+  });
+
+  it("refuses a Solana address allowlisted in another case", async () => {
+    // #given
+    await allowlistAddress(runtime, paying, SOLANA_ADDRESS, "Ops", "solana");
+
+    // #when
+    const response = await send("POST", base(), {
+      kind: "vendor",
+      name: "Cloud host",
+      details: {
+        method: "usdc",
+        chain: "solana",
+        address: SOLANA_OTHER_CASE,
+      },
+    });
+
+    // #then
+    expect(response.status).toBe(409);
+  });
+
+  it.each([
+    [
+      "a NEAR account with a capital letter",
+      "near",
+      "Acme.near",
+      "NEAR account",
+    ],
+    [
+      "a Solana address in lowercase",
+      "solana",
+      SOLANA_ADDRESS.toLowerCase(),
+      "Solana address",
+    ],
+    ["a NEAR account as a Base address", "base", "acme.near", "Base address"],
+  ])("says what is wrong with %s", async (_name, chain, address, named) => {
+    // #when
+    const response = await send("POST", base(), {
+      kind: "vendor",
+      name: "Cloud host",
+      details: { method: "usdc", chain, address },
+    });
+
+    // #then
+    const body = (await response.json()) as { error: { message: string } };
+    expect(response.status).toBe(400);
+    expect(body.error.message).toContain(named);
+  });
+
+  it("refuses a USDC payee without a payee chain", async () => {
+    // #when
+    const response = await send("POST", base(), {
+      kind: "vendor",
+      name: "Cloud host",
+      details: { method: "usdc", address: randomAddress() },
+    });
+
+    // #then
+    expect(response.status).toBe(400);
   });
 
   it("refuses the confirmation if the address left the allowlist meanwhile", async () => {
@@ -532,7 +657,7 @@ describe("USDC payees", () => {
     const challenge = await requestCreate({
       kind: "vendor",
       name: "Cloud host",
-      details: { method: "usdc", address },
+      details: { method: "usdc", chain: "base", address },
     });
     const removal = { action: "remove", addressId } as const;
     const removeChallenge = await runtime.runPromise(

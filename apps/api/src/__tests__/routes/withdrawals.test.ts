@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { App } from "../../app.js";
 import type { Database } from "../../db/client.js";
 import type { AppRuntime } from "../../runtime.js";
-import type { PayingCompany } from "../helpers/payouts.js";
+import type { NearUsdcPayingCompany } from "../helpers/near-usdc-payouts.js";
 import { SoftwarePasskey } from "../../../scripts/lib/software-passkey.js";
 import { createApp } from "../../app.js";
 import { DatabaseService } from "../../db/client.js";
@@ -26,20 +26,20 @@ import {
   requestPayoutApproval,
 } from "../../services/payout/payout-service.js";
 import { addMember, createUser } from "../helpers/db.js";
-import {
-  makeFakePaycrest,
-  makeFakePrivyWallets,
-  randomAddress,
-  TEST_ORIGIN,
-} from "../helpers/fakes.js";
+import { makeFakePaycrest, TEST_ORIGIN } from "../helpers/fakes.js";
 import {
   createIsolationFixture,
   expectRouteIsolation,
 } from "../helpers/isolation.js";
 import {
+  createNearUsdcPayingCompany,
+  makeNearUsdcFakes,
+  registeredNearAccount,
+  savedSends,
+} from "../helpers/near-usdc-payouts.js";
+import {
   allowlistAddress,
   claimRequest,
-  createPayingCompany,
   ledgerBalance,
   payClaims,
   readPayout,
@@ -49,19 +49,37 @@ import {
 import { bearer, makeTestRuntime } from "../helpers/runtime.js";
 import { TEST_DATABASE_URL_MIGRATE } from "../setup/test-database.js";
 
-const privy = makeFakePrivyWallets();
+const fakes = makeNearUsdcFakes();
 const paycrest = makeFakePaycrest();
 let runtime: AppRuntime;
 let db: Database;
 let app: App;
 let owner: pg.Pool;
-let paying: PayingCompany;
+let paying: NearUsdcPayingCompany;
 let treasury: string;
 let treasuryId: string;
+let broadcastsBefore: number;
+
+const createPayingCompany = (balance?: bigint) =>
+  createNearUsdcPayingCompany(runtime, db, fakes, balance);
+
+/** A NEAR account that can receive USDC, on `company`'s allowlist. */
+const allowlistNearAccount = (
+  company: NearUsdcPayingCompany,
+  label?: string,
+  account = registeredNearAccount(fakes),
+) => allowlistAddress(runtime, company, account, label, "near");
+
+/**
+ * How many transactions reached the chain since the test began. The
+ * treasury can already receive USDC, so each one is a send from a company
+ * wallet.
+ */
+const sends = () => fakes.chain.state.broadcasts.length - broadcastsBefore;
 
 beforeAll(async () => {
   runtime = makeTestRuntime({
-    privyWallets: privy.layer,
+    ...fakes.layers,
     paycrest: paycrest.layer,
   });
   ({ db } = await runtime.runPromise(DatabaseService));
@@ -74,11 +92,11 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  privy.state.reset();
   paycrest.state.reset();
-  paying = await createPayingCompany(runtime, db);
-  treasury = randomAddress();
-  treasuryId = await allowlistAddress(runtime, paying, treasury, "Treasury");
+  paying = await createPayingCompany();
+  treasury = registeredNearAccount(fakes);
+  treasuryId = await allowlistNearAccount(paying, "Treasury", treasury);
+  broadcastsBefore = fakes.chain.state.broadcasts.length;
 });
 
 interface Challenge {
@@ -86,6 +104,7 @@ interface Challenge {
   readonly options: Parameters<SoftwarePasskey["sign"]>[0];
   readonly withdrawal: {
     readonly id: string;
+    readonly chain: string;
     readonly address: string;
     readonly label: string;
     readonly amountUsdc: string;
@@ -192,6 +211,52 @@ describe("withdrawing to an allowlisted address", () => {
     });
   });
 
+  it("says a NEAR account is on NEAR", async () => {
+    // #when
+    const challenge = await challengeFor(10n * USDC);
+
+    // #then
+    expect(challenge.withdrawal.chain).toBe("near");
+  });
+
+  it.each([
+    ["a Base address", "base", "0x52908400098527886e0f7030069857d2e4169ee7"],
+    [
+      "a Solana address",
+      "solana",
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    ],
+  ] as const)(
+    "challenges a withdrawal to %s on its own chain, exactly as allowlisted",
+    async (_name, chain, address) => {
+      // #given
+      const addressId = await allowlistAddress(
+        runtime,
+        paying,
+        address,
+        "Elsewhere",
+        chain,
+      );
+
+      // #when
+      const challenge = await challengeFor(10n * USDC, { addressId });
+
+      // #then
+      expect(challenge.withdrawal).toMatchObject({
+        chain,
+        address,
+        label: "Elsewhere",
+        amountUsdc: "10000000",
+      });
+      const [payout] = await withdrawalPayouts();
+      expect(payout?.recipient).toMatchObject({
+        method: "usdc",
+        chain,
+        address,
+      });
+    },
+  );
+
   it("sends exactly the amount once the admin's passkey confirms it", async () => {
     // #given
     const challenge = await challengeFor(10n * USDC);
@@ -200,14 +265,30 @@ describe("withdrawing to an allowlisted address", () => {
     const response = await confirm(challenge);
 
     // #then
-    expect(response.status).toBe(200);
-    expect(privy.state.sends).toEqual([
-      expect.objectContaining({
-        to: treasury,
-        amount: 10n * USDC,
-        idempotencyKey: `payout-${challenge.withdrawal.id}`,
-      }),
-    ]);
+    const saved = await savedSends(db, paying.company);
+    expect({
+      status: response.status,
+      received: fakes.chain.state.usdcBalanceOf(treasury),
+      left: fakes.chain.state.usdcBalanceOf(paying.wallet.address),
+      sends: saved.map((send) => ({
+        key: send.sendKey,
+        to: send.receiverAccountId,
+        amount: send.usdcAmount,
+        status: send.status,
+      })),
+    }).toEqual({
+      status: 200,
+      received: 10n * USDC,
+      left: 90n * USDC,
+      sends: [
+        {
+          key: `payout-${challenge.withdrawal.id}`,
+          to: treasury,
+          amount: 10n * USDC,
+          status: "executed",
+        },
+      ],
+    });
   });
 
   it("records the debit as a withdrawal in the ledger", async () => {
@@ -225,6 +306,7 @@ describe("withdrawing to an allowlisted address", () => {
         tx
           .select({
             type: walletTransactions.type,
+            chain: walletTransactions.chain,
             usdcAmount: walletTransactions.usdcAmount,
           })
           .from(walletTransactions)
@@ -234,7 +316,7 @@ describe("withdrawing to an allowlisted address", () => {
       rows,
       balance: await ledgerBalance(db, paying.company),
     }).toEqual({
-      rows: [{ type: "withdrawal", usdcAmount: -10n * USDC }],
+      rows: [{ type: "withdrawal", chain: "near", usdcAmount: -10n * USDC }],
       balance: 90n * USDC,
     });
   });
@@ -252,7 +334,7 @@ describe("withdrawing to an allowlisted address", () => {
     };
     expect({
       ...body.data,
-      txHash: /^0x[0-9a-f]{64}$/.test(body.data.txHash),
+      txHash: body.data.txHash === fakes.chain.state.broadcasts.at(-1),
     }).toMatchObject({
       id: challenge.withdrawal.id,
       status: "paying",
@@ -295,7 +377,7 @@ describe("withdrawing to an allowlisted address", () => {
       // #then
       expect({
         status: replay.status,
-        sends: privy.state.sends.length,
+        sends: sends(),
       }).toEqual({ status: 403, sends: 1 });
     });
 
@@ -323,9 +405,10 @@ describe("withdrawing to an allowlisted address", () => {
       const again = await withdraw(10n * USDC, { requestId });
 
       // #then
-      expect({ status: again.status, sends: privy.state.sends.length }).toEqual(
-        { status: 409, sends: 1 },
-      );
+      expect({ status: again.status, sends: sends() }).toEqual({
+        status: 409,
+        sends: 1,
+      });
     });
 
     it("refuses a request ID reused for another amount", async () => {
@@ -369,8 +452,8 @@ describe("withdrawing to an allowlisted address", () => {
 
     it("refuses another company's allowlisted address", async () => {
       // #given
-      const other = await createPayingCompany(runtime, db);
-      const theirs = await allowlistAddress(runtime, other, randomAddress());
+      const other = await createPayingCompany();
+      const theirs = await allowlistNearAccount(other);
 
       // #when
       const response = await withdraw(10n * USDC, { addressId: theirs });
@@ -390,11 +473,11 @@ describe("withdrawing to an allowlisted address", () => {
       // #then
       expect({
         status: response.status,
-        sends: privy.state.sends,
+        sends: sends(),
         withdrawal: (
           await readPayout(db, paying.company, challenge.withdrawal.id)
         ).status,
-      }).toEqual({ status: 403, sends: [], withdrawal: "awaiting_approval" });
+      }).toEqual({ status: 403, sends: 0, withdrawal: "awaiting_approval" });
     });
   });
 
@@ -411,28 +494,33 @@ describe("withdrawing to an allowlisted address", () => {
       const response = await confirm(challenge);
 
       // #then
-      expect({ status: response.status, sends: privy.state.sends }).toEqual({
+      expect({ status: response.status, sends: sends() }).toEqual({
         status: 403,
-        sends: [],
+        sends: 0,
       });
     });
 
     it("refuses an approval once the withdrawal names another address", async () => {
       // #given another allowlisted address swapped in after signing
       const challenge = await challengeFor(10n * USDC);
-      const other = randomAddress();
-      await allowlistAddress(runtime, paying, other, "Other");
+      const other = registeredNearAccount(fakes);
+      await allowlistNearAccount(paying, "Other", other);
       await updatePayout(db, paying.company, challenge.withdrawal.id, {
-        recipient: { method: "usdc", address: other, accountName: "Treasury" },
+        recipient: {
+          method: "usdc",
+          chain: "near",
+          address: other,
+          accountName: "Treasury",
+        },
       });
 
       // #when
       const response = await confirm(challenge);
 
       // #then
-      expect({ status: response.status, sends: privy.state.sends }).toEqual({
+      expect({ status: response.status, sends: sends() }).toEqual({
         status: 403,
-        sends: [],
+        sends: 0,
       });
     });
 
@@ -444,9 +532,9 @@ describe("withdrawing to an allowlisted address", () => {
       const response = await confirm(challenge, SoftwarePasskey.create());
 
       // #then
-      expect({ status: response.status, sends: privy.state.sends }).toEqual({
+      expect({ status: response.status, sends: sends() }).toEqual({
         status: 403,
-        sends: [],
+        sends: 0,
       });
     });
 
@@ -461,9 +549,9 @@ describe("withdrawing to an allowlisted address", () => {
       });
 
       // #then
-      expect({ status: response.status, sends: privy.state.sends }).toEqual({
+      expect({ status: response.status, sends: sends() }).toEqual({
         status: 403,
-        sends: [],
+        sends: 0,
       });
     });
   });
@@ -471,8 +559,8 @@ describe("withdrawing to an allowlisted address", () => {
   describe("limits", () => {
     it("refuses more than the per-transaction cap", async () => {
       // #given a wallet whose cap is 5,000 USDC, holding more
-      paying = await createPayingCompany(runtime, db, 6_000n * USDC);
-      treasuryId = await allowlistAddress(runtime, paying, randomAddress());
+      paying = await createPayingCompany(6_000n * USDC);
+      treasuryId = await allowlistNearAccount(paying);
 
       // #when
       const response = await withdraw(5_000n * USDC + 1n);
@@ -486,8 +574,8 @@ describe("withdrawing to an allowlisted address", () => {
 
     it("allows exactly the per-transaction cap", async () => {
       // #given
-      paying = await createPayingCompany(runtime, db, 6_000n * USDC);
-      treasuryId = await allowlistAddress(runtime, paying, randomAddress());
+      paying = await createPayingCompany(6_000n * USDC);
+      treasuryId = await allowlistNearAccount(paying);
 
       // #when
       const response = await withdraw(5_000n * USDC);
@@ -520,14 +608,15 @@ describe("withdrawing to an allowlisted address", () => {
       await setCompany({ dailyPayoutCapKes: 150_000n });
       const withdrawn = await confirm(await challengeFor(50n * USDC));
 
-      // #when a KES 1,499.50 claim is paid the same day
+      // #when a KES 1,499.50 claim is approved the same day
       const [claim] = await payClaims(runtime, db, paying, [claimRequest()]);
 
-      // #then
+      // #then the cap, which the withdrawal would have used up, let it through
       expect({
         withdrawal: withdrawn.status,
-        claim: claim?.status,
-      }).toEqual({ withdrawal: 200, claim: "paying" });
+        claimApproved: claim?.approvedAt instanceof Date,
+        claimFailed: claim?.status === "failed",
+      }).toEqual({ withdrawal: 200, claimApproved: true, claimFailed: false });
     });
   });
 
@@ -555,9 +644,9 @@ describe("withdrawing to an allowlisted address", () => {
       const response = await confirm(challenge);
 
       // #then
-      expect({ status: response.status, sends: privy.state.sends }).toEqual({
+      expect({ status: response.status, sends: sends() }).toEqual({
         status: 409,
-        sends: [],
+        sends: 0,
       });
     });
   });
@@ -613,9 +702,9 @@ describe("withdrawing to an allowlisted address", () => {
     });
 
     // #then
-    expect({ status: response.status, sends: privy.state.sends }).toEqual({
+    expect({ status: response.status, sends: sends() }).toEqual({
       status: 404,
-      sends: [],
+      sends: 0,
     });
   });
 
@@ -667,9 +756,9 @@ describe("withdrawing to an allowlisted address", () => {
       );
 
       // #then
-      expect({ status: response.status, sends: privy.state.sends }).toEqual({
+      expect({ status: response.status, sends: sends() }).toEqual({
         status: 403,
-        sends: [],
+        sends: 0,
       });
     });
   });
@@ -713,7 +802,7 @@ describe("withdrawal routes keep companies apart", () => {
   it("a challenge from company B can't be confirmed through company A", async () => {
     // #given
     const challenge = await challengeFor(10n * USDC);
-    const other = await createPayingCompany(runtime, db);
+    const other = await createPayingCompany();
     await addMember(db, other.company, paying.company.admin, {
       role: "admin",
     });
@@ -725,9 +814,9 @@ describe("withdrawal routes keep companies apart", () => {
     );
 
     // #then
-    expect({ status: response.status, sends: privy.state.sends }).toEqual({
+    expect({ status: response.status, sends: sends() }).toEqual({
       status: 404,
-      sends: [],
+      sends: 0,
     });
   });
 });

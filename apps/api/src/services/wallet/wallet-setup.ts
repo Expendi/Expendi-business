@@ -9,7 +9,11 @@ import { ensureCompanyWallet } from "./company-wallet.js";
 
 const notReady: WalletSetup = { status: "creating", address: null };
 
-/** Ready for deposits: it exists in Privy and Alchemy watches its address. */
+/**
+ * The company wallet's address once it is ready to be given out: the wallet
+ * is active and Alchemy watches its transit address, so a refund landing on
+ * Base isn't missed.
+ */
 export function readyAddress(
   wallet: Pick<Wallet, "status" | "address" | "depositsWatchedAt">,
 ): string | null {

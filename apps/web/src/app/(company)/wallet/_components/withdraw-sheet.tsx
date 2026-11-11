@@ -18,6 +18,7 @@ import type {
   Withdrawal,
   WithdrawalAddress,
 } from "@expendi-business/shared";
+import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
 import {
   Callout,
@@ -28,13 +29,14 @@ import {
 } from "~/components/data/detail-sheet";
 import { Skel } from "~/components/data/states";
 import { Button } from "~/components/ui/button";
+import { addressOnChain, shortAddress } from "~/features/chain-display";
 import { describeApiError } from "~/lib/api";
 import { describeApprovalError } from "~/lib/approval";
 import { formatUsdc } from "~/lib/money";
 import { useApprovalPasskeyStatus } from "~/lib/use-approval";
 import { approxKes } from "./balance-card";
 import { GroupedAddress } from "./tx-sheet";
-import { parseUsdcAmount, shortAddress } from "./usdc-amount";
+import { parseUsdcAmount } from "./usdc-amount";
 import {
   useWithdraw,
   useWithdrawalAddresses,
@@ -125,6 +127,7 @@ export function WithdrawSheet({
         requestId: draft.requestId,
         addressId: draft.address.id,
         amountUsdc: draft.amountUsdc,
+        chain: draft.address.chain,
         address: draft.address.address,
       },
       {
@@ -245,7 +248,9 @@ export function WithdrawSheet({
           <DetailItem label="Address">
             <GroupedAddress address={draft.address.address} />
           </DetailItem>
-          <DetailItem label="Network">Base</DetailItem>
+          <DetailItem label="Payee chain">
+            {PAYEE_CHAIN_NAMES[draft.address.chain]}
+          </DetailItem>
           {kes ? <DetailItem label="About">KES {kes}</DetailItem> : null}
           <DetailItem label="Left after">{formatUsdc(left)} USDC</DetailItem>
         </DetailList>
@@ -254,9 +259,9 @@ export function WithdrawSheet({
             aria-hidden="true"
             className="mt-0.5 size-4 shrink-0 text-gray-500"
           />
-          Expendi pays the gas, so exactly this amount arrives. Your browser
-          asks for your approval passkey. To use the one on your phone, choose
-          “use a phone or tablet”.
+          Expendi pays the network fees, so exactly this amount arrives. Your
+          browser asks for your approval passkey. To use the one on your phone,
+          choose “use a phone or tablet”.
         </p>
         {withdraw.data?.status === "cancelled" ? (
           <p role="status" className="text-sm text-gray-600">
@@ -322,7 +327,11 @@ export function WithdrawSheet({
           {formatUsdc(step.withdrawal.amountUsdc)} USDC to{" "}
           {step.withdrawal.label}
         </p>
-        <p className="max-w-[34ch] text-gray-600">{result.body}</p>
+        <p className="max-w-[34ch] text-gray-600">
+          {result.sent
+            ? `It's on its way on ${PAYEE_CHAIN_NAMES[step.withdrawal.chain]} and shows in the history.`
+            : result.body}
+        </p>
         {step.withdrawal.failureReason ? (
           <p className="max-w-[34ch] text-gray-600">
             {step.withdrawal.failureReason}
@@ -330,7 +339,7 @@ export function WithdrawSheet({
         ) : null}
         {step.withdrawal.txHash ? (
           <p className="text-xs text-gray-500 tabular-nums">
-            {shortAddress(step.withdrawal.txHash)}
+            Transaction {shortAddress(step.withdrawal.txHash)}
           </p>
         ) : null}
       </div>
@@ -358,14 +367,16 @@ export function WithdrawSheet({
 }
 
 const RESULTS = {
-  sent: {
-    ok: true,
-    title: "Withdrawal sent",
-    body: "It's on its way on Base and shows in the history.",
+  sent: { ok: true, sent: true, title: "Withdrawal sent", body: null },
+  failed: {
+    ok: false,
+    sent: false,
+    title: "Withdrawal failed",
+    body: "Nothing was sent.",
   },
-  failed: { ok: false, title: "Withdrawal failed", body: "Nothing was sent." },
   review: {
     ok: false,
+    sent: false,
     title: "We're checking this withdrawal",
     body: "Its outcome isn't clear yet, so Expendi is checking it. Don't send it again.",
   },
@@ -478,7 +489,7 @@ function WithdrawForm({
                 {address.label}
               </span>
               <span className="block text-xs leading-4 text-gray-500 tabular-nums">
-                {shortAddress(address.address)}
+                {addressOnChain(address.chain, address.address)}
               </span>
             </span>
           </label>

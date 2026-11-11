@@ -3,6 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type {
   Payee,
   PayeeBanksResponse,
+  PayeeChain,
   PayeeDetails,
   PayeeKind,
   WithdrawalAddress,
@@ -36,9 +37,15 @@ export const PAYEE_BANKS: PayeeBanksResponse = [
   { code: "SCBLKENX", name: "Standard Chartered Kenya" },
 ];
 
-const address = (n: number, label: string, hex: string): WithdrawalAddress => ({
+const address = (
+  n: number,
+  label: string,
+  chain: PayeeChain,
+  value: string,
+): WithdrawalAddress => ({
   id: sampleId(n),
-  address: hex,
+  chain,
+  address: value,
   label,
   confirmedAt: "2025-10-20T07:00:00.000Z",
 });
@@ -47,24 +54,38 @@ export const ALLOWLIST: readonly WithdrawalAddress[] = [
   address(
     2401,
     "Treasury on Coinbase",
+    "base",
     "0x12ab7c3e9f04d5b6a8c1e2f3d4b5a6c7e8f99f3c",
   ),
   address(
     2402,
     "Ledger cold storage",
-    "0x5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f",
+    "near",
+    "5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f",
   ),
-  address(2403, "Figma billing", "0x7f2e4c1a9d03b85e6f21c7a4d9e0b3f86a12b9c4"),
   address(
-    2404,
-    "Google Workspace billing",
-    "0x3c91e2b75f4a08d6c3e19b72f5a4d8c0e6b1a07e",
+    2403,
+    "Figma billing",
+    "base",
+    "0x7f2e4c1a9d03b85e6f21c7a4d9e0b3f86a12b9c4",
   ),
-  address(2405, "Canva billing", "0x51aa7d3e8c2b4f6091e5d7a3c8b2f4e6a1d709d2"),
+  address(2404, "Google Workspace billing", "near", "workspace-billing.near"),
+  address(
+    2405,
+    "Canva billing",
+    "solana",
+    "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+  ),
 ];
 
-const addressOf = (label: string): string =>
-  ALLOWLIST.find((entry) => entry.label === label)?.address ?? "";
+function usdcTo(label: string): PayeeDetails {
+  const entry = ALLOWLIST.find((candidate) => candidate.label === label);
+  return {
+    method: "usdc",
+    chain: entry?.chain ?? "near",
+    address: entry?.address ?? "",
+  };
+}
 
 const paybill = (
   paybillNumber: string,
@@ -230,14 +251,14 @@ const SAMPLE_PAYEES: readonly SamplePayee[] = [
     id: sampleId(104),
     name: "Figma",
     kind: "vendor",
-    details: { method: "usdc", address: addressOf("Figma billing") },
+    details: usdcTo("Figma billing"),
     changedAt: "2026-05-02T14:26",
   },
   {
     id: sampleId(111),
     name: "Google Workspace",
     kind: "vendor",
-    details: { method: "usdc", address: addressOf("Google Workspace billing") },
+    details: usdcTo("Google Workspace billing"),
     changedAt: "2025-11-04T09:50",
   },
   {
@@ -320,7 +341,7 @@ const SAMPLE_PAYEES: readonly SamplePayee[] = [
     id: sampleId(115),
     name: "Canva",
     kind: "vendor",
-    details: { method: "usdc", address: addressOf("Canva billing") },
+    details: usdcTo("Canva billing"),
     changedAt: "2025-12-02T10:00",
     archived: true,
   },

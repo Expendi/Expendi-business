@@ -4,7 +4,10 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import type { WalletChain } from "@expendi-business/shared";
-import { WALLET_HISTORY_PAGE_SIZE } from "@expendi-business/shared";
+import {
+  fundInRequestSchema,
+  WALLET_HISTORY_PAGE_SIZE,
+} from "@expendi-business/shared";
 
 import type { DatabaseService } from "../db/client.js";
 import type { DatabaseError } from "../errors.js";
@@ -13,8 +16,14 @@ import type { AppRuntime } from "../runtime.js";
 import { wallets, walletTransactions } from "../db/schema/index.js";
 import { query, withScope } from "../db/scope.js";
 import { BadRequest, NotFound } from "../errors.js";
+import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
 import { requireAdminOrReader } from "../middleware/tenant.js";
+import {
+  createFundIn,
+  getFundIn,
+  listFundIns,
+} from "../services/intents/fund-in.js";
 import { kesCentsFor } from "../services/paycrest/amounts.js";
 import { Paycrest } from "../services/paycrest/paycrest-client.js";
 import { walletHistory } from "../services/wallet/history.js";
@@ -145,6 +154,9 @@ const historyQuerySchema = z.object({
  * Mounted at `/organizations/:organizationId/wallet`. Admins, and accountants
  * read-only (spec §4).
  * POST finishes a wallet whose setup stopped at sign-up; it's safe to repeat.
+ *
+ * `/fund-ins` follows the same rule: an admin starts a fund-in, and admins
+ * and accountants can see the deposit address and how it is going.
  */
 export function createWalletRoutes(
   runtime: AppRuntime,
@@ -173,6 +185,38 @@ export function createWalletRoutes(
           organizationId: tenant.organizationId,
           actor: { type: "user", id: tenant.userId },
         }),
+      );
+    })
+    .post("/fund-ins", (c) => {
+      const tenant = c.get("tenant");
+      return runEffect(
+        runtime,
+        c,
+        readBody(c.req.raw, fundInRequestSchema).pipe(
+          Effect.flatMap((body) =>
+            createFundIn({
+              organizationId: tenant.organizationId,
+              actor: { type: "user", id: tenant.userId },
+              chain: body.chain,
+              amount: BigInt(body.amount),
+              refundAddress: body.refundAddress,
+            }),
+          ),
+        ),
+        201,
+      );
+    })
+    .get("/fund-ins", (c) =>
+      runEffect(runtime, c, listFundIns(c.get("tenant").organizationId)),
+    )
+    .get("/fund-ins/:fundInId", (c) => {
+      const fundInId = c.req.param("fundInId");
+      return runEffect(
+        runtime,
+        c,
+        z.uuid().safeParse(fundInId).success
+          ? getFundIn(c.get("tenant").organizationId, fundInId)
+          : Effect.fail(new NotFound({ message: "Fund-in not found" })),
       );
     });
 }

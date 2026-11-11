@@ -17,13 +17,12 @@ import {
 } from "../../services/allowlist/allowlist.js";
 import { approvePayouts } from "../../services/payout/approve.js";
 import { fundPayout } from "../../services/payout/fund.js";
-import { confirmOnchainPayouts } from "../../services/payout/onchain.js";
 import {
   preparePayouts,
   requestPayoutApproval,
 } from "../../services/payout/payout-service.js";
 import { creditUsdcDeposits } from "../../services/wallet/deposits.js";
-import { transferReceipt } from "../helpers/chain.js";
+import { randomTxHash, transferReceipt } from "../helpers/chain.js";
 import {
   makeFakeBaseRpc,
   makeFakePaycrest,
@@ -31,11 +30,13 @@ import {
   randomAddress,
   TEST_ORIGIN,
 } from "../helpers/fakes.js";
+import { followPayout } from "../helpers/near-usdc-payouts.js";
 import {
   allowlistAddress,
   createPayingCompany,
   payClaims,
   readPayout,
+  updatePayout,
   USDC,
 } from "../helpers/payouts.js";
 import { makeTestRuntime } from "../helpers/runtime.js";
@@ -69,6 +70,8 @@ beforeEach(async () => {
   await allowlistAddress(runtime, paying, payee, "Supplier");
 });
 
+const SOLANA_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
 function usdcBill(
   overrides: Partial<UsdcPayoutRequest> = {},
 ): UsdcPayoutRequest {
@@ -76,7 +79,12 @@ function usdcBill(
     subjectType: "bill",
     subjectId: randomUUID(),
     idempotencyKey: `bill:${randomUUID()}:1`,
-    recipient: { method: "usdc", address: payee, accountName: "Acme Ltd" },
+    recipient: {
+      method: "usdc",
+      chain: "base",
+      address: payee,
+      accountName: "Acme Ltd",
+    },
     amountUsdc: 25n * USDC,
     ...overrides,
   };
@@ -119,47 +127,58 @@ async function removeFromAllowlist(addressId: string): Promise<void> {
   );
 }
 
-const confirmOnchain = () => runtime.runPromise(confirmOnchainPayouts(500));
+/**
+ * A USDC payout as a company wallet on Base sent it, before NEAR became the
+ * main chain: approved through the engine, then recorded as sent in
+ * `txHash`. Nothing sends from Base any more, so the row is written here.
+ */
+async function sentFromBase(): Promise<Payout & { txHash: string }> {
+  const prepared = await prepare(usdcBill());
+  if (Exit.isFailure(prepared)) throw new Error("prepare failed");
+  const [payout] = prepared.value;
+  if (!payout) throw new Error("nothing prepared");
+  const approval = await runtime.runPromise(
+    requestPayoutApproval({
+      organizationId: paying.company.organizationId,
+      userId: paying.company.admin.id,
+      payoutIds: [payout.id],
+    }),
+  );
+  await runtime.runPromise(
+    approvePayouts({
+      organizationId: paying.company.organizationId,
+      userId: paying.company.admin.id,
+      challengeId: approval.challengeId,
+      response: paying.passkey.sign(approval.options, TEST_ORIGIN),
+    }),
+  );
+  const txHash = randomTxHash();
+  await updatePayout(db, paying.company, payout.id, {
+    status: "paying",
+    fundingStartedAt: new Date(),
+    depositAddress: payee,
+    amountToTransferUsdc: payout.quotedUsdc,
+    txHash,
+  });
+  return { ...(await reload(payout)), txHash };
+}
+
 const reload = (payout: Payout) => readPayout(db, paying.company, payout.id);
 
-describe("USDC payouts to allowlisted addresses", () => {
-  it("sends exactly the amount to the address, once, and records the hash", async () => {
-    // #when
-    const [payout] = await payClaims(runtime, db, paying, [usdcBill()]);
-
-    // #then
-    const [send] = privy.state.sends;
-    expect({
-      status: payout?.status,
-      provider: payout?.provider,
-      to: send?.to,
-      amount: send?.amount,
-      sends: privy.state.sends.length,
-      hashRecorded: /^0x[0-9a-f]{64}$/.test(payout?.txHash ?? ""),
-      ordersAtPaycrest: paycrest.state.created.length,
-    }).toEqual({
-      status: "paying",
-      provider: "onchain",
-      to: payee,
-      amount: 25n * USDC,
-      sends: 1,
-      hashRecorded: true,
-      ordersAtPaycrest: 0,
-    });
-  });
-
+describe("USDC payouts sent from a company wallet on Base before the move", () => {
   it("is marked paid once the transfer is confirmed on chain", async () => {
     // #given
-    const [payout] = await payClaims(runtime, db, paying, [usdcBill()]);
-    if (!payout?.txHash) throw new Error("no hash");
-    const receipt = transferReceipt(
-      [{ from: paying.wallet.address, to: payee, amount: 25n * USDC }],
-      { txHash: payout.txHash },
+    const payout = await sentFromBase();
+    rpc.state.receipts.set(
+      payout.txHash,
+      transferReceipt(
+        [{ from: paying.wallet.address, to: payee, amount: 25n * USDC }],
+        { txHash: payout.txHash },
+      ),
     );
-    rpc.state.receipts.set(payout.txHash, receipt);
 
     // #when
-    await confirmOnchain();
+    await followPayout(runtime, payout);
 
     // #then
     const paid = await reload(payout);
@@ -171,8 +190,7 @@ describe("USDC payouts to allowlisted addresses", () => {
 
   it("sends a reverted transfer for review", async () => {
     // #given
-    const [payout] = await payClaims(runtime, db, paying, [usdcBill()]);
-    if (!payout?.txHash) throw new Error("no hash");
+    const payout = await sentFromBase();
     rpc.state.receipts.set(
       payout.txHash,
       transferReceipt(
@@ -182,7 +200,7 @@ describe("USDC payouts to allowlisted addresses", () => {
     );
 
     // #when
-    await confirmOnchain();
+    await followPayout(runtime, payout);
 
     // #then
     expect((await reload(payout)).status).toBe("needs_review");
@@ -190,8 +208,7 @@ describe("USDC payouts to allowlisted addresses", () => {
 
   it("sends a transfer that moved a different amount for review", async () => {
     // #given
-    const [payout] = await payClaims(runtime, db, paying, [usdcBill()]);
-    if (!payout?.txHash) throw new Error("no hash");
+    const payout = await sentFromBase();
     rpc.state.receipts.set(
       payout.txHash,
       transferReceipt(
@@ -201,10 +218,74 @@ describe("USDC payouts to allowlisted addresses", () => {
     );
 
     // #when
-    await confirmOnchain();
+    await followPayout(runtime, payout);
 
     // #then
     expect((await reload(payout)).status).toBe("needs_review");
+  });
+
+  it("never signs or sends anything while it is followed", async () => {
+    // #given
+    const payout = await sentFromBase();
+
+    // #when
+    await followPayout(runtime, payout);
+
+    // #then
+    expect({
+      status: (await reload(payout)).status,
+      sends: privy.state.sends.length,
+    }).toEqual({ status: "paying", sends: 0 });
+  });
+});
+
+describe("USDC payouts to allowlisted addresses", () => {
+  it.each([
+    ["a NEAR account", "near", "supplier.acme.near"],
+    ["a Solana address", "solana", SOLANA_ADDRESS],
+  ] as const)(
+    "prepares a payout to %s with its payee chain, exactly as allowlisted",
+    async (_name, chain, address) => {
+      // #given
+      await allowlistAddress(runtime, paying, address, "Supplier", chain);
+
+      // #when
+      const exit = await prepare(
+        usdcBill({
+          recipient: { method: "usdc", chain, address, accountName: "Acme" },
+        }),
+      );
+
+      // #then
+      if (Exit.isFailure(exit)) throw new Error("prepare failed");
+      expect(exit.value[0]?.recipient).toEqual({
+        method: "usdc",
+        chain,
+        address,
+        accountName: "Acme",
+      });
+    },
+  );
+
+  it.each([
+    ["a NEAR account with a capital letter", "near", "Supplier.near"],
+    ["a Solana address in lowercase", "solana", SOLANA_ADDRESS.toLowerCase()],
+    ["a NEAR account as a Base address", "base", "supplier.near"],
+    [
+      "a Base address as a NEAR account",
+      "near",
+      "0x52908400098527886e0f7030069857d2e4169ee7",
+    ],
+  ] as const)("can't pay %s", async (_name, chain, address) => {
+    // #when
+    const exit = await prepare(
+      usdcBill({
+        recipient: { method: "usdc", chain, address, accountName: "Acme" },
+      }),
+    );
+
+    // #then
+    expect(rejection(exit)).toBe("invalid_recipient");
   });
 
   it("can't pay an address that isn't on the allowlist", async () => {
@@ -213,6 +294,7 @@ describe("USDC payouts to allowlisted addresses", () => {
       usdcBill({
         recipient: {
           method: "usdc",
+          chain: "base",
           address: randomAddress(),
           accountName: "Stranger",
         },
@@ -232,7 +314,12 @@ describe("USDC payouts to allowlisted addresses", () => {
     const extraId = await allowlistAddress(runtime, paying, extra);
     const prepared = await prepare(
       usdcBill({
-        recipient: { method: "usdc", address: extra, accountName: "Soon gone" },
+        recipient: {
+          method: "usdc",
+          chain: "base",
+          address: extra,
+          accountName: "Soon gone",
+        },
       }),
     );
     if (Exit.isFailure(prepared)) throw new Error("prepare failed");
@@ -269,7 +356,12 @@ describe("USDC payouts to allowlisted addresses", () => {
     const extraId = await allowlistAddress(runtime, paying, extra);
     const prepared = await prepare(
       usdcBill({
-        recipient: { method: "usdc", address: extra, accountName: "Gone" },
+        recipient: {
+          method: "usdc",
+          chain: "base",
+          address: extra,
+          accountName: "Gone",
+        },
       }),
     );
     if (Exit.isFailure(prepared)) throw new Error("prepare failed");

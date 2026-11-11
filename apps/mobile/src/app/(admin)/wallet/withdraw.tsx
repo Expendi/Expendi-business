@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import type { Withdrawal, WithdrawalAddress } from "@expendi-business/shared";
+import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
 import type { PickerOption } from "~/components/option-picker";
 import type { Company } from "~/features/company/company-provider";
@@ -20,7 +21,8 @@ import {
   describeApprovalError,
 } from "~/features/approval";
 import { RequireAdmin } from "~/features/company/require-admin";
-import { parseUsdcAmount, shortAddress } from "~/features/wallet/usdc-amount";
+import { addressOnChain } from "~/features/wallet/chain-display";
+import { parseUsdcAmount } from "~/features/wallet/usdc-amount";
 import { useCompanyWallet } from "~/features/wallet/use-company-wallet";
 import {
   useWithdraw,
@@ -132,7 +134,7 @@ function WithdrawForm({
   const options: PickerOption<string>[] = addresses.map((address) => ({
     value: address.id,
     label: address.label,
-    description: shortAddress(address.address),
+    description: addressOnChain(address.chain, address.address),
   }));
 
   function handleReview(): void {
@@ -215,9 +217,12 @@ function Review({
         <Text selectable className="font-mono text-sm text-gray-700">
           {draft.address.address}
         </Text>
-        <Detail label="Network" value="Base" />
+        <Detail
+          label="Payee chain"
+          value={PAYEE_CHAIN_NAMES[draft.address.chain]}
+        />
         <Text className="text-sm text-gray-600">
-          Expendi pays the gas, so exactly this amount arrives.
+          Expendi pays the network fees, so exactly this amount arrives.
         </Text>
       </View>
       {outcome?.status === "cancelled" ? (
@@ -239,6 +244,7 @@ function Review({
               requestId: draft.requestId,
               addressId: draft.address.id,
               amountUsdc: draft.amountUsdc,
+              chain: draft.address.chain,
               address: draft.address.address,
             })
           }
@@ -272,13 +278,9 @@ function Detail({
 }
 
 const RESULTS: Record<
-  "sent" | "failed" | "review",
+  "failed" | "review",
   { readonly title: string; readonly body: string }
 > = {
-  sent: {
-    title: "Withdrawal sent",
-    body: "It’s on its way on Base and shows in the wallet history.",
-  },
   failed: {
     title: "Withdrawal failed",
     body: "Nothing was sent.",
@@ -301,7 +303,10 @@ function WithdrawalResult({
       ? RESULTS.failed
       : withdrawal.status === "needs_review"
         ? RESULTS.review
-        : RESULTS.sent;
+        : {
+            title: "Withdrawal sent",
+            body: `It’s on its way on ${PAYEE_CHAIN_NAMES[withdrawal.chain]} and shows in the wallet history.`,
+          };
 
   return (
     <View className="gap-6">
@@ -324,6 +329,7 @@ function WithdrawalResult({
       </View>
       {withdrawal.txHash ? (
         <View className="gap-2">
+          <Text className="text-sm text-gray-600">Transaction</Text>
           <Text selectable className="font-mono text-sm text-gray-700">
             {withdrawal.txHash}
           </Text>

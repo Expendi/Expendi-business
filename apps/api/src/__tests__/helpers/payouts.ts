@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 
+import type { PayeeChain } from "@expendi-business/shared";
+
 import type { Database } from "../../db/client.js";
 import type { Payout } from "../../db/schema/index.js";
 import type { AppRuntime } from "../../runtime.js";
@@ -160,14 +162,18 @@ export async function ledgerBalance(
   return rows.reduce((sum, row) => sum + row.usdcAmount, 0n);
 }
 
-/** Adds `address` to the company's allowlist, confirmed with the passkey. */
+/**
+ * Adds `address` to the company's allowlist, confirmed with the passkey. It
+ * is a Base address unless `chain` says otherwise.
+ */
 export async function allowlistAddress(
   runtime: AppRuntime,
   { company, passkey }: PayingCompany,
   address: string,
   label = "Treasury",
+  chain: PayeeChain = "base",
 ): Promise<string> {
-  const change = { action: "add", address, label } as const;
+  const change = { action: "add", chain, address, label } as const;
   const challenge = await runtime.runPromise(
     requestAllowlistChange({
       organizationId: company.organizationId,

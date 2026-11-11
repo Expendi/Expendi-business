@@ -24,6 +24,7 @@ import { PayeeChangeReview } from "~/features/payees/payee-change-review";
 import { PayeeDetailsFields } from "~/features/payees/payee-details-fields";
 import { CHANGE_WARNING } from "~/features/payees/payee-display";
 import {
+  changeDetailValue,
   detailsToValues,
   validateDetails,
 } from "~/features/payees/payee-fields";
@@ -146,7 +147,7 @@ function ChangeDetailsFlow({
   }
 
   function changeValue(field: DetailField, value: string): void {
-    setValues({ ...values, [field]: value });
+    setValues(changeDetailValue(values, field, value));
   }
 
   function handleReview(): void {

@@ -1,10 +1,10 @@
 import { eq, sql } from "drizzle-orm";
 import { Effect } from "effect";
 
-import type { PayoutStatus } from "@expendi-business/shared";
+import type { PayoutStatus, WalletChain } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
-import type { Payout } from "../../db/schema/index.js";
+import type { Payout, Wallet } from "../../db/schema/index.js";
 import type { BadRequest, DatabaseError } from "../../errors.js";
 import type { AuditEntryView } from "./audit-search.js";
 import type { LedgerRow } from "./payout-evidence.js";
@@ -18,7 +18,7 @@ import { syncPayoutOrder } from "../payout/sync.js";
 import { describeRecipient } from "../wallet/history.js";
 import { searchAuditLog } from "./audit-search.js";
 import { decodeCursor, encodeCursor, isoUtc, UUID } from "./paging.js";
-import { payoutLedger } from "./payout-evidence.js";
+import { payoutLedger, quoteHolding } from "./payout-evidence.js";
 import { withStaffReadScope } from "./staff-scope.js";
 
 /**
@@ -30,6 +30,7 @@ import { withStaffReadScope } from "./staff-scope.js";
 export interface StaffPayoutSummaryView {
   readonly id: string;
   readonly organization: { readonly id: string; readonly name: string };
+  readonly chain: WalletChain;
   readonly subjectType: Payout["subjectType"];
   readonly subjectId: string;
   readonly payrollRunId: string | null;
@@ -52,14 +53,31 @@ export interface StaffPayoutSummaryView {
 
 const iso = (date: Date | null): string | null => date?.toISOString() ?? null;
 
+/**
+ * The chain a payout's money leaves from: a company wallet on NEAR pays a
+ * USDC payout itself, into a NEAR Intents quote for a payee on another
+ * chain, while a cash-out is funded from the company's transit wallet on
+ * Base. A wallet made before the move pays everything on Base.
+ */
+export function payoutChain(
+  payout: Pick<Payout, "provider">,
+  walletChain: WalletChain,
+): WalletChain {
+  return walletChain === "near" && payout.provider === "onchain"
+    ? "near"
+    : "base";
+}
+
 /** A payout row as staff see it in lists. */
 export function payoutSummary(
   payout: Payout,
   organizationName: string,
+  walletChain: WalletChain,
 ): StaffPayoutSummaryView {
   return {
     id: payout.id,
     organization: { id: payout.organizationId, name: organizationName },
+    chain: payoutChain(payout, walletChain),
     subjectType: payout.subjectType,
     subjectId: payout.subjectId,
     payrollRunId: payout.payrollRunId,
@@ -85,6 +103,7 @@ interface QueueRow extends Record<string, unknown> {
   readonly payout_id: string;
   readonly organization_id: string;
   readonly organization_name: string;
+  readonly wallet_chain: WalletChain;
   readonly subject_type: Payout["subjectType"];
   readonly subject_id: string;
   readonly payroll_run_id: string | null;
@@ -109,6 +128,7 @@ function fromQueueRow(row: QueueRow): StaffPayoutSummaryView {
   return {
     id: row.payout_id,
     organization: { id: row.organization_id, name: row.organization_name },
+    chain: payoutChain(row, row.wallet_chain),
     subjectType: row.subject_type,
     subjectId: row.subject_id,
     payrollRunId: row.payroll_run_id,
@@ -156,7 +176,7 @@ export function payoutQueue(input: {
       query(() =>
         tx.execute<QueueRow>(sql`
           SELECT q.payout_id, q.organization_id, q.organization_name,
-                 q.subject_type, q.subject_id, q.payroll_run_id, q.provider,
+                 q.wallet_chain, q.subject_type, q.subject_id, q.payroll_run_id, q.provider,
                  q.method, q.status, q.amount_kes::text AS amount_kes,
                  q.amount_to_transfer_usdc::text AS amount_to_transfer_usdc,
                  q.provider_order_id, q.deposit_address, q.tx_hash,
@@ -218,7 +238,11 @@ export function payoutOrganization(
 export interface ScopedPayout {
   readonly payout: Payout;
   readonly organizationName: string;
+  /** The company wallet's address: a NEAR account, or on Base for an older wallet. */
   readonly walletAddress: string | null;
+  readonly walletChain: Wallet["chain"];
+  /** The transit wallet on Base that funds a NEAR company's cash-outs. */
+  readonly transitAddress: string | null;
 }
 
 /** The payout with its company's name and wallet, read in its company scope. */
@@ -233,6 +257,8 @@ export function readScopedPayout(
           payout: payouts,
           organizationName: organizations.name,
           walletAddress: wallets.address,
+          walletChain: wallets.chain,
+          transitAddress: wallets.transitAddress,
         })
         .from(payouts)
         .innerJoin(organizations, eq(organizations.id, payouts.organizationId))
@@ -257,6 +283,7 @@ export interface StaffPayoutDetailView extends StaffPayoutSummaryView {
   readonly approvedAt: string | null;
   readonly paidAt: string | null;
   readonly walletAddress: string | null;
+  readonly heldByIntentQuoteId: string | null;
   readonly ledger: readonly LedgerEntryView[];
   readonly auditTrail: readonly AuditEntryView[];
 }
@@ -265,6 +292,7 @@ export interface LedgerEntryView {
   readonly id: string;
   readonly type: LedgerRow["type"];
   readonly usdcAmount: bigint;
+  readonly chain: LedgerRow["chain"];
   readonly txHash: string | null;
   readonly createdAt: string;
 }
@@ -274,6 +302,7 @@ export function ledgerView(row: LedgerRow): LedgerEntryView {
     id: row.id,
     type: row.type,
     usdcAmount: row.usdcAmount,
+    chain: row.chain,
     txHash: row.txHash,
     createdAt: row.createdAt.toISOString(),
   };
@@ -289,10 +318,8 @@ export function payoutDetail(
 > {
   return Effect.gen(function* () {
     const organizationId = yield* payoutOrganization(payoutId);
-    const { payout, organizationName, walletAddress } = yield* readScopedPayout(
-      organizationId,
-      payoutId,
-    );
+    const { payout, organizationName, walletAddress, walletChain } =
+      yield* readScopedPayout(organizationId, payoutId);
     const ledger = yield* withStaffReadScope({ organizationId }, (tx) =>
       payoutLedger(tx, payoutId),
     );
@@ -302,7 +329,7 @@ export function payoutDetail(
       limit: 50,
     });
     return {
-      ...payoutSummary(payout, organizationName),
+      ...payoutSummary(payout, organizationName, walletChain),
       recipient: {
         name: payout.recipient.accountName,
         detail: describeRecipient(payout.recipient),
@@ -316,6 +343,7 @@ export function payoutDetail(
       approvedAt: iso(payout.approvedAt),
       paidAt: iso(payout.paidAt),
       walletAddress,
+      heldByIntentQuoteId: quoteHolding(payout),
       ledger: [...ledger.debits, ...ledger.refunds].map(ledgerView),
       auditTrail: trail.entries,
     };

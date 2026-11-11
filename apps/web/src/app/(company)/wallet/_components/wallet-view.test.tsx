@@ -142,7 +142,7 @@ describe("Accounts", () => {
       rows: [
         "Twiga Foods",
         "KES 186,000 · Bill",
-        "From 0x71c9…8b2e",
+        "From mwangaza-treasury.near",
         "Zuku payment failed, money returned",
         "To Treasury on Coinbase",
       ].every((line) => page.includes(line)),
@@ -166,10 +166,15 @@ describe("Accounts", () => {
 
     // #then
     expect({
-      deposit: page.includes("Send USDC on Base only"),
+      deposit: page.includes("Send USDC on NEAR only"),
+      account:
+        page.includes("NEAR account") &&
+        ["8f3a", "5b2c", "3d2e"].every((group) => html.includes(`>${group}<`)),
+      onNear: page.includes("On NEAR"),
       copy: page.includes("Copy address"),
       allowed:
-        page.includes("Treasury on Coinbase") && page.includes("Added 12 Aug"),
+        page.includes("Base · 0x12ab…9f3c · Added 12 Aug") &&
+        page.includes("NEAR · 5e6f7a…5e6f · Added 3 Sep"),
       paidFrom: PAID_FROM_ACCOUNTS.every((account) =>
         page.includes(account.name.replace("'", "&#x27;")),
       ),
@@ -177,6 +182,8 @@ describe("Accounts", () => {
       settings: html.includes('href="/settings?section=accounts"'),
     }).toEqual({
       deposit: true,
+      account: true,
+      onNear: true,
       copy: true,
       allowed: true,
       paidFrom: true,
@@ -192,13 +199,15 @@ describe("Accounts", () => {
     // #then
     expect({
       withdraw: page.includes(">Withdraw<"),
-      deposit: page.includes(">Deposit<"),
+      fundIn: page.includes(">Fund in<"),
+      otherChain: page.includes("Fund in from another chain"),
       add: page.includes(">Add address<"),
       remove: page.includes('aria-label="Remove Treasury on Coinbase"'),
       viewOnly: page.includes("View only"),
     }).toEqual({
       withdraw: true,
-      deposit: true,
+      fundIn: true,
+      otherChain: true,
       add: true,
       remove: true,
       viewOnly: false,
@@ -212,7 +221,8 @@ describe("Accounts", () => {
     // #then
     expect({
       withdraw: page.includes(">Withdraw<"),
-      deposit: page.includes(">Deposit<"),
+      fundIn: page.includes(">Fund in<"),
+      otherChain: page.includes("Fund in from another chain"),
       add: page.includes(">Add address<"),
       remove: page.includes(">Remove<"),
       viewOnly: page.includes(
@@ -220,7 +230,8 @@ describe("Accounts", () => {
       ),
     }).toEqual({
       withdraw: false,
-      deposit: true,
+      fundIn: true,
+      otherChain: false,
       add: false,
       remove: false,
       viewOnly: true,

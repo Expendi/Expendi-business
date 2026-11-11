@@ -11,6 +11,12 @@ import type {
   ControlsResponse,
   ImportReport,
   ImportRequest,
+  IntentQuoteEvidence,
+  IntentQuoteQueueQuery,
+  IntentQuoteQueueResponse,
+  IntentQuoteResolveConfirmed,
+  IntentQuoteResolvePrepared,
+  IntentQuoteResolvePrepareRequest,
   OpsAlertsResponse,
   PauseConfirmed,
   PausePrepared,
@@ -21,6 +27,7 @@ import type {
   ResolveConfirmed,
   ResolvePrepared,
   ResolvePrepareRequest,
+  StaffIntentQuoteDetail,
   StaffMeResponse,
   StaffPayoutDetail,
   SystemHealth,
@@ -39,6 +46,10 @@ import {
   controlsResponseSchema,
   importReportSchema,
   importResultSchema,
+  intentQuoteEvidenceSchema,
+  intentQuoteQueueResponseSchema,
+  intentQuoteResolveConfirmedSchema,
+  intentQuoteResolvePreparedSchema,
   opsAlertsResponseSchema,
   pauseConfirmedSchema,
   pausePreparedSchema,
@@ -46,6 +57,7 @@ import {
   payoutRefetchResponseSchema,
   resolveConfirmedSchema,
   resolvePreparedSchema,
+  staffIntentQuoteDetailSchema,
   staffMeResponseSchema,
   staffPayoutDetailSchema,
   systemHealthSchema,
@@ -104,6 +116,23 @@ export interface InternalApi {
       token: string,
     ) => Promise<PauseConfirmed>;
   };
+  /**
+   * NEAR Intents quotes that need a person: every staff role can look;
+   * resolving needs `ops_admin` and a second confirmation.
+   */
+  intentQuotes: {
+    queue: (query: IntentQuoteQueueQuery) => Promise<IntentQuoteQueueResponse>;
+    quote: (quoteId: string) => Promise<StaffIntentQuoteDetail>;
+    evidence: (quoteId: string) => Promise<IntentQuoteEvidence>;
+    prepareResolution: (
+      quoteId: string,
+      body: IntentQuoteResolvePrepareRequest,
+    ) => Promise<IntentQuoteResolvePrepared>;
+    confirmResolution: (
+      quoteId: string,
+      token: string,
+    ) => Promise<IntentQuoteResolveConfirmed>;
+  };
   /** A company's Zoho Books connection (T30); changes need `ops_admin`. */
   zoho: {
     status: (companyId: string) => Promise<ZohoStatusResponse>;
@@ -133,6 +162,9 @@ export type PauseAction = "pause" | "unpause";
 
 const payoutPath = (payoutId: string, suffix = "") =>
   `/internal/payouts/${encodeURIComponent(payoutId)}${suffix}` as const;
+
+const intentQuotePath = (quoteId: string, suffix = "") =>
+  `/internal/intent-quotes/${encodeURIComponent(quoteId)}${suffix}` as const;
 
 const zohoPath = (companyId: string, suffix = "") =>
   `/internal/companies/${encodeURIComponent(companyId)}/zoho${suffix}` as const;
@@ -228,6 +260,32 @@ export function createInternalApi(client: ApiClient): InternalApi {
           `/internal/controls/${action}/confirm`,
           { token },
           pauseConfirmedSchema,
+        ),
+    },
+    intentQuotes: {
+      queue: (query) =>
+        client.get(
+          `/internal/intent-quotes${toQueryString(query)}`,
+          intentQuoteQueueResponseSchema,
+        ),
+      quote: (quoteId) =>
+        client.get(intentQuotePath(quoteId), staffIntentQuoteDetailSchema),
+      evidence: (quoteId) =>
+        client.get(
+          intentQuotePath(quoteId, "/evidence"),
+          intentQuoteEvidenceSchema,
+        ),
+      prepareResolution: (quoteId, body) =>
+        client.post(
+          intentQuotePath(quoteId, "/resolve/prepare"),
+          body,
+          intentQuoteResolvePreparedSchema,
+        ),
+      confirmResolution: (quoteId, token) =>
+        client.post(
+          intentQuotePath(quoteId, "/resolve/confirm"),
+          { token },
+          intentQuoteResolveConfirmedSchema,
         ),
     },
     zoho: {

@@ -317,11 +317,7 @@ export function approvePayouts(input: {
         for (const payout of batch) {
           if (
             payout.recipient.method === "usdc" &&
-            !(yield* isAllowlisted(
-              tx,
-              organizationId,
-              payout.recipient.address,
-            ))
+            !(yield* isAllowlisted(tx, organizationId, payout.recipient))
           ) {
             return yield* reject(
               "not_allowlisted",

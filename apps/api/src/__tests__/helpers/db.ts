@@ -100,7 +100,11 @@ export interface TestWallet {
   readonly address: string;
 }
 
-/** An active company wallet, as `ensureCompanyWallet` leaves it. */
+/**
+ * An active company wallet on Base, as `ensureCompanyWallet` left it before
+ * NEAR became the main chain. Deposits and payouts still run on Base until
+ * they are ported, and their tests use this.
+ */
 export async function createActiveWallet(
   db: Database,
   company: TestCompany,
@@ -114,11 +118,48 @@ export async function createActiveWallet(
         .insert(wallets)
         .values({
           organizationId: company.organizationId,
+          chain: "base",
           status: "active",
           perTransactionMaxUsdc: 5_000_000_000n,
           privyPolicyId: `policy-${randomUUID()}`,
           privyWalletId: `wallet-${randomUUID()}`,
           address,
+          depositsWatchedAt: new Date(),
+        })
+        .returning({ id: wallets.id, address: wallets.address });
+      if (!wallet?.address) throw new Error("wallet insert returned no row");
+      return { id: wallet.id, address: wallet.address };
+    },
+  );
+}
+
+/**
+ * An active company wallet on NEAR with its transit wallet, as
+ * `ensureCompanyWallet` leaves it. `nearWallet` is the Privy wallet that
+ * signs for it.
+ */
+export async function createActiveNearWallet(
+  db: Database,
+  company: TestCompany,
+  nearWallet: { readonly privyWalletId: string; readonly accountId: string },
+  perTransactionMaxUsdc = 5_000_000_000n,
+): Promise<TestWallet> {
+  return runInScope(
+    db,
+    { organizationId: company.organizationId },
+    async (tx) => {
+      const [wallet] = await tx
+        .insert(wallets)
+        .values({
+          organizationId: company.organizationId,
+          status: "active",
+          perTransactionMaxUsdc,
+          privyWalletId: nearWallet.privyWalletId,
+          address: nearWallet.accountId,
+          privyPolicyId: `policy-${randomUUID()}`,
+          transitPrivyWalletId: `wallet-${randomUUID()}`,
+          transitAddress: `0x${randomBytes(20).toString("hex")}`,
+          onchainActivatedAt: new Date(),
           depositsWatchedAt: new Date(),
         })
         .returning({ id: wallets.id, address: wallets.address });

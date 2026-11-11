@@ -2,6 +2,8 @@ import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { Effect } from "effect";
 
+import type { PayeeChain } from "@expendi-business/shared";
+
 import type { DatabaseService } from "../../db/client.js";
 import type { Payout } from "../../db/schema/index.js";
 import type { DatabaseError, Forbidden } from "../../errors.js";
@@ -34,10 +36,13 @@ import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
  * the wallet lock) and at the funding barrier; a passkey challenge bound by
  * hash to the address and amount; the balance net of reservations; both
  * pauses; the per-transaction cap; one send; and on-chain confirmation.
+ * To a NEAR account it leaves the company wallet directly, like a payout to
+ * a USDC payee there (services/payout/onchain.ts).
  */
 
 export interface WithdrawalView {
   readonly id: string;
+  readonly chain: PayeeChain;
   readonly address: string;
   readonly label: string;
   readonly amountUsdc: bigint;
@@ -62,6 +67,7 @@ function toView(payout: Payout): Effect.Effect<WithdrawalView> {
   }
   return Effect.succeed({
     id: payout.id,
+    chain: recipient.chain,
     address: recipient.address,
     label: recipient.accountName,
     amountUsdc: payout.quotedUsdc,
@@ -106,6 +112,7 @@ export function requestWithdrawal(input: {
         const [listed] = yield* query(() =>
           tx
             .select({
+              chain: withdrawalAddresses.chain,
               address: withdrawalAddresses.address,
               label: withdrawalAddresses.label,
             })
@@ -161,6 +168,7 @@ export function requestWithdrawal(input: {
           idempotencyKey: `withdrawal:${input.requestId}`,
           recipient: {
             method: "usdc",
+            chain: destination.chain,
             address: destination.address,
             accountName: destination.label,
           },
@@ -228,8 +236,10 @@ function withdrawalOfChallenge(input: {
 
 /**
  * Approves the withdrawal with the admin's passkey assertion and sends it,
- * once. Returns where it ended: `paying` once sent (the confirm job marks it
- * `paid` from the receipt), `failed` with nothing sent, or `needs_review`.
+ * once. Returns where it stands: `paying` once sent (the confirm job marks
+ * it `paid` from the chain), `failed` with nothing sent, or `funding` while
+ * it waits for the company wallet to finish another send or for the chain
+ * to say what became of its own, which the confirm job follows.
  */
 export function confirmWithdrawal(input: {
   readonly organizationId: string;

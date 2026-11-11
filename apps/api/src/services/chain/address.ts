@@ -1,6 +1,9 @@
 import { keccak_256 } from "@noble/hashes/sha3";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils";
 
+import type { PayeeChain } from "@expendi-business/shared";
+import { isNearAccountId, isSolanaAddress } from "@expendi-business/shared";
+
 const HEX_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
 /** `address` in its EIP-55 mixed-case form. */
@@ -31,3 +34,32 @@ export function normaliseBaseAddress(raw: string): string | null {
     address === toChecksumAddress(address);
   return checksummed ? `0x${hex.toLowerCase()}` : null;
 }
+
+/**
+ * `raw` in the form an address on `chain` is stored, compared and paid in,
+ * or `null` if it isn't one. Only a Base address is lowercased. A NEAR
+ * account with a capital letter is refused rather than guessed at, and a
+ * Solana address is case-sensitive, so both are kept exactly as given.
+ */
+export function normalisePayeeAddress(
+  chain: PayeeChain,
+  raw: string,
+): string | null {
+  const address = raw.trim();
+  switch (chain) {
+    case "base":
+      return normaliseBaseAddress(address);
+    case "near":
+      return isNearAccountId(address) ? address : null;
+    case "solana":
+      return isSolanaAddress(address) ? address : null;
+  }
+}
+
+/** What to tell someone whose address `normalisePayeeAddress` refused. */
+export const INVALID_PAYEE_ADDRESS: Readonly<Record<PayeeChain, string>> = {
+  near: "That NEAR account isn't valid. Enter one like acme.near, or the 64-character account ID, in lowercase.",
+  base: "That Base address isn't valid. Check it for typos, or paste it again.",
+  solana:
+    "That Solana address isn't valid. Check it for typos, or paste it again.",
+};

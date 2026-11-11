@@ -13,6 +13,7 @@ import { useDashboard } from "~/contexts/dashboard-context";
 import { describeApiError } from "~/lib/api";
 import { AddAddressSheet, AllowedAddresses } from "./allowed-addresses";
 import { BalanceCard, panelClass } from "./balance-card";
+import { FundInSheet } from "./fund-in-sheet";
 import { DepositCard, PaidFromAccounts } from "./rail-cards";
 import { useCompanyWallet, useFinishWalletSetup } from "./wallet-api";
 import { nairobiDay } from "./wallet-display";
@@ -20,10 +21,11 @@ import { WalletHistory } from "./wallet-history";
 import { WithdrawSheet } from "./withdraw-sheet";
 
 /**
- * Accounts (spec §6.9, §6.14): the USDC wallet's balance, where to deposit,
- * the allowlist, every movement, and the accounts spending outside Expendi
- * is paid from. Admins and accountants see it all; only admins withdraw or
- * change the allowlist, each with their approval passkey.
+ * Accounts (spec §6.9, §6.14): the company wallet's balance, how to fund
+ * in, the allowlist, every movement, and the accounts spending outside
+ * Expendi is paid from. Admins and accountants see it all; only admins fund
+ * in from another chain, and only admins withdraw or change the allowlist,
+ * each with their approval passkey.
  */
 export function WalletView(): JSX.Element {
   const { company, canAct } = useDashboard();
@@ -36,7 +38,7 @@ export function WalletView(): JSX.Element {
   );
 }
 
-type OpenSheet = "withdraw" | "add-address" | null;
+type OpenSheet = "withdraw" | "add-address" | "fund-in" | null;
 
 function CompanyAccounts({
   organizationId,
@@ -85,7 +87,7 @@ function CompanyAccounts({
               ) : null}
               <Button onClick={showDeposit}>
                 <ArrowDownLeftIcon aria-hidden="true" />
-                Deposit
+                Fund in
               </Button>
             </>
           ) : null
@@ -111,6 +113,7 @@ function CompanyAccounts({
           highlighted={highlighted}
           copyRef={copyRef}
           onAddAddress={() => setSheet("add-address")}
+          onFundIn={() => setSheet("fund-in")}
         />
       ) : (
         <WalletStillCreating organizationId={organizationId} canAct={canAct} />
@@ -131,6 +134,12 @@ function CompanyAccounts({
             organizationId={organizationId}
             onClose={() => setSheet(null)}
           />
+          <FundInSheet
+            key={sheet === "fund-in" ? "open" : "closed"}
+            open={sheet === "fund-in"}
+            organizationId={organizationId}
+            onClose={() => setSheet(null)}
+          />
         </>
       ) : null}
     </section>
@@ -144,6 +153,7 @@ function ActiveAccounts({
   highlighted,
   copyRef,
   onAddAddress,
+  onFundIn,
 }: {
   organizationId: string;
   canAct: boolean;
@@ -151,6 +161,7 @@ function ActiveAccounts({
   highlighted: boolean;
   copyRef: RefObject<HTMLButtonElement | null>;
   onAddAddress: () => void;
+  onFundIn: () => void;
 }): JSX.Element {
   const today = nairobiDay(new Date());
   const rate = wallet.kesEquivalent?.rate ?? null;
@@ -176,8 +187,10 @@ function ActiveAccounts({
         <div className="min-w-0 [animation-delay:140ms] motion-safe:animate-rise max-[1120px]:order-2">
           <DepositCard
             address={wallet.address}
+            chain={wallet.chain}
             highlighted={highlighted}
             copyRef={copyRef}
+            onFundIn={canAct ? onFundIn : null}
           />
         </div>
         <div className="min-w-0 [animation-delay:280ms] motion-safe:animate-rise max-[1120px]:order-4">
@@ -230,7 +243,7 @@ function WalletStillCreating({
       </p>
       <p className="mt-1">
         {canAct
-          ? "Its deposit address appears here once it's ready."
+          ? "Its address appears here once it's ready."
           : "An admin can finish setting it up."}
       </p>
       {canAct ? (

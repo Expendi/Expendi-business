@@ -5,6 +5,8 @@ import type {
 } from "@expendi-business/shared";
 import {
   EMPLOYEE_PAYEE_METHODS,
+  PAYEE_CHAIN_NAMES,
+  PAYEE_CHAINS,
   PAYEE_METHODS,
   payeeDetailsSchema,
 } from "@expendi-business/shared";
@@ -24,6 +26,7 @@ export const DETAIL_FIELDS = [
   "bankCode",
   "accountNumber",
   "accountName",
+  "chain",
   "address",
 ] as const;
 
@@ -41,6 +44,7 @@ export const EMPTY_DETAIL_VALUES: DetailValues = {
   bankCode: "",
   accountNumber: "",
   accountName: "",
+  chain: "near",
   address: "",
 };
 
@@ -49,7 +53,7 @@ const METHOD_FIELDS: Record<PayeeMethod, readonly DetailField[]> = {
   mpesa_till: ["tillNumber", "accountName"],
   mpesa_paybill: ["paybillNumber", "accountReference", "accountName"],
   bank: ["bankCode", "accountNumber", "accountName"],
-  usdc: ["address"],
+  usdc: ["chain", "address"],
   outside: [],
 };
 
@@ -61,7 +65,8 @@ const FIELD_LABELS: Record<DetailField, string> = {
   bankCode: "Bank",
   accountNumber: "Account number",
   accountName: "Account name",
-  address: "Base address",
+  chain: "Payee chain",
+  address: "Address",
 };
 
 /** Employees can't be paid to a Till, a Paybill or a USDC wallet. */
@@ -105,6 +110,27 @@ export function detailValues(
 ): Partial<Record<DetailField, string>> {
   const { method: _method, ...values } = details;
   return values;
+}
+
+/** A field's value as people read it: a payee chain by its name. */
+export function displayValue(field: DetailField, value: string): string {
+  if (field !== "chain") return value;
+  const chain = PAYEE_CHAINS.find((candidate) => candidate === value);
+  return chain ? PAYEE_CHAIN_NAMES[chain] : value;
+}
+
+/**
+ * The values after the admin changes one field. An address belongs to its
+ * payee chain, so choosing another chain clears it.
+ */
+export function changeDetailValue(
+  values: DetailValues,
+  field: DetailField,
+  value: string,
+): DetailValues {
+  return field === "chain" && value !== values.chain
+    ? { ...values, chain: value, address: "" }
+    : { ...values, [field]: value };
 }
 
 /** The form prefilled with a payee's current details. */

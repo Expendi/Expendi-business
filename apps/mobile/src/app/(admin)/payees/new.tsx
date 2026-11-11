@@ -40,6 +40,7 @@ import {
   KIND_LABELS,
 } from "~/features/payees/payee-display";
 import {
+  changeDetailValue,
   EMPTY_DETAIL_VALUES,
   methodsForKind,
   validateDetails,
@@ -146,7 +147,7 @@ function NewPayeeFlow({
   }
 
   function changeValue(field: DetailField, value: string): void {
-    setValues({ ...values, [field]: value });
+    setValues(changeDetailValue(values, field, value));
   }
 
   function handleReview(): void {

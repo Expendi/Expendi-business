@@ -1,6 +1,8 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Effect } from "effect";
 
+import type { WalletChain } from "@expendi-business/shared";
+
 import type { DatabaseService } from "../../db/client.js";
 import type { BadRequest, DatabaseError } from "../../errors.js";
 import type { StaffPayoutSummaryView } from "./payouts.js";
@@ -117,6 +119,7 @@ export interface CompanyDetailView {
     readonly status: "invited" | "active" | "removed";
   }[];
   readonly wallet: {
+    readonly chain: WalletChain;
     readonly status: "creating" | "active";
     readonly address: string | null;
     readonly usdcBalance: bigint;
@@ -194,6 +197,7 @@ export function companyDetail(
           tx
             .select({
               id: wallets.id,
+              chain: wallets.chain,
               status: wallets.status,
               address: wallets.address,
             })
@@ -218,8 +222,9 @@ export function companyDetail(
         );
         const recent = yield* query(() =>
           tx
-            .select()
+            .select({ payout: payouts, walletChain: wallets.chain })
             .from(payouts)
+            .innerJoin(wallets, eq(wallets.id, payouts.walletId))
             .where(eq(payouts.organizationId, organizationId))
             .orderBy(desc(payouts.createdAt), desc(payouts.id))
             .limit(RECENT_PAYOUTS),
@@ -251,6 +256,7 @@ export function companyDetail(
       members: read.members,
       wallet: wallet
         ? {
+            chain: wallet.chain,
             status: wallet.status,
             address: wallet.address,
             usdcBalance: wallet.balance,
@@ -258,8 +264,8 @@ export function companyDetail(
           }
         : null,
       unpaidClaims: read.unpaid,
-      recentPayouts: read.recent.map((payout) =>
-        payoutSummary(payout, company.name),
+      recentPayouts: read.recent.map(({ payout, walletChain }) =>
+        payoutSummary(payout, company.name, walletChain),
       ),
     };
   });

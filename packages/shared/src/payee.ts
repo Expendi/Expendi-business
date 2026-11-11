@@ -4,6 +4,11 @@ import {
   passkeyAssertionSchema,
   passkeyRequestOptionsSchema,
 } from "./approval.js";
+import {
+  payeeAddressSchema,
+  payeeChainAddressProblem,
+  payeeChainSchema,
+} from "./payee-chain.js";
 
 /** Who a payee is (spec §6.19). Employee payees are linked to their membership. */
 export const PAYEE_KINDS = [
@@ -89,7 +94,7 @@ const enterAccountReference = "Enter the Paybill account number.";
 
 /**
  * A payee's payment details, by method. The API normalises them further:
- * an M-Pesa number to E.164, a USDC address to lowercase, and it checks
+ * an M-Pesa number to E.164, a Base address to lowercase, and it checks
  * the bank against Paycrest's list and the address against the company's
  * allowlist.
  */
@@ -143,14 +148,27 @@ export const payeeDetailsSchema = z.discriminatedUnion(
         ),
       accountName,
     }),
-    z.object({
-      method: z.literal("usdc"),
-      /** A Base address already on the company's allowlist. */
-      address: z
-        .string({ error: "Enter the Base address." })
-        .trim()
-        .regex(/^0x[0-9a-fA-F]{40}$/, "That isn't a Base address."),
-    }),
+    z
+      .object({
+        method: z.literal("usdc"),
+        /** The payee chain the address receives on. */
+        chain: payeeChainSchema,
+        /** An address on that chain, already on the company's allowlist. */
+        address: payeeAddressSchema,
+      })
+      .superRefine((details, context) => {
+        const problem = payeeChainAddressProblem(
+          details.chain,
+          details.address,
+        );
+        if (problem !== null) {
+          context.addIssue({
+            code: "custom",
+            path: ["address"],
+            message: problem,
+          });
+        }
+      }),
     z.object({ method: z.literal("outside") }),
   ],
   { error: "Choose how this payee is paid." },

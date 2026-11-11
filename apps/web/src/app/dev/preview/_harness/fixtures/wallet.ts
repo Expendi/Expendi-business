@@ -1,6 +1,7 @@
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 
 import type {
+  FundIn,
   PaidFromAccount,
   WalletHistoryItem,
   WalletHistoryPayout,
@@ -15,13 +16,16 @@ import { KES_RATE, ORGANIZATION_ID, sampleId } from "./company";
 
 /** The sample data of docs/mocks/wallet.html, today 6 Nov 2026 in Nairobi. */
 
-const DEPOSIT_ADDRESS = "0x8f3a5b2c9d1e4f7a6b0c3d2e1f9a8b7c6d5e4c21";
-const SENDER = "0x71c9a2b4d6e8f0a1b3c5d7e9f2a4b6c8d0e28b2e";
+const COMPANY_WALLET =
+  "8f3a5b2c9d1e4f7a6b0c3d2e1f9a8b7c6d5e4c218f3a5b2c9d1e4f7a6b0c3d2e";
+const SENDER = "mwangaza-treasury.near";
+/** Where money came from before the company wallet moved to NEAR. */
+const BASE_SENDER = "0x71c9a2b4d6e8f0a1b3c5d7e9f2a4b6c8d0e28b2e";
 
 export const ACCOUNTS_WALLET: WalletResponse = {
   status: "active",
-  address: DEPOSIT_ADDRESS,
-  chain: "base",
+  address: COMPANY_WALLET,
+  chain: "near",
   usdcBalance: "16420800000",
   kesEquivalent: { kesCents: "211828320", rate: KES_RATE },
 };
@@ -30,14 +34,40 @@ export const ALLOWED_ADDRESSES: WithdrawalAddress[] = [
   {
     id: sampleId(601),
     label: "Treasury on Coinbase",
+    chain: "base",
     address: "0x12ab7c3e9f04d5b6a8c1e2f3d4b5a6c7e8f99f3c",
     confirmedAt: "2026-08-12T07:30:00.000Z",
   },
   {
     id: sampleId(602),
     label: "Ledger cold storage",
-    address: "0x5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f",
+    chain: "near",
+    address: "5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f",
     confirmedAt: "2026-09-03T11:05:00.000Z",
+  },
+];
+
+/** One waiting for its USDC and one delivered, newest first. */
+export const FUND_INS: FundIn[] = [
+  {
+    id: sampleId(621),
+    chain: "base",
+    amountIn: "2500000000",
+    amountOut: "2499870000",
+    depositAddress: "0x9d4c1e7a2b5f8036c1d4e7a9b2c5f8e1d4a7b0c3",
+    deadline: "2026-11-06T08:30:00.000Z",
+    status: "awaiting_deposit",
+    createdAt: "2026-11-06T06:30:00.000Z",
+  },
+  {
+    id: sampleId(622),
+    chain: "solana",
+    amountIn: "6000000000",
+    amountOut: "5999910000",
+    depositAddress: "4Nd1mYw4r7Vq3Z8kq2cXJ5hT9sQeLb6uPfGa1WxRzDyC",
+    deadline: "2026-11-05T15:30:00.000Z",
+    status: "completed",
+    createdAt: "2026-11-05T13:30:00.000Z",
   },
 ];
 
@@ -73,7 +103,17 @@ function usdc(amount: number): string {
   return String(Math.round(amount * 100) * 10_000);
 }
 
-function hash(n: number): string {
+const BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+/** A NEAR transaction hash: 44 base58 characters, in both cases. */
+function nearHash(n: number): string {
+  return Array.from(
+    { length: 44 },
+    (_, index) => BASE58[(n * 7 + index * 11) % BASE58.length] ?? "1",
+  ).join("");
+}
+
+function baseHash(n: number): string {
   return `0x${n.toString(16).padStart(4, "0").repeat(16)}`;
 }
 
@@ -94,6 +134,7 @@ function payout(
     subjectType: "bill",
     method: "mpesa_paybill",
     subjectId: sampleId(800 + n),
+    recipientChain: null,
     payrollRunId: null,
     approvalId: null,
     approvedAt: null,
@@ -115,7 +156,8 @@ function row(
     id: sampleId(900 + n),
     type,
     usdcAmount: amount,
-    txHash: hash(n),
+    chain: "near",
+    txHash: nearHash(n),
     counterpartyAddress: null,
     createdAt,
     payout: null,
@@ -208,6 +250,7 @@ export const LEDGER: WalletHistoryItem[] = [
       method: "usdc",
       recipientName: "Treasury on Coinbase",
       recipientDetail: ALLOWED_ADDRESSES[0]?.address ?? "",
+      recipientChain: "base",
       amountKesCents: "25800000",
       status: "paid",
       rate: null,
@@ -245,7 +288,9 @@ export const LEDGER: WalletHistoryItem[] = [
     }),
   }),
   row(17, "deposit", usdc(2000), at("2026-10-20", "09:45"), {
-    counterpartyAddress: SENDER,
+    chain: "base",
+    txHash: baseHash(17),
+    counterpartyAddress: BASE_SENDER,
   }),
   row(18, "payout", `-${usdc(375.97)}`, at("2026-10-15", "08:30"), {
     payout: payout(18, {
@@ -268,7 +313,9 @@ export const LEDGER: WalletHistoryItem[] = [
     }),
   }),
   row(20, "deposit", usdc(2500), at("2026-10-08", "10:00"), {
-    counterpartyAddress: SENDER,
+    chain: "base",
+    txHash: baseHash(20),
+    counterpartyAddress: BASE_SENDER,
   }),
 ];
 
@@ -301,5 +348,9 @@ export function seedWallet(client: QueryClient): void {
     pages({ items: LEDGER, nextCursor: null }),
   );
   client.setQueryData(walletKeys.addresses(org), ALLOWED_ADDRESSES);
+  client.setQueryData(walletKeys.fundIns(org), FUND_INS);
+  for (const fundIn of FUND_INS) {
+    client.setQueryData(walletKeys.fundIn(org, fundIn.id), fundIn);
+  }
   client.setQueryData(billKeys.paidFromAccounts(org), PAID_FROM_ACCOUNTS);
 }

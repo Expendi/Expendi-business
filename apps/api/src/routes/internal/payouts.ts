@@ -20,12 +20,14 @@ import {
 } from "../../services/staff/payouts.js";
 import {
   confirmResolution,
+  payoutEvidence,
   prepareResolution,
 } from "../../services/staff/resolve.js";
 
 /**
  * Mounted at `/internal`, behind staff login (spec §6.15). Every staff role
- * can look; only an ops admin can re-fetch or resolve. Nothing here creates,
+ * can look, including at the evidence the chain and Paycrest hold for a
+ * payout; only an ops admin can re-fetch or resolve. Nothing here creates,
  * approves, funds or retries a payout: resolving closes one under review,
  * and re-fetching runs the ordinary forward-only sync.
  */
@@ -45,6 +47,9 @@ export function createPayoutRoutes(
     )
     .get("/payouts/:payoutId", (c) =>
       runEffect(runtime, c, payoutDetail(c.req.param("payoutId"))),
+    )
+    .get("/payouts/:payoutId/evidence", (c) =>
+      runEffect(runtime, c, payoutEvidence(c.req.param("payoutId"))),
     )
     .post("/payouts/:payoutId/refetch", opsAdmin, (c) =>
       runEffect(

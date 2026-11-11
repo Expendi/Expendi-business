@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { compareBaseUnits, parseUsdcAmount, shortAddress } from "./usdc-amount";
+import { compareBaseUnits, parseUsdcAmount } from "./usdc-amount";
 
 const PLENTY = "1000000000000000";
 
@@ -93,15 +93,5 @@ describe("compareBaseUnits", () => {
 
     // #then
     expect(result).toBe(expected);
-  });
-});
-
-describe("shortAddress", () => {
-  it("keeps the start and end of an address", () => {
-    // #when
-    const short = shortAddress("0x1234567890abcdef1234567890abcdef12345678");
-
-    // #then
-    expect(short).toBe("0x1234…5678");
   });
 });

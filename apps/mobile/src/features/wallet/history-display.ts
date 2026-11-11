@@ -4,8 +4,8 @@ import type {
   WalletTransactionType,
 } from "@expendi-business/shared";
 
-import { formatKesCents, formatUsdc } from "~/lib/money";
-import { shortAddress } from "./usdc-amount";
+import { formatKesCents, formatUsdc } from "../../lib/money";
+import { addressOnChain, shortAddress } from "./chain-display";
 
 export type Tone = "neutral" | "success" | "warning";
 
@@ -47,7 +47,11 @@ export function formatSignedUsdc(baseUnits: string): string {
 export function describeCounterparty(item: WalletHistoryItem): string | null {
   const { payout } = item;
   if (payout?.method === "usdc") {
-    return `${payout.recipientName} · ${shortAddress(payout.recipientDetail)}`;
+    return `${payout.recipientName} · ${
+      payout.recipientChain
+        ? addressOnChain(payout.recipientChain, payout.recipientDetail)
+        : shortAddress(payout.recipientDetail)
+    }`;
   }
   if (payout) {
     return `KES ${formatKesCents(payout.amountKesCents)} · ${payout.recipientName} · ${payout.recipientDetail}`;

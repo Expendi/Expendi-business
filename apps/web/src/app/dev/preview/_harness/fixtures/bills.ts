@@ -733,8 +733,8 @@ const ALL_BILLS = [...OPEN_BILLS, ...SETTLED_BILLS];
 /** The wallet as the bills page reads it, for today's KES per USDC. */
 export const WALLET: WalletResponse = {
   status: "active",
-  address: "0x7f2e9c41d0a3b6e85f1c2d4a9b0e3f6c8a1db9c4",
-  chain: "base",
+  address: "8f3a5b2c9d1e4f7a6b0c3d2e1f9a8b7c6d5e4c218f3a5b2c9d1e4f7a6b0c3d2e",
+  chain: "near",
   usdcBalance: "16420800000",
   kesEquivalent: { kesCents: "211828320", rate: KES_RATE },
 };

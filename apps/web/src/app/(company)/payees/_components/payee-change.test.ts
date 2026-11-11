@@ -8,7 +8,11 @@ import type {
 
 import type { PasskeyAssertion } from "~/lib/passkeys";
 import { listSummary } from "~/features/payees/payee-display";
-import { validateDetails } from "~/features/payees/payee-fields";
+import {
+  changeDetailValue,
+  EMPTY_DETAIL_VALUES,
+  validateDetails,
+} from "~/features/payees/payee-fields";
 import {
   payeeChangeSteps,
   requestPayeeChange,
@@ -20,6 +24,11 @@ const ORG = "00000000-0000-4000-8000-0000000000aa";
 const CHALLENGE = "00000000-0000-4000-8000-0000000000cc";
 const PAYEE = "00000000-0000-4000-8000-0000000000dd";
 const ADDRESS = "0x1111111111111111111111111111111111111111";
+const USDC_ON_BASE = {
+  method: "usdc",
+  chain: "base",
+  address: ADDRESS,
+} as const;
 
 const assertion: PasskeyAssertion = {
   id: "Y3JlZGVudGlhbA",
@@ -40,7 +49,7 @@ const payee: Payee = {
   kind: "supplier",
   name: "Base Supplies",
   membershipId: null,
-  details: { method: "usdc", address: ADDRESS },
+  details: USDC_ON_BASE,
   payoutPhoneConfirmed: null,
   detailsChangedAt: "2026-11-02T06:00:00.000Z",
   secondConfirmationUntil: "2026-11-03T06:00:00.000Z",
@@ -78,7 +87,7 @@ describe("adding a payee from the dashboard", () => {
     const create: CreatePayeeRequest = {
       kind: "supplier",
       name: "Base Supplies",
-      details: { method: "usdc", address: ADDRESS },
+      details: USDC_ON_BASE,
     };
     const challenge: PayeeChangeChallenge = {
       status: "confirmation_required",
@@ -86,7 +95,7 @@ describe("adding a payee from the dashboard", () => {
       options: { challenge: "Y2hhbGxlbmdl", userVerification: "required" },
       change: {
         action: "create",
-        payee: { ...create, details: { method: "usdc", address: ADDRESS } },
+        payee: { ...create, details: USDC_ON_BASE },
       },
     };
     const { api, requests } = stubApi((url) =>
@@ -251,6 +260,7 @@ describe("validateDetails", () => {
       bankCode: "",
       accountNumber: "12",
       accountName: "Jane Wanjiku",
+      chain: "near",
       address: "",
     };
 
@@ -274,6 +284,96 @@ describe("validateDetails", () => {
   });
 });
 
+describe("a USDC payee's chain", () => {
+  const NEAR_IMPLICIT =
+    "8f3a5b2c9d1e4f7a6b0c3d2e1f9a8b7c6d5e4c218f3a5b2c9d1e4f7a6b0c3d2e";
+  const SOLANA = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU";
+  const usdc = (chain: string, address: string) =>
+    validateDetails("usdc", "supplier", {
+      ...EMPTY_DETAIL_VALUES,
+      chain,
+      address,
+    });
+
+  it("is NEAR until another is chosen", () => {
+    // #then
+    expect(EMPTY_DETAIL_VALUES.chain).toBe("near");
+  });
+
+  it("goes with the address in the details the API is sent", () => {
+    // #then
+    expect([
+      usdc("near", "acme.near"),
+      usdc("near", NEAR_IMPLICIT),
+      usdc("base", ADDRESS),
+      usdc("solana", SOLANA),
+    ]).toEqual([
+      {
+        ok: true,
+        details: { method: "usdc", chain: "near", address: "acme.near" },
+      },
+      {
+        ok: true,
+        details: { method: "usdc", chain: "near", address: NEAR_IMPLICIT },
+      },
+      { ok: true, details: USDC_ON_BASE },
+      {
+        ok: true,
+        details: { method: "usdc", chain: "solana", address: SOLANA },
+      },
+    ]);
+  });
+
+  it("refuses an address from another chain, in the chosen chain's words", () => {
+    // #then
+    expect([
+      usdc("near", "0x12Ab7c3E9f04d5B6a8c1e2f3d4b5a6c7e8f99F3c"),
+      usdc("base", "acme.near"),
+      usdc("solana", ADDRESS),
+      usdc("near", ""),
+    ]).toEqual([
+      {
+        ok: false,
+        errors: {
+          address:
+            "That isn't a NEAR account. Enter one like acme.near, or the 64-character account ID, in lowercase.",
+        },
+      },
+      {
+        ok: false,
+        errors: {
+          address:
+            "That isn't a Base address. Enter 0x followed by 40 characters.",
+        },
+      },
+      {
+        ok: false,
+        errors: {
+          address:
+            "That isn't a Solana address. Check it for typos, or paste it again.",
+        },
+      },
+      { ok: false, errors: { address: "Enter the address." } },
+    ]);
+  });
+
+  it("clears the address when another chain is chosen, and only then", () => {
+    // #given
+    const values = { ...EMPTY_DETAIL_VALUES, chain: "base", address: ADDRESS };
+
+    // #then
+    expect([
+      changeDetailValue(values, "chain", "solana"),
+      changeDetailValue(values, "chain", "base"),
+      changeDetailValue(values, "accountName", "Figma"),
+    ]).toEqual([
+      { ...values, chain: "solana", address: "" },
+      values,
+      { ...values, accountName: "Figma" },
+    ]);
+  });
+});
+
 describe("listSummary", () => {
   it("shows the details as the API returns them", () => {
     // #then
@@ -291,10 +391,18 @@ describe("listSummary", () => {
         null,
       ),
       listSummary(payee, null),
+      listSummary(
+        {
+          details: { method: "usdc", chain: "near", address: "acme.near" },
+          payoutPhoneConfirmed: null,
+        },
+        null,
+      ),
       listSummary({ details: null, payoutPhoneConfirmed: null }, null),
     ]).toEqual([
       "M-Pesa Paybill · 888880, account A-17",
-      "USDC wallet · 0x1111…1111",
+      "USDC wallet · 0x1111…1111 on Base",
+      "USDC wallet · acme.near on NEAR",
       "No payment details yet",
     ]);
   });

@@ -207,7 +207,12 @@ describe("a float payment follows a USDC payout", () => {
             subjectType: "float",
             subjectId: movementId,
             idempotencyKey: `float:${movementId}:1`,
-            recipient: { method: "usdc", address, accountName: "Jane" },
+            recipient: {
+              method: "usdc",
+              chain: "base",
+              address,
+              accountName: "Jane",
+            },
             amountUsdc: 12n * USDC,
           },
         ],

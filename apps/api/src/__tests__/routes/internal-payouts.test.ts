@@ -33,12 +33,18 @@ import { createApp } from "../../app.js";
 import { DatabaseService } from "../../db/client.js";
 import { walletTransactions } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
+import { approvePayouts } from "../../services/payout/approve.js";
+import {
+  preparePayouts,
+  requestPayoutApproval,
+} from "../../services/payout/payout-service.js";
 import { randomTxHash } from "../helpers/chain.js";
 import {
   makeFakeBaseRpc,
   makeFakePaycrest,
   makeFakePrivyWallets,
   randomAddress,
+  TEST_ORIGIN,
 } from "../helpers/fakes.js";
 import {
   allowlistAddress,
@@ -130,25 +136,59 @@ async function sentPayoutUnderReview(): Promise<Payout> {
   return readPayout(db, paying.company, payout.id);
 }
 
-/** A USDC payout to an allowlisted address whose send had an unknown outcome. */
+/**
+ * A USDC payout sent from a company wallet on Base, before NEAR became the
+ * main chain, whose send had an unknown outcome: under review, with funding
+ * started two hours ago and no ledger debit.
+ */
 async function stuckUsdcPayout(): Promise<Payout> {
   const address = randomAddress();
   await allowlistAddress(runtime, paying, address);
-  privy.state.nextSends("unknown");
-  const [payout] = await payClaims(runtime, db, paying, [
-    {
-      subjectType: "bill",
-      subjectId: randomUUID(),
-      idempotencyKey: `bill:${randomUUID()}:1`,
-      recipient: { method: "usdc", address, accountName: "Acme Ltd" },
-      amountUsdc: 25n * USDC,
-    },
-  ]);
-  if (payout?.status !== "needs_review") throw new Error("not under review");
-  await updatePayout(db, paying.company, payout.id, {
+  const [prepared] = await runtime.runPromise(
+    preparePayouts({
+      organizationId: paying.company.organizationId,
+      actor: { type: "user", id: paying.company.admin.id },
+      requests: [
+        {
+          subjectType: "bill",
+          subjectId: randomUUID(),
+          idempotencyKey: `bill:${randomUUID()}:1`,
+          recipient: {
+            method: "usdc",
+            chain: "base",
+            address,
+            accountName: "Acme Ltd",
+          },
+          amountUsdc: 25n * USDC,
+        },
+      ],
+    }),
+  );
+  if (!prepared) throw new Error("nothing was prepared");
+  const approval = await runtime.runPromise(
+    requestPayoutApproval({
+      organizationId: paying.company.organizationId,
+      userId: paying.company.admin.id,
+      payoutIds: [prepared.id],
+    }),
+  );
+  await runtime.runPromise(
+    approvePayouts({
+      organizationId: paying.company.organizationId,
+      userId: paying.company.admin.id,
+      challengeId: approval.challengeId,
+      response: paying.passkey.sign(approval.options, TEST_ORIGIN),
+    }),
+  );
+  await updatePayout(db, paying.company, prepared.id, {
+    status: "needs_review",
     fundingStartedAt: new Date(Date.now() - 2 * HOUR_MS),
+    depositAddress: address,
+    amountToTransferUsdc: prepared.quotedUsdc,
+    failureReason:
+      "The transfer's outcome is unknown. Check the chain before doing anything; never send again.",
   });
-  return readPayout(db, paying.company, payout.id);
+  return readPayout(db, paying.company, prepared.id);
 }
 
 function setOrder(payout: Payout, changes: Partial<PaycrestOrder>): void {
@@ -387,7 +427,11 @@ describe("GET /internal/payouts/:id", () => {
       recipient: { name: "Jane Wanjiku", detail: "•••• 5678" },
       walletAddress: paying.wallet.address,
       ledger: [
-        { type: "payout", usdcAmount: `-${payout.amountToTransferUsdc}` },
+        {
+          type: "payout",
+          chain: "base",
+          usdcAmount: `-${payout.amountToTransferUsdc}`,
+        },
       ],
     });
     expect(detail.auditTrail.map((entry) => entry.action)).toEqual(
@@ -903,6 +947,7 @@ describe("resolving as paid", () => {
         paycrestStatus: null,
         depositTransfers: [
           {
+            chain: "base",
             txHash: transfer.txHash,
             usdcAmount: transfer.amount.toString(),
           },

@@ -11,6 +11,7 @@ import { createStaffAuthRoutes } from "./auth.js";
 import { createCompanyRoutes } from "./companies.js";
 import { createControlRoutes } from "./controls.js";
 import { createImportRoutes } from "./imports.js";
+import { createIntentQuoteRoutes } from "./intent-quotes.js";
 import { createPayoutRoutes } from "./payouts.js";
 
 /**
@@ -35,5 +36,6 @@ export function createInternalRoutes(
     .route("/", createCompanyRoutes(runtime))
     .route("/", createImportRoutes(runtime))
     .route("/", createPayoutRoutes(runtime))
+    .route("/", createIntentQuoteRoutes(runtime))
     .route("/", createControlRoutes(runtime));
 }

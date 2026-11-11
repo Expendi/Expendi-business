@@ -1,5 +1,8 @@
+import type { PublicKey } from "near-api-js";
 import { createHmac, randomBytes } from "node:crypto";
+import { APIError } from "@privy-io/node";
 import { Effect, Layer, Redacted } from "effect";
+import { KeyPair, Signer } from "near-api-js";
 
 import type {
   TransactionReceipt,
@@ -33,8 +36,10 @@ import type {
 } from "../../services/phone-verification/otp-provider.js";
 import type { StoredObject } from "../../services/storage/file-storage.js";
 import type {
+  CreateNearWalletInput,
   CreatePolicyInput,
   CreateWalletInput,
+  NearSigningWallet,
   PrivyWalletRecord,
   SendUsdcInput,
   SentTransaction,
@@ -105,11 +110,55 @@ export const TestWalletSettings = Layer.succeed(
 export const randomAddress = (): string =>
   `0x${randomBytes(20).toString("hex")}`;
 
-type FailingCall = "createPolicy" | "createWallet" | "findWalletByExternalId";
+type FailingCall =
+  | "createPolicy"
+  | "createWallet"
+  | "findWalletByExternalId"
+  | "createNearWallet"
+  | "findNearWalletByExternalId";
+
+/** `refused` is a definite no from Privy; `unavailable` is a lost reply. */
+type NearSigningOutcome = "signed" | "refused" | "unavailable";
+
+/** Signs as Privy would for a NEAR wallet: with the wallet's own ed25519 key. */
+class FakePrivyNearSigner extends Signer {
+  constructor(
+    private readonly keyPair: KeyPair | null,
+    private readonly nextOutcome: () => NearSigningOutcome,
+  ) {
+    super();
+  }
+
+  getPublicKey(): Promise<PublicKey> {
+    if (!this.keyPair) return Promise.reject(new Error("fake: no such wallet"));
+    return Promise.resolve(this.keyPair.getPublicKey());
+  }
+
+  protected signBytes(bytes: Uint8Array): Promise<Uint8Array> {
+    const outcome = this.nextOutcome();
+    if (!this.keyPair || outcome === "refused") {
+      return Promise.reject(
+        new APIError(400, undefined, "fake signing refusal", undefined),
+      );
+    }
+    if (outcome === "unavailable") {
+      return Promise.reject(new Error("fake signing timeout"));
+    }
+    return Promise.resolve(this.keyPair.sign(bytes).signature);
+  }
+}
+
+interface FakeNearWallet extends PrivyWalletRecord {
+  readonly input: CreateNearWalletInput;
+  /** Null for a seeded wallet nobody can sign for. */
+  readonly keyPair: KeyPair | null;
+}
 
 /**
  * In-memory Privy. Like the real API, a repeated idempotency key replays
- * the first result instead of creating a second policy or wallet.
+ * the first result instead of creating a second policy or wallet. NEAR
+ * wallets hold real ed25519 keys, so what they sign verifies on the fake
+ * chain (helpers/near.ts).
  */
 export function makeFakePrivyWallets() {
   const policies = new Map<string, { id: string; input: CreatePolicyInput }>();
@@ -117,10 +166,15 @@ export function makeFakePrivyWallets() {
     string,
     PrivyWalletRecord & { readonly input: CreateWalletInput }
   >();
+  const nearWallets = new Map<string, FakeNearWallet>();
+  const nearSigningOutcomes: NearSigningOutcome[] = [];
+  const nearSigningRequests = new Map<string, number>();
   const calls: Record<FailingCall, number> = {
     createPolicy: 0,
     createWallet: 0,
     findWalletByExternalId: 0,
+    createNearWallet: 0,
+    findNearWalletByExternalId: 0,
   };
   const failures = new Map<FailingCall, number>();
   /** Every send that reached "Privy", in order; replays aren't repeated. */
@@ -142,9 +196,66 @@ export function makeFakePrivyWallets() {
     );
   };
 
+  const newNearWallet = (input: CreateNearWalletInput): FakeNearWallet => {
+    const keyPair = KeyPair.fromRandom("ed25519");
+    return {
+      id: `near-wallet-${randomBytes(6).toString("hex")}`,
+      address: Buffer.from(keyPair.getPublicKey().data).toString("hex"),
+      ownerId: input.ownerQuorumId,
+      policyIds: [],
+      signerIds: [input.signerQuorumId],
+      input,
+      keyPair,
+    };
+  };
+
   const state = {
     policies,
+    /** Ethereum wallets: the transit wallets. */
     wallets,
+    /** NEAR wallets: the company wallets, and the gas relayer's. */
+    nearWallets,
+    /** How many times a NEAR wallet was asked to sign, refusals included. */
+    nearSigningRequestsFor: (privyWalletId: string): number =>
+      nearSigningRequests.get(privyWalletId) ?? 0,
+    /** Queue outcomes for the next NEAR signings; each without one signs. */
+    nextNearSignings(...outcomes: NearSigningOutcome[]) {
+      nearSigningOutcomes.push(...outcomes);
+    },
+    /** What the service hands out: a signer holding the wallet's key now. */
+    nearSigner({ privyWalletId, accountId }: NearSigningWallet): Signer {
+      const wallet = [...nearWallets.values()].find(
+        (candidate) =>
+          candidate.id === privyWalletId && candidate.address === accountId,
+      );
+      return new FakePrivyNearSigner(wallet?.keyPair ?? null, () => {
+        nearSigningRequests.set(
+          privyWalletId,
+          state.nearSigningRequestsFor(privyWalletId) + 1,
+        );
+        return nearSigningOutcomes.shift() ?? "signed";
+      });
+    },
+    /** A NEAR wallet that exists in Privy without going through the API. */
+    addNearWallet(externalId = `standalone-${randomBytes(4).toString("hex")}`) {
+      const wallet = newNearWallet({
+        externalId,
+        displayName: externalId,
+        ownerQuorumId: TEST_WALLET_SETTINGS.managementQuorumId,
+        signerQuorumId: TEST_WALLET_SETTINGS.runtimeSignerId,
+        idempotencyKey: `standalone-${externalId}`,
+      });
+      nearWallets.set(wallet.input.idempotencyKey, wallet);
+      return { privyWalletId: wallet.id, accountId: wallet.address };
+    },
+    /** A NEAR wallet created outside this fake's idempotency (e.g. >24h ago). */
+    seedNearWallet(record: PrivyWalletRecord, input: CreateNearWalletInput) {
+      nearWallets.set(`seeded-${record.id}`, {
+        ...record,
+        input,
+        keyPair: null,
+      });
+    },
     calls,
     /** The next `times` calls of `call` fail. */
     failNext(call: FailingCall, times = 1) {
@@ -162,6 +273,9 @@ export function makeFakePrivyWallets() {
     reset() {
       policies.clear();
       wallets.clear();
+      nearWallets.clear();
+      nearSigningOutcomes.length = 0;
+      nearSigningRequests.clear();
       failures.clear();
       sends.length = 0;
       sent.clear();
@@ -207,6 +321,26 @@ export function makeFakePrivyWallets() {
             ) ?? null,
         ),
       ),
+    createNearWallet: (input) =>
+      maybeFail("createNearWallet").pipe(
+        Effect.map(() => {
+          const existing = nearWallets.get(input.idempotencyKey);
+          if (existing) return existing;
+          const wallet = newNearWallet(input);
+          nearWallets.set(input.idempotencyKey, wallet);
+          return wallet;
+        }),
+      ),
+    findNearWalletByExternalId: (externalId) =>
+      maybeFail("findNearWalletByExternalId").pipe(
+        Effect.map(
+          () =>
+            [...nearWallets.values()].find(
+              (wallet) => wallet.input.externalId === externalId,
+            ) ?? null,
+        ),
+      ),
+    nearSigner: (wallet) => state.nearSigner(wallet),
     sendUsdc: (input) => {
       const replay = sent.get(input.idempotencyKey);
       if (replay) return Effect.succeed(replay);

@@ -2,16 +2,20 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
-import type { WithdrawalAddress } from "@expendi-business/shared";
+import type { PayeeChain, WithdrawalAddress } from "@expendi-business/shared";
 import {
-  allowlistChangeSchema,
+  PAYEE_CHAIN_NAMES,
+  PAYEE_CHAINS,
   WITHDRAWAL_ADDRESS_LABEL_MAX_LENGTH,
 } from "@expendi-business/shared";
 
+import type { PickerOption } from "~/components/option-picker";
 import type { Company } from "~/features/company/company-provider";
+import type { AllowlistFieldErrors } from "~/features/wallet/allowlist-change";
 import { Button } from "~/components/button";
 import { ConfirmSheet } from "~/components/confirm-sheet";
 import { ErrorMessage } from "~/components/error-message";
+import { OptionPicker } from "~/components/option-picker";
 import { Screen } from "~/components/screen";
 import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
@@ -21,6 +25,11 @@ import {
   useApprovalPasskeyStatus,
 } from "~/features/approval";
 import { RequireAdmin } from "~/features/company/require-admin";
+import { addressToAdd } from "~/features/wallet/allowlist-change";
+import {
+  ADDRESS_LABELS,
+  ADDRESS_PLACEHOLDERS,
+} from "~/features/wallet/chain-display";
 import {
   useChangeAllowlist,
   useWithdrawalAddresses,
@@ -65,8 +74,9 @@ function WithdrawalAddressesScreen({
       onRefresh={() => void addresses.refetch()}
     >
       <Text className="text-base text-gray-600">
-        Withdrawals and USDC payments can only go to these Base addresses.
-        Adding or removing one needs your passkey.
+        Withdrawals and USDC payments can only go to these addresses. Each is on
+        its payee chain: NEAR, Base or Solana. Adding or removing one needs your
+        passkey.
       </Text>
 
       <ApprovalPasskeyGate>
@@ -133,6 +143,9 @@ function AddressRow({
         <Text className="text-base font-semibold text-gray-900">
           {address.label}
         </Text>
+        <Text className="text-sm text-gray-600">
+          {PAYEE_CHAIN_NAMES[address.chain]}
+        </Text>
         <Text selectable className="font-mono text-sm text-gray-700">
           {address.address}
         </Text>
@@ -148,10 +161,10 @@ function AddressRow({
   );
 }
 
-interface FieldErrors {
-  address?: string;
-  label?: string;
-}
+const CHAIN_OPTIONS: PickerOption<PayeeChain>[] = PAYEE_CHAINS.map((chain) => ({
+  value: chain,
+  label: PAYEE_CHAIN_NAMES[chain],
+}));
 
 function AddAddressForm({
   organizationId,
@@ -159,30 +172,20 @@ function AddAddressForm({
   organizationId: string;
 }): JSX.Element {
   const add = useChangeAllowlist(organizationId);
+  const [chain, setChain] = useState<PayeeChain>("near");
   const [address, setAddress] = useState("");
   const [label, setLabel] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [fieldErrors, setFieldErrors] = useState<AllowlistFieldErrors>({});
   const added = add.data?.status === "approved" ? add.data.result : null;
 
   function handleAdd(): void {
-    const parsed = allowlistChangeSchema.safeParse({
-      action: "add",
-      address,
-      label,
-    });
-    if (!parsed.success) {
-      const errors: FieldErrors = {};
-      for (const issue of parsed.error.issues) {
-        const field = issue.path[0];
-        if ((field === "address" || field === "label") && !errors[field]) {
-          errors[field] = issue.message;
-        }
-      }
-      setFieldErrors(errors);
+    const adding = addressToAdd(chain, label, address);
+    if (!adding.ok) {
+      setFieldErrors(adding.errors);
       return;
     }
     setFieldErrors({});
-    add.mutate(parsed.data, {
+    add.mutate(adding.change, {
       onSuccess: (outcome) => {
         if (outcome.status === "approved") {
           setAddress("");
@@ -197,11 +200,21 @@ function AddAddressForm({
       <Text className="text-sm font-semibold uppercase tracking-wide text-gray-500">
         Add an address
       </Text>
+      <OptionPicker
+        label="Payee chain"
+        options={CHAIN_OPTIONS}
+        value={chain}
+        disabled={add.isPending}
+        onChange={(next) => {
+          setChain(next);
+          setFieldErrors({ label: fieldErrors.label });
+        }}
+      />
       <TextField
-        label="Base address"
+        label={ADDRESS_LABELS[chain]}
         value={address}
         onChangeText={setAddress}
-        placeholder="0x…"
+        placeholder={ADDRESS_PLACEHOLDERS[chain]}
         autoCapitalize="none"
         autoCorrect={false}
         editable={!add.isPending}
@@ -217,8 +230,8 @@ function AddAddressForm({
       />
       <ErrorMessage message={fieldErrors.label ?? null} />
       <Text className="text-sm text-gray-600">
-        Check the address character by character. USDC sent to a wrong address
-        can’t be recovered.
+        Check the address character by character. USDC sent to a wrong address,
+        or to an address on another chain, can’t be recovered.
       </Text>
       <ErrorMessage
         message={add.isError ? describeApprovalError(add.error) : null}

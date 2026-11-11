@@ -1,0 +1,2 @@
+ALTER TABLE "intent_quotes" DROP CONSTRAINT "intent_quotes_fee_cover_is_for_a_hop";--> statement-breakpoint
+ALTER TABLE "intent_quotes" ADD CONSTRAINT "intent_quotes_fee_cover_is_for_a_company_send" CHECK (("intent_quotes"."fee_cover_usdc" IS NULL OR ("intent_quotes"."fee_cover_usdc" > 0 AND "intent_quotes"."purpose" IN ('base_hop', 'usdc_payout'))) AND ("intent_quotes"."fee_cover_tx_hash" IS NULL OR "intent_quotes"."fee_cover_usdc" IS NOT NULL));

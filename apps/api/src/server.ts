@@ -8,7 +8,13 @@ import { billStatusJob } from "./station/bill-status.js";
 import { cardReceiptRemindersJob } from "./station/card-receipt-reminders.js";
 import { closeCardsJob } from "./station/close-cards.js";
 import { confirmOnchainJob } from "./station/confirm-onchain.js";
+import { fundInsJob } from "./station/fund-ins.js";
 import { monthlyExportJob } from "./station/monthly-export.js";
+import { nearDepositsJob } from "./station/near-deposits.js";
+import {
+  outboundQuotesJob,
+  sweepTransitWalletsJob,
+} from "./station/outbound-quotes.js";
 import { payrollDraftsJob } from "./station/payroll-drafts.js";
 import {
   pushNotificationsJob,
@@ -47,6 +53,10 @@ const stopStation = startStation(runtime, [
   closeCardsJob,
   reconcileLithicJob,
   cardReceiptRemindersJob,
+  nearDepositsJob,
+  fundInsJob,
+  outboundQuotesJob,
+  sweepTransitWalletsJob,
 ]);
 
 function shutdown(signal: NodeJS.Signals): void {

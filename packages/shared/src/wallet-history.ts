@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { walletTransactionTypeSchema } from "./wallet.js";
+import { payeeChainSchema } from "./payee-chain.js";
+import { walletChainSchema, walletTransactionTypeSchema } from "./wallet.js";
 
 export const PAYOUT_SUBJECT_TYPES = [
   "claim",
@@ -51,10 +52,12 @@ export const walletHistoryPayoutSchema = z.object({
   recipientName: z.string(),
   /**
    * Where it went, safe to show: an M-Pesa number masked to its last 4
-   * digits, a Till or Paybill number, a bank account's last 4, or a Base
-   * address.
+   * digits, a Till or Paybill number, a bank account's last 4, or the
+   * address a USDC payout went to.
    */
   recipientDetail: z.string(),
+  /** The payee chain of a USDC payout or withdrawal; null for a cash-out. */
+  recipientChain: payeeChainSchema.nullable(),
   /** What the recipient receives (KES cents); the KES value for USDC. */
   amountKesCents: digits,
   status: payoutStatusSchema,
@@ -79,6 +82,15 @@ export const walletHistoryItemSchema = z.object({
   type: walletTransactionTypeSchema,
   /** USDC base units, signed: credits positive, debits negative. */
   usdcAmount: integerString,
+  /**
+   * The chain the money moved on: NEAR for the company wallet, Base for the
+   * transit wallet.
+   */
+  chain: walletChainSchema,
+  /**
+   * The transaction on `chain`: a 0x hash on Base, a base58 hash on NEAR.
+   * A NEAR hash is case-sensitive, so show and link it exactly as given.
+   */
   txHash: z.string().nullable(),
   /** The sender of money in, or where money out went. */
   counterpartyAddress: z.string().nullable(),

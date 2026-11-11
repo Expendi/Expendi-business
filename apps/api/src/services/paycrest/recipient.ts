@@ -5,6 +5,8 @@
  * its institution code from Paycrest's KES list.
  */
 
+import type { PayeeChain } from "@expendi-business/shared";
+
 export const MPESA_INSTITUTION = "SAFAKEPC";
 
 /** What every Paycrest recipient sees as the payment's description. */
@@ -38,10 +40,14 @@ export type KesRecipient =
 
 export type KesMethod = KesRecipient["method"];
 
-/** A USDC payee: paid by direct transfer to an allowlisted Base address. */
+/** A USDC payee: paid in USDC to an allowlisted address on its payee chain. */
 export interface UsdcRecipient {
   readonly method: "usdc";
-  /** A Base address on the company's allowlist. */
+  readonly chain: PayeeChain;
+  /**
+   * An address on the company's allowlist, as the allowlist stores it: a
+   * Base address lowercased, a NEAR account or Solana address unchanged.
+   */
   readonly address: string;
   readonly accountName: string;
 }

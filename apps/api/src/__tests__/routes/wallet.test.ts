@@ -25,6 +25,7 @@ import {
   createIsolationFixture,
   expectRouteIsolation,
 } from "../helpers/isolation.js";
+import { randomNearAccount } from "../helpers/near.js";
 import { bearer, makeTestRuntime } from "../helpers/runtime.js";
 
 let runtime: AppRuntime;
@@ -122,12 +123,15 @@ describe("GET /organizations/:organizationId/wallet", () => {
   it.each([
     ["before the Privy wallet exists", { status: "creating" as const }],
     [
-      "before deposits to it are watched",
+      "before its transit address is watched",
       {
         status: "active" as const,
-        privyPolicyId: "policy-unwatched",
         privyWalletId: "wallet-unwatched",
-        address: randomAddress(),
+        address: randomNearAccount(),
+        privyPolicyId: "policy-unwatched",
+        transitPrivyWalletId: "transit-unwatched",
+        transitAddress: randomAddress(),
+        onchainActivatedAt: new Date(),
         depositsWatchedAt: null,
       },
     ],
@@ -156,11 +160,7 @@ describe("GET /organizations/:organizationId/wallet", () => {
         status: 200,
         body: { success: true, data: { status: "creating" } },
       });
-      expect(privy.state.calls).toEqual({
-        createPolicy: 0,
-        createWallet: 0,
-        findWalletByExternalId: 0,
-      });
+      expect(new Set(Object.values(privy.state.calls))).toEqual(new Set([0]));
     },
   );
 

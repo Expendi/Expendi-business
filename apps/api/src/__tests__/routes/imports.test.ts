@@ -1015,6 +1015,7 @@ describe("company-admin imports", () => {
           .update(payees)
           .set({
             method: "usdc",
+            usdcChain: "base",
             usdcAddress: "0x1111111111111111111111111111111111111111",
             detailsChangedAt: new Date(),
           })

@@ -1,7 +1,10 @@
 import { Effect } from "effect";
 
 import type { PayeeDetails, PayeeKind } from "@expendi-business/shared";
-import { EMPLOYEE_PAYEE_METHODS } from "@expendi-business/shared";
+import {
+  EMPLOYEE_PAYEE_METHODS,
+  PAYEE_CHAIN_NAMES,
+} from "@expendi-business/shared";
 
 import type { NewPayee, PayeeRow } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
@@ -11,7 +14,10 @@ import { BadRequest, Conflict, ServiceUnavailable } from "../../errors.js";
 import { isAllowlisted } from "../allowlist/allowlist.js";
 import { canonicalJson } from "../approval/passkeys.js";
 import { toKenyanMobile } from "../auth/phone.js";
-import { normaliseBaseAddress } from "../chain/address.js";
+import {
+  INVALID_PAYEE_ADDRESS,
+  normalisePayeeAddress,
+} from "../chain/address.js";
 import { Paycrest } from "../paycrest/paycrest-client.js";
 import {
   InvalidRecipient,
@@ -48,8 +54,9 @@ function checkPaycrestRecipient(
 
 /**
  * The details in the form they're stored and confirmed: an M-Pesa number in
- * E.164, a USDC address lowercased (and checked against its EIP-55
- * checksum), names with single spaces. Applying it twice changes nothing.
+ * E.164, a USDC address as its payee chain writes it (a Base address
+ * lowercased and checked against its EIP-55 checksum), names with single
+ * spaces. Applying it twice changes nothing.
  * Whether the payee's kind allows them is `checkDetailsForKind`.
  */
 export function normaliseDetails(
@@ -93,15 +100,11 @@ export function normaliseDetails(
       return checkPaycrestRecipient(normalised).pipe(Effect.as(normalised));
     }
     case "usdc": {
-      const address = normaliseBaseAddress(details.address);
+      const { chain } = details;
+      const address = normalisePayeeAddress(chain, details.address);
       return address === null
-        ? Effect.fail(
-            new BadRequest({
-              message:
-                "That Base address isn't valid. Check it for typos, or paste it again.",
-            }),
-          )
-        : Effect.succeed({ method: "usdc", address });
+        ? Effect.fail(new BadRequest({ message: INVALID_PAYEE_ADDRESS[chain] }))
+        : Effect.succeed({ method: "usdc", chain, address });
     }
     case "outside":
       return Effect.succeed({ method: "outside" });
@@ -186,8 +189,8 @@ export function checkBank(
 }
 
 /**
- * A USDC payee can only be an address already on the company's allowlist
- * (spec §6.19, §7). Adding it there is its own passkey-confirmed step.
+ * A USDC payee can only be an address already on the company's allowlist,
+ * on the same payee chain (spec §6.19, §7). Adding it there is its own passkey-confirmed step.
  */
 export function checkAllowlisted(
   tx: Transaction,
@@ -195,7 +198,7 @@ export function checkAllowlisted(
   details: PayeeDetails | undefined,
 ): Effect.Effect<void, Conflict | DatabaseError> {
   if (details?.method !== "usdc") return Effect.void;
-  return isAllowlisted(tx, organizationId, details.address).pipe(
+  return isAllowlisted(tx, organizationId, details).pipe(
     Effect.flatMap((listed) =>
       listed
         ? Effect.void
@@ -220,6 +223,7 @@ type DetailColumns = Required<
     | "bankCode"
     | "bankAccountNumber"
     | "accountName"
+    | "usdcChain"
     | "usdcAddress"
   >
 >;
@@ -233,6 +237,7 @@ const NO_DETAILS: DetailColumns = {
   bankCode: null,
   bankAccountNumber: null,
   accountName: null,
+  usdcChain: null,
   usdcAddress: null,
 };
 
@@ -276,6 +281,7 @@ export function detailColumns(
       return {
         ...NO_DETAILS,
         method: details.method,
+        usdcChain: details.chain,
         usdcAddress: details.address,
       };
     case "outside":
@@ -330,8 +336,10 @@ export function detailsOf(row: PayeeRow): PayeeDetails | null {
         accountName: required(row.accountName, "account_name"),
       };
     case "usdc":
+      if (row.usdcChain === null) throw missingColumn(row.id, "usdc_chain");
       return {
         method: row.method,
+        chain: row.usdcChain,
         address: required(row.usdcAddress, "usdc_address"),
       };
     case "outside":
@@ -347,7 +355,7 @@ export function lastFour(value: string): string {
 /**
  * The details safe for the audit log: phone and account numbers show only
  * their last 4 characters. Till and Paybill business numbers, bank codes,
- * names and Base addresses are public identifiers and stay whole.
+ * names and USDC addresses are public identifiers and stay whole.
  */
 export function maskDetails(details: PayeeDetails): PayeeDetails {
   switch (details.method) {
@@ -389,7 +397,7 @@ export function describeDetails(
     case "bank":
       return `${bankName ?? details.bankCode} account ${endingIn(details.accountNumber)}, in the name of ${details.accountName}`;
     case "usdc":
-      return `USDC on Base to ${details.address}`;
+      return `USDC on ${PAYEE_CHAIN_NAMES[details.chain]} to ${details.address}`;
     case "outside":
       return "outside Expendi (Expendi won't pay them)";
   }

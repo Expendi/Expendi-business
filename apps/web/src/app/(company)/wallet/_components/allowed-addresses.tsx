@@ -4,9 +4,11 @@ import type { FormEvent, JSX } from "react";
 import { KeyRoundIcon, PlusIcon, ShieldCheckIcon } from "lucide-react";
 import { useId, useState } from "react";
 
-import type { AllowlistChange } from "@expendi-business/shared";
+import type { AllowlistChange, PayeeChain } from "@expendi-business/shared";
 import {
   allowlistChangeSchema,
+  PAYEE_CHAIN_NAMES,
+  PAYEE_CHAINS,
   WITHDRAWAL_ADDRESS_LABEL_MAX_LENGTH,
 } from "@expendi-business/shared";
 
@@ -25,11 +27,19 @@ import {
   FieldLabel,
 } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "~/components/ui/native-select";
+import {
+  ADDRESS_LABELS,
+  ADDRESS_PLACEHOLDERS,
+  shortAddress,
+} from "~/features/chain-display";
 import { describeApiError } from "~/lib/api";
 import { describeApprovalError } from "~/lib/approval";
 import { useApprovalPasskeyStatus } from "~/lib/use-approval";
 import { railCardClass, RailRow, RailTitle } from "./rail-cards";
-import { shortAddress } from "./usdc-amount";
 import { useChangeAllowlist, useWithdrawalAddresses } from "./wallet-api";
 import { dayMonth, nairobiDay } from "./wallet-display";
 
@@ -72,7 +82,7 @@ export function AllowedAddresses({
         ) : null}
       </RailTitle>
       <p className="mt-0.5 text-sm text-gray-600">
-        Withdrawals can only go to these Base addresses.
+        Withdrawals and USDC payments can only go to these addresses.
       </p>
       {addresses.isPending ? (
         <div className="mt-3 flex flex-col gap-3" aria-busy="true">
@@ -106,7 +116,7 @@ export function AllowedAddresses({
             <RailRow
               key={address.id}
               title={address.label}
-              detail={`${shortAddress(address.address)} · Added ${dayMonth(nairobiDay(address.confirmedAt))}`}
+              detail={`${PAYEE_CHAIN_NAMES[address.chain]} · ${shortAddress(address.address)} · Added ${dayMonth(nairobiDay(address.confirmedAt))}`}
               action={
                 canChange ? (
                   <Button
@@ -182,6 +192,36 @@ interface FieldErrors {
   readonly address?: string;
 }
 
+export type AddressToAdd =
+  | { readonly ok: true; readonly change: AllowlistChange }
+  | { readonly ok: false; readonly errors: FieldErrors };
+
+/**
+ * The change that adds an address on `chain`, checked with the API's own
+ * schema so the address must be one that chain can pay.
+ */
+export function addressToAdd(
+  chain: PayeeChain,
+  label: unknown,
+  address: unknown,
+): AddressToAdd {
+  const parsed = allowlistChangeSchema.safeParse({
+    action: "add",
+    chain,
+    label,
+    address,
+  });
+  if (parsed.success) return { ok: true, change: parsed.data };
+  const errors: { label?: string; address?: string } = {};
+  for (const issue of parsed.error.issues) {
+    const field = issue.path[0];
+    if (field === "label" || field === "address") {
+      errors[field] ??= issue.message;
+    }
+  }
+  return { ok: false, errors };
+}
+
 /** Adds an address to the allowlist, confirmed with the admin's passkey. */
 export function AddAddressSheet({
   open,
@@ -195,30 +235,25 @@ export function AddAddressSheet({
   const change = useChangeAllowlist(organizationId);
   const formId = useId();
   const nameId = useId();
+  const chainId = useId();
   const addressId = useId();
+  const [chain, setChain] = useState<PayeeChain>("near");
   const [errors, setErrors] = useState<FieldErrors>({});
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const values = new FormData(event.currentTarget);
-    const parsed = allowlistChangeSchema.safeParse({
-      action: "add",
-      label: values.get("label"),
-      address: values.get("address"),
-    });
-    if (!parsed.success) {
-      const next: { label?: string; address?: string } = {};
-      for (const issue of parsed.error.issues) {
-        const field = issue.path[0];
-        if (field === "label" && !next.label) next.label = issue.message;
-        if (field === "address" && !next.address) next.address = issue.message;
-      }
-      setErrors(next);
+    const adding = addressToAdd(
+      chain,
+      values.get("label"),
+      values.get("address"),
+    );
+    if (!adding.ok) {
+      setErrors(adding.errors);
       return;
     }
     setErrors({});
-    const request: AllowlistChange = parsed.data;
-    change.mutate(request, {
+    change.mutate(adding.change, {
       onSuccess: (outcome) => {
         if (outcome.status === "approved") onClose();
       },
@@ -274,19 +309,46 @@ export function AddAddressSheet({
           {errors.label ? <FieldError>{errors.label}</FieldError> : null}
         </Field>
         <Field>
-          <FieldLabel htmlFor={addressId}>Base address</FieldLabel>
+          <FieldLabel htmlFor={chainId}>Payee chain</FieldLabel>
+          <NativeSelect
+            id={chainId}
+            className="w-full"
+            value={chain}
+            disabled={change.isPending}
+            onChange={(event) => {
+              const next = PAYEE_CHAINS.find(
+                (candidate) => candidate === event.target.value,
+              );
+              if (next) {
+                setChain(next);
+                setErrors({ label: errors.label });
+              }
+            }}
+          >
+            {PAYEE_CHAINS.map((candidate) => (
+              <NativeSelectOption key={candidate} value={candidate}>
+                {PAYEE_CHAIN_NAMES[candidate]}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <FieldDescription>
+            The chain this address receives USDC on.
+          </FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={addressId}>{ADDRESS_LABELS[chain]}</FieldLabel>
           <Input
             id={addressId}
             name="address"
-            placeholder="0x…"
+            placeholder={ADDRESS_PLACEHOLDERS[chain]}
             autoComplete="off"
             spellCheck={false}
             className="tabular-nums"
             aria-invalid={errors.address ? true : undefined}
           />
           <FieldDescription>
-            Check it carefully: USDC sent to a wrong address can&apos;t be
-            recovered.
+            Check it carefully: USDC sent to a wrong address, or to an address
+            on another chain, can&apos;t be recovered.
           </FieldDescription>
           {errors.address ? <FieldError>{errors.address}</FieldError> : null}
         </Field>

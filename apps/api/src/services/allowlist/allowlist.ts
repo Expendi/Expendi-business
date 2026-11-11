@@ -2,6 +2,8 @@ import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { Effect } from "effect";
 
+import type { PayeeChain } from "@expendi-business/shared";
+
 import type { DatabaseService } from "../../db/client.js";
 import type { WithdrawalAddress } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
@@ -20,10 +22,16 @@ import {
   verifyApproval,
 } from "../approval/passkeys.js";
 import { AuditLog } from "../audit/audit-log.js";
+import {
+  INVALID_PAYEE_ADDRESS,
+  normalisePayeeAddress,
+} from "../chain/address.js";
 
 /**
  * The company's address allowlist (spec §6.9, §6.19, §7): USDC payees and
- * withdrawals can only be paid to these addresses. Every change needs a
+ * withdrawals can only be paid to these addresses, each on its own payee
+ * chain. The same characters on another chain are another address, so every
+ * lookup names the chain. Every change needs a
  * fresh confirmation with an admin's passkey, bound to exactly that change,
  * and is audited.
  */
@@ -31,21 +39,35 @@ import { AuditLog } from "../audit/audit-log.js";
 export type AllowlistChange =
   | {
       readonly action: "add";
+      readonly chain: PayeeChain;
       readonly address: string;
       readonly label: string;
     }
   | { readonly action: "remove"; readonly addressId: string };
 
-const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const MAX_LABEL_LENGTH = 60;
 
 type AllowlistDeps = DatabaseService | AuditLog | ApprovalSettings;
 
-/** Whether `address` is on the company's allowlist right now. */
+/** An address and the payee chain it receives on. */
+export interface PayeeDestination {
+  readonly chain: PayeeChain;
+  readonly address: string;
+}
+
+/**
+ * The address as the allowlist stores it. Base addresses are stored
+ * lowercased, so one is found however it is written; NEAR and Solana
+ * addresses are found only exactly as they were added.
+ */
+const asListed = ({ chain, address }: PayeeDestination): string =>
+  chain === "base" ? address.toLowerCase() : address;
+
+/** Whether the address is on the company's allowlist, on that chain, right now. */
 export function isAllowlisted(
   tx: Transaction,
   organizationId: string,
-  address: string,
+  destination: PayeeDestination,
 ): Effect.Effect<boolean, DatabaseError> {
   return query(() =>
     tx
@@ -54,7 +76,8 @@ export function isAllowlisted(
       .where(
         and(
           eq(withdrawalAddresses.organizationId, organizationId),
-          eq(withdrawalAddresses.address, address.toLowerCase()),
+          eq(withdrawalAddresses.chain, destination.chain),
+          eq(withdrawalAddresses.address, asListed(destination)),
           isNull(withdrawalAddresses.removedAt),
         ),
       )
@@ -98,9 +121,10 @@ function normaliseChange(
 ): Effect.Effect<AllowlistChange, BadRequest> {
   if (change.action === "remove") return Effect.succeed(change);
   const label = change.label.trim();
-  if (!EVM_ADDRESS.test(change.address)) {
+  const address = normalisePayeeAddress(change.chain, change.address);
+  if (address === null) {
     return Effect.fail(
-      new BadRequest({ message: "That isn't a Base address." }),
+      new BadRequest({ message: INVALID_PAYEE_ADDRESS[change.chain] }),
     );
   }
   if (label.length === 0 || label.length > MAX_LABEL_LENGTH) {
@@ -112,7 +136,8 @@ function normaliseChange(
   }
   return Effect.succeed({
     action: "add",
-    address: change.address.toLowerCase(),
+    chain: change.chain,
+    address,
     label,
   });
 }
@@ -163,7 +188,7 @@ export function requestAllowlistChange(input: {
       Effect.gen(function* () {
         yield* requireAdmin(tx, organizationId, userId);
         if (change.action === "add") {
-          if (yield* isAllowlisted(tx, organizationId, change.address)) {
+          if (yield* isAllowlisted(tx, organizationId, change)) {
             return yield* Effect.fail(
               new BadRequest({ message: "That address is already allowed." }),
             );
@@ -243,6 +268,7 @@ export function confirmAllowlistChange(input: {
                   .insert(withdrawalAddresses)
                   .values({
                     organizationId,
+                    chain: change.chain,
                     address: change.address,
                     label: change.label,
                     addedBy: userId,
@@ -282,6 +308,7 @@ export function confirmAllowlistChange(input: {
               : "withdrawal_address.removed",
           entity: { type: "withdrawal_address", id: row.id },
           after: {
+            chain: row.chain,
             address: row.address,
             label: row.label,
             approvalId: approval.approvalId,

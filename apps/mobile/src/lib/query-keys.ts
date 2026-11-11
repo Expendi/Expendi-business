@@ -8,6 +8,10 @@ export const queryKeys = {
     ["organizations", organizationId, "wallet"] as const,
   walletHistory: (organizationId: string) =>
     ["organizations", organizationId, "wallet", "history"] as const,
+  fundIns: (organizationId: string) =>
+    ["organizations", organizationId, "wallet", "fund-ins"] as const,
+  fundIn: (organizationId: string, fundInId: string) =>
+    ["organizations", organizationId, "wallet", "fund-ins", fundInId] as const,
   withdrawalAddresses: (organizationId: string) =>
     ["organizations", organizationId, "withdrawal-addresses"] as const,
   approvalPasskey: ["approval-passkey"] as const,

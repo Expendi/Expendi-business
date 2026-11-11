@@ -130,7 +130,7 @@ describe("a ledger row", () => {
     // #then
     expect(lines).toEqual([
       ["Twiga Foods", "KES 186,000 · Bill"],
-      ["Deposit", "From 0x71c9…8b2e"],
+      ["Deposit", "From mwangaza-treasury.near"],
       ["Refund", "Zuku payment failed, money returned"],
       ["Withdrawal", "To Treasury on Coinbase"],
       ["Wanjiru Kamau", "KES 260,000 · Payroll"],

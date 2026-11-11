@@ -5,6 +5,7 @@ import {
   BellIcon,
   BookOpenIcon,
   Building2Icon,
+  RouteIcon,
   ScrollTextIcon,
   SlidersHorizontalIcon,
 } from "lucide-react";
@@ -27,6 +28,12 @@ export const navItems: NavItem[] = [
     title: "Payouts",
     href: "/payouts",
     icon: ArrowLeftRightIcon,
+    group: "Operations",
+  },
+  {
+    title: "NEAR Intents",
+    href: "/intent-quotes",
+    icon: RouteIcon,
     group: "Operations",
   },
   { title: "Alerts", href: "/alerts", icon: BellIcon, group: "Monitoring" },

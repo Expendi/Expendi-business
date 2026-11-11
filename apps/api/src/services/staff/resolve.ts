@@ -1,7 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { Effect } from "effect";
 
-import type { PayoutStatus, ResolveOutcome } from "@expendi-business/shared";
+import type {
+  PayoutStatus,
+  ResolveOutcome,
+  WalletChain,
+} from "@expendi-business/shared";
 import { resolveOutcomeSchema } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
@@ -12,12 +16,19 @@ import type {
   ServiceUnavailable,
 } from "../../errors.js";
 import type { BaseRpc } from "../chain/base-rpc.js";
+import type { NearRpc } from "../chain/near-rpc.js";
+import type { NearChain } from "../chain/near.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
 import type { ConfirmationRefused } from "./confirmations.js";
+import type { CompanyWalletSendView } from "./near-send-evidence.js";
 import type { LedgerRow, PayoutEvidence } from "./payout-evidence.js";
 import type { LedgerEntryView } from "./payouts.js";
 import type { StaffMember } from "./staff-auth.js";
-import { payouts, walletTransactions } from "../../db/schema/index.js";
+import {
+  companyWalletSends,
+  payouts,
+  walletTransactions,
+} from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { BadRequest, Conflict } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
@@ -28,6 +39,7 @@ import {
   peekConfirmation,
   spendConfirmation,
 } from "./confirmations.js";
+import { companyWalletSendView } from "./near-send-evidence.js";
 import {
   gatherChainAndPaycrest,
   payoutLedger,
@@ -42,9 +54,16 @@ import { withStaffReadScope } from "./staff-scope.js";
  * Paycrest and the chain support the outcome. It never sends, re-sends or
  * orders anything. The only money record it writes is the one ledger debit
  * the chain shows was missing.
+ *
+ * A USDC payout on NEAR is resolved from its company wallet sends. If one
+ * is still open, its outcome was never read and it holds up every other
+ * send from that wallet, so resolving the payout closes it too: as run,
+ * where the chain shows it moved the USDC, or as never having moved
+ * anything, once it can no longer run.
  */
 
-type ResolveDeps = DatabaseService | AuditLog | Paycrest | BaseRpc;
+type EvidenceDeps = DatabaseService | Paycrest | BaseRpc | NearRpc | NearChain;
+type ResolveDeps = EvidenceDeps | AuditLog;
 type ResolveError =
   | NotFound
   | Conflict
@@ -60,6 +79,7 @@ export interface EvidenceView {
   readonly paycrestStatus: string | null;
   readonly fundingStarted: boolean;
   readonly depositTransfers: readonly {
+    readonly chain: WalletChain;
     readonly txHash: string;
     readonly logIndex: number;
     readonly blockNumber: bigint;
@@ -67,6 +87,12 @@ export interface EvidenceView {
   }[];
   readonly ledgerDebits: readonly LedgerEntryView[];
   readonly refunds: readonly LedgerEntryView[];
+  /**
+   * A NEAR payout's company wallet sends, newest first, each with the
+   * relayer transactions that carried it and what the chain shows of them.
+   * Empty for a payout funded on Base.
+   */
+  readonly companyWalletSends: readonly CompanyWalletSendView[];
 }
 
 export function evidenceView(evidence: PayoutEvidence): EvidenceView {
@@ -74,6 +100,7 @@ export function evidenceView(evidence: PayoutEvidence): EvidenceView {
     paycrestStatus: evidence.paycrestStatus,
     fundingStarted: evidence.fundingStarted,
     depositTransfers: evidence.depositTransfers.map((transfer) => ({
+      chain: evidence.chain,
       txHash: transfer.txHash,
       logIndex: transfer.logIndex,
       blockNumber: transfer.blockNumber,
@@ -81,6 +108,7 @@ export function evidenceView(evidence: PayoutEvidence): EvidenceView {
     })),
     ledgerDebits: evidence.ledgerDebits.map(ledgerView),
     refunds: evidence.refunds.map(ledgerView),
+    companyWalletSends: (evidence.near?.sends ?? []).map(companyWalletSendView),
   };
 }
 
@@ -89,23 +117,23 @@ const notUnderReview = (payout: Payout) =>
     message: `Only a payout under review can be resolved; this one is ${payout.status}.`,
   });
 
-function evidenceFor(
+/** A payout with what Paycrest, the chain and the ledger say of it right now. */
+function gatherEvidence(
   organizationId: string,
   payoutId: string,
 ): Effect.Effect<
   { payout: Payout; evidence: PayoutEvidence },
   NotFound | Conflict | ServiceUnavailable | DatabaseError,
-  DatabaseService | Paycrest | BaseRpc
+  EvidenceDeps
 > {
   return Effect.gen(function* () {
-    const { payout, walletAddress } = yield* readScopedPayout(
-      organizationId,
-      payoutId,
-    );
-    if (payout.status !== "needs_review") {
-      return yield* Effect.fail(notUnderReview(payout));
-    }
-    const chain = yield* gatherChainAndPaycrest(payout, walletAddress);
+    const scoped = yield* readScopedPayout(organizationId, payoutId);
+    const { payout } = scoped;
+    const chain = yield* gatherChainAndPaycrest(payout, {
+      chain: scoped.walletChain,
+      address: scoped.walletAddress,
+      transitAddress: scoped.transitAddress,
+    });
     const ledger = yield* withStaffReadScope({ organizationId }, (tx) =>
       payoutLedger(tx, payoutId),
     );
@@ -118,6 +146,42 @@ function evidenceFor(
       },
     };
   });
+}
+
+function evidenceFor(
+  organizationId: string,
+  payoutId: string,
+): Effect.Effect<
+  { payout: Payout; evidence: PayoutEvidence },
+  NotFound | Conflict | ServiceUnavailable | DatabaseError,
+  EvidenceDeps
+> {
+  return gatherEvidence(organizationId, payoutId).pipe(
+    Effect.filterOrFail(
+      ({ payout }) => payout.status === "needs_review",
+      ({ payout }) => notUnderReview(payout),
+    ),
+  );
+}
+
+/**
+ * What the chain, Paycrest and the ledger show for a payout in any status,
+ * gathered fresh: for a NEAR payout, its saved company wallet sends, their
+ * relayer transactions and the USDC those moved. It only reads.
+ */
+export function payoutEvidence(
+  payoutId: string,
+): Effect.Effect<
+  EvidenceView,
+  NotFound | Conflict | ServiceUnavailable | DatabaseError,
+  EvidenceDeps
+> {
+  return payoutOrganization(payoutId).pipe(
+    Effect.flatMap((organizationId) =>
+      gatherEvidence(organizationId, payoutId),
+    ),
+    Effect.map(({ evidence }) => evidenceView(evidence)),
+  );
 }
 
 /**
@@ -242,9 +306,14 @@ export function confirmResolution(
                 walletId: payout.walletId,
                 type:
                   payout.subjectType === "withdrawal" ? "withdrawal" : "payout",
+                chain: evidence.chain,
                 usdcAmount: -transfer.amount,
                 txHash: transfer.txHash,
-                logIndex: transfer.logIndex,
+                // A NEAR row names a log only together with its receipt,
+                // which the evidence doesn't carry.
+                ...(evidence.chain === "base" && {
+                  logIndex: transfer.logIndex,
+                }),
                 blockNumber: transfer.blockNumber,
                 counterpartyAddress: transfer.to,
                 payoutId,
@@ -284,6 +353,36 @@ export function confirmResolution(
           );
         }
 
+        for (const closure of plan.sendsToClose) {
+          const [closed] = yield* query(() =>
+            tx
+              .update(companyWalletSends)
+              .set({
+                status: closure.status,
+                txHash: closure.txHash,
+                blockHeight: closure.blockHeight,
+                failure: closure.failure,
+              })
+              .where(
+                and(
+                  eq(companyWalletSends.id, closure.sendId),
+                  inArray(companyWalletSends.status, ["reserved", "signed"]),
+                ),
+              )
+              .returning({ id: companyWalletSends.id }),
+          );
+          // The send settled itself after the evidence was read: the
+          // resolution was planned on evidence that no longer holds.
+          if (!closed) {
+            return yield* Effect.fail(
+              new Conflict({
+                message:
+                  "The company wallet's send changed while this was being confirmed. Nothing was changed; start again.",
+              }),
+            );
+          }
+        }
+
         const after = {
           ...evidence,
           ledgerDebits: recorded ? [...ledger.debits, recorded] : ledger.debits,
@@ -305,6 +404,7 @@ export function confirmResolution(
             depositTransfers: view.depositTransfers,
             ledgerDebits: view.ledgerDebits,
             refunds: view.refunds,
+            companyWalletSendsClosed: plan.sendsToClose,
             via: "admin-app",
             note: reason,
             confirmationId: confirmation.id,

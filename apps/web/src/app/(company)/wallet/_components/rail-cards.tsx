@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import type { JSX, ReactNode, Ref } from "react";
 import { cn } from "cn";
 import {
+  ArrowDownLeftIcon,
   BanknoteIcon,
   CreditCardIcon,
   LandmarkIcon,
@@ -13,10 +14,15 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import type { PaidFromAccountKind } from "@expendi-business/shared";
+import type {
+  PaidFromAccountKind,
+  WalletChain,
+} from "@expendi-business/shared";
+import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
 import { textLinkClass } from "~/components/data/actions";
 import { Skel } from "~/components/data/states";
+import { Button } from "~/components/ui/button";
 import { usePaidFromAccounts } from "~/features/bills/bills-api";
 import { describeApiError } from "~/lib/api";
 import { CopyButton } from "./copy-button";
@@ -81,16 +87,25 @@ export function RailRow({
   );
 }
 
-/** Where to send USDC, with a warning that only Base works. */
+/**
+ * Where to send USDC on the company wallet's own chain, with a warning that
+ * nothing else works, and the way in from another chain.
+ */
 export function DepositCard({
   address,
+  chain,
   highlighted,
   copyRef,
+  onFundIn,
 }: {
   address: string;
+  chain: WalletChain;
   highlighted: boolean;
   copyRef: Ref<HTMLButtonElement>;
+  /** Opens the fund-in from another chain; null for someone who can't. */
+  onFundIn: (() => void) | null;
 }): JSX.Element {
+  const chainName = PAYEE_CHAIN_NAMES[chain];
   return (
     <section
       id="deposit"
@@ -101,12 +116,13 @@ export function DepositCard({
         highlighted && "shadow-[0_0_0_2px_var(--color-brand-500)]",
       )}
     >
-      <RailTitle id="deposit-title">Deposit address</RailTitle>
+      <RailTitle id="deposit-title">Fund in</RailTitle>
       <p className="mt-0.5 text-sm text-gray-600">
-        Send USDC here from an exchange or another wallet.
+        Send USDC on {chainName} to the company wallet from an exchange or
+        another wallet.
       </p>
       <p className="mt-4 text-xs leading-4 font-(--w-ui) text-gray-500">
-        Base address
+        {chain === "near" ? "NEAR account" : `${chainName} address`}
       </p>
       <p className="mt-1 text-sm leading-5 select-all">
         <GroupedAddress address={address} />
@@ -119,8 +135,25 @@ export function DepositCard({
           aria-hidden="true"
           className="mt-0.5 size-4 shrink-0"
         />
-        Send USDC on Base only. Anything else sent here can be lost.
+        Send USDC on {chainName} only. Anything else sent here can be lost.
       </p>
+      {onFundIn ? (
+        <>
+          <p className="mt-3.5 text-sm text-gray-600">
+            USDC on Base, Ethereum, Arbitrum or Solana needs its own one-time
+            address.
+          </p>
+          <Button
+            variant="outline"
+            size="md"
+            className="mt-3 w-full"
+            onClick={onFundIn}
+          >
+            <ArrowDownLeftIcon aria-hidden="true" />
+            Fund in from another chain
+          </Button>
+        </>
+      ) : null}
     </section>
   );
 }

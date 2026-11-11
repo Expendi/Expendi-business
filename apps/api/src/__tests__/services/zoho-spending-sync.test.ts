@@ -36,7 +36,6 @@ import {
 import { runInScope, withScope } from "../../db/scope.js";
 import { nairobiDate } from "../../services/bills/status.js";
 import { kesCentsFor } from "../../services/paycrest/amounts.js";
-import { confirmOnchainPayouts } from "../../services/payout/onchain.js";
 import { applyPayoutOutcome } from "../../services/payout/subjects.js";
 import { draftDuePayroll } from "../../services/payroll/drafts.js";
 import {
@@ -47,7 +46,6 @@ import {
 import { kesDecimal } from "../../services/zoho/posting.js";
 import { syncAccountingItem } from "../../services/zoho/sync.js";
 import { insertBill, insertPayee, readBill } from "../helpers/bills.js";
-import { transferReceipt } from "../helpers/chain.js";
 import { claimFlow, makePayable } from "../helpers/claim-flow.js";
 import {
   addCategory,
@@ -60,12 +58,16 @@ import {
   makeFakeBaseRpc,
   makeFakeFileStorage,
   makeFakePaycrest,
-  makeFakePrivyWallets,
   makeFakeZoho,
-  randomAddress,
   signPaycrestBody,
   TEST_ORIGIN,
 } from "../helpers/fakes.js";
+import {
+  createNearUsdcPayingCompany,
+  followPayout,
+  makeNearUsdcFakes,
+  registeredNearAccount,
+} from "../helpers/near-usdc-payouts.js";
 import {
   allowlistAddress,
   createPayingCompany,
@@ -96,7 +98,8 @@ import { TEST_DATABASE_URL_MIGRATE } from "../setup/test-database.js";
 
 const TOKEN_KEY_BASE64 = Buffer.alloc(32, 7).toString("base64");
 
-const privy = makeFakePrivyWallets();
+const near = makeNearUsdcFakes();
+const { privy } = near;
 const paycrest = makeFakePaycrest();
 const storage = makeFakeFileStorage();
 const rpc = makeFakeBaseRpc();
@@ -121,7 +124,7 @@ const NOV_23_EAT = new Date("2026-11-22T21:00:00Z");
 beforeAll(async () => {
   runtime = makeTestRuntime(
     {
-      privyWallets: privy.layer,
+      ...near.layers,
       paycrest: paycrest.layer,
       fileStorage: storage.layer,
       baseRpc: rpc.layer,
@@ -186,8 +189,13 @@ async function addPaidFromAccount(
  * A funded company with an Office category and two paid-from accounts: the
  * KCB account is mapped in Zoho, the card isn't.
  */
-async function setUpCompany(): Promise<Company> {
-  const paying = await createPayingCompany(runtime, db, 20_000n * USDC);
+async function setUpCompany(
+  mainChain: "base" | "near" = "base",
+): Promise<Company> {
+  const paying =
+    mainChain === "near"
+      ? await createNearUsdcPayingCompany(runtime, db, near, 20_000n * USDC)
+      : await createPayingCompany(runtime, db, 20_000n * USDC);
   const { company } = paying;
   const officeId = await addCategory(db, company, "Office");
   const kcbId = await addPaidFromAccount(
@@ -213,8 +221,14 @@ async function setUpCompany(): Promise<Company> {
   };
 }
 
-async function connected(): Promise<Company> {
-  const setUp = await setUpCompany();
+/**
+ * A company connected to Zoho Books. Its wallet is on Base, where cash-outs
+ * are funded in these tests, unless the test pays USDC from NEAR.
+ */
+async function connected(
+  mainChain: "base" | "near" = "base",
+): Promise<Company> {
+  const setUp = await setUpCompany(mainChain);
   await connectZoho(app, opsAdmin, setUp.company, setUp.mapping);
   return setUp;
 }
@@ -818,13 +832,14 @@ describe("bills in Zoho Books", () => {
   });
 
   it("posts a USD bill at the KES its payment was worth", async () => {
-    // #given USD 25 to an allowlisted address
-    const setUp = await connected();
-    const address = randomAddress().toLowerCase();
-    await allowlistAddress(runtime, setUp.paying, address, "Vercel");
+    // #given USD 25 to an allowlisted NEAR account
+    const setUp = await connected("near");
+    const address = registeredNearAccount(near);
+    await allowlistAddress(runtime, setUp.paying, address, "Vercel", "near");
     const payeeId = await insertPayee(db, setUp.company, {
       name: "Vercel Inc",
       method: "usdc",
+      usdcChain: "near",
       usdcAddress: address,
       detailsChangedAt: OLD_CHANGE,
     });
@@ -839,20 +854,7 @@ describe("bills in Zoho Books", () => {
     });
     const payout = await payBill(setUp, billId);
     if (!payout.txHash) throw new Error("no hash");
-    rpc.state.receipts.set(
-      payout.txHash,
-      transferReceipt(
-        [
-          {
-            from: setUp.paying.wallet.address,
-            to: address,
-            amount: 25n * USDC,
-          },
-        ],
-        { txHash: payout.txHash },
-      ),
-    );
-    await runtime.runPromise(confirmOnchainPayouts(500));
+    await followPayout(runtime, payout);
 
     // #when
     const outcomes = await runSync(setUp.company);

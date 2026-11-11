@@ -91,8 +91,8 @@ export default function CreateCompanyScreen(): JSX.Element {
   return (
     <Screen belowHeader>
       <Text className="text-base text-gray-600">
-        You’ll be the company’s first admin. Next, you’ll get the address to
-        deposit USDC to.
+        You’ll be the company’s first admin. Next, you’ll get the company
+        wallet’s address to send USDC to.
       </Text>
 
       <View className="gap-4">

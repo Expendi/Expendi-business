@@ -16,6 +16,7 @@ export const STAFF_CONFIRMATION_PURPOSES = [
   "resolve_payout",
   "pause_payouts",
   "unpause_payouts",
+  "resolve_intent_quote",
 ] as const;
 export type StaffConfirmationPurpose =
   (typeof STAFF_CONFIRMATION_PURPOSES)[number];
@@ -27,9 +28,10 @@ export const staffConfirmationPurpose = pgEnum(
 
 /**
  * The second confirmation a staff action needs (spec §6.15): resolving a
- * stuck payout, and pausing or unpausing payouts. Preparing the action
- * writes a row and hands the staff member a token; confirming with it
- * applies exactly what was prepared, once, before it expires.
+ * stuck payout or NEAR Intents quote, and pausing or unpausing payouts.
+ * Preparing the action writes a row and hands the staff member a token;
+ * confirming with it applies exactly what was prepared, once, before it
+ * expires.
  *
  * Not company data. The API may insert and read rows, and spend one; a
  * trigger refuses any other change, the owner's included.
@@ -42,7 +44,7 @@ export const staffConfirmations = pgTable(
       .notNull()
       .references(() => staffUsers.id),
     purpose: staffConfirmationPurpose("purpose").notNull(),
-    /** The payout's ID, the company's ID, or `platform`. */
+    /** The payout's or quote's ID, the company's ID, or `platform`. */
     target: text("target").notNull(),
     /** What confirming applies, e.g. the outcome and the reason. */
     params: jsonb("params").$type<Record<string, string>>().notNull(),

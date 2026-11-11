@@ -18,6 +18,7 @@ import { PAYEE_KINDS, PAYEE_METHODS } from "@expendi-business/shared";
 import { timestamps } from "./columns.js";
 import { memberships } from "./memberships.js";
 import { organizations } from "./organizations.js";
+import { addressMatchesChain, payeeChain } from "./payee-chain.js";
 
 export const payeeKind = pgEnum("payee_kind", PAYEE_KINDS);
 export const payeeMethod = pgEnum("payee_method", PAYEE_METHODS);
@@ -55,7 +56,12 @@ export const payees = pgTable(
     bankAccountNumber: text("bank_account_number"),
     /** The account holder's name, which Paycrest needs for KES payments. */
     accountName: text("account_name"),
-    /** Lowercased, and on the company's allowlist when it was saved. */
+    /** The payee chain a USDC payee receives on. */
+    usdcChain: payeeChain("usdc_chain"),
+    /**
+     * On the company's allowlist when it was saved. A Base address is
+     * lowercased; a NEAR account or Solana address is kept exactly as given.
+     */
     usdcAddress: text("usdc_address"),
     detailsChangedAt: timestamp("details_changed_at", { withTimezone: true }),
     archived: boolean("archived").notNull().default(false),
@@ -114,7 +120,17 @@ export const payees = pgTable(
     ),
     check(
       "payees_usdc_details",
-      sql`${table.method} IS DISTINCT FROM 'usdc' OR (${table.usdcAddress} IS NOT NULL AND ${table.usdcAddress} ~ '^0x[0-9a-f]{40}$' AND num_nonnulls(${table.phone}, ${table.tillNumber}, ${table.paybillNumber}, ${table.accountReference}, ${table.bankCode}, ${table.bankAccountNumber}, ${table.accountName}) = 0)`,
+      sql`${table.method} IS DISTINCT FROM 'usdc' OR (${table.usdcAddress} IS NOT NULL AND num_nonnulls(${table.phone}, ${table.tillNumber}, ${table.paybillNumber}, ${table.accountReference}, ${table.bankCode}, ${table.bankAccountNumber}, ${table.accountName}) = 0)`,
+    ),
+    // An address always says which chain it is on, so the other methods'
+    // checks, which rule out an address, rule out a chain too.
+    check(
+      "payees_usdc_chain_with_address",
+      sql`(${table.usdcChain} IS NULL) = (${table.usdcAddress} IS NULL)`,
+    ),
+    check(
+      "payees_usdc_address_matches_chain",
+      sql`${table.usdcAddress} IS NULL OR ${addressMatchesChain(table.usdcChain, table.usdcAddress)}`,
     ),
   ],
 );

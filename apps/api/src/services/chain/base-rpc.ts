@@ -38,6 +38,39 @@ export interface BaseRpcShape {
 
 export class BaseRpc extends Context.Tag("BaseRpc")<BaseRpc, BaseRpcShape>() {}
 
+/** `balanceOf(address)` */
+const ERC20_BALANCE_OF_SELECTOR = "0x70a08231";
+const UINT256_WORD = /^0x[0-9a-fA-F]{64}$/;
+const BASE_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
+/**
+ * The USDC an address holds on Base right now, in base units: what a
+ * transit wallet can actually pay out, whatever our records expect.
+ */
+export function baseUsdcBalance(
+  address: string,
+): Effect.Effect<bigint, BaseRpcError, BaseRpc> {
+  return Effect.gen(function* () {
+    if (!BASE_ADDRESS.test(address)) {
+      return yield* Effect.fail(
+        new BaseRpcError({ message: `Not a Base address: ${address}` }),
+      );
+    }
+    const rpc = yield* BaseRpc;
+    const word = yield* rpc.ethCall(
+      USDC_BASE_ADDRESS,
+      `${ERC20_BALANCE_OF_SELECTOR}${address.slice(2).toLowerCase().padStart(64, "0")}`,
+    );
+    return UINT256_WORD.test(word)
+      ? BigInt(word)
+      : yield* Effect.fail(
+          new BaseRpcError({
+            message: "Base RPC returned no USDC balance",
+          }),
+        );
+  });
+}
+
 const RPC_TIMEOUT_MS = 10_000;
 
 interface JsonRpcResponse<T> {
