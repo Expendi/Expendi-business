@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
+import { PageHeader } from "~/components/data/page-header";
 import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import { PauseFlow } from "~/components/pause-flow";
 import { inputClass, linkClass, secondaryButton } from "~/components/styles";
@@ -29,15 +30,13 @@ export function ControlsView() {
   });
 
   return (
-    <section className="max-w-3xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Controls</h1>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-        Pause payouts for every company or for one. Pausing sends nothing and
-        takes effect at once; every change needs a reason and a second
-        confirmation, and is audited.
-      </p>
+    <section className="flex max-w-3xl flex-col gap-6">
+      <PageHeader
+        title="Controls"
+        subtitle="Pause payouts for every company or for one. Pausing sends nothing and takes effect at once; every change needs a reason and a second confirmation, and is audited."
+      />
       {canAct ? null : (
-        <p className="mt-2 text-sm text-stone-500">
+        <p className="-mt-2 text-sm text-muted-foreground">
           You can look but not change anything: that needs an ops admin.
         </p>
       )}
@@ -48,7 +47,7 @@ export function ControlsView() {
         <PageError>{describeApiError(result.error)}</PageError>
       ) : (
         <>
-          <Card className="mt-6">
+          <Card>
             <CardHeader>
               <CardTitle>
                 <h2>All companies</h2>
@@ -59,7 +58,7 @@ export function ControlsView() {
                 {result.data.platformPayoutsPaused
                   ? "Every company's payouts are paused."
                   : "Payouts are running."}{" "}
-                <span className="text-stone-500">
+                <span className="text-muted-foreground">
                   Last changed{" "}
                   {formatNairobiTime(result.data.platformUpdatedAt)}.
                 </span>
@@ -82,7 +81,7 @@ export function ControlsView() {
             </CardContent>
           </Card>
 
-          <Card className="mt-6">
+          <Card>
             <CardHeader>
               <CardTitle>
                 <h2>Paused companies</h2>
@@ -137,14 +136,14 @@ function PauseOneCompany() {
   }
 
   return (
-    <Card className="mt-6">
+    <Card>
       <CardHeader>
         <CardTitle>
           <h2>Pause one company</h2>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="mt-1 text-sm text-stone-600">
+        <p className="mt-1 text-sm text-muted-foreground">
           Find the company under{" "}
           <Link href="/companies" className={linkClass}>
             Companies

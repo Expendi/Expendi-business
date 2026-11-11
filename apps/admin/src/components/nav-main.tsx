@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 
 import type { NavItem } from "~/config/navigation";
 import {
@@ -14,8 +13,17 @@ import {
   useSidebar,
 } from "~/components/ui/sidebar";
 
-export function NavMain({ items }: { items: readonly NavItem[] }) {
-  const pathname = usePathname();
+export function isCurrent(item: NavItem, path: string): boolean {
+  return path === item.href || path.startsWith(`${item.href}/`);
+}
+
+export function NavMain({
+  items,
+  path,
+}: {
+  items: readonly NavItem[];
+  path: string;
+}) {
   const { setOpenMobile } = useSidebar();
   const groups = [...new Set(items.map((item) => item.group))];
   return (
@@ -24,19 +32,18 @@ export function NavMain({ items }: { items: readonly NavItem[] }) {
         <SidebarGroup key={group}>
           <SidebarGroupLabel>{group}</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
+            <SidebarMenu>
               {items
                 .filter((item) => item.group === group)
                 .map((item) => {
-                  const active =
-                    pathname === item.href ||
-                    pathname.startsWith(`${item.href}/`);
+                  const active = isCurrent(item, path);
                   return (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
                         asChild
                         isActive={active}
                         tooltip={item.title}
+                        className="data-active:bg-accent data-active:text-accent-foreground data-active:[&>svg]:text-accent-foreground [&>svg]:text-muted-foreground"
                       >
                         <Link
                           href={item.href}

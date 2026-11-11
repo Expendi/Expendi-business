@@ -1,17 +1,18 @@
 import type { PayoutStatus } from "@expendi-business/shared";
 
-import { Badge } from "~/components/ui/badge";
+import type { StatusTone } from "~/components/data/status-badge";
+import { StatusBadge } from "~/components/data/status-badge";
 
-const STYLES: Partial<Record<PayoutStatus, string>> = {
-  needs_review: "bg-amber-100 text-amber-900",
-  failed: "bg-error-50 text-error-700",
-  paid: "bg-emerald-50 text-emerald-800",
+const TONES: Partial<Record<PayoutStatus, StatusTone>> = {
+  needs_review: "waiting",
+  failed: "failed",
+  paid: "paid",
 };
 
 export function PayoutStatusBadge({ status }: { status: PayoutStatus }) {
   return (
-    <Badge variant="secondary" className={STYLES[status]}>
+    <StatusBadge tone={TONES[status] ?? "quiet"}>
       {status.replace("_", " ")}
-    </Badge>
+    </StatusBadge>
   );
 }

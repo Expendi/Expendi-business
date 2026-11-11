@@ -2,6 +2,11 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Opt-in looks from the layout controls; the Expendi brand below is "default". */
+@import "../styles/presets/tangerine.css";
+@import "../styles/presets/soft-pop.css";
+@import "../styles/presets/brutalist.css";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -12,6 +17,7 @@
   --color-brand-700: #cc4528;
   --color-brand-800: #a63620;
   /* Expendi miniapp neutral scale; stone aliases support existing screens. */
+  --color-gray-25: #fcfcfd;
   --color-gray-50: #f9fafb;
   --color-gray-100: #f2f4f7;
   --color-gray-200: #e4e7ec;
@@ -34,12 +40,81 @@
   --color-stone-900: #101828;
   --color-error-50: #fef3f2;
   --color-error-700: #b42318;
+
+  /* Status tints (docs/mocks/bills.html :root). */
+  --color-warn-50: #fffaeb;
+  --color-warn-600: #dc6803;
+  --color-warn-700: #b54708;
+  --color-success-50: #ecfdf3;
+  --color-success-700: #067647;
+  --color-blue-50: #eff8ff;
+  --color-blue-500: #2e90fa;
+  --color-blue-700: #175cd3;
+  --color-amber-500: #f79009;
+  --color-green-500: #17b26a;
+  --color-red-500: #f04438;
+
+  /* Panels follow the theme's card colour, so dark mode and presets reach them. */
+  --color-surface: var(--card);
+  --color-hairline: #f2f4f7;
+  /* Translucent so it stays visible on white, gray and coral row tints. */
+  --color-row-divider: rgb(16 24 40 / 0.08);
+  --color-control-border: #d0d5dd;
+  --color-scrim: rgb(16 24 40 / 0.24);
+
+  /* Shape rule: controls and business marks 8px, panels 14px, pills and people full. */
+  --radius-control: 8px;
+  --radius-panel: 14px;
+
+  --shadow-panel:
+    0 1px 2px rgb(16 24 40 / 0.04), 0 12px 32px -18px rgb(16 24 40 / 0.16);
+  --shadow-menu: 0 16px 40px -12px rgb(16 24 40 / 0.28);
+  --shadow-sheet: -16px 0 48px -16px rgb(16 24 40 / 0.2);
+  --shadow-selection-bar: 0 -8px 24px -16px rgb(16 24 40 / 0.2);
+  --shadow-paper: 0 8px 24px -12px rgb(16 24 40 / 0.25);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-pop: pop 0.14s var(--ease-out-expo);
+  --animate-rise: rise 0.5s var(--ease-out-expo) both;
+  --animate-fade: fade 0.2s ease;
+  --animate-slide-in: slide-in 0.32s var(--ease-out-expo);
+  --animate-skeleton: skeleton 1.4s ease-in-out infinite;
+
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes slide-in {
+    from {
+      transform: translateX(24px);
+      opacity: 0;
+    }
+  }
+  @keyframes skeleton {
+    50% {
+      opacity: 0.55;
+    }
+  }
 }
 
 @theme inline {
-  --font-heading: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--app-font), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--app-font), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--app-font), ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -81,14 +156,29 @@
 }
 
 :root {
-  --background: #f9fafb;
+  /* Type weights by role (docs/design-system.md). 600 is the heaviest. Use as `font-(--w-name)`. */
+  --w-display: 400;
+  --w-heading: 400;
+  --w-title: 600;
+  --w-name: 600;
+  --w-amount: 500;
+  --w-ui: 500;
+  --w-strong: 600;
+  --w-button: 600;
+  --w-figure: 600;
+  --focus-ring: #cc4528;
+  --check-tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5'/%3E%3C/svg%3E");
+
+  --app-font: var(--font-outfit);
+
+  --background: #ffffff;
   --foreground: #101828;
-  --card: oklch(1 0 0);
+  --card: #ffffff;
   --card-foreground: #101828;
-  --popover: oklch(1 0 0);
+  --popover: #ffffff;
   --popover-foreground: #101828;
   --primary: #ff7e5f;
-  --primary-foreground: #101828;
+  --primary-foreground: #ffffff;
   --secondary: #f2f4f7;
   --secondary-foreground: #344054;
   --muted: #f2f4f7;
@@ -99,54 +189,136 @@
   --border: #e4e7ec;
   --input: #d0d5dd;
   --ring: #cc4528;
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --chart-1: #ff7e5f;
+  --chart-2: #cc4528;
+  --chart-3: #98a2b3;
+  --chart-4: #ffc2b2;
+  --chart-5: #475467;
   --radius: 0.625rem;
-  --sidebar: #ffffff;
+  --sidebar: #f9fafb;
   --sidebar-foreground: #344054;
   --sidebar-primary: #cc4528;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: #fff4f0;
-  --sidebar-accent-foreground: #a63620;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f2f4f7;
+  --sidebar-accent-foreground: #101828;
   --sidebar-border: #e4e7ec;
   --sidebar-ring: #cc4528;
 }
 
+/*
+ * Dark mode. The semantic shadcn colours and the mocks' raw scale both turn
+ * over, so pages written with `text-gray-900`, `bg-surface` or `bg-brand-50`
+ * stay legible without per-page changes: gray runs light-on-dark, tints
+ * become deep washes of the same hue, and their text colours lighten.
+ */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --focus-ring: #ff9c84;
+
+  --color-gray-25: #1a1f2b;
+  --color-gray-50: #1f242f;
+  --color-gray-100: #262b36;
+  --color-gray-200: #333741;
+  --color-gray-300: #414651;
+  --color-gray-400: #6f737c;
+  --color-gray-500: #94969c;
+  --color-gray-600: #b4b7bd;
+  --color-gray-700: #cecfd2;
+  --color-gray-800: #e4e5e7;
+  --color-gray-900: #f5f5f6;
+  --color-stone-50: #1f242f;
+  --color-stone-100: #262b36;
+  --color-stone-200: #333741;
+  --color-stone-300: #414651;
+  --color-stone-400: #6f737c;
+  --color-stone-500: #94969c;
+  --color-stone-600: #b4b7bd;
+  --color-stone-700: #cecfd2;
+  --color-stone-800: #e4e5e7;
+  --color-stone-900: #f5f5f6;
+
+  --color-brand-50: #37292e;
+  --color-brand-100: #4e3334;
+  --color-brand-700: #f26b49;
+  --color-brand-800: #ffb39f;
+  --color-error-50: #3a1d1f;
+  --color-error-700: #fda29b;
+  --color-warn-50: #3a2c14;
+  --color-warn-600: #f79009;
+  --color-warn-700: #fdb022;
+  --color-success-50: #10301f;
+  --color-success-700: #75e0a7;
+  --color-blue-50: #12294a;
+  --color-blue-700: #84caff;
+
+  --color-hairline: #262b36;
+  --color-row-divider: rgb(255 255 255 / 0.08);
+  --color-control-border: #414651;
+  --color-scrim: rgb(0 0 0 / 0.6);
+  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-menu: 0 16px 40px -12px rgb(0 0 0 / 0.6);
+  --shadow-sheet: -16px 0 48px -16px rgb(0 0 0 / 0.6);
+  --shadow-selection-bar: 0 -8px 24px -16px rgb(0 0 0 / 0.6);
+
+  --background: #0c111d;
+  --foreground: #f5f5f6;
+  --card: #161b26;
+  --card-foreground: #f5f5f6;
+  --popover: #161b26;
+  --popover-foreground: #f5f5f6;
   --primary: #ff7e5f;
-  --primary-foreground: #101828;
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
+  --primary-foreground: #ffffff;
+  --secondary: #1f242f;
+  --secondary-foreground: #cecfd2;
+  --muted: #1f242f;
+  --muted-foreground: #94969c;
+  --accent: #37292e;
+  --accent-foreground: #ffb39f;
+  --destructive: #f97066;
+  --border: #333741;
+  --input: #414651;
+  --ring: #ff9c84;
+  --chart-1: #ff7e5f;
+  --chart-2: #ffb39f;
+  --chart-3: #94969c;
+  --chart-4: #f26b49;
+  --chart-5: #cecfd2;
+  --sidebar: #111622;
+  --sidebar-foreground: #cecfd2;
   --sidebar-primary: #ff7e5f;
   --sidebar-primary-foreground: #101828;
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-accent: #1f242f;
+  --sidebar-accent-foreground: #f5f5f6;
+  --sidebar-border: #262b36;
+  --sidebar-ring: #ff9c84;
+}
+
+/* The font picked in the layout controls (`data-font` on <html>). */
+html[data-font="geist"] {
+  --app-font: var(--font-geist);
+}
+html[data-font="inter"] {
+  --app-font: var(--font-inter);
+}
+html[data-font="system"] {
+  --app-font: system-ui;
+}
+
+/* Presets bring their own shadows; the Expendi default keeps Tailwind's. */
+[data-theme-preset]:not([data-theme-preset="default"]) .shadow-xs {
+  box-shadow: var(--shadow-xs);
+}
+[data-theme-preset]:not([data-theme-preset="default"]) .shadow-sm {
+  box-shadow: var(--shadow-sm);
+}
+[data-theme-preset]:not([data-theme-preset="default"]) .shadow-md {
+  box-shadow: var(--shadow-md);
+}
+[data-theme-preset]:not([data-theme-preset="default"]) .shadow-lg {
+  box-shadow: var(--shadow-lg);
+}
+
+.disable-transitions * {
+  transition: none !important;
 }
 
 @layer base {
@@ -163,9 +335,20 @@
   [role="button"]:not([aria-disabled="true"]) {
     cursor: pointer;
   }
-  :where(a, button, input, select, textarea):focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 3px;
+  .lucide {
+    stroke-width: 1.75;
+  }
+  :where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [tabindex]:not([tabindex="-1"])
+  ):focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
   }
   .app-content :where(section, form, .grid, .grid > *, dl > *, header > *) {
     min-width: 0;

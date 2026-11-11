@@ -4,11 +4,10 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { AppShell } from "~/components/app-shell";
 import { FullScreenMessage } from "~/components/full-screen-message";
-import { Sidebar } from "~/components/sidebar";
-import { SiteHeader } from "~/components/site-header";
 import { Button } from "~/components/ui/button";
-import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
+import { ROLE_LABELS } from "~/config/roles";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 
 export default function StaffLayout({ children }: { children: ReactNode }) {
@@ -44,17 +43,12 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SidebarProvider>
-      <Sidebar staff={staff} onSignOut={() => void signOut()} />
-      <SidebarInset className="min-w-0">
-        <SiteHeader />
-        <main
-          id="main-content"
-          className="app-content @container/main mx-auto flex w-full min-w-0 max-w-[1440px] flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
-        >
-          {children}
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    <AppShell
+      email={staff.email}
+      role={ROLE_LABELS[staff.role]}
+      onSignOut={() => void signOut()}
+    >
+      {children}
+    </AppShell>
   );
 }

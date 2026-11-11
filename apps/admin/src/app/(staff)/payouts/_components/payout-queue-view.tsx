@@ -8,10 +8,13 @@ import { useState } from "react";
 import type { StaffPayoutQueueStatus } from "@expendi-business/shared";
 import { STAFF_PAYOUT_QUEUE_STATUSES } from "@expendi-business/shared";
 
+import { CursorPager } from "~/components/cursor-pager";
+import { PageHeader } from "~/components/data/page-header";
 import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import { PayoutsTable } from "~/components/payouts-table";
-import { linkClass, secondaryButton } from "~/components/styles";
+import { linkClass } from "~/components/styles";
 import { buttonVariants } from "~/components/ui/button";
+import { Card } from "~/components/ui/card";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { toQueryString } from "~/lib/internal-api";
@@ -48,13 +51,11 @@ export function PayoutQueueView() {
   ];
 
   return (
-    <section>
-      <h1 className="text-2xl font-semibold tracking-tight">Payouts</h1>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-        Claims, bills, floats, payroll runs and withdrawals that need review or
-        have failed. Staff never send or retry a payout; the company&apos;s
-        admin does.
-      </p>
+    <section className="flex flex-col gap-4">
+      <PageHeader
+        title="Payouts"
+        subtitle="Claims, bills, floats, payroll runs and withdrawals that need review or have failed. Staff never send or retry a payout; the company's admin does."
+      />
       {companyId ? (
         <p className="mt-2 text-sm">
           One company only ·{" "}
@@ -117,7 +118,7 @@ function QueueResults({
   }
   const { payouts, nextCursor } = result.data;
   return (
-    <div className="mt-4">
+    <Card className="gap-0 overflow-hidden py-0">
       {payouts.length === 0 ? (
         <PageEmpty title="Nothing needs attention.">
           Payouts that need review or have failed will appear here.
@@ -125,30 +126,17 @@ function QueueResults({
       ) : (
         <PayoutsTable payouts={payouts} showCompany />
       )}
-      <nav
-        aria-label="Pages"
-        className="mt-4 flex flex-wrap items-center gap-3 text-sm"
-      >
-        <button
-          type="button"
-          disabled={cursors.length === 1}
-          onClick={() => setCursors((stack) => stack.slice(0, -1))}
-          className={secondaryButton}
-        >
-          Newer
-        </button>
-        <span className="text-stone-600">Page {cursors.length}</span>
-        <button
-          type="button"
-          disabled={!nextCursor || result.isPlaceholderData}
-          onClick={() => {
-            if (nextCursor) setCursors((stack) => [...stack, nextCursor]);
-          }}
-          className={secondaryButton}
-        >
-          Older
-        </button>
-      </nav>
-    </div>
+      <CursorPager
+        page={cursors.length}
+        hasPrevious={cursors.length > 1}
+        hasNext={Boolean(nextCursor) && !result.isPlaceholderData}
+        onPrevious={() => setCursors((stack) => stack.slice(0, -1))}
+        onNext={() => {
+          if (nextCursor) setCursors((stack) => [...stack, nextCursor]);
+        }}
+        previousLabel="Newer"
+        nextLabel="Older"
+      />
+    </Card>
   );
 }

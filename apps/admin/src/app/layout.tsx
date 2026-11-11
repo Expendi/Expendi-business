@@ -1,19 +1,17 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import type { JSX, ReactNode } from "react";
+import { cn } from "cn";
 
 import { Providers } from "./providers";
 
 import "~/app/styles.css";
 
-import { Outfit } from "next/font/google";
-
 import { TooltipProvider } from "~/components/ui/tooltip";
-
-const outfit = Outfit({
-  subsets: ["latin"],
-  variable: "--font-outfit",
-  display: "swap",
-});
+import { fontVariables } from "~/lib/fonts/registry";
+import { preferenceAttributes } from "~/lib/preferences/preferences-config";
+import { readPreferenceCookies } from "~/lib/preferences/preferences-server";
+import { ThemeBootScript } from "~/lib/preferences/theme-boot-script";
+import { PreferencesStoreProvider } from "~/stores/preferences/preferences-provider";
 
 export const metadata: Metadata = {
   title: "Expendi Business Ops",
@@ -21,13 +19,33 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}): Promise<JSX.Element> {
+  const { preferences, sidebarOpen } = await readPreferenceCookies();
+  const dark = preferences.theme_mode === "dark";
   return (
-    <html lang="en" className={outfit.variable}>
+    <html
+      lang="en"
+      className={cn(fontVariables, dark && "dark")}
+      style={{ colorScheme: dark ? "dark" : "light" }}
+      {...preferenceAttributes(preferences)}
+      suppressHydrationWarning
+    >
+      <head>
+        <ThemeBootScript />
+      </head>
       <body className="min-h-screen font-sans">
-        <TooltipProvider>
-          <Providers>{children}</Providers>
-        </TooltipProvider>
+        <PreferencesStoreProvider
+          initialValues={preferences}
+          sidebarOpen={sidebarOpen}
+        >
+          <TooltipProvider>
+            <Providers>{children}</Providers>
+          </TooltipProvider>
+        </PreferencesStoreProvider>
       </body>
     </html>
   );

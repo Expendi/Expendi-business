@@ -1,27 +1,25 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { GaugeIcon, ReceiptIcon, WalletIcon } from "lucide-react";
 import Link from "next/link";
 
 import type { CompanyDetail } from "@expendi-business/shared";
 import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
+import { DataTable, useDataTable } from "~/components/data/data-table";
+import { PageHeader } from "~/components/data/page-header";
+import { StatCard, StatCards } from "~/components/data/stat-cards";
 import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import { PauseFlow } from "~/components/pause-flow";
 import { PayoutsTable } from "~/components/payouts-table";
-import {
-  cellClass,
-  headCellClass,
-  secondaryButton,
-  tableClass,
-} from "~/components/styles";
+import { secondaryButton } from "~/components/styles";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Table } from "~/components/ui/table";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatKesCents, formatNairobiTime, formatUsdc } from "~/lib/format";
 import { queryKeys } from "~/lib/query-keys";
+import { memberColumns } from "./columns";
 
 /** One company, as the Expendi team sees it (spec §6.15). Read-only except the pause. */
 export function CompanyView({ companyId }: { companyId: string }) {
@@ -45,19 +43,23 @@ export function CompanyView({ companyId }: { companyId: string }) {
       <p className="text-sm">
         <Link
           href="/companies"
-          className="text-stone-600 underline-offset-4 hover:underline"
+          className="text-muted-foreground underline-offset-4 hover:underline"
         >
           Companies
         </Link>
       </p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-        {company.name}
-      </h1>
-      <p className="mt-1 text-sm text-stone-600">
-        KRA PIN {company.kraPin ?? "not given"} · signed up{" "}
-        {formatNairobiTime(company.createdAt)} ·{" "}
-        <span className="font-mono text-xs">{company.id}</span>
-      </p>
+      <div className="mt-2">
+        <PageHeader
+          title={company.name}
+          subtitle={
+            <>
+              KRA PIN {company.kraPin ?? "not given"} · signed up{" "}
+              {formatNairobiTime(company.createdAt)} ·{" "}
+              <span className="font-mono text-xs">{company.id}</span>
+            </>
+          }
+        />
+      </div>
       <p className="mt-4 flex flex-wrap gap-2 text-sm">
         {canAct ? (
           <Link
@@ -89,33 +91,40 @@ export function CompanyView({ companyId }: { companyId: string }) {
 
       <PauseSection company={company} canAct={canAct} />
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <Stat label="Wallet balance (ledger)">
-          {company.wallet ? (
-            <>
-              {formatUsdc(company.wallet.usdcBalance)}
-              <span className="block text-sm font-normal text-stone-600">
-                {company.wallet.kesEquivalent
-                  ? `≈ ${formatKesCents(company.wallet.kesEquivalent.kesCents)} at ${company.wallet.kesEquivalent.rate}`
-                  : "KES equivalent unavailable"}
-              </span>
-            </>
-          ) : (
-            "No wallet yet"
-          )}
-        </Stat>
-        <Stat label="Daily payout cap">
-          {formatKesCents(company.dailyPayoutCapKesCents)}
-        </Stat>
-        <Stat label="Unpaid claims">
-          {company.unpaidClaims.count}
-          <span className="block text-sm font-normal text-stone-600">
-            {formatKesCents(company.unpaidClaims.totalKesCents)}
-          </span>
-        </Stat>
-      </div>
+      <StatCards label="Company figures" columns={3}>
+        <StatCard
+          icon={WalletIcon}
+          tone="total"
+          label="Wallet balance (ledger)"
+          value={
+            company.wallet
+              ? formatUsdc(company.wallet.usdcBalance)
+              : "No wallet yet"
+          }
+          sub={
+            company.wallet
+              ? company.wallet.kesEquivalent
+                ? `≈ ${formatKesCents(company.wallet.kesEquivalent.kesCents)} at ${company.wallet.kesEquivalent.rate}`
+                : "KES equivalent unavailable"
+              : undefined
+          }
+        />
+        <StatCard
+          icon={GaugeIcon}
+          tone="total"
+          label="Daily payout cap"
+          value={formatKesCents(company.dailyPayoutCapKesCents)}
+        />
+        <StatCard
+          icon={ReceiptIcon}
+          tone="total"
+          label="Unpaid claims"
+          value={company.unpaidClaims.count}
+          sub={formatKesCents(company.unpaidClaims.totalKesCents)}
+        />
+      </StatCards>
       {company.wallet?.address ? (
-        <p className="mt-2 text-sm text-stone-600">
+        <p className="mt-2 text-sm text-muted-foreground">
           Company wallet on {PAYEE_CHAIN_NAMES[company.wallet.chain]}{" "}
           <span className="font-mono text-xs break-all">
             {company.wallet.address}
@@ -124,71 +133,32 @@ export function CompanyView({ companyId }: { companyId: string }) {
         </p>
       ) : null}
 
-      <h2 className="mt-8 text-base font-semibold">Members</h2>
-      {company.members.length === 0 ? (
-        <PageEmpty title="No members yet." />
-      ) : (
-        <div className="mt-3 overflow-hidden rounded-xl border border-border bg-card">
-          <Table className={tableClass} aria-label="Company members">
-            <thead className="bg-muted/50 text-muted-foreground">
-              <tr>
-                <th scope="col" className={headCellClass}>
-                  Name
-                </th>
-                <th scope="col" className={headCellClass}>
-                  Email
-                </th>
-                <th scope="col" className={headCellClass}>
-                  Role
-                </th>
-                <th scope="col" className={headCellClass}>
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {company.members.map((member) => (
-                <tr
-                  key={member.id}
-                  className="border-t border-border hover:bg-muted/50"
-                >
-                  <td className={`${cellClass} min-w-40 max-w-64 break-words`}>
-                    {member.name ?? "—"}
-                  </td>
-                  <td className={`${cellClass} min-w-48 max-w-72 break-all`}>
-                    {member.email}
-                  </td>
-                  <td className={cellClass}>{member.role}</td>
-                  <td className={cellClass}>{member.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </div>
-      )}
+      <Card className="mt-6 gap-0 overflow-hidden py-0">
+        <CardHeader className="border-b py-4">
+          <CardTitle>
+            <h2>Members</h2>
+          </CardTitle>
+        </CardHeader>
+        {company.members.length === 0 ? (
+          <PageEmpty title="No members yet." />
+        ) : (
+          <MembersTable members={company.members} />
+        )}
+      </Card>
 
-      <h2 className="mt-8 text-base font-semibold">Recent payouts</h2>
-      <div className="mt-2">
+      <Card className="mt-6 gap-0 overflow-hidden py-0">
+        <CardHeader className="border-b py-4">
+          <CardTitle>
+            <h2>Recent payouts</h2>
+          </CardTitle>
+        </CardHeader>
         {company.recentPayouts.length === 0 ? (
           <PageEmpty title="No payouts yet." />
         ) : (
           <PayoutsTable payouts={company.recentPayouts} showCompany={false} />
         )}
-      </div>
+      </Card>
     </section>
-  );
-}
-
-function Stat({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <Card size="sm">
-      <CardHeader>
-        <p className="text-sm text-muted-foreground">{label}</p>
-      </CardHeader>
-      <CardContent>
-        <p className="text-xl font-semibold tabular-nums">{children}</p>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -231,7 +201,7 @@ function PauseSection({
               />
             )
           ) : (
-            <p className="text-sm text-stone-500">
+            <p className="text-sm text-muted-foreground">
               Pausing needs an ops admin.
             </p>
           )}
@@ -239,4 +209,15 @@ function PauseSection({
       </CardContent>
     </Card>
   );
+}
+
+function MembersTable({ members }: { members: CompanyDetail["members"] }) {
+  const table = useDataTable({
+    data: members,
+    columns: memberColumns,
+    getRowId: (member) => member.id,
+    manual: true,
+    paginate: false,
+  });
+  return <DataTable table={table} caption="Company members" />;
 }

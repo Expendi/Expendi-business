@@ -16,21 +16,24 @@ import {
   suggestImportMapping,
 } from "@expendi-business/shared";
 
+import {
+  DataTable,
+  DataTablePagination,
+  useDataTable,
+} from "~/components/data/data-table";
+import { PageHeader } from "~/components/data/page-header";
 import { PageError, PageLoading } from "~/components/page-state";
 import {
-  cellClass,
-  headCellClass,
   inputClass,
   linkClass,
   primaryButton,
   secondaryButton,
-  tableClass,
 } from "~/components/styles";
 import { NativeSelect } from "~/components/ui/native-select";
-import { Table } from "~/components/ui/table";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { queryKeys } from "~/lib/query-keys";
+import { importRowColumns } from "./columns";
 
 const fields: Record<ImportRequest["kind"], ImportField[]> = {
   payee: ["name", "payeeKind", "email"],
@@ -235,16 +238,13 @@ export function ImportView({ companyId }: { companyId: string }) {
         <Link href={`/companies/${companyId}`} className={linkClass}>
           {company.data.name}
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-          Import spreadsheet
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-stone-600">
-          Upload one UTF-8 CSV or TSV per record type, up to 500 non-empty rows.
-          Invite members and create categories first, then import payees before
-          salaries and bills. Dates use DD/MM/YYYY or YYYY-MM-DD; amounts use
-          KES, such as 1,500.00.
-        </p>
-        <p className="mt-2 max-w-2xl text-sm text-stone-600">
+        <div className="mt-2">
+          <PageHeader
+            title="Import spreadsheet"
+            subtitle="Upload one UTF-8 CSV or TSV per record type, up to 500 non-empty rows. Invite members and create categories first, then import payees before salaries and bills. Dates use DD/MM/YYYY or YYYY-MM-DD; amounts use KES, such as 1,500.00."
+          />
+        </div>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           Payment details remain unset until a company admin adds and confirms
           them. History supports earlier financial periods. Float totals are
           opening balances; import individual historic purchases separately as
@@ -277,7 +277,7 @@ export function ImportView({ companyId }: { companyId: string }) {
           </NativeSelect>
         </label>
         {layout === "shanga" ? (
-          <div className="max-w-2xl space-y-2 text-sm text-stone-600">
+          <div className="max-w-2xl space-y-2 text-sm text-muted-foreground">
             <p>
               Repeated headings and summary-only cells outside named columns are
               skipped. Money In is income and cannot be imported here.
@@ -411,43 +411,7 @@ export function ImportView({ companyId }: { companyId: string }) {
             {preview.report.ready} ready · {preview.report.skipped} skipped ·{" "}
             {preview.report.errors} errors. This preview has saved nothing.
           </p>
-          <div
-            className="max-h-96 overflow-auto rounded-xl border border-border bg-card"
-            tabIndex={0}
-            role="region"
-            aria-label="Import preview rows"
-          >
-            <Table className={tableClass} aria-label="Import preview">
-              <thead className="bg-muted/50">
-                <tr>
-                  {["Row", "Status", "Mapped values", "Result"].map((h) => (
-                    <th key={h} scope="col" className={headCellClass}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {preview.report.rows.map((r) => (
-                  <tr key={r.row} className="border-t border-stone-200">
-                    <td className={cellClass}>{r.row}</td>
-                    <td className={cellClass}>{r.status}</td>
-                    <td
-                      className={`${cellClass} min-w-56 max-w-sm break-words`}
-                    >
-                      {Object.entries(r.values).map(([k, v]) => (
-                        <div key={k}>
-                          <span className="text-stone-600">{k}: </span>
-                          {v}
-                        </div>
-                      ))}
-                    </td>
-                    <td className={cellClass}>{r.message}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </div>
+          <ImportPreviewTable rows={preview.report.rows} />
           {preview.report.previewToken && preview.report.ready > 0 ? (
             <div className="space-y-4">
               <label className="flex min-h-11 items-start gap-3 text-sm">
@@ -481,5 +445,26 @@ export function ImportView({ companyId }: { companyId: string }) {
         </section>
       ) : null}
     </section>
+  );
+}
+
+function ImportPreviewTable({ rows }: { rows: ImportReport["rows"] }) {
+  const table = useDataTable({
+    data: rows,
+    columns: importRowColumns,
+    getRowId: (row) => String(row.row),
+    pagination: { initialPageSize: 25 },
+  });
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <DataTable table={table} caption="Import preview" />
+      {rows.length > 25 ? (
+        <DataTablePagination
+          table={table}
+          noun="rows"
+          pageSizes={[25, 50, 100]}
+        />
+      ) : null}
+    </div>
   );
 }

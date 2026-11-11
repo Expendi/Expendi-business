@@ -2,7 +2,7 @@ export function MissingConfig({ invalidKeys }: { invalidKeys: string[] }) {
   return (
     <main className="mx-auto max-w-lg px-6 py-16">
       <h1 className="text-xl font-semibold">The admin app isn&apos;t set up</h1>
-      <p className="mt-3 text-sm text-stone-600">
+      <p className="mt-3 text-sm text-muted-foreground">
         Set these variables (see <code>apps/admin/.env.example</code>), then
         rebuild:
       </p>
