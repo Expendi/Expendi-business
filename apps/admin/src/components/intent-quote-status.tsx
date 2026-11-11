@@ -11,6 +11,7 @@ export const INTENT_QUOTE_PURPOSE_LABELS: Record<IntentQuotePurpose, string> = {
   usdc_payout: "USDC payout",
   sweep: "Sweep",
   fund_in: "Fund-in",
+  fund_in_return: "Fund-in return",
 };
 
 const STYLES: Partial<Record<IntentQuoteStatus, string>> = {

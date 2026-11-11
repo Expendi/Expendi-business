@@ -25,14 +25,16 @@ const blankIsAbsent = (value: unknown) => (value === "" ? undefined : value);
 /**
  * Why Expendi took the quote: `base_hop` (company wallet to transit wallet,
  * for a cash-out), `sweep` (transit wallet back to the company wallet),
- * `fund_in` (a company adding money) and `usdc_payout` (company wallet to a
- * USDC payee on Base or Solana).
+ * `fund_in` (a company adding money), `usdc_payout` (company wallet to a
+ * USDC payee on Base or Solana) and `fund_in_return` (a refunded fund-in,
+ * from the company's NEAR Intents account back to its company wallet).
  */
 export const INTENT_QUOTE_PURPOSES = [
   "base_hop",
   "sweep",
   "fund_in",
   "usdc_payout",
+  "fund_in_return",
 ] as const;
 export const intentQuotePurposeSchema = z.enum(INTENT_QUOTE_PURPOSES);
 export type IntentQuotePurpose = z.infer<typeof intentQuotePurposeSchema>;

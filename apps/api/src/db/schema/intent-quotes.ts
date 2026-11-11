@@ -27,12 +27,16 @@ import { wallets } from "./wallets.js";
  * - `sweep`: transit wallet back to the company wallet.
  * - `fund_in`: a company adding money from another chain or asset.
  * - `usdc_payout`: company wallet to a USDC payee on Base or Solana.
+ * - `fund_in_return`: what a fund-in refunded into the company's NEAR
+ *   Intents account, swapped back to USDC on NEAR and delivered to the
+ *   company wallet.
  */
 export const INTENT_QUOTE_PURPOSES = [
   "base_hop",
   "sweep",
   "fund_in",
   "usdc_payout",
+  "fund_in_return",
 ] as const;
 export type IntentQuotePurpose = (typeof INTENT_QUOTE_PURPOSES)[number];
 
@@ -41,7 +45,7 @@ export type IntentQuotePurpose = (typeof INTENT_QUOTE_PURPOSES)[number];
  * - `depositing`: a send to its deposit address was started, or 1Click has
  *   seen one. The money may be with 1Click.
  * - `succeeded`: 1Click delivered to the recipient. Final.
- * - `refunded`: 1Click returned the deposit to the refund address. Final.
+ * - `refunded`: 1Click returned the deposit to `refundTo`. Final.
  * - `failed`: 1Click gave up on it. Final.
  * - `expired`: its deadline passed with nothing deposited. Final.
  * - `needs_review`: what happened is unclear; a person is checking it.
@@ -72,6 +76,13 @@ export const UNSETTLED_INTENT_QUOTE_STATUSES = [
 export const INTENT_QUOTE_SWAP_TYPES = ["EXACT_INPUT", "EXACT_OUTPUT"] as const;
 export type IntentQuoteSwapType = (typeof INTENT_QUOTE_SWAP_TYPES)[number];
 
+/**
+ * Where 1Click takes a deposit or returns a refund: on the asset's own
+ * chain, or to an account inside NEAR Intents.
+ */
+export const ONE_CLICK_ACCOUNT_TYPES = ["ORIGIN_CHAIN", "INTENTS"] as const;
+export type OneClickAccountType = (typeof ONE_CLICK_ACCOUNT_TYPES)[number];
+
 /** What 1Click's status endpoint reports for a deposit address. */
 export const ONE_CLICK_STATUSES = [
   "PENDING_DEPOSIT",
@@ -97,6 +108,10 @@ export const intentQuoteSwapType = pgEnum(
   INTENT_QUOTE_SWAP_TYPES,
 );
 export const oneClickStatus = pgEnum("one_click_status", ONE_CLICK_STATUSES);
+export const oneClickAccountType = pgEnum(
+  "one_click_account_type",
+  ONE_CLICK_ACCOUNT_TYPES,
+);
 
 /**
  * An amount of any asset in its smallest unit. A fund-in can start from an
@@ -144,14 +159,31 @@ export const intentQuotes = pgTable(
     /** `EXACT_INPUT` only: the least the recipient may receive. */
     minAmountOut: assetAmount("min_amount_out"),
     /**
-     * Where the origin asset is sent, on the origin chain; exactly as 1Click
-     * gave it. On NEAR it is a 64-hex implicit account.
+     * Where the origin asset is sent, exactly as 1Click gave it: on the
+     * origin chain, or an account inside NEAR Intents when `depositType` is
+     * `INTENTS`. On NEAR it is a 64-hex implicit account.
      */
     depositAddress: text("deposit_address").notNull(),
+    depositType: oneClickAccountType("deposit_type")
+      .notNull()
+      .default("ORIGIN_CHAIN"),
     /** Who receives the destination asset, on the destination chain. */
     recipient: text("recipient").notNull(),
-    /** Where 1Click returns the origin asset, on the origin chain. */
+    /**
+     * Where 1Click returns the origin asset: on the origin chain, or the
+     * company's own account inside NEAR Intents when `refundType` is
+     * `INTENTS`.
+     */
     refundTo: text("refund_to").notNull(),
+    refundType: oneClickAccountType("refund_type")
+      .notNull()
+      .default("ORIGIN_CHAIN"),
+    /**
+     * A refunded fund-in's: the quote that returns its USDC from the
+     * company's NEAR Intents account to the company wallet. A newer return
+     * replaces one that didn't deliver.
+     */
+    returnQuoteId: uuid("return_quote_id"),
     /** After this, 1Click refunds a deposit instead of delivering it. */
     deadline: timestamp("deadline", { withTimezone: true }).notNull(),
     /**
@@ -244,6 +276,11 @@ export const intentQuotes = pgTable(
         companyWalletSends.organizationId,
       ],
     }),
+    foreignKey({
+      name: "intent_quotes_return_quote_organization_fk",
+      columns: [table.returnQuoteId, table.organizationId],
+      foreignColumns: [table.id, table.organizationId],
+    }),
     // Target of payouts' composite foreign keys.
     unique("intent_quotes_id_organization_id_unique").on(
       table.id,
@@ -280,10 +317,22 @@ export const intentQuotes = pgTable(
       "intent_quotes_settled_has_time",
       sql`(${table.status} IN ('succeeded', 'refunded', 'failed', 'expired')) = (${table.settledAt} IS NOT NULL)`,
     ),
-    // Only a Base hop and a USDC payout start from the company wallet.
+    // Only a Base hop, a USDC payout and a fund-in return start from the
+    // company wallet. Compared as text: an enum value can't be used in the
+    // transaction that adds it.
     check(
       "intent_quotes_send_is_from_company_wallet",
-      sql`${table.companyWalletSendId} IS NULL OR ${table.purpose} IN ('base_hop', 'usdc_payout')`,
+      sql`${table.companyWalletSendId} IS NULL OR ${table.purpose}::text IN ('base_hop', 'usdc_payout', 'fund_in_return')`,
+    ),
+    // Only a fund-in return is paid from inside NEAR Intents, and only a
+    // fund-in or its return refunds into it.
+    check(
+      "intent_quotes_intents_side_matches_purpose",
+      sql`(${table.depositType} = 'INTENTS') = (${table.purpose}::text = 'fund_in_return') AND (${table.refundType} = 'ORIGIN_CHAIN' OR ${table.purpose}::text IN ('fund_in', 'fund_in_return'))`,
+    ),
+    check(
+      "intent_quotes_return_is_for_a_fund_in",
+      sql`${table.returnQuoteId} IS NULL OR ${table.purpose}::text = 'fund_in'`,
     ),
     // Expendi covers what a quote costs beyond the amount it delivers, for
     // the two purposes a company wallet funds.

@@ -208,10 +208,25 @@ function refreshQuotes(
   });
 }
 
+/** The quote whose delivery a deposit is, when 1Click lists the transfer. */
+interface DeliveringQuote {
+  readonly id: string;
+  readonly purpose: "fund_in" | "fund_in_return";
+}
+
+function deliveringQuote(quote: {
+  readonly id: string;
+  readonly purpose: string;
+}): DeliveringQuote | null {
+  return quote.purpose === "fund_in" || quote.purpose === "fund_in_return"
+    ? { id: quote.id, purpose: quote.purpose }
+    : null;
+}
+
 function creditDeposit(
   wallet: WatchedWallet,
   transfer: NearUsdcReceiptTransfer,
-  fundInId: string | null,
+  delivering: DeliveringQuote | null,
 ): Effect.Effect<Verdict, DatabaseError, DatabaseService | AuditLog> {
   return withScope({ organizationId: wallet.organization_id }, (tx) =>
     Effect.gen(function* () {
@@ -245,7 +260,12 @@ function creditDeposit(
         action: "wallet.deposit_received",
         entity: { type: "wallet_transaction", id: credit.id },
         after: {
-          ...(fundInId !== null && { fundInId }),
+          ...(delivering?.purpose === "fund_in" && {
+            fundInId: delivering.id,
+          }),
+          ...(delivering?.purpose === "fund_in_return" && {
+            fundInReturnId: delivering.id,
+          }),
           walletId: wallet.wallet_id,
           chain: "near",
           usdcAmount: transfer.amount,
@@ -266,9 +286,10 @@ function creditDeposit(
  * order the decision record gives:
  *
  * 1. from the gas relayer: its fee cover, internal;
- * 2. in a transaction one of the company's quotes lists: the fund-in
- *    arriving if that quote is a fund-in, otherwise a hop refund, a sweep or
- *    a payout refund, internal;
+ * 2. in a transaction one of the company's quotes lists: a deposit if that
+ *    quote is a fund-in or a fund-in return (money that never reached the
+ *    company wallet before), otherwise a hop refund, a sweep or a payout
+ *    refund, internal;
  * 3. from NEAR Intents, unexplained, while a quote of the company's is
  *    still unsettled: held, because 1Click may not have listed it yet;
  * 4. anything else: a deposit.
@@ -285,10 +306,10 @@ function settleTransfer(
     const explained = (
       listing: readonly { readonly id: string; readonly purpose: string }[],
     ) => {
-      const [first] = listing;
-      if (first === undefined) return null;
-      return listing.every((quote) => quote.purpose === "fund_in")
-        ? creditDeposit(wallet, transfer, first.id)
+      if (listing.length === 0) return null;
+      const delivering = listing.map(deliveringQuote);
+      return delivering.every((quote) => quote !== null)
+        ? creditDeposit(wallet, transfer, delivering[0] ?? null)
         : Effect.succeed<Verdict>("internal");
     };
 
@@ -444,6 +465,7 @@ const QUOTE_PURPOSE_NAMES: Readonly<Record<IntentQuotePurpose, string>> = {
   sweep: "sweep",
   fund_in: "fund-in",
   usdc_payout: "USDC payout",
+  fund_in_return: "fund-in return",
 };
 
 function holdExplained(reason: HoldReason): string {

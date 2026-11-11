@@ -6,7 +6,12 @@ import type { IntentQuote } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { BaseRpc } from "../chain/base-rpc.js";
-import type { CompanyWalletSendDeps } from "../wallet/company-wallet-send.js";
+import type {
+  CompanyWalletSendDeps,
+  CompanyWalletSendError,
+  CompanyWalletSendInput,
+  CompanyWalletSendReceipt,
+} from "../wallet/company-wallet-send.js";
 import {
   companyWalletSends,
   intentQuotes,
@@ -100,6 +105,19 @@ export type DepositGate =
 
 export type QuoteDepositDeps =
   CompanyWalletSendDeps | OneClick | BaseRpc | DatabaseService;
+
+/**
+ * How the company wallet pays a quote's deposit address: USDC on NEAR for a
+ * Base hop or a USDC payout, a token inside NEAR Intents for a fund-in
+ * return.
+ */
+export type CompanyDepositSend = (
+  input: CompanyWalletSendInput,
+) => Effect.Effect<
+  CompanyWalletSendReceipt,
+  CompanyWalletSendError,
+  CompanyWalletSendDeps
+>;
 
 /**
  * Takes a firm `EXACT_OUTPUT` quote that delivers exactly `amountOut` USDC
@@ -480,6 +498,7 @@ function coverFee(
 /** Step 4, and following up a send whose outcome wasn't known yet. */
 function deposit(
   quote: IntentQuote,
+  send: CompanyDepositSend,
 ): Effect.Effect<IntentQuote, DatabaseError, QuoteDepositDeps> {
   const sendKey = quoteSendKey(quote.id);
   const unpaid = and(
@@ -533,7 +552,7 @@ function deposit(
       );
     }
 
-    const sent = yield* sendUsdcFromCompanyWallet({
+    const sent = yield* send({
       organizationId: quote.organizationId,
       sendKey,
       to: quote.depositAddress,
@@ -665,8 +684,24 @@ export function advanceCompanyQuote<R>(input: {
       quote = started;
     }
 
+    return yield* continueCompanyDeposit(quote, sendUsdcFromCompanyWallet);
+  });
+}
+
+/**
+ * Steps 4 to 6 for a quote whose deposit has started (`depositing`, or
+ * `needs_review` after starting): pays the deposit address with `send` if
+ * no send is recorded yet, tells 1Click, and settles the quote from 1Click's
+ * status. Anything else comes back unchanged.
+ */
+export function continueCompanyDeposit(
+  input: IntentQuote,
+  send: CompanyDepositSend,
+): Effect.Effect<IntentQuote, DatabaseError, QuoteDepositDeps> {
+  return Effect.gen(function* () {
+    let quote = input;
     if (quote.status === "depositing" && quote.companyWalletSendId === null) {
-      quote = yield* deposit(quote);
+      quote = yield* deposit(quote, send);
     }
     // 1Click's word settles a quote under review too, even one whose
     // deposit we lost track of.

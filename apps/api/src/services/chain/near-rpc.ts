@@ -37,6 +37,15 @@ export interface NearRpcShape {
   readonly usdcBalance: (
     accountId: string,
   ) => Effect.Effect<bigint, NearRpcError>;
+  /**
+   * What the account holds inside the NEAR Intents contract, per token ID,
+   * in base units and in the order of `tokenIds`. Zero for a token it holds
+   * none of.
+   */
+  readonly intentsBalances: (
+    accountId: string,
+    tokenIds: readonly string[],
+  ) => Effect.Effect<readonly bigint[], NearRpcError>;
   /** The latest block that can no longer be reverted. */
   readonly finalBlock: () => Effect.Effect<NearBlock, NearRpcError>;
   /**
@@ -132,6 +141,7 @@ type RpcReply =
 export function makeNearRpc(
   rpcUrl: Redacted.Redacted,
   usdcContractId: string,
+  intentsContractId: string,
   fetchImpl: typeof fetch = fetch,
 ): NearRpcShape {
   const request = (
@@ -219,17 +229,18 @@ export function makeNearRpc(
       })),
     );
 
-  /** A read-only call to the USDC contract at the final block: its JSON result. */
-  const viewUsdc = (
+  /** A read-only call to a contract at the final block: its JSON result. */
+  const viewContract = (
+    contractId: string,
     methodName: string,
-    args: Readonly<Record<string, string>>,
+    args: Readonly<Record<string, unknown>>,
   ): Effect.Effect<unknown, NearRpcError> =>
     call(
       "query",
       {
         request_type: "call_function",
         finality: "final",
-        account_id: usdcContractId,
+        account_id: contractId,
         method_name: methodName,
         args_base64: Buffer.from(JSON.stringify(args)).toString("base64"),
       },
@@ -243,6 +254,12 @@ export function makeNearRpc(
         }),
       ),
     );
+
+  const viewUsdc = (
+    methodName: string,
+    args: Readonly<Record<string, string>>,
+  ): Effect.Effect<unknown, NearRpcError> =>
+    viewContract(usdcContractId, methodName, args);
 
   return {
     transactionOutcome: (txHash, signerAccountId) =>
@@ -316,6 +333,26 @@ export function makeNearRpc(
         }),
       ),
 
+    intentsBalances: (accountId, tokenIds) =>
+      tokenIds.length === 0
+        ? Effect.succeed([])
+        : viewContract(intentsContractId, "mt_batch_balance_of", {
+            account_id: accountId,
+            token_ids: tokenIds,
+          }).pipe(
+            Effect.flatMap((balances) => {
+              const parsed = z
+                .array(z.string().regex(/^\d{1,39}$/))
+                .length(tokenIds.length)
+                .safeParse(balances);
+              return parsed.success
+                ? Effect.succeed(parsed.data.map((amount) => BigInt(amount)))
+                : Effect.fail(
+                    malformed("query mt_batch_balance_of", parsed.error),
+                  );
+            }),
+          ),
+
     finalBlock: () => block({ finality: "final" }),
 
     accessKeyNonce: ({ accountId, publicKey, atBlockHeight }) =>
@@ -352,6 +389,6 @@ export const NearRpcLive: Layer.Layer<
   Effect.gen(function* () {
     const chain = yield* NearChain;
     const url = yield* Config.redacted("NEAR_RPC_URL");
-    return makeNearRpc(url, chain.usdcContractId);
+    return makeNearRpc(url, chain.usdcContractId, chain.intentsContractId);
   }),
 );

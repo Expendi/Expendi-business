@@ -45,7 +45,7 @@ export default function FundInRoute(): JSX.Element {
 
 /**
  * Fund-in from another chain: the admin says which chain the USDC comes
- * from, how much, and where a refund should go, and gets a one-time deposit
+ * from and how much, and gets a one-time deposit
  * address. The screen then follows the fund-in until it reaches the company
  * wallet, is refunded, or expires.
  */
@@ -85,12 +85,10 @@ function FundInForm({
   const start = useStartFundIn(organizationId);
   const [chain, setChain] = useState<FundInChain>("base");
   const [amount, setAmount] = useState("");
-  const [refundAddress, setRefundAddress] = useState("");
   const [errors, setErrors] = useState<FundInFieldErrors>({});
-  const chainName = FUND_IN_CHAIN_NAMES[chain];
 
   function handleStart(): void {
-    const draft = fundInDraft(chain, amount, refundAddress);
+    const draft = fundInDraft(chain, amount);
     if (!draft.ok) {
       setErrors(draft.errors);
       return;
@@ -127,22 +125,11 @@ function FundInForm({
           autoCorrect={false}
           editable={!start.isPending}
         />
-        <ErrorMessage message={errors.amount ?? null} />
-      </View>
-      <View className="gap-2">
-        <TextField
-          label={`Refund address on ${chainName}`}
-          value={refundAddress}
-          onChangeText={setRefundAddress}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!start.isPending}
-        />
         <Text className="text-sm text-gray-600">
-          If the fund-in can’t be completed, the USDC goes back to this address
-          on {chainName}. Use one you control.
+          If the fund-in can’t be completed, the USDC comes back to your company
+          wallet.
         </Text>
-        <ErrorMessage message={errors.refundAddress ?? null} />
+        <ErrorMessage message={errors.amount ?? null} />
       </View>
       <ErrorMessage
         message={start.isError ? describeApiError(start.error) : null}
@@ -308,8 +295,8 @@ function FundInDetails({ fundIn }: { fundIn: FundIn }): JSX.Element {
             </Text>
             <Text className="text-sm text-amber-900">
               Send it in one transfer of exactly this amount. This address works
-              once: anything sent after the deadline goes back to your refund
-              address.
+              once: if the fund-in can’t be completed, the USDC comes back to
+              your company wallet.
             </Text>
           </View>
         </View>

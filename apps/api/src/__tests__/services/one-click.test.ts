@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import type { OneClickQuoteRequest } from "../../services/intents/one-click.js";
 import {
   makeOneClick,
+  ONE_CLICK_FUND_IN_USDC_ASSET_IDS,
   ONE_CLICK_USDC_ASSET_IDS,
   OneClick,
   OneClickLive,
@@ -201,6 +202,57 @@ describe("OneClick.quote", () => {
       recipientType: "DESTINATION_CHAIN",
       deadline: "2026-11-11T12:00:00.000Z",
     });
+  });
+
+  it("asks for a deposit or a refund inside NEAR Intents when the quote says so", async () => {
+    // #given
+    const back = {
+      ...sweep,
+      originAsset: ONE_CLICK_FUND_IN_USDC_ASSET_IDS.arbitrum,
+      recipient: COMPANY_WALLET,
+      refundTo: COMPANY_WALLET,
+      depositType: "INTENTS",
+      refundType: "INTENTS",
+    } as const;
+    const { oneClick, calls } = oneClickAnswering({
+      json: signed(quoteResponse(back)),
+      httpStatus: 201,
+    });
+
+    // #when
+    await Effect.runPromise(oneClick.quote(back));
+
+    // #then
+    expect(calls[0]?.body).toMatchObject({
+      depositType: "INTENTS",
+      refundTo: COMPANY_WALLET,
+      refundType: "INTENTS",
+      recipientType: "DESTINATION_CHAIN",
+    });
+  });
+
+  it("refuses a signed quote that refunds on the origin chain when NEAR Intents was asked", async () => {
+    // #given
+    const fundIn = {
+      ...sweep,
+      refundTo: COMPANY_WALLET,
+      refundType: "INTENTS",
+    } as const;
+    const { oneClick } = oneClickAnswering({
+      json: signed(
+        quoteResponse(fundIn, { quoteRequest: { refundType: "ORIGIN_CHAIN" } }),
+      ),
+    });
+
+    // #when
+    const error = await failureOf(oneClick.quote(fundIn));
+
+    // #then
+    expect(error).toMatchObject({
+      _tag: "OneClickQuoteUntrusted",
+      reason: "request_mismatch",
+    });
+    expect(error.message).toContain("refundType");
   });
 
   it("passes on how long 1Click may wait for a better quote", async () => {

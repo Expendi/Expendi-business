@@ -16,7 +16,6 @@ import {
   NEAR_INTENTS_ACCOUNT_ID,
   watchNearDeposits,
 } from "../../services/wallet/near-deposits.js";
-import { randomAddress } from "../helpers/fakes.js";
 import { makeFakeFastNear } from "../helpers/fast-near.js";
 import {
   createFundedCompany,
@@ -541,7 +540,6 @@ describe("watchNearDeposits", () => {
         actor: { type: "user", id: funded.company.admin.id },
         chain: "base",
         amount: 25_000_000n,
-        refundAddress: randomAddress(),
       }),
     );
     const delivery = arrived(NEAR_INTENTS_ACCOUNT_ID, fundIn.amountOut);
@@ -575,6 +573,40 @@ describe("watchNearDeposits", () => {
     });
   });
 
+  it("credits a fund-in return's delivery as a deposit: that money never reached the company wallet before", async () => {
+    // #given
+    const back = await saveQuote(runtime, db, funded, "fund_in_return", {
+      row: { status: "depositing", depositStartedAt: new Date() },
+    });
+    const delivery = arrived(NEAR_INTENTS_ACCOUNT_ID, back.amountOut);
+    oneClick.state.setStatus(back.depositAddress, {
+      status: "SUCCESS",
+      destinationChainTxHashes: [delivery.txHash],
+    });
+
+    // #when
+    const summary = await watch();
+
+    // #then
+    expect({
+      credited: summary.credited,
+      ledger: (await ledger()).map((row) => ({
+        type: row.type,
+        usdcAmount: row.usdcAmount,
+        txHash: row.txHash,
+      })),
+    }).toEqual({
+      credited: 1,
+      ledger: [
+        {
+          type: "deposit",
+          usdcAmount: back.amountOut,
+          txHash: delivery.txHash,
+        },
+      ],
+    });
+  });
+
   it("doesn't credit a fund-in from 1Click's word alone", async () => {
     // #given
     const fundIn = await runtime.runPromise(
@@ -583,7 +615,6 @@ describe("watchNearDeposits", () => {
         actor: { type: "user", id: funded.company.admin.id },
         chain: "solana",
         amount: 25_000_000n,
-        refundAddress: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
       }),
     );
     oneClick.state.setStatus(fundIn.depositAddress, {

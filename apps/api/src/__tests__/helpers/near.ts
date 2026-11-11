@@ -29,6 +29,7 @@ import {
 
 export const TEST_NEAR_CHAIN = makeNearChain("testnet");
 export const TEST_USDC_CONTRACT = TEST_NEAR_CHAIN.usdcContractId;
+export const TEST_INTENTS_CONTRACT = TEST_NEAR_CHAIN.intentsContractId;
 export const TestNearChain = Layer.succeed(NearChain, TEST_NEAR_CHAIN);
 
 /** An implicit account ID nobody holds the key to. */
@@ -52,6 +53,27 @@ export const ftTransferLog = (entries: readonly FtTransferEntry[]): string =>
       old_owner_id: entry.from,
       new_owner_id: entry.to,
       amount: entry.amount.toString(),
+    })),
+  })}`;
+
+export interface MtTransferEntry {
+  readonly from: string;
+  readonly to: string;
+  readonly tokenIds: readonly string[];
+  readonly amounts: readonly (bigint | string)[];
+}
+
+/** A NEP-245 `mt_transfer` event log, as the NEAR Intents contract emits it. */
+export const mtTransferLog = (entries: readonly MtTransferEntry[]): string =>
+  `EVENT_JSON:${JSON.stringify({
+    standard: "nep245",
+    version: "1.0.0",
+    event: "mt_transfer",
+    data: entries.map((entry) => ({
+      old_owner_id: entry.from,
+      new_owner_id: entry.to,
+      token_ids: entry.tokenIds,
+      amounts: entry.amounts.map((amount) => amount.toString()),
     })),
   })}`;
 
@@ -129,11 +151,16 @@ function callArgs(call: FunctionCallView): Record<string, unknown> {
  * expiry, and USDC moves only between registered accounts that can cover
  * it. Transactions are the real borsh bytes the API would broadcast.
  */
-export function makeFakeNearRpc(usdcContractId = TEST_USDC_CONTRACT) {
+export function makeFakeNearRpc(
+  usdcContractId = TEST_USDC_CONTRACT,
+  intentsContractId = TEST_INTENTS_CONTRACT,
+) {
   /** Accounts that exist on chain, with their access key's nonce. */
   const accounts = new Map<string, bigint>();
   const registered = new Set<string>();
   const balances = new Map<string, bigint>();
+  /** What each account holds inside NEAR Intents, keyed by account then token. */
+  const intentsHoldings = new Map<string, Map<string, bigint>>();
   const outcomes = new Map<string, NearTransactionOutcome>();
   const withheld = new Map<string, NearTransactionOutcome>();
   /** The hash of every transaction handed to the node, in order. */
@@ -174,6 +201,15 @@ export function makeFakeNearRpc(usdcContractId = TEST_USDC_CONTRACT) {
       balances.set(accountId, (balances.get(accountId) ?? 0n) + amount);
     },
     usdcBalanceOf: (accountId: string): bigint => balances.get(accountId) ?? 0n,
+    /** Credits an account with a token inside NEAR Intents. */
+    fundIntents(accountId: string, tokenId: string, amount: bigint) {
+      state.createAccount(accountId);
+      const held = intentsHoldings.get(accountId) ?? new Map<string, bigint>();
+      held.set(tokenId, (held.get(tokenId) ?? 0n) + amount);
+      intentsHoldings.set(accountId, held);
+    },
+    intentsBalanceOf: (accountId: string, tokenId: string): bigint =>
+      intentsHoldings.get(accountId)?.get(tokenId) ?? 0n,
     nonceOf: (accountId: string): bigint | null =>
       accounts.get(accountId) ?? null,
   };
@@ -219,6 +255,39 @@ export function makeFakeNearRpc(usdcContractId = TEST_USDC_CONTRACT) {
         ftTransferLog([{ from: receiverId, to: senderId, amount }]),
       ],
       successValue: base64Json("0"),
+    };
+  }
+
+  /** Runs NEAR Intents' `mt_transfer`; the logs if it succeeded. */
+  function runIntentsCall(
+    senderId: string,
+    call: FunctionCallView,
+  ): { readonly logs: string[]; readonly successValue: string } | null {
+    if (call.methodName !== "mt_transfer") return null;
+    const args = callArgs(call);
+    const receiverId = String(args.receiver_id);
+    const tokenId = String(args.token_id);
+    const amount = BigInt(String(args.amount));
+    if (
+      call.deposit !== 1n ||
+      state.intentsBalanceOf(senderId, tokenId) < amount
+    ) {
+      return null;
+    }
+    state.fundIntents(senderId, tokenId, -amount);
+    state.fundIntents(receiverId, tokenId, amount);
+    return {
+      logs: [
+        mtTransferLog([
+          {
+            from: senderId,
+            to: receiverId,
+            tokenIds: [tokenId],
+            amounts: [amount],
+          },
+        ]),
+      ],
+      successValue: "",
     };
   }
 
@@ -323,7 +392,9 @@ export function makeFakeNearRpc(usdcContractId = TEST_USDC_CONTRACT) {
       const ran =
         delegateAction.receiverId === usdcContractId
           ? runUsdcCall(delegateAction.senderId, inner.functionCall)
-          : null;
+          : delegateAction.receiverId === intentsContractId
+            ? runIntentsCall(delegateAction.senderId, inner.functionCall)
+            : null;
       return outcome(
         [
           own(true),
@@ -352,6 +423,12 @@ export function makeFakeNearRpc(usdcContractId = TEST_USDC_CONTRACT) {
     usdcBalance: (accountId) =>
       maybeFail("usdcBalance").pipe(
         Effect.map(() => state.usdcBalanceOf(accountId)),
+      ),
+    intentsBalances: (accountId, tokenIds) =>
+      maybeFail("intentsBalances").pipe(
+        Effect.map(() =>
+          tokenIds.map((tokenId) => state.intentsBalanceOf(accountId, tokenId)),
+        ),
       ),
     finalBlock: () =>
       maybeFail("finalBlock").pipe(
@@ -408,6 +485,7 @@ export function makeFakeNearRpc(usdcContractId = TEST_USDC_CONTRACT) {
     service,
     state,
     usdcContractId,
+    intentsContractId,
   };
 }
 
@@ -467,6 +545,7 @@ export function nearRelayerOnFakeChain(
     signer: privy.nearSigner(wallet),
     rpc: rpc.service,
     usdcContractId: rpc.usdcContractId,
+    intentsContractId: rpc.intentsContractId,
     outcomePolling: { attempts: 2, interval: 0 },
   });
   return {

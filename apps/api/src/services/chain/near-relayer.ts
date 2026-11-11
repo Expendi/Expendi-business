@@ -124,9 +124,10 @@ export function makeNearRelayer(deps: {
   readonly signer: Signer;
   readonly rpc: NearRpcShape;
   readonly usdcContractId: string;
+  readonly intentsContractId: string;
   readonly outcomePolling?: OutcomePolling;
 }): NearRelayerShape {
-  const { accountId, signer, rpc, usdcContractId } = deps;
+  const { accountId, signer, rpc, usdcContractId, intentsContractId } = deps;
   const polling = deps.outcomePolling ?? DEFAULT_OUTCOME_POLLING;
   // One at a time: two transactions built from the same reading of the
   // relayer's nonce would share it, and the chain accepts only one of them.
@@ -263,12 +264,13 @@ export function makeNearRelayer(deps: {
 
     relayDelegate: ({ signedDelegate, beforeBroadcast }) => {
       const { senderId, receiverId } = signedDelegate.delegateAction;
-      // A company wallet only ever talks to the USDC contract. Anything else
-      // reaching the relayer is a bug upstream, and gas isn't spent on it.
-      if (receiverId !== usdcContractId) {
+      // A company wallet only ever talks to the USDC and NEAR Intents
+      // contracts. Anything else reaching the relayer is a bug upstream, and
+      // gas isn't spent on it.
+      if (receiverId !== usdcContractId && receiverId !== intentsContractId) {
         return Effect.fail(
           new NearRelayerError({
-            message: `Refusing to relay a delegate action for ${receiverId}: only USDC is relayed`,
+            message: `Refusing to relay a delegate action for ${receiverId}: only USDC and NEAR Intents are relayed`,
           }),
         );
       }
@@ -347,6 +349,7 @@ export const NearRelayerLive: Layer.Layer<
       signer: privy.nearSigner({ privyWalletId, accountId }),
       rpc,
       usdcContractId: chain.usdcContractId,
+      intentsContractId: chain.intentsContractId,
     });
   }),
 );

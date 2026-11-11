@@ -222,6 +222,7 @@ const fundInsPath = (organizationId: string) =>
 /** A fund-in in one of these has stopped changing. */
 const FINAL_FUND_IN_STATUSES: readonly FundInStatus[] = [
   "completed",
+  "returned",
   "refunded",
   "failed",
   "expired",

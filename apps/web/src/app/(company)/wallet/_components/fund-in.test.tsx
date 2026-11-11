@@ -12,9 +12,6 @@ import { fundInPollInterval, isFinalFundIn } from "./wallet-api";
 
 vi.mock("~/lib/use-api", () => ({ useApi: () => ({}) }));
 
-const BASE_ADDRESS = "0x12ab7c3e9f04d5b6a8c1e2f3d4b5a6c7e8f99f3c";
-const SOLANA_ADDRESS = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU";
-
 /** 09:30 on 6 November 2026 in Nairobi. */
 const NOW = new Date("2026-11-06T06:30:00Z");
 
@@ -44,51 +41,23 @@ function details(fundIn: FundIn): string {
 }
 
 describe("starting a fund-in from another chain", () => {
-  it("asks for the chain, the amount in base units and the refund address", () => {
+  it("asks for the chain and the amount in base units", () => {
     // #when
-    const draft = fundInDraft("arbitrum", "2500.5", ` ${BASE_ADDRESS} `);
+    const draft = fundInDraft("arbitrum", "2500.5");
 
     // #then
     expect(draft).toEqual({
       ok: true,
-      request: {
-        chain: "arbitrum",
-        amount: "2500500000",
-        refundAddress: BASE_ADDRESS,
-      },
+      request: { chain: "arbitrum", amount: "2500500000" },
     });
-  });
-
-  it("refuses a refund address that isn't on the chosen chain", () => {
-    // #when
-    const drafts = [
-      fundInDraft("solana", "100", BASE_ADDRESS),
-      fundInDraft("base", "100", SOLANA_ADDRESS),
-      fundInDraft("solana", "100", SOLANA_ADDRESS),
-      fundInDraft("ethereum", "100", ""),
-    ];
-
-    // #then
-    expect(drafts.map((draft) => (draft.ok ? "ok" : draft.errors))).toEqual([
-      {
-        refundAddress:
-          "That isn't a Solana address. Check it for typos, or paste it again.",
-      },
-      {
-        refundAddress:
-          "That isn't an address on that chain. Enter 0x followed by 40 characters.",
-      },
-      "ok",
-      { refundAddress: "Enter the address a refund should go to." },
-    ]);
   });
 
   it("refuses an amount that isn't a positive USDC amount", () => {
     // #when
     const drafts = [
-      fundInDraft("base", "", BASE_ADDRESS),
-      fundInDraft("base", "0", BASE_ADDRESS),
-      fundInDraft("base", "1.0000001", BASE_ADDRESS),
+      fundInDraft("base", ""),
+      fundInDraft("base", "0"),
+      fundInDraft("base", "1.0000001"),
     ];
 
     // #then
@@ -113,6 +82,8 @@ describe("following a fund-in", () => {
       ["awaiting_deposit", false, 5000],
       ["processing", false, 5000],
       ["completed", true, false],
+      ["returning", false, 5000],
+      ["returned", true, false],
       ["refunded", true, false],
       ["failed", true, false],
       ["expired", true, false],
@@ -153,7 +124,9 @@ describe("following a fund-in", () => {
   it.each([
     ["processing", "On its way", "on its way to the company wallet"],
     ["completed", "In the wallet", "is in the company wallet"],
-    ["refunded", "Refunded", "went back to your refund address"],
+    ["returning", "Returning", "on its way back to your company wallet"],
+    ["returned", "Returned", "shows in History as a deposit"],
+    ["refunded", "Refunded", "went back to the refund address you gave"],
     ["failed", "Failed", "Expendi is looking into it"],
     ["expired", "Expired", "Start a new fund-in"],
   ] as const)(

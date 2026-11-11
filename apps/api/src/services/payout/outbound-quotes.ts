@@ -110,6 +110,7 @@ export function advanceOutboundQuotes(
               yield* advanceSweep(quote);
               return;
             case "fund_in":
+            case "fund_in_return":
               return;
           }
         }),

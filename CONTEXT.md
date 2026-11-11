@@ -28,6 +28,10 @@ _Avoid_: Paymaster, sponsor, fee wallet
 A company adding money to its company wallet by sending a supported asset from any supported chain.
 _Avoid_: Deposit, on-ramp, bridge in
 
+**Fund-in return**:
+Sending a fund-in that couldn't be completed from the company's own NEAR Intents account, where it was refunded, back to its company wallet as USDC on NEAR.
+_Avoid_: Refund address, reverse fund-in
+
 **Cash-out**:
 A payout the recipient receives as shillings through M-Pesa, a till, a paybill or a bank.
 _Avoid_: Off-ramp, fiat payout

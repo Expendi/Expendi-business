@@ -1,5 +1,7 @@
+import type { SQL } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { Cause, Effect, Exit } from "effect";
 
 import type { FundInChain, FundInStatus } from "@expendi-business/shared";
@@ -35,6 +37,11 @@ import { refreshQuoteStatus } from "./quote-status.js";
  * sending USDC on another chain to a deposit address NEAR Intents gives for
  * it. Nothing here credits the ledger: the deposit watcher does, when the
  * USDC actually arrives at the company wallet.
+ *
+ * A fund-in that can't be completed is refunded into the company's own
+ * NEAR Intents account, never to an address on the sending chain, so
+ * nobody has to give one. The fund-in return (fund-in-return.ts) swaps it
+ * back and delivers it to the company wallet, where it is credited.
  */
 
 /**
@@ -72,15 +79,19 @@ const chainOfAsset = (originAsset: string): FundInChain | null =>
 /**
  * What the company is shown. A fund-in under review still reads as
  * `processing`: the money is somewhere between the two chains, and saying
- * `failed` before a person has looked would be a guess.
+ * `failed` before a person has looked would be a guess. A fund-in refunded
+ * into NEAR Intents is `returning` until the quote returning it delivers.
  */
 export function fundInStatus(
-  quote: Pick<IntentQuote, "status" | "oneClickStatus">,
+  quote: Pick<IntentQuote, "status" | "oneClickStatus" | "refundType">,
+  returnStatus: IntentQuoteStatus | null,
 ): FundInStatus {
   switch (quote.status) {
     case "succeeded":
       return "completed";
     case "refunded":
+      if (quote.refundType === "ORIGIN_CHAIN") return "refunded";
+      return returnStatus === "succeeded" ? "returned" : "returning";
     case "failed":
     case "expired":
       return quote.status;
@@ -95,7 +106,10 @@ export function fundInStatus(
   }
 }
 
-function toView(quote: IntentQuote): Effect.Effect<FundInView> {
+function toView(
+  quote: IntentQuote,
+  returnStatus: IntentQuoteStatus | null,
+): Effect.Effect<FundInView> {
   const chain = chainOfAsset(quote.originAsset);
   return chain === null
     ? Effect.dieMessage(
@@ -108,7 +122,7 @@ function toView(quote: IntentQuote): Effect.Effect<FundInView> {
         amountOut: quote.amountOut,
         depositAddress: quote.depositAddress,
         deadline: quote.deadline,
-        status: fundInStatus(quote),
+        status: fundInStatus(quote, returnStatus),
         createdAt: quote.createdAt,
       });
 }
@@ -128,8 +142,6 @@ export function createFundIn(input: {
   readonly chain: FundInChain;
   /** USDC base units. */
   readonly amount: bigint;
-  /** On `chain`: where the USDC returns if it can't be delivered. */
-  readonly refundAddress: string;
 }): Effect.Effect<
   FundInView,
   BadRequest | Conflict | ServiceUnavailable | DatabaseError,
@@ -176,7 +188,8 @@ export function createFundIn(input: {
         destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
         amount: input.amount,
         recipient: accountId,
-        refundTo: input.refundAddress,
+        refundTo: accountId,
+        refundType: "INTENTS",
         deadline: new Date(Date.now() + FUND_IN_DEADLINE_MS),
         slippageBps: FUND_IN_SLIPPAGE_BPS,
       })
@@ -227,7 +240,8 @@ export function createFundIn(input: {
               minAmountOut: quote.minAmountOut,
               depositAddress: quote.depositAddress,
               recipient: accountId,
-              refundTo: input.refundAddress,
+              refundTo: accountId,
+              refundType: "INTENTS",
               deadline: quote.deadline,
               quoteResponse: quote.signedResponse,
             })
@@ -246,13 +260,14 @@ export function createFundIn(input: {
             amountOut: row.amountOut,
             depositAddress: row.depositAddress,
             refundTo: row.refundTo,
+            refundType: row.refundType,
             deadline: row.deadline.toISOString(),
           },
         });
         return row;
       }),
     );
-    return yield* toView(saved);
+    return yield* toView(saved, null);
   });
 }
 
@@ -262,38 +277,54 @@ const fundInsOf = (organizationId: string) =>
     eq(intentQuotes.purpose, "fund_in"),
   );
 
+const returnQuotes = alias(intentQuotes, "return_quote");
+
+/** Fund-ins matching `where`, each with the status of the quote returning it. */
+function fundInRows(
+  organizationId: string,
+  where: SQL | undefined,
+  limit: number,
+) {
+  return withScope({ organizationId }, (tx) =>
+    query(() =>
+      tx
+        .select({ fundIn: intentQuotes, returnStatus: returnQuotes.status })
+        .from(intentQuotes)
+        .leftJoin(
+          returnQuotes,
+          and(
+            eq(returnQuotes.id, intentQuotes.returnQuoteId),
+            eq(returnQuotes.organizationId, intentQuotes.organizationId),
+          ),
+        )
+        .where(and(fundInsOf(organizationId), where))
+        .orderBy(desc(intentQuotes.createdAt), desc(intentQuotes.id))
+        .limit(limit),
+    ),
+  );
+}
+
 /** The company's latest fund-ins, newest first. */
 export function listFundIns(
   organizationId: string,
 ): Effect.Effect<FundInView[], DatabaseError, DatabaseService> {
-  return withScope({ organizationId }, (tx) =>
-    query(() =>
-      tx
-        .select()
-        .from(intentQuotes)
-        .where(fundInsOf(organizationId))
-        .orderBy(desc(intentQuotes.createdAt), desc(intentQuotes.id))
-        .limit(FUND_INS_LISTED),
+  return fundInRows(organizationId, undefined, FUND_INS_LISTED).pipe(
+    Effect.flatMap((rows) =>
+      Effect.forEach(rows, ({ fundIn, returnStatus }) =>
+        toView(fundIn, returnStatus),
+      ),
     ),
-  ).pipe(Effect.flatMap((rows) => Effect.forEach(rows, toView)));
+  );
 }
 
 export function getFundIn(
   organizationId: string,
   fundInId: string,
 ): Effect.Effect<FundInView, NotFound | DatabaseError, DatabaseService> {
-  return withScope({ organizationId }, (tx) =>
-    query(() =>
-      tx
-        .select()
-        .from(intentQuotes)
-        .where(and(fundInsOf(organizationId), eq(intentQuotes.id, fundInId)))
-        .limit(1),
-    ),
-  ).pipe(
+  return fundInRows(organizationId, eq(intentQuotes.id, fundInId), 1).pipe(
     Effect.flatMap(([row]) =>
       row
-        ? toView(row)
+        ? toView(row.fundIn, row.returnStatus)
         : Effect.fail(new NotFound({ message: "Fund-in not found" })),
     ),
   );

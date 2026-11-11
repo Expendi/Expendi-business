@@ -17,12 +17,24 @@ export const USDC_NEAR_CONTRACT_IDS: Readonly<Record<NearNetwork, string>> = {
   testnet: "usdc.fakes.testnet",
 };
 
+/**
+ * The NEAR Intents contract on each network, which holds the balances the
+ * company has inside NEAR Intents. A constant for the same reason as the
+ * USDC contract.
+ */
+export const INTENTS_NEAR_CONTRACT_IDS: Readonly<Record<NearNetwork, string>> =
+  {
+    mainnet: "intents.near",
+    testnet: "intents.testnet",
+  };
+
 export interface NearChainShape {
   readonly network: NearNetwork;
   readonly usdcContractId: string;
+  readonly intentsContractId: string;
 }
 
-/** Which NEAR network the API is on, and the USDC contract that goes with it. */
+/** Which NEAR network the API is on, and the USDC and NEAR Intents contracts that go with it. */
 export class NearChain extends Context.Tag("NearChain")<
   NearChain,
   NearChainShape
@@ -31,6 +43,7 @@ export class NearChain extends Context.Tag("NearChain")<
 export const makeNearChain = (network: NearNetwork): NearChainShape => ({
   network,
   usdcContractId: USDC_NEAR_CONTRACT_IDS[network],
+  intentsContractId: INTENTS_NEAR_CONTRACT_IDS[network],
 });
 
 export const NearChainLive: Layer.Layer<NearChain, ConfigError.ConfigError> =
@@ -56,6 +69,7 @@ const FT_TRANSFER_GAS = 30n * TGAS;
 /** Covers the receiver's `ft_on_transfer` and the contract's own resolve step. */
 const FT_TRANSFER_CALL_GAS = 100n * TGAS;
 const STORAGE_DEPOSIT_GAS = 30n * TGAS;
+const MT_TRANSFER_GAS = 30n * TGAS;
 
 const IMPLICIT_ACCOUNT = /^[0-9a-f]{64}$/;
 const NAMED_ACCOUNT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -136,6 +150,32 @@ export function usdcTransferCallAction(
     "ft_transfer_call",
     { ...checkedTransfer(to, amount), msg },
     FT_TRANSFER_CALL_GAS,
+    ONE_YOCTO,
+  );
+}
+
+/**
+ * NEAR Intents `mt_transfer(receiver_id, token_id, amount)`, to be sent to
+ * the NEAR Intents contract: moves a token the sender holds inside it to
+ * another account inside it. The contract takes the owner from the caller,
+ * so it can only move the balance of the account that signs.
+ */
+export function intentsTokenTransferAction(
+  receiverId: string,
+  tokenId: string,
+  amount: bigint,
+): Action {
+  if (tokenId.length === 0) {
+    throw new RangeError("A NEAR Intents token ID can't be empty");
+  }
+  const { receiver_id, amount: amountText } = checkedTransfer(
+    receiverId,
+    amount,
+  );
+  return actions.functionCall(
+    "mt_transfer",
+    { receiver_id, token_id: tokenId, amount: amountText },
+    MT_TRANSFER_GAS,
     ONE_YOCTO,
   );
 }
@@ -340,4 +380,97 @@ export function nearUsdcReceiptTransfersIn(
       }),
     );
   });
+}
+
+const mtTransferEventSchema = z.object({
+  standard: z.literal("nep245"),
+  event: z.literal("mt_transfer"),
+  data: z.array(z.unknown()).max(LOG_INDEX_STRIDE),
+});
+
+const mtTransferEntrySchema = z.object({
+  old_owner_id: z.string(),
+  new_owner_id: z.string(),
+  token_ids: z.array(z.string().min(1)),
+  amounts: z.array(z.string().regex(/^\d{1,39}$/)),
+});
+
+/** The entries of a NEP-245 `mt_transfer` event log, or none if it isn't one. */
+function mtTransferEntries(log: string): readonly unknown[] {
+  if (!log.startsWith(EVENT_PREFIX)) return [];
+  const event = mtTransferEventSchema.safeParse(
+    parseJson(log.slice(EVENT_PREFIX.length)),
+  );
+  return event.success ? event.data.data : [];
+}
+
+/** One token's move between two NEAR Intents accounts. */
+export interface NearIntentsTransfer {
+  readonly from: string;
+  readonly to: string;
+  /** The NEAR Intents token ID, e.g. `nep141:…`. */
+  readonly tokenId: string;
+  /** Base units of `tokenId`. */
+  readonly amount: bigint;
+  /** The receipt whose logs carry the transfer. Base58. */
+  readonly receiptId: string;
+  /**
+   * The log's position among all the transaction's logs, times
+   * `LOG_INDEX_STRIDE`, plus the token's position among the tokens of the
+   * event's entries, counted in order.
+   */
+  readonly logIndex: number;
+}
+
+/**
+ * The NEAR Intents token transfers a finished NEAR transaction made, read
+ * from NEP-245 `mt_transfer` event logs. As with USDC, only logs the NEAR
+ * Intents contract itself emitted in a receipt that succeeded count. Mints
+ * and burns are not transfers and are ignored. An entry that lists its
+ * tokens and amounts inconsistently is dropped whole.
+ */
+export function nearIntentsTransfersIn(
+  outcome: NearTransactionOutcome,
+  intentsContractId: string,
+): NearIntentsTransfer[] {
+  const transfers: NearIntentsTransfer[] = [];
+  let logPosition = 0;
+  for (const receipt of outcome.receipts) {
+    for (const log of receipt.logs) {
+      const position = logPosition;
+      logPosition += 1;
+      if (!receipt.succeeded || receipt.executorId !== intentsContractId) {
+        continue;
+      }
+      let flattenedIndex = 0;
+      for (const rawEntry of mtTransferEntries(log)) {
+        const entry = mtTransferEntrySchema.safeParse(rawEntry);
+        if (!entry.success) continue;
+        const { old_owner_id: from, new_owner_id: to } = entry.data;
+        const { token_ids: tokenIds, amounts } = entry.data;
+        const firstIndex = flattenedIndex;
+        flattenedIndex += tokenIds.length;
+        if (
+          tokenIds.length !== amounts.length ||
+          normaliseNearAccountId(from) !== from ||
+          normaliseNearAccountId(to) !== to
+        ) {
+          continue;
+        }
+        tokenIds.forEach((tokenId, index) => {
+          const amount = BigInt(amounts[index] ?? "0");
+          if (amount <= 0n || amount >= U128_LIMIT) return;
+          transfers.push({
+            from,
+            to,
+            tokenId,
+            amount,
+            receiptId: receipt.receiptId,
+            logIndex: position * LOG_INDEX_STRIDE + firstIndex + index,
+          });
+        });
+      }
+    }
+  }
+  return transfers;
 }

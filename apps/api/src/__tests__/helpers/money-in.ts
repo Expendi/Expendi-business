@@ -17,6 +17,7 @@ import {
 } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 import {
+  ONE_CLICK_FUND_IN_USDC_ASSET_IDS,
   ONE_CLICK_USDC_ASSET_IDS,
   OneClick,
 } from "../../services/intents/one-click.js";
@@ -84,6 +85,11 @@ const QUOTE_ROUTES: Readonly<
     originAsset: ONE_CLICK_USDC_ASSET_IDS.near,
     destinationAsset: ONE_CLICK_USDC_ASSET_IDS.base,
   },
+  fund_in_return: {
+    swapType: "EXACT_INPUT",
+    originAsset: ONE_CLICK_FUND_IN_USDC_ASSET_IDS.arbitrum,
+    destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+  },
 };
 
 /**
@@ -101,11 +107,14 @@ export async function saveQuote(
   } = {},
 ): Promise<IntentQuote> {
   const route = QUOTE_ROUTES[purpose];
+  const intents = purpose === "fund_in_return";
   const fromCompanyWallet = purpose !== "sweep";
-  const recipient = fromCompanyWallet
-    ? funded.transitAddress
-    : funded.accountId;
+  const recipient =
+    fromCompanyWallet && !intents ? funded.transitAddress : funded.accountId;
   const refundTo = fromCompanyWallet ? funded.accountId : funded.transitAddress;
+  const sides = intents
+    ? ({ depositType: "INTENTS", refundType: "INTENTS" } as const)
+    : ({ depositType: "ORIGIN_CHAIN", refundType: "ORIGIN_CHAIN" } as const);
   const quote = await runtime.runPromise(
     Effect.flatMap(OneClick, (oneClick) =>
       oneClick.quote({
@@ -114,6 +123,7 @@ export async function saveQuote(
         amount: options.amount ?? 5_000_000n,
         recipient,
         refundTo,
+        ...sides,
         deadline: new Date(Date.now() + 10 * 60_000),
         slippageBps: 100,
       }),
@@ -139,6 +149,7 @@ export async function saveQuote(
           depositAddress: quote.depositAddress,
           recipient,
           refundTo,
+          ...sides,
           deadline: quote.deadline,
           quoteResponse: quote.signedResponse,
           ...options.row,

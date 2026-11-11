@@ -24,12 +24,9 @@ import {
   createCompany,
   createUser,
 } from "../helpers/db.js";
-import { randomAddress } from "../helpers/fakes.js";
 import { createFundedCompany, readQuote } from "../helpers/money-in.js";
 import { makeFakeOneClick } from "../helpers/one-click.js";
 import { bearer, makeTestRuntime } from "../helpers/runtime.js";
-
-const SOLANA_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 const oneClick = makeFakeOneClick();
 let runtime: AppRuntime;
@@ -75,11 +72,7 @@ const read = (
     headers: bearer(as.privyUserId),
   });
 
-const fromBase = (amount = "25000000") => ({
-  chain: "base",
-  amount,
-  refundAddress: randomAddress(),
-});
+const fromBase = (amount = "25000000") => ({ chain: "base", amount });
 
 async function data(response: Response): Promise<unknown> {
   const body = (await response.json()) as { data?: unknown };
@@ -129,19 +122,14 @@ describe("POST /organizations/:id/wallet/fund-ins", () => {
     });
   });
 
-  it.each<[FundInChain, string]>([
-    ["base", randomAddress()],
-    ["ethereum", randomAddress()],
-    ["arbitrum", randomAddress()],
-    ["solana", SOLANA_ADDRESS],
-  ])(
-    "takes a firm quote from USDC on %s to the company wallet, refunding to the given address",
-    async (chain, refundAddress) => {
+  it.each<FundInChain>(["base", "ethereum", "arbitrum", "solana"])(
+    "takes a firm quote from USDC on %s to the company wallet, refunding into the company's NEAR Intents account",
+    async (chain) => {
       // #given
       const before = oneClick.state.quoteRequests.length;
 
       // #when
-      await start({ chain, amount: "5000000", refundAddress });
+      await start({ chain, amount: "5000000" });
 
       // #then
       const [request] = oneClick.state.quoteRequests.slice(before);
@@ -153,6 +141,7 @@ describe("POST /organizations/:id/wallet/fund-ins", () => {
         amount: request?.amount,
         recipient: request?.recipient,
         refundTo: request?.refundTo,
+        refundType: request?.refundType,
         deadlineAhead: (request?.deadline.getTime() ?? 0) > Date.now(),
       }).toEqual({
         dry: false,
@@ -161,11 +150,30 @@ describe("POST /organizations/:id/wallet/fund-ins", () => {
         destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
         amount: 5_000_000n,
         recipient: funded.accountId,
-        refundTo: refundAddress,
+        refundTo: funded.accountId,
+        refundType: "INTENTS",
         deadlineAhead: true,
       });
     },
   );
+
+  it("ignores a refund address an older app still sends: refunds go to the company's NEAR Intents account", async () => {
+    // #given
+    const before = oneClick.state.quoteRequests.length;
+
+    // #when
+    const response = await start({
+      ...fromBase(),
+      refundAddress: "0x2222222222222222222222222222222222222222",
+    });
+
+    // #then
+    const [request] = oneClick.state.quoteRequests.slice(before);
+    expect({ status: response.status, refundTo: request?.refundTo }).toEqual({
+      status: 201,
+      refundTo: funded.accountId,
+    });
+  });
 
   it("saves the quote as a fund-in before showing its deposit address", async () => {
     // #given
@@ -196,14 +204,6 @@ describe("POST /organizations/:id/wallet/fund-ins", () => {
     ["an amount of zero", { ...fromBase(), amount: "0" }],
     ["an amount that isn't base units", { ...fromBase(), amount: "2.5" }],
     ["a chain Expendi doesn't take", { ...fromBase(), chain: "tron" }],
-    [
-      "a Solana refund address for Ethereum",
-      { chain: "ethereum", amount: "5000000", refundAddress: SOLANA_ADDRESS },
-    ],
-    [
-      "an EVM refund address for Solana",
-      { chain: "solana", amount: "5000000", refundAddress: randomAddress() },
-    ],
   ])("refuses %s and asks 1Click nothing", async (_name, body) => {
     // #given
     const before = oneClick.state.quoteRequests.length;
@@ -287,11 +287,7 @@ describe("GET /organizations/:id/wallet/fund-ins", () => {
   it("lists the company's fund-ins newest first", async () => {
     // #given
     const first = await started();
-    const second = await started({
-      chain: "solana",
-      amount: "7000000",
-      refundAddress: SOLANA_ADDRESS,
-    });
+    const second = await started({ chain: "solana", amount: "7000000" });
 
     // #when
     const response = await read();

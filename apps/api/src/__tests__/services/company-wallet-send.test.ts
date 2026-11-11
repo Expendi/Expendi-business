@@ -9,9 +9,11 @@ import type { TestCompany } from "../helpers/db.js";
 import { DatabaseService } from "../../db/client.js";
 import { companyWalletSends, wallets } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
+import { ONE_CLICK_FUND_IN_USDC_ASSET_IDS } from "../../services/intents/one-click.js";
 import {
   DELEGATE_TTL_BLOCKS,
   delegateVerdict,
+  sendIntentsTokenFromCompanyWallet,
   sendUsdcFromCompanyWallet,
   sendUsdcFromCompanyWalletWithCall,
   settleCompanyWalletSend,
@@ -25,9 +27,12 @@ import { makeFakePrivyWallets } from "../helpers/fakes.js";
 import {
   ftTransferLog,
   makeFakeNearRpc,
+  mtTransferLog,
   nearOutcome,
   nearRelayerOnFakeChain,
   randomNearAccount,
+  TEST_INTENTS_CONTRACT,
+  TEST_NEAR_CHAIN,
   TEST_USDC_CONTRACT,
 } from "../helpers/near.js";
 import { makeTestRuntime } from "../helpers/runtime.js";
@@ -923,6 +928,7 @@ describe("delegateVerdict", () => {
     senderAccountId: sender,
     receiverAccountId: receiver,
     usdcAmount: 5_000_000n,
+    tokenId: null,
   };
   const moved = (
     overrides: { to?: string; amount?: bigint; from?: string } = {},
@@ -950,7 +956,7 @@ describe("delegateVerdict", () => {
       { receiverId: sender, succeeded: options.succeeded ?? true },
     );
   const verdict = (outcome: ReturnType<typeof relayed>) =>
-    delegateVerdict(outcome, transfer, TEST_USDC_CONTRACT);
+    delegateVerdict(outcome, transfer, TEST_NEAR_CHAIN);
 
   it("is executed when the USDC contract logged exactly the signed transfer", () => {
     expect(verdict(relayed([moved()]))).toBe("executed");
@@ -974,6 +980,301 @@ describe("delegateVerdict", () => {
     [
       "the transfer was logged by another contract",
       relayed([moved()], { usdc: "evil.near" }),
+    ],
+    [
+      "the transaction wasn't sent to the company wallet",
+      { ...relayed([moved()]), receiverId: "someone-else.near" },
+    ],
+  ])("is unclear when %s", (_name, outcome) => {
+    expect(verdict(outcome)).toBe("unclear");
+  });
+});
+
+describe("sendIntentsTokenFromCompanyWallet", () => {
+  const TOKEN = ONE_CLICK_FUND_IN_USDC_ASSET_IDS.base;
+  const OTHER_TOKEN = ONE_CLICK_FUND_IN_USDC_ASSET_IDS.solana;
+
+  beforeEach(() => {
+    chain.state.fundIntents(companyAccount, TOKEN, OPENING_BALANCE);
+  });
+
+  const sendToken = (
+    overrides: Partial<
+      Parameters<typeof sendIntentsTokenFromCompanyWallet>[0]
+    > = {},
+  ) =>
+    runtime.runPromiseExit(
+      sendIntentsTokenFromCompanyWallet({
+        organizationId: company.organizationId,
+        sendKey: "refund-1",
+        to: payee,
+        amount: AMOUNT,
+        tokenId: TOKEN,
+        ...overrides,
+      }),
+    );
+
+  it("moves the token inside NEAR Intents and saves the send with its token", async () => {
+    // #when
+    const exit = await sendToken();
+
+    // #then
+    const [saved] = await savedSends();
+    expect({
+      sent: Exit.isSuccess(exit),
+      paid: chain.state.intentsBalanceOf(payee, TOKEN),
+      left: chain.state.intentsBalanceOf(companyAccount, TOKEN),
+      usdcMoved: paid(),
+      saved: {
+        kind: saved?.kind,
+        status: saved?.status,
+        tokenId: saved?.tokenId,
+        msg: saved?.msg,
+        usdcAmount: saved?.usdcAmount,
+      },
+    }).toEqual({
+      sent: true,
+      paid: AMOUNT,
+      left: OPENING_BALANCE - AMOUNT,
+      usdcMoved: 0n,
+      saved: {
+        kind: "intents_transfer",
+        status: "executed",
+        tokenId: TOKEN,
+        msg: null,
+        usdcAmount: AMOUNT,
+      },
+    });
+  });
+
+  it("signs a delegate action to the Intents contract, relayed by the gas relayer", async () => {
+    // #when
+    await sendToken();
+
+    // #then
+    const outcome = chain.state.outcomes.get(
+      chain.state.broadcasts.at(-1) ?? "",
+    );
+    expect({
+      signer: outcome?.signerId,
+      receiver: outcome?.receiverId,
+      ranOn: outcome?.receipts.map((receipt) => receipt.executorId),
+    }).toEqual({
+      signer: relayer.accountId,
+      receiver: companyAccount,
+      ranOn: [companyAccount, TEST_INTENTS_CONTRACT],
+    });
+  });
+
+  it("returns the same receipt for the same key without signing again", async () => {
+    // #given
+    const first = await sendToken();
+    const observed = watching();
+
+    // #when
+    const second = await sendToken();
+
+    // #then
+    expect({
+      same:
+        Exit.isSuccess(first) &&
+        Exit.isSuccess(second) &&
+        first.value.sendId === second.value.sendId,
+      paid: chain.state.intentsBalanceOf(payee, TOKEN),
+      ...observed(),
+    }).toEqual({ same: true, paid: AMOUNT, signings: 0, broadcasts: 0 });
+  });
+
+  it("fails for good when the contract moved nothing", async () => {
+    // #given
+    chain.state.fundIntents(companyAccount, TOKEN, -OPENING_BALANCE);
+
+    // #when
+    const exit = await sendToken();
+
+    // #then
+    const [saved] = await savedSends();
+    expect({ outcome: tag(exit), status: saved?.status }).toEqual({
+      outcome: "SendRefused",
+      status: "failed",
+    });
+  });
+
+  it.each([
+    ["a made-up token", "nep141:made-up.omft.near"],
+    ["an empty token", ""],
+    ["the NEAR USDC contract", TEST_USDC_CONTRACT],
+  ])(
+    "refuses %s before reserving or signing anything",
+    async (_name, tokenId) => {
+      // #given
+      const observed = watching();
+
+      // #when
+      const exit = await sendToken({ tokenId });
+
+      // #then
+      expect({
+        outcome: tag(exit),
+        saved: await savedSends(),
+        ...observed(),
+      }).toMatchObject({
+        outcome: "SendRefused",
+        saved: [],
+        signings: 0,
+        broadcasts: 0,
+      });
+    },
+  );
+
+  it("refuses a key that already names the same transfer of a different token", async () => {
+    // #given
+    await sendToken();
+    const observed = watching();
+
+    // #when
+    const exit = await sendToken({ tokenId: OTHER_TOKEN });
+
+    // #then
+    expect({
+      outcome: tag(exit),
+      paid: chain.state.intentsBalanceOf(payee, TOKEN),
+      other: chain.state.intentsBalanceOf(payee, OTHER_TOKEN),
+      ...observed(),
+    }).toEqual({
+      outcome: "SendRefused",
+      paid: AMOUNT,
+      other: 0n,
+      signings: 0,
+      broadcasts: 0,
+    });
+  });
+
+  it("refuses a key already used for a USDC send of the same amount", async () => {
+    // #given
+    await send({ sendKey: "shared-key" });
+
+    // #when
+    const exit = await sendToken({ sendKey: "shared-key" });
+
+    // #then
+    expect(tag(exit)).toBe("SendRefused");
+  });
+
+  it("is capped like a USDC send", async () => {
+    // #given
+    const observed = watching();
+
+    // #when
+    const exit = await sendToken({ amount: CAP + 1n });
+
+    // #then
+    expect({ sent: Exit.isSuccess(exit), ...observed() }).toEqual({
+      sent: false,
+      signings: 0,
+      broadcasts: 0,
+    });
+  });
+});
+
+describe("delegateVerdict for an Intents transfer", () => {
+  const TOKEN = ONE_CLICK_FUND_IN_USDC_ASSET_IDS.base;
+  const sender = randomNearAccount();
+  const receiver = "deposit.near";
+  const intentsSend = {
+    kind: "intents_transfer" as const,
+    senderAccountId: sender,
+    receiverAccountId: receiver,
+    usdcAmount: 5_000_000n,
+    tokenId: TOKEN,
+  };
+  const moved = (
+    overrides: {
+      to?: string;
+      from?: string;
+      tokenId?: string;
+      amount?: bigint;
+    } = {},
+  ) =>
+    mtTransferLog([
+      {
+        from: overrides.from ?? sender,
+        to: overrides.to ?? receiver,
+        tokenIds: [overrides.tokenId ?? TOKEN],
+        amounts: [overrides.amount ?? 5_000_000n],
+      },
+    ]);
+  const relayed = (
+    intentsLogs: readonly string[],
+    options: {
+      succeeded?: boolean;
+      delegateRan?: boolean;
+      intents?: string;
+      usdcLogs?: readonly string[];
+    } = {},
+  ) =>
+    nearOutcome(
+      [
+        { executorId: sender, succeeded: options.delegateRan ?? true },
+        {
+          executorId: options.intents ?? TEST_INTENTS_CONTRACT,
+          logs: intentsLogs,
+          succeeded: options.succeeded ?? true,
+        },
+        ...(options.usdcLogs
+          ? [{ executorId: TEST_USDC_CONTRACT, logs: options.usdcLogs }]
+          : []),
+      ],
+      { receiverId: sender, succeeded: options.succeeded ?? true },
+    );
+  const verdict = (outcome: ReturnType<typeof relayed>) =>
+    delegateVerdict(outcome, intentsSend, TEST_NEAR_CHAIN);
+
+  it("is executed when the Intents contract logged exactly the signed transfer", () => {
+    expect(verdict(relayed([moved()]))).toBe("executed");
+  });
+
+  it("is failed when the delegate action ran and the Intents call failed", () => {
+    expect(verdict(relayed([], { succeeded: false }))).toBe("failed");
+  });
+
+  it("is not run when the chain rejected the delegate action itself", () => {
+    expect(verdict(relayed([], { delegateRan: false, succeeded: false }))).toBe(
+      "not_run",
+    );
+  });
+
+  it.each([
+    ["a different amount moved", relayed([moved({ amount: 4_999_999n })])],
+    ["it went to a different account", relayed([moved({ to: "thief.near" })])],
+    [
+      "it came from a different account",
+      relayed([moved({ from: "other.near" })]),
+    ],
+    [
+      "a different token moved",
+      relayed([moved({ tokenId: ONE_CLICK_FUND_IN_USDC_ASSET_IDS.solana })]),
+    ],
+    ["a second transfer moved with it", relayed([moved(), moved()])],
+    ["it succeeded with no transfer logged", relayed([])],
+    [
+      "the transfer was logged by another contract",
+      relayed([moved()], { intents: "evil.near" }),
+    ],
+    [
+      "USDC moved as well",
+      relayed([moved()], {
+        usdcLogs: [
+          ftTransferLog([{ from: sender, to: "thief.near", amount: 1n }]),
+        ],
+      }),
+    ],
+    [
+      "it failed after USDC moved",
+      relayed([], {
+        succeeded: false,
+        usdcLogs: [ftTransferLog([{ from: sender, to: receiver, amount: 1n }])],
+      }),
     ],
     [
       "the transaction wasn't sent to the company wallet",

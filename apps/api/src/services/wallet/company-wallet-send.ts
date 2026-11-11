@@ -1,4 +1,4 @@
-import type { SignedDelegate } from "near-api-js";
+import type { Action, SignedDelegate } from "near-api-js";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Data, Effect } from "effect";
 import {
@@ -16,7 +16,11 @@ import type {
 } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
 import type { NearRpcError } from "../chain/near-rpc.js";
-import type { NearTransactionOutcome } from "../chain/near.js";
+import type {
+  NearChainShape,
+  NearIntentsTransfer,
+  NearTransactionOutcome,
+} from "../chain/near.js";
 import type { PrivyWalletError } from "./privy-wallets.js";
 import { companyWalletSends, wallets } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
@@ -24,14 +28,17 @@ import { NearRelayer } from "../chain/near-relayer.js";
 import { NearRpc } from "../chain/near-rpc.js";
 import {
   implicitAccountPublicKey,
+  intentsTokenTransferAction,
   isImplicitNearAccount,
   NEAR_ED25519,
   NearChain,
+  nearIntentsTransfersIn,
   nearUsdcTransfersIn,
   normaliseNearAccountId,
   usdcTransferAction,
   usdcTransferCallAction,
 } from "../chain/near.js";
+import { ONE_CLICK_FUND_IN_USDC_ASSET_IDS } from "../intents/one-click.js";
 import {
   nearSigningFailure,
   PrivyWallets,
@@ -67,11 +74,11 @@ export interface CompanyWalletSendInput {
   readonly sendKey: string;
   /** A NEAR account ID, already normalised. */
   readonly to: string;
-  /** USDC base units. */
+  /** USDC base units; for an Intents token send, base units of that token. */
   readonly amount: bigint;
 }
 
-/** A send the chain ran and that moved the USDC. */
+/** A send the chain ran and that moved the USDC, or the Intents token. */
 export interface CompanyWalletSendReceipt {
   readonly sendId: string;
   /** The relayer transaction that carried it. Base58: never lowercase it. */
@@ -92,12 +99,16 @@ export type CompanyWalletSendDeps =
 
 type SentTransfer = Pick<
   CompanyWalletSend,
-  "kind" | "senderAccountId" | "receiverAccountId" | "usdcAmount"
+  "kind" | "senderAccountId" | "receiverAccountId" | "usdcAmount" | "tokenId"
 >;
+
+const ALLOWED_INTENTS_TOKEN_IDS: ReadonlySet<string> = new Set(
+  Object.values(ONE_CLICK_FUND_IN_USDC_ASSET_IDS),
+);
 
 /**
  * - `executed`: the delegate action ran and the USDC moved as asked.
- * - `failed`: it ran, but the USDC call failed or returned everything, so
+ * - `failed`: it ran, but the token call failed or returned everything, so
  *   nothing stayed moved.
  * - `not_run`: the chain rejected the delegate action in this transaction,
  *   e.g. as expired. It may still run in another.
@@ -112,6 +123,27 @@ function usedAmount(successValue: string | null): bigint | null {
   return match?.[1] === undefined ? null : BigInt(match[1]);
 }
 
+function intentsVerdict(
+  outcome: NearTransactionOutcome,
+  send: SentTransfer,
+  moved: readonly NearIntentsTransfer[],
+  usdcTransferCount: number,
+): DelegateVerdict {
+  const [sent] = moved;
+  const sentAsSigned =
+    moved.length === 1 &&
+    sent?.from === send.senderAccountId &&
+    sent.to === send.receiverAccountId &&
+    sent.tokenId === send.tokenId &&
+    sent.amount === send.usdcAmount;
+  if (outcome.succeeded && sentAsSigned && usdcTransferCount === 0) {
+    return "executed";
+  }
+  return !outcome.succeeded && moved.length === 0 && usdcTransferCount === 0
+    ? "failed"
+    : "unclear";
+}
+
 /**
  * What one relayer transaction did with a saved send, read from its final
  * outcome. Strict on purpose: anything that isn't exactly the transfer that
@@ -120,7 +152,7 @@ function usedAmount(successValue: string | null): bigint | null {
 export function delegateVerdict(
   outcome: NearTransactionOutcome,
   send: SentTransfer,
-  usdcContractId: string,
+  chain: Pick<NearChainShape, "usdcContractId" | "intentsContractId">,
 ): DelegateVerdict {
   const ownReceipt = outcome.receipts.find(
     (receipt) => receipt.receiptId === outcome.ownReceiptId,
@@ -133,7 +165,15 @@ export function delegateVerdict(
   }
   if (!ownReceipt.succeeded) return "not_run";
 
-  const transfers = nearUsdcTransfersIn(outcome, usdcContractId);
+  const transfers = nearUsdcTransfersIn(outcome, chain.usdcContractId);
+  if (send.kind === "intents_transfer") {
+    return intentsVerdict(
+      outcome,
+      send,
+      nearIntentsTransfersIn(outcome, chain.intentsContractId),
+      transfers.length,
+    );
+  }
   const [sent, returned] = transfers;
   const sentAsSigned =
     sent?.from === send.senderAccountId &&
@@ -165,24 +205,46 @@ export function delegateVerdict(
 /**
  * The delegate action a saved send stands for. Built only from the row, so
  * the same row always yields the same bytes, and the only actions it can
- * hold are the two USDC transfers.
+ * hold are the two USDC transfers and a NEAR Intents token transfer.
  */
 function delegateActionFor(
   send: CompanyWalletSend,
-  usdcContractId: string,
+  chain: Pick<NearChainShape, "usdcContractId" | "intentsContractId">,
 ): DelegateAction {
-  return new DelegateAction({
-    senderId: send.senderAccountId,
-    receiverId: usdcContractId,
-    actions: [
-      send.kind === "transfer"
-        ? usdcTransferAction(send.receiverAccountId, send.usdcAmount)
-        : usdcTransferCallAction(
+  const { receiverId, action } = ((): {
+    readonly receiverId: string;
+    readonly action: Action;
+  } => {
+    switch (send.kind) {
+      case "transfer":
+        return {
+          receiverId: chain.usdcContractId,
+          action: usdcTransferAction(send.receiverAccountId, send.usdcAmount),
+        };
+      case "transfer_call":
+        return {
+          receiverId: chain.usdcContractId,
+          action: usdcTransferCallAction(
             send.receiverAccountId,
             send.usdcAmount,
             send.msg ?? "",
           ),
-    ],
+        };
+      case "intents_transfer":
+        return {
+          receiverId: chain.intentsContractId,
+          action: intentsTokenTransferAction(
+            send.receiverAccountId,
+            send.tokenId ?? "",
+            send.usdcAmount,
+          ),
+        };
+    }
+  })();
+  return new DelegateAction({
+    senderId: send.senderAccountId,
+    receiverId,
+    actions: [action],
     nonce: send.nonce,
     maxBlockHeight: send.maxBlockHeight,
     publicKey: implicitAccountPublicKey(send.senderAccountId),
@@ -196,13 +258,13 @@ function delegateActionFor(
  */
 function savedSignedDelegate(
   send: CompanyWalletSend,
-  usdcContractId: string,
+  chain: NearChainShape,
 ): Effect.Effect<SignedDelegate, SendOutcomeUnknown> {
   return Effect.try({
     try: () => {
       const saved = Buffer.from(send.signedDelegate ?? "", "base64");
       const rebuilt = actions.signedDelegate({
-        delegateAction: delegateActionFor(send, usdcContractId),
+        delegateAction: delegateActionFor(send, chain),
         signature: new Signature({
           keyType: NEAR_ED25519,
           data: Uint8Array.from(
@@ -266,6 +328,7 @@ const unknownOnceSigned =
 interface TransferRequest extends CompanyWalletSendInput {
   readonly kind: CompanyWalletSendKind;
   readonly msg: string | null;
+  readonly tokenId: string | null;
 }
 
 interface SendingWallet {
@@ -403,7 +466,7 @@ function settle(
     for (const txHash of [...current.relayTxHashes].reverse()) {
       const outcome = yield* rpc.transactionOutcome(txHash, relayer.accountId);
       if (outcome === null) continue;
-      const verdict = delegateVerdict(outcome, current, chain.usdcContractId);
+      const verdict = delegateVerdict(outcome, current, chain);
       if (verdict === "not_run") continue;
       if (verdict === "unclear") {
         return yield* Effect.fail(
@@ -419,7 +482,7 @@ function settle(
         blockHeight: outcome.blockHeight,
         failure:
           verdict === "failed"
-            ? "The chain ran it, but the USDC contract moved nothing"
+            ? "The chain ran it, but the token contract moved nothing"
             : null,
       });
     }
@@ -542,6 +605,7 @@ function reserve(
               receiverAccountId: request.to,
               usdcAmount: request.amount,
               msg: request.msg,
+              tokenId: request.tokenId,
               nonce:
                 (chainNonce > highestSaved ? chainNonce : highestSaved) + 1n,
               maxBlockHeight: final.height + DELEGATE_TTL_BLOCKS,
@@ -653,10 +717,7 @@ function sign(
       accountId: wallet.accountId,
     });
     const signed = yield* Effect.tryPromise({
-      try: () =>
-        signer.signDelegateAction(
-          delegateActionFor(send, chain.usdcContractId),
-        ),
+      try: () => signer.signDelegateAction(delegateActionFor(send, chain)),
       catch: nearSigningFailure,
     }).pipe(Effect.catchTag("SendRefused", refuse));
 
@@ -683,10 +744,7 @@ function relayAndSettle(
   return Effect.gen(function* () {
     const relayer = yield* NearRelayer;
     const chain = yield* NearChain;
-    const signedDelegate = yield* savedSignedDelegate(
-      send,
-      chain.usdcContractId,
-    );
+    const signedDelegate = yield* savedSignedDelegate(send, chain);
 
     const relayed = yield* relayer
       .relayDelegate({
@@ -780,6 +838,14 @@ function send(
     if (request.amount <= 0n) {
       return yield* Effect.fail(refused("The amount must be positive"));
     }
+    if (
+      request.kind === "intents_transfer" &&
+      !ALLOWED_INTENTS_TOKEN_IDS.has(request.tokenId ?? "")
+    ) {
+      return yield* Effect.fail(
+        refused(`${request.tokenId} isn't a token that can be sent`),
+      );
+    }
     const wallet = yield* sendingWallet(request.organizationId);
 
     const earlier = yield* liveSendFor(request.organizationId, request.sendKey);
@@ -793,7 +859,8 @@ function send(
       current.kind !== request.kind ||
       current.receiverAccountId !== request.to ||
       current.usdcAmount !== request.amount ||
-      current.msg !== request.msg
+      current.msg !== request.msg ||
+      current.tokenId !== request.tokenId
     ) {
       return yield* Effect.fail(
         refused(
@@ -841,7 +908,7 @@ export function sendUsdcFromCompanyWallet(
   CompanyWalletSendError,
   CompanyWalletSendDeps
 > {
-  return send({ ...input, kind: "transfer", msg: null });
+  return send({ ...input, kind: "transfer", msg: null, tokenId: null });
 }
 
 /**
@@ -856,7 +923,27 @@ export function sendUsdcFromCompanyWalletWithCall(
   CompanyWalletSendError,
   CompanyWalletSendDeps
 > {
-  return send({ ...input, kind: "transfer_call" });
+  return send({ ...input, kind: "transfer_call", tokenId: null });
+}
+
+/**
+ * Moves a token the company holds inside NEAR Intents to another NEAR
+ * Intents account, as an `mt_transfer` on the NEAR Intents contract, with
+ * the same guarantees and errors as `sendUsdcFromCompanyWallet`. `to` is the
+ * receiving NEAR Intents account, e.g. a 1Click quote's deposit address, and
+ * `amount` is in base units of `tokenId`. Only the USDC tokens 1Click funds
+ * in with are allowed, all of 6 decimals, which is why the per-transaction
+ * cap applies to `amount` as it does to USDC. It counts as sent only if the
+ * chain shows that one transfer and no USDC moved.
+ */
+export function sendIntentsTokenFromCompanyWallet(
+  input: CompanyWalletSendInput & { readonly tokenId: string },
+): Effect.Effect<
+  CompanyWalletSendReceipt,
+  CompanyWalletSendError,
+  CompanyWalletSendDeps
+> {
+  return send({ ...input, kind: "intents_transfer", msg: null });
 }
 
 /**

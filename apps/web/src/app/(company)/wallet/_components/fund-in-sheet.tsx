@@ -47,7 +47,7 @@ const RECENT_FUND_INS = 5;
 
 /**
  * Fund-in from another chain: the admin says which chain the USDC comes
- * from, how much, and where a refund should go, and gets a one-time deposit
+ * from and how much, and gets a one-time deposit
  * address. The sheet then follows the fund-in until it reaches the company
  * wallet, is refunded, or expires.
  */
@@ -135,16 +135,13 @@ function FundInForm({
 }): JSX.Element {
   const chainId = useId();
   const amountId = useId();
-  const refundId = useId();
   const [chain, setChain] = useState<FundInChain>("base");
   const [amount, setAmount] = useState("");
-  const [refundAddress, setRefundAddress] = useState("");
   const [errors, setErrors] = useState<FundInFieldErrors>({});
-  const chainName = FUND_IN_CHAIN_NAMES[chain];
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const draft = fundInDraft(chain, amount, refundAddress);
+    const draft = fundInDraft(chain, amount);
     if (!draft.ok) {
       setErrors(draft.errors);
       return;
@@ -200,29 +197,11 @@ function FundInForm({
           className="tabular-nums"
           aria-invalid={errors.amount ? true : undefined}
         />
-        {errors.amount ? <FieldError>{errors.amount}</FieldError> : null}
-      </Field>
-      <Field>
-        <FieldLabel htmlFor={refundId}>
-          Refund address on {chainName}
-        </FieldLabel>
-        <Input
-          id={refundId}
-          autoComplete="off"
-          spellCheck={false}
-          value={refundAddress}
-          disabled={busy}
-          onChange={(event) => setRefundAddress(event.target.value)}
-          className="tabular-nums"
-          aria-invalid={errors.refundAddress ? true : undefined}
-        />
         <FieldDescription>
-          If the fund-in can&apos;t be completed, the USDC goes back to this
-          address on {chainName}. Use one you control.
+          If the fund-in can&apos;t be completed, the USDC comes back to your
+          company wallet.
         </FieldDescription>
-        {errors.refundAddress ? (
-          <FieldError>{errors.refundAddress}</FieldError>
-        ) : null}
+        {errors.amount ? <FieldError>{errors.amount}</FieldError> : null}
       </Field>
     </form>
   );
@@ -372,8 +351,8 @@ export function FundInDetails({ fundIn }: { fundIn: FundIn }): JSX.Element {
           <CopyButton value={fundIn.depositAddress} label="Copy address" />
           <Callout tone="warn">
             Send only USDC on {chainName}, in one transfer of exactly this
-            amount. This address works once: anything sent after the deadline
-            goes back to your refund address.
+            amount. This address works once: if the fund-in can&apos;t be
+            completed, the USDC comes back to your company wallet.
           </Callout>
         </>
       ) : null}

@@ -115,10 +115,14 @@ export function chainOfAsset(assetId: string): PayeeChain | null {
   );
 }
 
-/** The chain the quote's USDC leaves from: NEAR or Base. */
+/**
+ * The chain the quote's USDC leaves from: NEAR or Base. Null for a fund-in
+ * return, which is paid from inside NEAR Intents, on no chain.
+ */
 export function originChainOf(
-  quote: Pick<IntentQuote, "originAsset">,
+  quote: Pick<IntentQuote, "originAsset" | "depositType">,
 ): WalletChain | null {
+  if (quote.depositType === "INTENTS") return null;
   const chain = chainOfAsset(quote.originAsset);
   return chain === "near" || chain === "base" ? chain : null;
 }
@@ -249,6 +253,11 @@ export function gatherQuoteEvidence(
   EvidenceDeps
 > {
   return Effect.gen(function* () {
+    if (quote.depositType === "INTENTS") {
+      return yield* refuse(
+        "This quote is paid from inside NEAR Intents, where no chain shows the deposit or a refund. Check the company's NEAR Intents account and 1Click's status by hand.",
+      );
+    }
     const originChain = originChainOf(quote);
     const destinationChain = chainOfAsset(quote.destinationAsset);
     if (originChain === null || destinationChain === null) {

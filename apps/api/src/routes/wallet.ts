@@ -199,7 +199,6 @@ export function createWalletRoutes(
               actor: { type: "user", id: tenant.userId },
               chain: body.chain,
               amount: BigInt(body.amount),
-              refundAddress: body.refundAddress,
             }),
           ),
         ),

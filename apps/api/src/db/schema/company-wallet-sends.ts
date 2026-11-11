@@ -15,7 +15,16 @@ import { timestamps } from "./columns.js";
 import { organizations } from "./organizations.js";
 import { wallets } from "./wallets.js";
 
-export const COMPANY_WALLET_SEND_KINDS = ["transfer", "transfer_call"] as const;
+/**
+ * - `transfer`, `transfer_call`: USDC on NEAR, from the company wallet.
+ * - `intents_transfer`: a token the company holds inside NEAR Intents, to
+ *   another account there (`mt_transfer` on the NEAR Intents contract).
+ */
+export const COMPANY_WALLET_SEND_KINDS = [
+  "transfer",
+  "transfer_call",
+  "intents_transfer",
+] as const;
 export type CompanyWalletSendKind = (typeof COMPANY_WALLET_SEND_KINDS)[number];
 
 /**
@@ -69,8 +78,13 @@ export const companyWalletSends = pgTable(
     /** The company wallet's account when the send was built. */
     senderAccountId: text("sender_account_id").notNull(),
     receiverAccountId: text("receiver_account_id").notNull(),
-    /** USDC base units. */
+    /**
+     * USDC base units; for `intents_transfer`, base units of `tokenId`, which
+     * is always a USDC with 6 decimals, so the cap reads the same.
+     */
     usdcAmount: bigint("usdc_amount", { mode: "bigint" }).notNull(),
+    /** `intents_transfer` only: the NEAR Intents token ID, e.g. `nep141:…`. */
+    tokenId: text("token_id"),
     /** The `msg` of an `ft_transfer_call`. */
     msg: text("msg"),
     /** The delegate action's nonce on the company wallet's access key. */
@@ -127,6 +141,12 @@ export const companyWalletSends = pgTable(
     check(
       "company_wallet_sends_msg_matches_kind",
       sql`(${table.kind} = 'transfer_call') = (${table.msg} IS NOT NULL)`,
+    ),
+    // Compared as text: an enum value can't be used in the transaction that
+    // adds it.
+    check(
+      "company_wallet_sends_token_matches_kind",
+      sql`(${table.kind}::text = 'intents_transfer') = (${table.tokenId} IS NOT NULL)`,
     ),
     check(
       "company_wallet_sends_signed_is_saved",

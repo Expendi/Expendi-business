@@ -237,6 +237,16 @@ describe("company_wallet_sends", () => {
       { kind: "transfer_call" as const },
       "company_wallet_sends_msg_matches_kind",
     ],
+    [
+      "a plain transfer with a token",
+      { tokenId: "nep141:base-0xabc.omft.near" },
+      "company_wallet_sends_token_matches_kind",
+    ],
+    [
+      "an Intents transfer without a token",
+      { kind: "intents_transfer" as const },
+      "company_wallet_sends_token_matches_kind",
+    ],
   ])("rejects a send that is %s", async (_name, overrides, constraint) => {
     // #given
     const { company, wallet } = await companyWithWallet();
@@ -246,6 +256,26 @@ describe("company_wallet_sends", () => {
 
     // #then
     await expect(insert).rejects.toMatchObject({ cause: { constraint } });
+  });
+
+  it("accepts an Intents transfer that names its token", async () => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const [saved] = await insertAs(
+      company,
+      send(company, wallet, {
+        kind: "intents_transfer",
+        tokenId: "nep141:base-0xabc.omft.near",
+      }),
+    );
+
+    // #then
+    expect(saved).toMatchObject({
+      kind: "intents_transfer",
+      tokenId: "nep141:base-0xabc.omft.near",
+    });
   });
 
   it("can't be deleted by the API", async () => {

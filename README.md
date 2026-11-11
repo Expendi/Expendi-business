@@ -19,7 +19,7 @@ A Kenyan company keeps its money as USDC in its own NEAR account. From there it 
 ### How the money moves
 
 1. **Wallet.** A company gets a NEAR company wallet (a Privy wallet, owned by Expendi's management key, which the API signs for under its own key) and a Base transit wallet.
-2. **Fund-in.** A plain USDC transfer on NEAR is credited once the chain confirms it. A fund-in from another chain is a 1Click quote that delivers USDC on NEAR. Transfers Expendi itself caused (refunds, sweeps, relayer transfers) are recognised by transaction hash and never credited.
+2. **Fund-in.** A plain USDC transfer on NEAR is credited once the chain confirms it. A fund-in from another chain is a 1Click quote that delivers USDC on NEAR; if it can't be completed, it is refunded into the company's own NEAR Intents account and swapped back to the company wallet, so nobody gives a refund address. Transfers Expendi itself caused (refunds, sweeps, relayer transfers) are recognised by transaction hash and never credited.
 3. **Approval.** An admin approves a claim, bill or payroll run with a passkey. The per-transaction cap is checked by the API immediately before Privy signs.
 4. **Payout.** A NEAR payee is paid directly. A Base or Solana payee is paid through 1Click. A payroll run's M-Pesa cash-outs move to the transit wallet in one Base hop, then Paycrest pays each person in KES.
 5. **Safety.** Every signed send is saved before it is broadcast, so a retry re-sends the same bytes and can never pay twice. Anything unclear goes to `needs_review`, and staff resolve it from the chain's evidence.
@@ -45,7 +45,8 @@ You should see every test pass. The NEAR behaviour lives in these files under `a
 | `services/near-deposits.serial.test.ts`       | Deposits are credited once, forged events from other contracts are ignored, and Expendi's own refunds are skipped.                                               |
 | `services/base-hop.test.ts`                   | A payroll run hops to Base once, splits when it exceeds the cap, and resumes after a crash at any step.                                                          |
 | `services/usdc-delivery.test.ts`              | USDC payees on Base and Solana are paid through 1Click; a refunded quote returns the money and fails the payout cleanly.                                         |
-| `routes/fund-ins.test.ts`                     | Fund-in from Base, Ethereum, Arbitrum and Solana.                                                                                                                |
+| `routes/fund-ins.test.ts`                     | Fund-in from Base, Ethereum, Arbitrum and Solana, refunding into the company's NEAR Intents account instead of asking for a refund address.                      |
+| `services/fund-in-returns.serial.test.ts`     | A refunded fund-in is swapped back from NEAR Intents, paid by the company wallet inside NEAR Intents, and credited as a deposit when it arrives.                 |
 | `routes/internal-near-payouts.serial.test.ts` | Staff resolve a stuck NEAR payout from the chain's evidence, without signing anything.                                                                           |
 
 ### On mainnet

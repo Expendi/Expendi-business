@@ -8,6 +8,7 @@ import type { FundInChain, PayeeChain } from "@expendi-business/shared";
 
 import type {
   IntentQuoteSwapType,
+  OneClickAccountType,
   OneClickStatus,
 } from "../../db/schema/intent-quotes.js";
 import { ONE_CLICK_STATUSES } from "../../db/schema/intent-quotes.js";
@@ -93,8 +94,18 @@ export interface OneClickQuoteRequest {
   readonly amount: bigint;
   /** Who receives the destination asset, on its own chain. */
   readonly recipient: string;
-  /** Where the origin asset returns to, on its own chain. */
+  /**
+   * Where the origin asset returns to: on its own chain, or an account
+   * inside NEAR Intents when `refundType` is `INTENTS`.
+   */
   readonly refundTo: string;
+  /** `ORIGIN_CHAIN` unless given. */
+  readonly refundType?: OneClickAccountType;
+  /**
+   * `INTENTS` to pay the deposit address from inside NEAR Intents instead
+   * of on the origin chain; `ORIGIN_CHAIN` unless given.
+   */
+  readonly depositType?: OneClickAccountType;
   /** After this, 1Click refunds a deposit instead of delivering it. */
   readonly deadline: Date;
   /** Basis points: 100 is 1%. */
@@ -275,13 +286,18 @@ const toBigInt = (value: string | null | undefined): bigint | null =>
 const toDate = (value: string | null | undefined): Date | null =>
   value === null || value === undefined ? null : new Date(value);
 
-const DEPOSIT_TYPE = "ORIGIN_CHAIN";
-const REFUND_TYPE = "ORIGIN_CHAIN";
 const RECIPIENT_TYPE = "DESTINATION_CHAIN";
 
+const depositTypeOf = (request: OneClickQuoteRequest): OneClickAccountType =>
+  request.depositType ?? "ORIGIN_CHAIN";
+const refundTypeOf = (request: OneClickQuoteRequest): OneClickAccountType =>
+  request.refundType ?? "ORIGIN_CHAIN";
+
 /**
- * The body of `POST /v0/quote`. Deposits, refunds and deliveries are always
- * on the assets' own chains: Expendi holds nothing inside NEAR Intents.
+ * The body of `POST /v0/quote`. Deliveries are always on the destination
+ * asset's own chain. Deposits and refunds are too, except for a fund-in,
+ * which refunds into the company's own NEAR Intents account, and the quote
+ * that returns it from there (docs/decisions/near-main-chain.md, "Fund-in").
  */
 export function oneClickQuoteBody(
   request: OneClickQuoteRequest,
@@ -291,11 +307,11 @@ export function oneClickQuoteBody(
     swapType: request.swapType,
     slippageTolerance: request.slippageBps,
     originAsset: request.originAsset,
-    depositType: DEPOSIT_TYPE,
+    depositType: depositTypeOf(request),
     destinationAsset: request.destinationAsset,
     amount: request.amount.toString(),
     refundTo: request.refundTo,
-    refundType: REFUND_TYPE,
+    refundType: refundTypeOf(request),
     recipient: request.recipient,
     recipientType: RECIPIENT_TYPE,
     deadline: request.deadline.toISOString(),
@@ -324,8 +340,8 @@ function requestMismatch(
     ["amount", echoed.amount !== exact],
     ["recipient", echoed.recipient !== request.recipient],
     ["refundTo", echoed.refundTo !== request.refundTo],
-    ["depositType", echoed.depositType !== DEPOSIT_TYPE],
-    ["refundType", echoed.refundType !== REFUND_TYPE],
+    ["depositType", echoed.depositType !== depositTypeOf(request)],
+    ["refundType", echoed.refundType !== refundTypeOf(request)],
     ["recipientType", echoed.recipientType !== RECIPIENT_TYPE],
     ["slippageTolerance", echoed.slippageTolerance !== request.slippageBps],
     // 1Click rewrites the timestamp's format, so compare the instants.

@@ -29,10 +29,20 @@ export const FUND_IN_STATUS: Record<
     tone: "success",
     note: "The USDC is in the company wallet and shows in the wallet history.",
   },
+  returning: {
+    label: "Returning",
+    tone: "neutral",
+    note: "It couldn’t be completed, so the USDC is on its way back to your company wallet.",
+  },
+  returned: {
+    label: "Returned",
+    tone: "warning",
+    note: "It couldn’t be completed, so the USDC was returned to your company wallet. It shows in History as a deposit.",
+  },
   refunded: {
     label: "Refunded",
     tone: "warning",
-    note: "It couldn’t be completed, so the USDC went back to your refund address.",
+    note: "It couldn’t be completed, so the USDC went back to the refund address you gave.",
   },
   failed: {
     label: "Failed",
@@ -49,6 +59,7 @@ export const FUND_IN_STATUS: Record<
 /** A fund-in in one of these has stopped changing. */
 const FINAL_STATUSES: readonly FundInStatus[] = [
   "completed",
+  "returned",
   "refunded",
   "failed",
   "expired",
@@ -67,36 +78,25 @@ export function fundInPollInterval(fundIn: FundIn | undefined): number | false {
 
 export interface FundInFieldErrors {
   readonly amount?: string;
-  readonly refundAddress?: string;
 }
 
 export type FundInDraft =
   | { readonly ok: true; readonly request: FundInRequest }
   | { readonly ok: false; readonly errors: FundInFieldErrors };
 
-/**
- * What the admin typed as the request the API takes, checked with the API's
- * own schema so the refund address must be one on the chosen chain.
- */
-export function fundInDraft(
-  chain: FundInChain,
-  amount: string,
-  refundAddress: string,
-): FundInDraft {
+/** What the admin typed as the request the API takes, checked with its schema. */
+export function fundInDraft(chain: FundInChain, amount: string): FundInDraft {
   const units = toUsdcBaseUnits(amount);
   const parsed = fundInRequestSchema.safeParse({
     chain,
     amount: units.ok ? units.baseUnits : "1",
-    refundAddress,
   });
-  const errors: { amount?: string; refundAddress?: string } = {};
+  const errors: { amount?: string } = {};
   if (!units.ok) errors.amount = units.error;
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
       const field = issue.path[0];
-      if (field === "amount" || field === "refundAddress") {
-        errors[field] ??= issue.message;
-      }
+      if (field === "amount") errors.amount ??= issue.message;
     }
   }
   return parsed.success && units.ok

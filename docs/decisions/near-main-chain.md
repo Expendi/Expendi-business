@@ -2,7 +2,7 @@
 
 _2026-11-10. Dennis, in the design session for the NEAR port (branch `chain/near`)._
 
-Every company's money sits as USDC in its own company wallet on NEAR. We chose this over holding balances inside the NEAR Intents contract, because an account a person can look up on chain is easier to audit and to explain, and over staying on Base, because NEAR Intents lets a company fund in from any chain and pay a USDC payee on the chain they choose.
+Every company's money sits as USDC in its own company wallet on NEAR. We chose this over holding balances inside the NEAR Intents contract, because an account a person can look up on chain is easier to audit and to explain, and over staying on Base, because NEAR Intents lets a company fund in from any chain and pay a USDC payee on the chain they choose. A company's own account inside NEAR Intents only ever holds a refunded fund-in on its way back to the company wallet (see "Fund-in").
 
 Cash-outs still need Base. Paycrest takes USDC on Base and refunds to a Base address, so each company also has a transit wallet on Base. A cash-out first moves the exact amount from the company wallet to the transit wallet (the Base hop, through NEAR Intents), then pays Paycrest from the transit wallet with the code path that existed before the port. Refunds land in the transit wallet and are swept back.
 
@@ -22,7 +22,7 @@ On mainnet, 2026-11-10: the gas relayer, itself a Privy NEAR wallet, registered 
 
 On mainnet, 2026-11-11, with `scripts/near-mainnet-smoke.ts`: a company wallet set up by `ensureCompanyWallet` (`cfe4f640…312d02`) received 0.5 USDC from the relayer (`Hdok6k8RBUGxTjkhjokAA884P64MxPmMsPsnnmgGpsS4`), which the deposit watcher classed as internal, then sent 0.2 USDC back as a delegate action the relayer paid for (`8YXj2VoApYJxqtXAPeBqiZMPP1XPRhQyeJQ1zcpe36kB`). Its NEAR balance did not change.
 
-Not proved yet: a real Base hop and Paycrest cash-out on mainnet. NEAR Intents has no testnet.
+Not proved yet: a real Base hop and Paycrest cash-out on mainnet, and a fund-in return on mainnet. NEAR Intents has no testnet.
 
 ## Rules
 
@@ -35,7 +35,7 @@ Not proved yet: a real Base hop and Paycrest cash-out on mainnet. NEAR Intents h
 
 ### The spend cap
 
-Privy has no policy conditions for NEAR. The per-transaction USDC cap is therefore enforced by the API immediately before it asks Privy to sign, in the one function that builds a company wallet send. The only actions that function can build are a USDC `ft_transfer` and a USDC `ft_transfer_call` to a 1Click deposit address. The transit wallet keeps the Privy-enforced cap.
+Privy has no policy conditions for NEAR. The per-transaction USDC cap is therefore enforced by the API immediately before it asks Privy to sign, in the one function that builds a company wallet send. The only actions that function can build are a USDC `ft_transfer`, a USDC `ft_transfer_call` to a 1Click deposit address, and an `mt_transfer` inside NEAR Intents of a fund-in USDC token (Base, Ethereum, Arbitrum or Solana USDC, all with 6 decimals, so one cap reads for all) to a 1Click deposit account. The transit wallet keeps the Privy-enforced cap.
 
 ### Sending from a company wallet
 
@@ -51,7 +51,7 @@ NEAR sends are broadcast by us, so Privy's idempotency key no longer makes a ret
 
 The ledger stays the single source of a company's balance. It now covers the company wallet and the transit wallet together.
 
-- **Ledger entries:** a fund-in or plain USDC transfer arriving at the company wallet (deposit), a payout leaving for a payee or for Paycrest (payout, withdrawal), and a Paycrest refund arriving at the transit wallet (refund).
+- **Ledger entries:** a fund-in, a fund-in return or a plain USDC transfer arriving at the company wallet (deposit), a payout leaving for a payee or for Paycrest (payout, withdrawal), and a Paycrest refund arriving at the transit wallet (refund).
 - **Not ledger entries:** a Base hop, a sweep, a hop refund, and the relayer's fee cover. These move a company's money between its own two wallets, or are Expendi's cost. They are recorded in their own table.
 - The deposit watcher must classify every inbound transfer before crediting it. A transfer from the gas relayer, or one that matches an open hop, sweep or hop refund, is internal. Everything else arriving at a company wallet is a deposit. Anything unexpected arriving at a transit wallet is flagged for review, never credited.
 
@@ -64,6 +64,17 @@ The ledger stays the single source of a company's balance. It now covers the com
 5. Poll 1Click until `SUCCESS`, `REFUNDED` or `FAILED`. On success the existing Paycrest funding runs from the transit wallet. A payroll run hops once for its total.
 6. `EXACT_OUTPUT` always returns its unused buffer to the company wallet, as a separate transfer from `intents.near` a few seconds later. That transfer is internal.
 7. Whatever remains in a transit wallet once nothing is in flight is swept back with a Base to NEAR quote.
+
+### Fund-in
+
+_Added 2026-11-11: a fund-in no longer asks for a refund address._
+
+1. A fund-in is a 1Click `EXACT_INPUT` quote from USDC on Base, Ethereum, Arbitrum or Solana, recipient = the company wallet. It refunds into the company's own account inside NEAR Intents (`refundType: INTENTS`, `refundTo` = the company wallet's account), never to an address on the sending chain, so nobody has to give one. Someone sending from an exchange has no address there to give anyway.
+2. A refund arrives in that account as the sending chain's USDC token, not as USDC on NEAR. The fund-in return job reads the account's balances of those four tokens every 30 seconds and returns each one with a 1Click `EXACT_INPUT` quote paid from inside NEAR Intents (`depositType: INTENTS`), recipient = the company wallet, refunding into the same account.
+3. The company wallet pays it with one `mt_transfer` to the quote's deposit account, signed and relayed like any other company wallet send. The spend cap applies, so a balance over it goes back over several returns.
+4. The delivery is a deposit and is credited once, when it arrives: that money never reached the company wallet before. The return costs the company a few cents; Expendi doesn't cover it.
+5. One return per company at a time. After a return of a token ends refunded or failed, that token waits 30 minutes before the next try.
+6. The balance is read, not worked out from fund-ins, so anything that lands in the account goes back the same way: an overpaid fund-in's excess, a deposit after the deadline, or a return that was itself refunded.
 
 ### Telling internal transfers from deposits
 
@@ -78,5 +89,6 @@ A USDC payee or withdrawal address has a payee chain: NEAR, Base or Solana. NEAR
 ## What this costs us
 
 - The wallet-level cap on the main chain is gone; it is only as strong as the API. The decision in `privy-wallet-policies.md` now describes the transit wallet only.
+- A refunded fund-in sits in the company's NEAR Intents account until the next run of the return job, and the return costs the company a few cents. Staff can't resolve a return under review from the chains' evidence, because nothing of it happens on a chain: they check 1Click and the account by hand.
 - Every cash-out takes about half a minute longer and depends on NEAR Intents being up.
 - NEAR transaction hashes are base58 and case-sensitive. They must never be lowercased.

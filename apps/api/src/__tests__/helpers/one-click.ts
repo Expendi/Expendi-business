@@ -115,9 +115,13 @@ export function makeFakeOneClick() {
     };
   }
 
-  /** A fresh address on the origin asset's chain: Base, or else NEAR. */
-  const depositAddressFor = (originAsset: string): string =>
-    originAsset === ONE_CLICK_USDC_ASSET_IDS.base
+  /**
+   * A fresh address on the origin asset's chain (Base, or else NEAR), or an
+   * account inside NEAR Intents for a deposit paid from there.
+   */
+  const depositAddressFor = (request: OneClickQuoteRequest): string =>
+    request.depositType !== "INTENTS" &&
+    request.originAsset === ONE_CLICK_USDC_ASSET_IDS.base
       ? `0x${randomBytes(20).toString("hex")}`
       : randomBytes(32).toString("hex");
 
@@ -169,7 +173,7 @@ export function makeFakeOneClick() {
         };
         return Effect.succeed(dry);
       }
-      const depositAddress = depositAddressFor(request.originAsset);
+      const depositAddress = depositAddressFor(request);
       const quote: OneClickFirmQuote = {
         ...shared,
         dry: false,

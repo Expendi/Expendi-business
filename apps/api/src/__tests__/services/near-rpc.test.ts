@@ -6,6 +6,7 @@ import {
   ftTransferLog,
   randomNearAccount,
   randomNearTxHash,
+  TEST_INTENTS_CONTRACT,
   TEST_USDC_CONTRACT,
 } from "../helpers/near.js";
 
@@ -41,6 +42,7 @@ function nodeAnswering(answer: (request: RpcRequest) => RpcAnswer) {
   const rpc = makeNearRpc(
     Redacted.make("https://rpc.near.test/key"),
     TEST_USDC_CONTRACT,
+    TEST_INTENTS_CONTRACT,
     fetchImpl,
   );
   return { rpc, requests };
@@ -291,6 +293,65 @@ describe("NearRpc account reads", () => {
 
     // #when
     const exit = await Effect.runPromiseExit(rpc.usdcBalance(company));
+
+    // #then
+    expect(Exit.isFailure(exit)).toBe(true);
+  });
+
+  it("reads NEAR Intents balances with one batch call, in the order asked", async () => {
+    // #given
+    const tokenIds = ["nep141:a.omft.near", "nep141:b.omft.near"];
+    const { rpc, requests } = nodeAnswering(() => viewResult(["123", "0"]));
+
+    // #when
+    const balances = await Effect.runPromise(
+      rpc.intentsBalances(company, tokenIds),
+    );
+
+    // #then
+    expect(balances).toEqual([123n, 0n]);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.method).toBe("query");
+    expect(requests[0]?.params).toMatchObject({
+      request_type: "call_function",
+      account_id: TEST_INTENTS_CONTRACT,
+      method_name: "mt_batch_balance_of",
+      finality: "final",
+    });
+    const args = (requests[0]?.params as { args_base64: string }).args_base64;
+    expect(JSON.parse(Buffer.from(args, "base64").toString("utf8"))).toEqual({
+      account_id: company,
+      token_ids: tokenIds,
+    });
+  });
+
+  it("asks nothing when there are no tokens to read", async () => {
+    // #given
+    const { rpc, requests } = nodeAnswering(() => viewResult([]));
+
+    // #when
+    const balances = await Effect.runPromise(rpc.intentsBalances(company, []));
+
+    // #then
+    expect(balances).toEqual([]);
+    expect(requests).toHaveLength(0);
+  });
+
+  it.each([
+    ["a different number of balances", ["1"]],
+    ["a balance that isn't a whole number", ["1", "2.5"]],
+    ["something that isn't a list", "1"],
+  ])("fails on NEAR Intents balances with %s", async (_name, answer) => {
+    // #given
+    const { rpc } = nodeAnswering(() => viewResult(answer));
+
+    // #when
+    const exit = await Effect.runPromiseExit(
+      rpc.intentsBalances(company, [
+        "nep141:a.omft.near",
+        "nep141:b.omft.near",
+      ]),
+    );
 
     // #then
     expect(Exit.isFailure(exit)).toBe(true);

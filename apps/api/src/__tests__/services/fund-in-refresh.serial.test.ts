@@ -14,7 +14,6 @@ import {
   getFundIn,
   refreshOpenFundIns,
 } from "../../services/intents/fund-in.js";
-import { randomAddress } from "../helpers/fakes.js";
 import {
   createFundedCompany,
   ledgerOf,
@@ -44,7 +43,6 @@ beforeEach(async () => {
       actor: { type: "user", id: funded.company.admin.id },
       chain: "arbitrum",
       amount: 40_000_000n,
-      refundAddress: randomAddress(),
     }),
   );
 });
@@ -71,7 +69,7 @@ const deadlinePassed = () =>
 describe("refreshOpenFundIns", () => {
   it.each<[OneClickStatus, string, string]>([
     ["SUCCESS", "succeeded", "completed"],
-    ["REFUNDED", "refunded", "refunded"],
+    ["REFUNDED", "refunded", "returning"],
     ["FAILED", "failed", "failed"],
   ])(
     "settles a fund-in 1Click reports as %s",
@@ -97,6 +95,84 @@ describe("refreshOpenFundIns", () => {
       });
     },
   );
+
+  it("asks for refunds into the company's own NEAR Intents account, so nobody gives a refund address", async () => {
+    // #when
+    const saved = await quote();
+
+    // #then
+    const asked = oneClick.state.quotes.get(fundIn.depositAddress)?.request;
+    expect({
+      askedRefundTo: asked?.refundTo,
+      askedRefundType: asked?.refundType,
+      refundTo: saved.refundTo,
+      refundType: saved.refundType,
+      depositType: saved.depositType,
+    }).toEqual({
+      askedRefundTo: funded.accountId,
+      askedRefundType: "INTENTS",
+      refundTo: funded.accountId,
+      refundType: "INTENTS",
+      depositType: "ORIGIN_CHAIN",
+    });
+  });
+
+  it.each<[string, "succeeded" | "depositing" | "refunded", string]>([
+    ["delivered", "succeeded", "returned"],
+    ["still on its way", "depositing", "returning"],
+    ["refunded again", "refunded", "returning"],
+  ])(
+    "shows a refunded fund-in whose return is %s as %s",
+    async (_, returnStatus, expectedShown) => {
+      // #given
+      oneClick.state.setStatus(fundIn.depositAddress, { status: "REFUNDED" });
+      await refresh();
+      const back = await saveQuote(runtime, db, funded, "fund_in_return", {
+        row: {
+          status: returnStatus,
+          ...(returnStatus !== "depositing" && { settledAt: new Date() }),
+        },
+      });
+      await runInScope(
+        db,
+        { organizationId: funded.company.organizationId },
+        (tx) =>
+          tx
+            .update(intentQuotes)
+            .set({ returnQuoteId: back.id })
+            .where(eq(intentQuotes.id, fundIn.id)),
+      );
+
+      // #when
+      const status = (await shown()).status;
+
+      // #then
+      expect(status).toBe(expectedShown);
+    },
+  );
+
+  it("still shows a fund-in refunded on its own chain, from before refunds went to NEAR Intents, as refunded", async () => {
+    // #given
+    await runInScope(
+      db,
+      { organizationId: funded.company.organizationId },
+      (tx) =>
+        tx
+          .update(intentQuotes)
+          .set({
+            status: "refunded",
+            settledAt: new Date(),
+            refundType: "ORIGIN_CHAIN",
+          })
+          .where(eq(intentQuotes.id, fundIn.id)),
+    );
+
+    // #when
+    const status = (await shown()).status;
+
+    // #then
+    expect(status).toBe("refunded");
+  });
 
   it("never credits the ledger: that is the deposit watcher's, when the USDC arrives", async () => {
     // #given
