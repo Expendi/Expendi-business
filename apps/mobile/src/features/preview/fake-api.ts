@@ -17,7 +17,15 @@ export function createPreviewApi(routes: readonly PreviewRoute[]): ApiClient {
       if (route.data === PREVIEW_FAIL) {
         return Promise.reject(new Error("Preview: offline"));
       }
-      return Promise.resolve(schema.parse(route.data));
+      const parsed = schema.safeParse(route.data);
+      if (!parsed.success) {
+        console.warn(
+          `[preview] fixture for GET ${path} doesn't match its schema`,
+          JSON.stringify(parsed.error.issues.slice(0, 5)),
+        );
+        return Promise.reject(parsed.error);
+      }
+      return Promise.resolve(parsed.data);
     },
     post: readOnly,
     patch: readOnly,

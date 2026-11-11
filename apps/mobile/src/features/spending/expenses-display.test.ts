@@ -47,14 +47,14 @@ function overview(overrides: Partial<SpendingOverview> = {}): SpendingOverview {
       { id: "c", name: "Rent", currentKes: "0", previousKes: "900" },
     ],
     recentPayments: [],
-    outstanding: { overdue: [], dueToday: [], claims: [], noReceipt: [] },
+    outstanding: { overdue: [], dueToday: [], claims: [], noReceipt: [], noEtims: [] },
     cash: {
       today: "2026-11-11",
       through: "2026-12-10",
       totalKes: "0",
       unknownAmounts: 0,
       obligations: [
-        { id: "r1", kind: "payroll", name: "Payroll", dueOn: "2026-11-28", amountKes: "1", status: "scheduled", payVia: "expendi", needsAmount: false, heading: "salaries" },
+        { id: "r1", kind: "payroll", name: "Payroll", notes: null, schedule: null, people: 7, dueOn: "2026-11-28", amountKes: "1", status: "scheduled", payVia: "expendi", needsAmount: false, heading: "salaries" },
       ],
       balanceUsdc: "0",
       reservedUsdc: "0",
@@ -196,7 +196,24 @@ describe("paymentMeta", () => {
   it("flags petty cash the overview lists as missing a receipt", () => {
     // #given
     const data = overview({
-      outstanding: { overdue: [], dueToday: [], claims: [], noReceipt: [{ id: "p1", name: "Fuel", amountKes: "1", floatId: null }] },
+      outstanding: {
+        overdue: [],
+        dueToday: [],
+        claims: [],
+        noReceipt: [
+          {
+            id: "p1",
+            name: "Fuel",
+            amountKes: "1",
+            floatId: null,
+            spentOn: "2026-11-10",
+            personName: "Joseph Kariuki",
+            categoryName: "Travel",
+            description: null,
+          },
+        ],
+        noEtims: [],
+      },
     });
 
     // #when
