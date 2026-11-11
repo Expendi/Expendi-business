@@ -12,7 +12,7 @@ import {
   ReceiptTextIcon,
   WalletIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import type {
   CardBalance,
@@ -26,10 +26,10 @@ import {
 } from "@expendi-business/shared";
 
 import type { CardSortKey } from "./cards-display";
+import type { SortState } from "~/components/data/data-table";
 import type { FilterOption } from "~/components/data/filter-chip";
 import type { KindTab } from "~/components/data/kind-tabs";
 import type { StatTone } from "~/components/data/stat-cards";
-import type { SortState } from "~/components/data/table";
 import type { PasskeyState } from "~/features/payment-ui";
 import { Banner, Banners } from "~/components/data/banner";
 import { FilterChip } from "~/components/data/filter-chip";
@@ -172,7 +172,7 @@ function CompanyCards({
 
 function PlainPanel({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <div className="mt-4 rounded-panel border border-gray-200 bg-surface shadow-panel">
+    <div className="mt-4 rounded-xl border border-border bg-card shadow-xs">
       {children}
     </div>
   );
@@ -211,7 +211,10 @@ function ProgramOn({
         ? "loads"
         : "cards";
   const filters = readPurchaseFilters(param);
-  const rows = sortCards(cards.data?.cards ?? [], sort);
+  const rows = useMemo(
+    () => sortCards(cards.data?.cards ?? [], sort),
+    [cards.data, sort],
+  );
   const ids = rows.map((card) => card.id);
   const openCard = rows.find((card) => card.id === param("id"));
   const canIssue = canAct && !program.paused;

@@ -1,82 +1,31 @@
-"use client";
-
 import type { JSX } from "react";
-import {
-  FilterXIcon,
-  ReceiptTextIcon,
-  ShoppingBagIcon,
-  TriangleAlertIcon,
-  Undo2Icon,
-} from "lucide-react";
+import { FilterXIcon, ShoppingBagIcon } from "lucide-react";
+import { useMemo } from "react";
 
 import type { CardPurchase } from "@expendi-business/shared";
 
 import type { CardPurchaseFilters } from "~/lib/query-keys";
 import { personName } from "~/app/(company)/expenses/_components/expense-labels";
-import { AmountStack } from "~/components/data/money";
+import { EntityMark, PhoneCard } from "~/components/data/cells";
+import { DataTable, useDataTable } from "~/components/data/data-table";
 import { ResultsBody, ResultsFoot } from "~/components/data/results";
 import { EmptyState, ErrorState } from "~/components/data/states";
 import { StatusBadge } from "~/components/data/status-badge";
-import {
-  DataRow,
-  DataTable,
-  EntityMark,
-  Mini,
-  PhoneCard,
-  PhoneCards,
-  RowMeta,
-  RowTitle,
-  TableSkeletonRows,
-  Td,
-  Th,
-} from "~/components/data/table";
 import { Button } from "~/components/ui/button";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiDate } from "~/lib/dates";
 import { useCardPurchases } from "./cards-api";
+import { hasPurchaseFilter, PURCHASE_STATUS } from "./cards-display";
 import {
-  cardLabel,
-  CHANGED_AFTER_EXPENSE_NOTE,
-  hasPurchaseFilter,
-  PURCHASE_STATUS,
-  purchaseAmount,
-  REFUND_NOTE,
-} from "./cards-display";
+  PurchaseAmount,
+  purchaseColumns,
+  PurchaseFlags,
+  REFUND_META,
+} from "./columns";
 import { PurchaseSheet } from "./purchase-sheet";
-import { Usd } from "./usd";
+import { useStableOpen } from "./use-stable-open";
 
-const REFUND_META = "Refund · the books aren't adjusted";
-
-function PurchaseFlags({ purchase }: { purchase: CardPurchase }): JSX.Element {
-  return (
-    <>
-      {purchase.needsReceipt ? (
-        <Mini icon={ReceiptTextIcon} label="Needs a receipt" warn>
-          Needs receipt
-        </Mini>
-      ) : null}
-      {purchase.changedAfterExpense ? (
-        <Mini icon={TriangleAlertIcon} label={CHANGED_AFTER_EXPENSE_NOTE} warn>
-          Changed after recording
-        </Mini>
-      ) : null}
-    </>
-  );
-}
-
-function amountOf(purchase: CardPurchase): JSX.Element {
-  const amount = purchaseAmount(purchase);
-  const refund = purchase.kind === "refund";
-  return (
-    <AmountStack sub={amount.sub}>
-      <Usd
-        cents={amount.cents}
-        plus={refund}
-        className={refund ? "text-success-700" : undefined}
-      />
-    </AmountStack>
-  );
-}
+const NO_PURCHASES: readonly CardPurchase[] = [];
 
 /**
  * The company's Card purchases and refunds, newest first, a page at a time.
@@ -100,7 +49,11 @@ export function PurchasesResults({
   onClearFilters: () => void;
 }): JSX.Element {
   const purchases = useCardPurchases(organizationId, filters);
-  const rows = purchases.data?.pages.flatMap((page) => page.purchases) ?? [];
+  const rows = useMemo(
+    () =>
+      purchases.data?.pages.flatMap((page) => page.purchases) ?? NO_PURCHASES,
+    [purchases.data],
+  );
   const ids = rows.map((row) => row.id);
   const open = openId ? rows.find((row) => row.id === openId) : undefined;
   const index = open ? ids.indexOf(open.id) : -1;
@@ -114,11 +67,7 @@ export function PurchasesResults({
         refreshing={purchases.isPlaceholderData}
       >
         {purchases.isPending ? (
-          <DataTable caption="Loading purchases">
-            <tbody>
-              <TableSkeletonRows rows={6} columns={5} />
-            </tbody>
-          </DataTable>
+          <PurchasesSkeleton />
         ) : purchases.isError ? (
           <ErrorState
             title="Purchases didn't load"
@@ -184,6 +133,20 @@ export function PurchasesResults({
   );
 }
 
+function PurchasesSkeleton(): JSX.Element {
+  const columns = useMemo(
+    () => purchaseColumns({ onOpen: () => undefined }),
+    [],
+  );
+  const table = useDataTable({
+    data: NO_PURCHASES,
+    columns,
+    getRowId: (purchase) => purchase.id,
+    paginate: false,
+  });
+  return <DataTable table={table} caption="Loading purchases" loading />;
+}
+
 function PurchaseTable({
   rows,
   openId,
@@ -193,93 +156,50 @@ function PurchaseTable({
   openId: string | null;
   onOpen: (purchaseId: string) => void;
 }): JSX.Element {
+  const open = useStableOpen(onOpen);
+  const columns = useMemo(() => purchaseColumns({ onOpen: open }), [open]);
+  const table = useDataTable({
+    data: rows,
+    columns,
+    getRowId: (purchase) => purchase.id,
+    manual: true,
+    paginate: false,
+  });
   return (
-    <>
-      <DataTable caption="Card purchases">
-        <thead>
-          <tr>
-            <Th>Date</Th>
-            <Th>Holder and card</Th>
-            <Th>Merchant</Th>
-            <Th align="end">Amount</Th>
-            <Th>Status</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((purchase) => {
-            const status = PURCHASE_STATUS[purchase.status];
-            const holder = personName(purchase.holder);
-            const refund = purchase.kind === "refund";
-            return (
-              <DataRow
-                key={purchase.id}
-                open={purchase.id === openId}
-                onOpen={() => onOpen(purchase.id)}
-              >
-                <Td kind="date">{formatNairobiDate(purchase.authorizedAt)}</Td>
-                <Td>
-                  <span className="flex items-start gap-2.5">
-                    <EntityMark name={holder} kind="person" />
-                    <span className="min-w-0">
-                      <span className="block whitespace-nowrap text-gray-900">
-                        {holder}
-                      </span>
-                      <span className="block whitespace-nowrap text-gray-500 tabular-nums">
-                        {cardLabel(purchase.card)}
-                      </span>
-                    </span>
-                  </span>
-                </Td>
-                <Td kind="main">
-                  <RowTitle onOpen={() => onOpen(purchase.id)}>
-                    {purchase.merchant}
-                  </RowTitle>
-                  <RowMeta text={refund ? REFUND_META : purchase.category.name}>
-                    {refund ? (
-                      <Mini icon={Undo2Icon} label={REFUND_NOTE} />
-                    ) : null}
-                    <PurchaseFlags purchase={purchase} />
-                  </RowMeta>
-                </Td>
-                <Td align="end">{amountOf(purchase)}</Td>
-                <Td>
-                  <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-                </Td>
-              </DataRow>
-            );
-          })}
-        </tbody>
-      </DataTable>
-      <PhoneCards label="Card purchases">
-        {rows.map((purchase) => {
-          const status = PURCHASE_STATUS[purchase.status];
-          const holder = personName(purchase.holder);
-          const refund = purchase.kind === "refund";
-          return (
-            <PhoneCard
-              key={purchase.id}
-              mark={<EntityMark name={holder} kind="person" />}
-              title={purchase.merchant}
-              sub={
-                refund
-                  ? REFUND_META
-                  : `${holder} · ${formatNairobiDate(purchase.authorizedAt)}`
-              }
-              flags={
-                <>
-                  {refund ? (
-                    <StatusBadge tone="moving">Refund</StatusBadge>
-                  ) : null}
-                  <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
-                  <PurchaseFlags purchase={purchase} />
-                </>
-              }
-              aside={amountOf(purchase)}
-              onOpen={() => onOpen(purchase.id)}
-            />
-          );
-        })}
-      </PhoneCards>
-    </>
+    <DataTable
+      table={table}
+      caption="Card purchases"
+      onRowOpen={(purchase) => onOpen(purchase.id)}
+      openRowId={openId}
+      renderPhoneCard={(row) => {
+        const purchase = row.original;
+        const status = PURCHASE_STATUS[purchase.status];
+        const holder = personName(purchase.holder);
+        const refund = purchase.kind === "refund";
+        return (
+          <PhoneCard
+            key={row.id}
+            mark={<EntityMark name={holder} kind="person" />}
+            title={purchase.merchant}
+            sub={
+              refund
+                ? REFUND_META
+                : `${holder} · ${formatNairobiDate(purchase.authorizedAt)}`
+            }
+            flags={
+              <>
+                {refund ? (
+                  <StatusBadge tone="moving">Refund</StatusBadge>
+                ) : null}
+                <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+                <PurchaseFlags purchase={purchase} />
+              </>
+            }
+            aside={<PurchaseAmount purchase={purchase} />}
+            onOpen={() => onOpen(purchase.id)}
+          />
+        );
+      }}
+    />
   );
 }

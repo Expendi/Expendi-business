@@ -296,7 +296,7 @@ export function CardSheet({
       stepKey={card.id}
       headerExtra={
         <>
-          <p className="mt-0.5 text-gray-600 tabular-nums">
+          <p className="mt-0.5 text-muted-foreground tabular-nums">
             {maskedLastFour(card.lastFour)}
           </p>
           <StatusBadge tone={state.tone} className="mt-2">
@@ -403,7 +403,7 @@ export function CardSheet({
           {card.state === "frozen" && canAct && passkey === "missing" ? (
             <PasskeySetupCallout />
           ) : null}
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Only the last four digits show here. The cardholder sees the full
             number in the app.{" "}
             <TextLinkButton onClick={onViewPurchases}>

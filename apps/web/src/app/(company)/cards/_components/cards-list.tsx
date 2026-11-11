@@ -1,37 +1,31 @@
 "use client";
 
 import type { JSX } from "react";
+import { useMemo } from "react";
 
 import type { ExpendiCard } from "@expendi-business/shared";
 
 import type { CardSortKey } from "./cards-display";
-import type { SortState } from "~/components/data/table";
+import type { SortState } from "~/components/data/data-table";
 import { personName } from "~/app/(company)/expenses/_components/expense-labels";
+import { EntityMark, PhoneCard } from "~/components/data/cells";
+import {
+  DataTable,
+  sortFromTable,
+  toSorting,
+  useDataTable,
+} from "~/components/data/data-table";
 import { AmountStack } from "~/components/data/money";
 import { StatusBadge } from "~/components/data/status-badge";
-import {
-  DataRow,
-  DataTable,
-  EntityMark,
-  nextSort,
-  PhoneCard,
-  PhoneCards,
-  RowMeta,
-  RowTitle,
-  SortHeader,
-  TableSkeletonRows,
-  Td,
-  Th,
-} from "~/components/data/table";
-import {
-  CARD_SORT_FIRST,
-  CARD_STATE,
-  formatUsd,
-  maskedLastFour,
-} from "./cards-display";
+import { CARD_STATE, formatUsd, maskedLastFour } from "./cards-display";
+import { CARD_SORT_KEYS, cardColumns } from "./columns";
 import { Usd } from "./usd";
+import { useStableOpen } from "./use-stable-open";
 
-/** Every card the company has issued; a row opens its side sheet. */
+/**
+ * Every card the company has issued, already in `sort` order; a row opens
+ * its side sheet.
+ */
 export function CardsTable({
   cards,
   sort,
@@ -45,117 +39,62 @@ export function CardsTable({
   openId: string | null;
   onOpen: (cardId: string) => void;
 }): JSX.Element {
-  const sortBy = (key: CardSortKey) =>
-    onSort(nextSort(sort, key, CARD_SORT_FIRST[key]));
+  const open = useStableOpen(onOpen);
+  const columns = useMemo(() => cardColumns({ onOpen: open }), [open]);
+  const table = useDataTable({
+    data: cards,
+    columns,
+    getRowId: (card) => card.id,
+    manual: true,
+    paginate: false,
+    sorting: {
+      value: toSorting(sort),
+      onChange: (next) => onSort(sortFromTable(next, sort, CARD_SORT_KEYS)),
+    },
+  });
   return (
-    <>
-      <DataTable caption="Expendi cards">
-        <thead>
-          <tr>
-            <SortHeader
-              label="Card"
-              sortKey="card"
-              sort={sort}
-              onSort={sortBy}
-            />
-            <SortHeader
-              label="Holder"
-              sortKey="holder"
-              sort={sort}
-              onSort={sortBy}
-            />
-            <Th>State</Th>
-            <SortHeader
-              label="Spent this month"
-              sortKey="spent"
-              sort={sort}
-              onSort={sortBy}
-              align="end"
-            />
-            <SortHeader
-              label="Monthly limit"
-              sortKey="limit"
-              sort={sort}
-              onSort={sortBy}
-              align="end"
-            />
-          </tr>
-        </thead>
-        <tbody>
-          {cards.map((card) => {
-            const state = CARD_STATE[card.state];
-            const holder = personName(card.holder);
-            return (
-              <DataRow
-                key={card.id}
-                open={card.id === openId}
-                onOpen={() => onOpen(card.id)}
+    <DataTable
+      table={table}
+      caption="Expendi cards"
+      onRowOpen={(card) => onOpen(card.id)}
+      openRowId={openId}
+      renderPhoneCard={(row) => {
+        const card = row.original;
+        const state = CARD_STATE[card.state];
+        const holder = personName(card.holder);
+        return (
+          <PhoneCard
+            key={row.id}
+            mark={<EntityMark name={holder} kind="person" />}
+            title={card.nickname}
+            sub={`${maskedLastFour(card.lastFour)} · ${holder}`}
+            flags={<StatusBadge tone={state.tone}>{state.label}</StatusBadge>}
+            aside={
+              <AmountStack
+                sub={`of ${formatUsd(card.monthlyLimitUsdCents)} a month`}
               >
-                <Td kind="main">
-                  <RowTitle onOpen={() => onOpen(card.id)}>
-                    {card.nickname}
-                  </RowTitle>
-                  <RowMeta
-                    text={`${maskedLastFour(card.lastFour)} · ${card.defaultCategory.name}`}
-                  />
-                </Td>
-                <Td>
-                  <span className="flex items-center gap-2.5 whitespace-nowrap">
-                    <EntityMark name={holder} kind="person" />
-                    {holder}
-                  </span>
-                </Td>
-                <Td>
-                  <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
-                </Td>
-                <Td align="end">
-                  <AmountStack>
-                    <Usd cents={card.spentThisMonthUsdCents} />
-                  </AmountStack>
-                </Td>
-                <Td align="end">
-                  <AmountStack>
-                    <Usd cents={card.monthlyLimitUsdCents} />
-                  </AmountStack>
-                </Td>
-              </DataRow>
-            );
-          })}
-        </tbody>
-      </DataTable>
-      <PhoneCards label="Expendi cards">
-        {cards.map((card) => {
-          const state = CARD_STATE[card.state];
-          const holder = personName(card.holder);
-          return (
-            <PhoneCard
-              key={card.id}
-              mark={<EntityMark name={holder} kind="person" />}
-              title={card.nickname}
-              sub={`${maskedLastFour(card.lastFour)} · ${holder}`}
-              flags={<StatusBadge tone={state.tone}>{state.label}</StatusBadge>}
-              aside={
-                <AmountStack
-                  sub={`of ${formatUsd(card.monthlyLimitUsdCents)} a month`}
-                >
-                  <Usd cents={card.spentThisMonthUsdCents} />
-                </AmountStack>
-              }
-              onOpen={() => onOpen(card.id)}
-            />
-          );
-        })}
-      </PhoneCards>
-    </>
+                <Usd cents={card.spentThisMonthUsdCents} />
+              </AmountStack>
+            }
+            onOpen={() => onOpen(card.id)}
+          />
+        );
+      }}
+    />
   );
 }
 
+const NO_CARDS: readonly ExpendiCard[] = [];
+
 export function CardsTableSkeleton(): JSX.Element {
+  const columns = useMemo(() => cardColumns({ onOpen: () => undefined }), []);
+  const table = useDataTable({
+    data: NO_CARDS,
+    columns,
+    getRowId: (card) => card.id,
+    paginate: false,
+  });
   return (
-    <DataTable caption="Loading cards">
-      <tbody>
-        <TableSkeletonRows rows={5} columns={5} />
-      </tbody>
-    </DataTable>
+    <DataTable table={table} caption="Loading cards" loading skeletonRows={5} />
   );
 }

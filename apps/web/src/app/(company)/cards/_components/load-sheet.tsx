@@ -97,7 +97,7 @@ export function LoadSheet({
           <p className="text-lg leading-[26px] font-(--w-title) tabular-nums">
             <Usd cents={loaded.amountUsdCents} />
           </p>
-          <p className="max-w-[34ch] text-gray-600">
+          <p className="max-w-[34ch] text-muted-foreground">
             KES {formatKes(loaded.amountKes)} at KES {loaded.usdKesRate} per
             USD, counted against today&apos;s limit. It shows in Loads.
           </p>

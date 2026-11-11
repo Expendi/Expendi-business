@@ -8,10 +8,13 @@ import { ImportView } from "~/app/(staff)/companies/[id]/imports/view";
 import { ZohoBooksView } from "~/app/(staff)/companies/[id]/zoho/_components/zoho-books-view";
 import { ControlsView } from "~/app/(staff)/controls/_components/controls-view";
 import { HealthView } from "~/app/(staff)/health/_components/health-view";
+import { IntentQuoteQueueView } from "~/app/(staff)/intent-quotes/_components/intent-quote-queue-view";
+import { IntentQuoteView } from "~/app/(staff)/intent-quotes/[id]/_components/intent-quote-view";
 import { PayoutQueueView } from "~/app/(staff)/payouts/_components/payout-queue-view";
 import { PayoutView } from "~/app/(staff)/payouts/[id]/_components/payout-view";
 import ZohoBooksPage from "~/app/(staff)/zoho-books/page";
 import { COMPANY_ID } from "./fixtures/companies";
+import { INTENT_QUOTE_ID } from "./fixtures/intent-quotes";
 import { PAYOUT_ID } from "./fixtures/payouts";
 
 export interface PagePreview {
@@ -30,6 +33,10 @@ function CompanyImportsPreview(): JSX.Element {
 
 function CompanyZohoPreview(): JSX.Element {
   return <ZohoBooksView companyId={COMPANY_ID} />;
+}
+
+function IntentQuotePreview(): JSX.Element {
+  return <IntentQuoteView quoteId={INTENT_QUOTE_ID} />;
 }
 
 function PayoutPreview(): JSX.Element {
@@ -56,6 +63,11 @@ export const PAGE_PREVIEWS: Readonly<Record<string, PagePreview>> = {
   },
   controls: { path: "/controls", View: ControlsView },
   health: { path: "/health", View: HealthView },
+  "intent-quote": {
+    path: `/intent-quotes/${INTENT_QUOTE_ID}`,
+    View: IntentQuotePreview,
+  },
+  "intent-quotes": { path: "/intent-quotes", View: IntentQuoteQueueView },
   payout: { path: `/payouts/${PAYOUT_ID}`, View: PayoutPreview },
   payouts: { path: "/payouts", View: PayoutQueueView },
   "zoho-books": { path: "/zoho-books", View: ZohoBooksPage },

@@ -3,7 +3,8 @@ import type {
   IntentQuoteStatus,
 } from "@expendi-business/shared";
 
-import { Badge } from "~/components/ui/badge";
+import type { StatusTone } from "~/components/data/status-badge";
+import { StatusBadge } from "~/components/data/status-badge";
 
 /** What a quote was for, in the words CONTEXT.md gives. */
 export const INTENT_QUOTE_PURPOSE_LABELS: Record<IntentQuotePurpose, string> = {
@@ -14,10 +15,11 @@ export const INTENT_QUOTE_PURPOSE_LABELS: Record<IntentQuotePurpose, string> = {
   fund_in_return: "Fund-in return",
 };
 
-const STYLES: Partial<Record<IntentQuoteStatus, string>> = {
-  needs_review: "bg-amber-100 text-amber-900",
-  failed: "bg-error-50 text-error-700",
-  succeeded: "bg-emerald-50 text-emerald-800",
+const TONES: Partial<Record<IntentQuoteStatus, StatusTone>> = {
+  needs_review: "waiting",
+  depositing: "moving",
+  failed: "failed",
+  succeeded: "paid",
 };
 
 export function IntentQuoteStatusBadge({
@@ -26,8 +28,8 @@ export function IntentQuoteStatusBadge({
   status: IntentQuoteStatus;
 }) {
   return (
-    <Badge variant="secondary" className={STYLES[status]}>
+    <StatusBadge tone={TONES[status] ?? "quiet"}>
       {status.replace("_", " ")}
-    </Badge>
+    </StatusBadge>
   );
 }

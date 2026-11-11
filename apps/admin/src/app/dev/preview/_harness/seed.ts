@@ -9,6 +9,12 @@ import {
   companyDetail,
   CONTROLS,
 } from "./fixtures/companies";
+import {
+  INTENT_QUOTE_DETAIL,
+  INTENT_QUOTE_EVIDENCE,
+  INTENT_QUOTE_ID,
+  INTENT_QUOTES,
+} from "./fixtures/intent-quotes";
 import { PAYOUT_DETAIL, PAYOUT_ID, PAYOUTS } from "./fixtures/payouts";
 import {
   ZOHO_ACCOUNTS,
@@ -49,6 +55,22 @@ export function seedSampleData(client: QueryClient): void {
     },
   );
   client.setQueryData(queryKeys.payout(PAYOUT_ID), PAYOUT_DETAIL);
+  client.setQueryData(
+    queryKeys.intentQuoteQueue({
+      companyId: undefined,
+      cursor: undefined,
+      limit: PAGE_SIZE,
+    }),
+    { quotes: INTENT_QUOTES, nextCursor: null },
+  );
+  client.setQueryData(
+    queryKeys.intentQuote(INTENT_QUOTE_ID),
+    INTENT_QUOTE_DETAIL,
+  );
+  client.setQueryData(
+    queryKeys.intentQuoteEvidence(INTENT_QUOTE_ID),
+    INTENT_QUOTE_EVIDENCE,
+  );
   client.setQueryData(queryKeys.opsAlerts(), OPS_ALERTS);
   client.setQueryData(queryKeys.systemHealth(), SYSTEM_HEALTH);
   client.setQueryData(queryKeys.controls(), CONTROLS);

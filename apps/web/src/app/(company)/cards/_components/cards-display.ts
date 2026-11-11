@@ -12,8 +12,8 @@ import {
   usdCentsAmountSchema,
 } from "@expendi-business/shared";
 
+import type { SortDirection, SortState } from "~/components/data/data-table";
 import type { StatusTone } from "~/components/data/status-badge";
-import type { SortDirection, SortState } from "~/components/data/table";
 import type { CardPurchaseFilters } from "~/lib/query-keys";
 import { personName } from "~/app/(company)/expenses/_components/expense-labels";
 import { formatKes } from "~/lib/money";

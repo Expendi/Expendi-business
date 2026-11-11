@@ -187,15 +187,15 @@ export function TurnOnCards({
   return (
     <section
       aria-labelledby={`${formId}-title`}
-      className="mt-6 max-w-[640px] rounded-panel border border-gray-200 bg-surface p-6 shadow-panel [animation-delay:60ms] motion-safe:animate-rise max-[600px]:p-4"
+      className="mt-6 max-w-[640px] rounded-xl border border-border bg-card p-6 shadow-xs [animation-delay:60ms] motion-safe:animate-rise max-[600px]:p-4"
     >
       <h2
         id={`${formId}-title`}
-        className="text-lg leading-[26px] font-(--w-title) text-gray-900"
+        className="text-lg leading-[26px] font-(--w-title) text-card-foreground"
       >
         Turn on cards
       </h2>
-      <p className="mt-1 text-sm text-gray-600">
+      <p className="mt-1 text-sm text-muted-foreground">
         Issue virtual cards that spend from a Card balance you load yourself.
         You do this once for the company.
       </p>

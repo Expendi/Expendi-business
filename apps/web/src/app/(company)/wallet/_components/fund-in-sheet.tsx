@@ -322,13 +322,13 @@ export function FundInDetails({ fundIn }: { fundIn: FundIn }): JSX.Element {
       <div className="flex flex-col items-start gap-1">
         <p className="text-2xl leading-8 font-(--w-heading) tracking-[-0.02em] tabular-nums">
           {formatUsdc(fundIn.amountIn)}{" "}
-          <span className="text-[0.6em] font-(--w-ui) tracking-[0.04em] text-gray-500">
+          <span className="text-[0.6em] font-(--w-ui) tracking-[0.04em] text-muted-foreground">
             USDC
           </span>
         </p>
         <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
       </div>
-      <p role="status" className="text-sm text-gray-600">
+      <p role="status" className="text-sm text-muted-foreground">
         {status.note}
       </p>
       <DetailList>

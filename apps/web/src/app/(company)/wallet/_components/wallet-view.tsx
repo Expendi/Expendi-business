@@ -130,13 +130,17 @@ function CompanyAccounts({
             onAddAddress={() => setSheet("add-address")}
           />
           <AddAddressSheet
-            key={sheet === "add-address" ? "open" : "closed"}
+            key={
+              sheet === "add-address"
+                ? "add-address-open"
+                : "add-address-closed"
+            }
             open={sheet === "add-address"}
             organizationId={organizationId}
             onClose={() => setSheet(null)}
           />
           <FundInSheet
-            key={sheet === "fund-in" ? "open" : "closed"}
+            key={sheet === "fund-in" ? "fund-in-open" : "fund-in-closed"}
             open={sheet === "fund-in"}
             organizationId={organizationId}
             onClose={() => setSheet(null)}

@@ -1,27 +1,16 @@
 "use client";
 
 import type { JSX } from "react";
+import { useMemo } from "react";
 
 import type { CardLoad } from "@expendi-business/shared";
 
+import { DataTable, useDataTable } from "~/components/data/data-table";
 import { AmountStack, Money } from "~/components/data/money";
 import { StatusBadge } from "~/components/data/status-badge";
-import {
-  DataRow,
-  DataTable,
-  PhoneCards,
-  RowMeta,
-  RowTitle,
-  TableSkeletonRows,
-  Td,
-  Th,
-} from "~/components/data/table";
 import { formatNairobiDate } from "~/lib/dates";
-import { formatKes } from "~/lib/money";
+import { loadColumns } from "./columns";
 import { Usd } from "./usd";
-
-const rateLine = (load: CardLoad) =>
-  `At KES ${load.usdKesRate} per USD · KES ${formatKes(load.amountKes)}`;
 
 /** Every Card load, newest first. Loads are a record: nothing to open. */
 export function LoadsTable({
@@ -29,52 +18,30 @@ export function LoadsTable({
 }: {
   loads: readonly CardLoad[];
 }): JSX.Element {
+  const columns = useMemo(() => loadColumns(), []);
+  const table = useDataTable({
+    data: loads,
+    columns,
+    getRowId: (load) => load.id,
+    manual: true,
+    paginate: false,
+  });
   return (
-    <>
-      <DataTable caption="Card loads">
-        <thead>
-          <tr>
-            <Th>Date</Th>
-            <Th>Loaded by</Th>
-            <Th align="end">Amount</Th>
-            <Th>Kind</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {loads.map((load) => (
-            <DataRow key={load.id}>
-              <Td kind="date">{formatNairobiDate(load.createdAt)}</Td>
-              <Td kind="main">
-                <RowTitle>{load.loadedBy}</RowTitle>
-                <RowMeta text={rateLine(load)} />
-              </Td>
-              <Td align="end">
-                <AmountStack
-                  sub={<Money amount={load.amountKes} currency="KES" />}
-                >
-                  <Usd cents={load.amountUsdCents} />
-                </AmountStack>
-              </Td>
-              <Td>
-                {load.simulated ? (
-                  <StatusBadge tone="quiet">Simulated</StatusBadge>
-                ) : null}
-              </Td>
-            </DataRow>
-          ))}
-        </tbody>
-      </DataTable>
-      <PhoneCards label="Card loads">
-        {loads.map((load) => (
+    <DataTable
+      table={table}
+      caption="Card loads"
+      renderPhoneCard={(row) => {
+        const load = row.original;
+        return (
           <li
-            key={load.id}
-            className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-b border-row-divider px-4 py-3.5"
+            key={row.id}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-b border-border px-4 py-3.5"
           >
             <span className="min-w-0">
-              <span className="block truncate text-base leading-6 font-(--w-name) text-gray-900">
+              <span className="block truncate text-base leading-6 font-(--w-name) text-foreground">
                 {load.loadedBy}
               </span>
-              <span className="block truncate text-gray-500 tabular-nums">
+              <span className="block truncate text-muted-foreground tabular-nums">
                 {formatNairobiDate(load.createdAt)}
               </span>
               {load.simulated ? (
@@ -87,18 +54,28 @@ export function LoadsTable({
               <Usd cents={load.amountUsdCents} />
             </AmountStack>
           </li>
-        ))}
-      </PhoneCards>
-    </>
+        );
+      }}
+    />
   );
 }
 
+const NO_LOADS: readonly CardLoad[] = [];
+
 export function LoadsTableSkeleton(): JSX.Element {
+  const columns = useMemo(() => loadColumns(), []);
+  const table = useDataTable({
+    data: NO_LOADS,
+    columns,
+    getRowId: (load) => load.id,
+    paginate: false,
+  });
   return (
-    <DataTable caption="Loading Card loads">
-      <tbody>
-        <TableSkeletonRows rows={4} columns={4} />
-      </tbody>
-    </DataTable>
+    <DataTable
+      table={table}
+      caption="Loading Card loads"
+      loading
+      skeletonRows={4}
+    />
   );
 }

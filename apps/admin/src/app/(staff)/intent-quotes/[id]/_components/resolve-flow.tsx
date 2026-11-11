@@ -146,7 +146,7 @@ export function ResolveQuoteFlow({ quoteId }: { quoteId: string }) {
             />
             <span>
               <span className="font-medium">{option.label}</span>
-              <span className="block text-stone-600">{option.hint}</span>
+              <span className="block text-muted-foreground">{option.hint}</span>
             </span>
           </label>
         ))}
@@ -218,18 +218,18 @@ export function QuoteEvidenceSummary({
 }) {
   return (
     <dl className="mt-4 grid grid-cols-1 gap-x-4 gap-y-3 text-sm sm:grid-cols-[12rem_minmax(0,1fr)]">
-      <dt className="text-stone-600">1Click says</dt>
+      <dt className="text-muted-foreground">1Click says</dt>
       <dd>
         {evidence.oneClickStatus ?? "— (not asked yet)"}
         {evidence.depositedAmount
           ? `, ${formatUsdc(evidence.depositedAmount)} deposited`
           : ""}
       </dd>
-      <dt className="text-stone-600">Deposit</dt>
+      <dt className="text-muted-foreground">Deposit</dt>
       <dd>
         <Transfers transfers={evidence.deposits} none="None found on chain" />
       </dd>
-      <dt className="text-stone-600">Delivered to the recipient</dt>
+      <dt className="text-muted-foreground">Delivered to the recipient</dt>
       <dd>
         {evidence.unreadDeliveries.length > 0 ? (
           evidence.unreadDeliveries.map((txHash) => (
@@ -246,14 +246,14 @@ export function QuoteEvidenceSummary({
           />
         )}
       </dd>
-      <dt className="text-stone-600">Back to the refund address</dt>
+      <dt className="text-muted-foreground">Back to the refund address</dt>
       <dd>
         <Transfers
           transfers={evidence.refunds}
           none="None in the transactions 1Click lists"
         />
       </dd>
-      <dt className="text-stone-600">Company wallet sends</dt>
+      <dt className="text-muted-foreground">Company wallet sends</dt>
       <dd>
         {evidence.companyWalletSends.length === 0
           ? "None"
@@ -273,7 +273,7 @@ export function QuoteEvidenceSummary({
               </span>
             ))}
       </dd>
-      <dt className="text-stone-600">Payouts</dt>
+      <dt className="text-muted-foreground">Payouts</dt>
       <dd>
         {evidence.payouts.length === 0
           ? "None"

@@ -20,6 +20,8 @@ env check (`app/providers.tsx`), and the API is replaced by sample data
 | `company`         | `/companies/[id]`                           |
 | `company-imports` | `/companies/[id]/imports`                   |
 | `company-zoho`    | `/companies/[id]/zoho`                      |
+| `intent-quotes`   | `/intent-quotes`                            |
+| `intent-quote`    | `/intent-quotes/[id]`, a quote under review |
 | `payouts`         | `/payouts` (`?status=failed` filters it)    |
 | `payout`          | `/payouts/[id]`, a payout that needs review |
 | `alerts`          | `/alerts`                                   |

@@ -8,6 +8,11 @@ import { ApiError } from "~/lib/api";
 import { OPS_ALERTS, SYSTEM_HEALTH } from "./fixtures/alerts";
 import { AUDIT_ENTRIES } from "./fixtures/audit";
 import { COMPANIES, companyDetail, CONTROLS } from "./fixtures/companies";
+import {
+  INTENT_QUOTE_EVIDENCE,
+  INTENT_QUOTES,
+  intentQuoteDetail,
+} from "./fixtures/intent-quotes";
 import { payoutDetail, PAYOUTS } from "./fixtures/payouts";
 import {
   ZOHO_ACCOUNTS,
@@ -87,6 +92,26 @@ const ROUTES: readonly Route[] = [
         nextCursor: null,
       };
     },
+  },
+  {
+    pattern: /^\/internal\/intent-quotes$/,
+    respond: (_match, query) => {
+      const companyId = query.get("companyId");
+      return {
+        quotes: INTENT_QUOTES.filter(
+          (quote) => !companyId || quote.organization.id === companyId,
+        ),
+        nextCursor: null,
+      };
+    },
+  },
+  {
+    pattern: /^\/internal\/intent-quotes\/([^/]+)\/evidence$/,
+    respond: () => INTENT_QUOTE_EVIDENCE,
+  },
+  {
+    pattern: /^\/internal\/intent-quotes\/([^/]+)$/,
+    respond: (match) => intentQuoteDetail(match[1] ?? ""),
   },
   {
     pattern: /^\/internal\/payouts\/([^/]+)$/,

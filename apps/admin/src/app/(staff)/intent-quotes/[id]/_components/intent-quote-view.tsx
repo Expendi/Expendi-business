@@ -1,11 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { cn } from "cn";
 import Link from "next/link";
 
 import type { StaffIntentQuoteDetail } from "@expendi-business/shared";
 import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
+import { PageHeader } from "~/components/data/page-header";
 import {
   INTENT_QUOTE_PURPOSE_LABELS,
   IntentQuoteStatusBadge,
@@ -13,7 +15,13 @@ import {
 import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import { PayoutsTable } from "~/components/payouts-table";
 import { linkClass } from "~/components/styles";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiTime, formatUsdc } from "~/lib/format";
@@ -60,37 +68,47 @@ export function IntentQuoteView({ quoteId }: { quoteId: string }) {
       <p className="text-sm">
         <Link
           href="/intent-quotes"
-          className="text-stone-600 underline-offset-4 hover:underline"
+          className="text-muted-foreground underline-offset-4 hover:underline"
         >
           NEAR Intents
         </Link>
       </p>
-      <h1 className="mt-2 flex flex-wrap items-center gap-3 text-2xl font-semibold tracking-tight">
-        {INTENT_QUOTE_PURPOSE_LABELS[quote.purpose]} of{" "}
-        {formatUsdc(quote.amountOut)}
-        <IntentQuoteStatusBadge status={quote.status} />
-      </h1>
-      <p className="mt-1 text-sm text-stone-600">
-        <Link
-          href={`/companies/${quote.organization.id}`}
-          className={linkClass}
-        >
-          {quote.organization.name}
-        </Link>{" "}
-        · {chain(quote.originChain)} to {chain(quote.destinationChain)} ·{" "}
-        <Link href={auditHref} className={linkClass}>
-          Audit trail
-        </Link>
-      </p>
+      <div className="mt-2">
+        <PageHeader
+          title={
+            <span className="flex flex-wrap items-center gap-3">
+              <span>
+                {INTENT_QUOTE_PURPOSE_LABELS[quote.purpose]} of{" "}
+                {formatUsdc(quote.amountOut)}
+              </span>
+              <IntentQuoteStatusBadge status={quote.status} />
+            </span>
+          }
+          subtitle={
+            <>
+              <Link
+                href={`/companies/${quote.organization.id}`}
+                className={linkClass}
+              >
+                {quote.organization.name}
+              </Link>{" "}
+              · {chain(quote.originChain)} to {chain(quote.destinationChain)} ·{" "}
+              <Link href={auditHref} className={linkClass}>
+                Audit trail
+              </Link>
+            </>
+          }
+        />
+      </div>
       {quote.failure ? (
-        <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm">
+        <p className="mt-3 rounded-md bg-warn-50 px-3 py-2 text-sm">
           {quote.failure}
         </p>
       ) : null}
 
       <div className="mt-4">
         {!canAct ? (
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-muted-foreground">
             Resolving needs an ops admin.
           </p>
         ) : resolvable(quote) ? (
@@ -144,7 +162,7 @@ export function IntentQuoteView({ quoteId }: { quoteId: string }) {
               ] as const
             ).map(([label, value]) => (
               <div key={label} className="contents">
-                <dt className="text-stone-500">{label}</dt>
+                <dt className="text-muted-foreground">{label}</dt>
                 <dd className="break-all">{value}</dd>
               </div>
             ))}
@@ -152,43 +170,59 @@ export function IntentQuoteView({ quoteId }: { quoteId: string }) {
         </CardContent>
       </Card>
 
-      <h2 className="mt-8 text-base font-semibold">
-        What 1Click and the chains show
-      </h2>
-      <QuoteEvidence quoteId={quote.id} />
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>
+            <h2>What 1Click and the chains show</h2>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <QuoteEvidence quoteId={quote.id} />
+        </CardContent>
+      </Card>
 
-      <h2 className="mt-8 text-base font-semibold">Payouts</h2>
-      {quote.payouts.length === 0 ? (
-        <PageEmpty title="No payouts.">
-          This quote moves the company&apos;s money between its own wallets.
-        </PageEmpty>
-      ) : (
-        <div className="mt-3">
+      <Card className="mt-6 gap-0 overflow-hidden py-0">
+        <CardHeader className="border-b py-4">
+          <CardTitle>
+            <h2>Payouts</h2>
+          </CardTitle>
+        </CardHeader>
+        {quote.payouts.length === 0 ? (
+          <PageEmpty title="No payouts.">
+            This quote moves the company&apos;s money between its own wallets.
+          </PageEmpty>
+        ) : (
           <PayoutsTable payouts={quote.payouts} showCompany={false} />
-        </div>
-      )}
+        )}
+      </Card>
 
-      <h2 className="mt-8 text-base font-semibold">Audit trail</h2>
-      {quote.auditTrail.length === 0 ? (
-        <PageEmpty title="No audit entries yet." />
-      ) : (
-        <ol className="mt-3 divide-y divide-border rounded-xl border border-border bg-card px-4 text-sm sm:px-6">
-          {quote.auditTrail.map((entry) => (
-            <li key={entry.id} className="py-4 break-words">
-              <span className="text-stone-500">
-                {formatNairobiTime(entry.occurredAt)}
-              </span>{" "}
-              <span className="font-mono text-xs">{entry.action}</span> by{" "}
-              {entry.actor.email ?? entry.actor.id}
-            </li>
-          ))}
-        </ol>
-      )}
-      <p className="mt-2 text-sm">
-        <Link href={auditHref} className={linkClass}>
-          Open in the audit log, with before and after
-        </Link>
-      </p>
+      <Card className="mt-6 gap-0 overflow-hidden py-0">
+        <CardHeader className="border-b py-4">
+          <CardTitle>
+            <h2>Audit trail</h2>
+          </CardTitle>
+          <CardAction>
+            <Link href={auditHref} className={cn(linkClass, "text-sm")}>
+              Open in the audit log, with before and after
+            </Link>
+          </CardAction>
+        </CardHeader>
+        {quote.auditTrail.length === 0 ? (
+          <PageEmpty title="No audit entries yet." />
+        ) : (
+          <ol className="divide-y divide-border px-4 text-sm sm:px-6">
+            {quote.auditTrail.map((entry) => (
+              <li key={entry.id} className="py-4 break-words">
+                <span className="text-muted-foreground">
+                  {formatNairobiTime(entry.occurredAt)}
+                </span>{" "}
+                <span className="font-mono text-xs">{entry.action}</span> by{" "}
+                {entry.actor.email ?? entry.actor.id}
+              </li>
+            ))}
+          </ol>
+        )}
+      </Card>
     </section>
   );
 }
@@ -205,9 +239,5 @@ function QuoteEvidence({ quoteId }: { quoteId: string }) {
   if (result.isError) {
     return <PageError>{describeApiError(result.error)}</PageError>;
   }
-  return (
-    <div className="mt-3 rounded-xl border border-border bg-card px-4 pb-4 sm:px-6">
-      <QuoteEvidenceSummary evidence={result.data} />
-    </div>
-  );
+  return <QuoteEvidenceSummary evidence={result.data} />;
 }
