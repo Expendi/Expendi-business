@@ -2,7 +2,65 @@
 
 B2B stablecoin finance for African startups. The current Kenya MVP brings staff claims, petty cash, supplier bills, subscriptions and salary payments into one workspace, with mobile, customer web and internal operations apps.
 
-Companies hold USDC on Base in wallets managed by Expendi. The payment engine supports KES payouts to M-Pesa numbers, Tills, Paybills and Kenyan bank accounts, plus USDC wallet transfers. Staff claims currently reimburse to verified M-Pesa numbers; payroll currently pays fixed net salaries in KES.
+Companies hold USDC on NEAR in wallets managed by Expendi. The payment engine supports KES payouts to M-Pesa numbers, Tills, Paybills and Kenyan bank accounts, plus USDC transfers to NEAR, Base and Solana. Staff claims currently reimburse to verified M-Pesa numbers; payroll currently pays fixed net salaries in KES.
+
+## NEAR HACKATHON submission
+
+**Track 08 · Real-World Money.** Expendi Business already ran on Base before the hackathon. What was built for NEAR HACKATHON is the port that makes NEAR the main chain: everything on the `chain/near` branch after the `pre-hackathon-near` tag. [See the diff](https://github.com/Expendi/Expendi-business/compare/pre-hackathon-near...chain/near).
+
+A Kenyan company keeps its money as USDC in its own NEAR account. From there it pays staff claims, supplier bills and payroll, to M-Pesa or to a USDC payee on the chain the payee chooses. It never sees a gas token.
+
+| Track tag         | How it is used                                                                                                                                                                                                                                     |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stablecoins       | Every company's balance is native USDC on NEAR. The ledger, approvals, payroll and accountant export all run on it.                                                                                                                                |
+| NEAR Intents      | Companies fund in with USDC from Base, Ethereum, Arbitrum or Solana. USDC payees on Base or Solana are paid through 1Click. Each M-Pesa cash-out moves the exact amount to Base through 1Click, because the KES off-ramp (Paycrest) settles there. |
+| Meta transactions | Each company wallet is a Privy server wallet that signs NEP-366 delegate actions. Expendi's gas relayer pays every fee, creates each account and pays its USDC registration.                                                                       |
+
+### How the money moves
+
+1. **Wallet.** A company gets a NEAR company wallet (a Privy wallet, owned by Expendi's management key, which the API signs for under its own key) and a Base transit wallet.
+2. **Fund-in.** A plain USDC transfer on NEAR is credited once the chain confirms it. A fund-in from another chain is a 1Click quote that delivers USDC on NEAR. Transfers Expendi itself caused (refunds, sweeps, relayer transfers) are recognised by transaction hash and never credited.
+3. **Approval.** An admin approves a claim, bill or payroll run with a passkey. The per-transaction cap is checked by the API immediately before Privy signs.
+4. **Payout.** A NEAR payee is paid directly. A Base or Solana payee is paid through 1Click. A payroll run's M-Pesa cash-outs move to the transit wallet in one Base hop, then Paycrest pays each person in KES.
+5. **Safety.** Every signed send is saved before it is broadcast, so a retry re-sends the same bytes and can never pay twice. Anything unclear goes to `needs_review`, and staff resolve it from the chain's evidence.
+
+The design and its trade-offs are in [docs/decisions/near-main-chain.md](docs/decisions/near-main-chain.md). Terms are in [CONTEXT.md](CONTEXT.md).
+
+### Check it yourself
+
+Needs Node 22, pnpm 10 and a local Postgres with trust auth. No provider keys are needed: the tests use in-memory fakes of NEAR, 1Click, Privy, Paycrest and Alchemy, and the fake NEAR chain runs the real borsh-encoded transactions.
+
+```sh
+pnpm install
+pnpm --filter @expendi-business/api db:setup-local
+pnpm --filter @expendi-business/shared build
+pnpm --filter @expendi-business/api test
+```
+
+You should see every test pass. The NEAR behaviour lives in these files under `apps/api/src/__tests__/`:
+
+| Do                                            | See                                                                                                                                                              |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `services/company-wallet-send.test.ts`        | A send over the cap is refused before signing; a retried send relays the same saved bytes; a send is only called expired once the chain proves its nonce unused. |
+| `services/near-deposits.serial.test.ts`       | Deposits are credited once, forged events from other contracts are ignored, and Expendi's own refunds are skipped.                                               |
+| `services/base-hop.test.ts`                   | A payroll run hops to Base once, splits when it exceeds the cap, and resumes after a crash at any step.                                                          |
+| `services/usdc-delivery.test.ts`              | USDC payees on Base and Solana are paid through 1Click; a refunded quote returns the money and fails the payout cleanly.                                         |
+| `routes/fund-ins.test.ts`                     | Fund-in from Base, Ethereum, Arbitrum and Solana.                                                                                                                |
+| `routes/internal-near-payouts.serial.test.ts` | Staff resolve a stuck NEAR payout from the chain's evidence, without signing anything.                                                                           |
+
+### On mainnet
+
+- [`9HtNEa3es1a6FGcbYRBytbsBU6kBuY26taGsvYZVbdeH`](https://nearblocks.io/txns/9HtNEa3es1a6FGcbYRBytbsBU6kBuY26taGsvYZVbdeH): the gas relayer, a Privy server wallet, registering itself with the NEAR USDC contract. The transaction was built by the API, signed by Privy and broadcast by the API.
+- Company wallet [`cfe4f640…312d02`](https://nearblocks.io/address/cfe4f640d78bd13a6cbefd5301f94466d24fdca2790ef0d46f135cd1bd312d02), created by the same `ensureCompanyWallet` that company sign-up uses: a Privy NEAR wallet, put on chain and registered for USDC by the relayer, plus its Base transit wallet.
+- [`Hdok6k8RBUGxTjkhjokAA884P64MxPmMsPsnnmgGpsS4`](https://nearblocks.io/txns/Hdok6k8RBUGxTjkhjokAA884P64MxPmMsPsnnmgGpsS4): the relayer sends the company wallet 0.5 USDC. The deposit watcher, run against FastNEAR and the RPC, classed it as internal and credited nothing, because the relayer's own transfers are never deposits.
+- [`8YXj2VoApYJxqtXAPeBqiZMPP1XPRhQyeJQ1zcpe36kB`](https://nearblocks.io/txns/8YXj2VoApYJxqtXAPeBqiZMPP1XPRhQyeJQ1zcpe36kB): the company wallet sends 0.2 USDC as a Privy-signed NEP-366 delegate action that the relayer submitted and paid for. The company wallet's NEAR balance did not change. `apps/api/scripts/near-mainnet-smoke.ts` repeats steps like these for any company.
+- `apps/api/scripts/spike-privy-near.ts` is the go/no-go spike run on 2026-11-10. It creates a Privy NEAR wallet, has a relayer pay gas for its delegate action, and prices 1Click routes. It needs the Privy app's keys.
+
+### Disclosure
+
+- Expendi Business existed on Base before NEAR HACKATHON. The NEAR port is the hackathon work.
+- Code was written with Claude Code (Anthropic), using parallel subagents, and reviewed and verified in the main session.
+- Libraries: `near-api-js`, `@privy-io/node`, `@defuse-protocol/one-click-sdk-typescript`, plus the existing stack listed under Development.
 
 ## Status
 
@@ -45,7 +103,7 @@ These phase numbers belong to the [51-task MVP build plan](docs/expense-mvp-buil
 
 ### Wallets and payments
 
-- One managed Privy wallet per company, Base USDC deposit detection through Alchemy, ledger/history and KES balance estimates.
+- One managed Privy wallet per company on NEAR, with a Base transit wallet for cash-outs; NEAR USDC deposit detection, fund-in from other chains through NEAR Intents, ledger/history and KES balance estimates.
 - Shared payout engine for claims, bills, floats and payroll: batch-bound passkey approval, balance reservation, daily/payroll caps, company/global pauses and idempotent funding.
 - Paycrest KES payouts, exact USDC transfers, passkey-protected withdrawal allowlists, signed webhooks, reconciliation, onchain confirmation, refunds and explicit retries. Uncertain outcomes enter `needs_review`.
 
@@ -144,7 +202,7 @@ Wallet deposits, supplier bill attachments and recurring outgoing payments are r
 - [ ] **Delivery and client portal:** send, duplicate, cancel and remind actions; public payment links, invoice viewing and payment-method selection.
 - [ ] **Payment acceptance:** expiring FX/fee quotes, invoice-specific crypto addresses and QR instructions, fiat virtual accounts/bank references, card checkout and mobile-money collections.
 - [ ] **Payment matching and settlement:** invoice-linked incoming payment detection, confirmations, partial payments, receipts, conversion/swaps and settlement to the company's chosen wallet/bank/mobile-money destination.
-- [ ] **Additional assets/rails:** USDT/DAI and the required additional fiat currencies/chains; the current engine operates on Base USDC and Kenyan payout rails.
+- [ ] **Additional assets/rails:** USDT/DAI and the required additional fiat currencies/chains; the current engine operates on NEAR USDC, with Base for cash-outs, and Kenyan payout rails.
 - [ ] **Automation and reconciliation:** recurring customer invoices, automatic sending and overdue reminders, accounting sync and receivables reports.
 - [ ] **API and UI:** invoice/client CRUD, public payment options/initiation, recurring-invoice endpoints and collection-provider webhooks, with tenant isolation and end-to-end tests.
 
