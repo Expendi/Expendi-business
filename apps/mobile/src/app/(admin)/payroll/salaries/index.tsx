@@ -1,21 +1,19 @@
 import type { JSX } from "react";
 import { useRouter } from "expo-router";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { Users } from "lucide-react-native";
 
 import type { Salary } from "@expendi-business/shared";
 
 import type { Company } from "~/features/company/company-provider";
-import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
-import { ErrorMessage } from "~/components/error-message";
+import { EmptyState } from "~/components/empty-state";
+import { LoadError } from "~/components/load-error";
 import { Screen } from "~/components/screen";
-import { Text } from "~/components/text";
-import { formatIsoDate } from "~/features/claims/dates";
+import { ItemRow, SoftGroup, SoftGroupSkeleton } from "~/components/soft-group";
+import { formatShortDate, localIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
-import {
-  payDayInWords,
-  SALARY_STATE_LABELS,
-} from "~/features/payroll/payroll-display";
+import { SALARY_STATE_LABELS } from "~/features/payroll/payroll-display";
+import { payoutLabel } from "~/features/payroll/payroll-overview";
 import { useSalaries } from "~/features/payroll/use-payroll";
 import { describeApiError } from "~/lib/api";
 import { formatKesCents } from "~/lib/money";
@@ -44,28 +42,30 @@ function SalariesScreen({ company }: { company: Company }): JSX.Element {
       />
 
       {salaries.isPending ? (
-        <ActivityIndicator accessibilityLabel="Loading salaries" />
+        <SoftGroupSkeleton rows={4} label="Loading salaries" />
       ) : salaries.isError ? (
-        <View className="gap-4">
-          <ErrorMessage message={describeApiError(salaries.error)} />
-          <Button
-            label="Try again"
-            variant="secondary"
-            loading={salaries.isFetching}
-            onPress={() => void salaries.refetch()}
-          />
-        </View>
+        <LoadError
+          message={describeApiError(salaries.error)}
+          retrying={salaries.isFetching}
+          onRetry={() => void salaries.refetch()}
+        />
       ) : salaries.data.length === 0 ? (
-        <Text className="text-base text-gray-600">
-          Set up each person’s net pay and pay day once. Only admins see
-          salaries.
-        </Text>
+        <EmptyState
+          icon={Users}
+          title="No salaries yet"
+          message="Set up each person’s net pay and pay day once. Only admins see salaries."
+        />
       ) : (
-        <View className="gap-3">
+        <SoftGroup>
           {salaries.data.map((salary) => (
-            <SalaryRow
+            <ItemRow
               key={salary.id}
-              salary={salary}
+              title={salary.payee.name}
+              meta={salaryMeta(salary)}
+              metaTone={salary.state === "active" ? "default" : "negative"}
+              amount={formatKesCents(salary.amountKes)}
+              avatarName={salary.payee.name}
+              accessibilityLabel={`${salary.payee.name}, KES ${formatKesCents(salary.amountKes)}, ${salaryMeta(salary)}`}
               onPress={() =>
                 router.push({
                   pathname: "/payroll/salaries/[salaryId]",
@@ -74,44 +74,17 @@ function SalariesScreen({ company }: { company: Company }): JSX.Element {
               }
             />
           ))}
-        </View>
+        </SoftGroup>
       )}
     </Screen>
   );
 }
 
-function SalaryRow({
-  salary,
-  onPress,
-}: {
-  salary: Salary;
-  onPress: () => void;
-}): JSX.Element {
-  const amount = `KES ${formatKesCents(salary.amountKes)}`;
-  const state = SALARY_STATE_LABELS[salary.state];
+/** Payout method and next pay day; a paused or ended salary says so instead. */
+function salaryMeta(salary: Salary): string {
+  if (salary.state !== "active") return SALARY_STATE_LABELS[salary.state].label;
   const next = salary.nextPayDate
-    ? `Next paid ${formatIsoDate(salary.nextPayDate)}`
-    : "No more pay";
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${salary.payee.name}, ${amount}, ${next}, ${state.label}`}
-      onPress={onPress}
-      className="gap-2 rounded-xl border border-gray-200 px-4 py-3 active:bg-gray-50"
-    >
-      <View className="flex-row items-start justify-between gap-3">
-        <View className="flex-1 gap-0.5">
-          <Text className="text-base font-semibold text-gray-900">
-            {salary.payee.name}
-          </Text>
-          <Text className="text-sm text-gray-600">
-            {payDayInWords(salary.payDay)}
-          </Text>
-          <Text className="text-sm text-gray-600">{next}</Text>
-        </View>
-        <Text className="text-base font-semibold text-gray-900">{amount}</Text>
-      </View>
-      <Badge label={state.label} tone={state.tone} />
-    </Pressable>
-  );
+    ? `next paid ${formatShortDate(salary.nextPayDate, localIsoDate(new Date()))}`
+    : "no more pay";
+  return `${payoutLabel(salary.payee.method)} · ${next}`;
 }

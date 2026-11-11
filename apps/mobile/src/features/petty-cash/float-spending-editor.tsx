@@ -196,7 +196,7 @@ export function FloatSpendingEditor({
     if (receiptFileIds.length === 0 && !errors.receipts) {
       if (overspend) {
         errors.receipts =
-          "The extra becomes a claim, and a claim needs a receipt. Add a photo or screenshot, or paste the M-Pesa SMS.";
+          "The extra becomes a reimbursement, and a reimbursement needs a receipt. Add a photo or screenshot, or paste the M-Pesa SMS.";
       } else if (!withoutReceipt.on) {
         errors.receipts = "Add a receipt, or choose No receipt and say why.";
       }
@@ -286,7 +286,7 @@ export function FloatSpendingEditor({
           />
           {duplicate?.expenseId && duplicate.kind === "claim" ? (
             <Button
-              label="Open the earlier claim"
+              label="Open the earlier reimbursement"
               variant="secondary"
               onPress={() => {
                 if (duplicate.expenseId) {
@@ -299,7 +299,7 @@ export function FloatSpendingEditor({
             />
           ) : null}
           <Button
-            label={overspend ? "Save and submit the claim" : "Save spending"}
+            label={overspend ? "Save and submit the reimbursement" : "Save spending"}
             loading={submitting}
             onPress={() => onSubmit(review)}
           />

@@ -29,6 +29,9 @@ React Native controls.
   muted: gray 500 `#667085`.
 - Borders: gray 200 `#e4e7ec`; control borders: gray 300 `#d0d5dd`.
 - Error: `#b42318`; status colors communicate state, not decoration.
+- Success (mobile): 50 `#ecfdf3`, 700 `#067647`, from the same Untitled UI
+  family as the gray scale. Only for money coming in (the green trend line)
+  and paid states; never on coral, where red and green fail contrast.
 
 Browser tokens live in each app's existing `src/app/styles.css` and are kept
 identical. Legacy `stone-*` classes alias the Expendi gray scale while screens
@@ -61,7 +64,8 @@ dark-token definitions; the current product remains light by default.
   48px large. Inputs and adjacent buttons share a height.
 - Native controls: minimum 48px; height grows with text scaling. Labels can
   wrap without clipping. Native content is capped at 768px with 20px gutters.
-- Browser controls: 8px corners; panels: 14px. Native controls/panels: 12px.
+- Browser controls: 8px corners; panels: 14px. Native fields: 12px; native
+  groups, cards and buttons follow the K1 geometry under Mobile.
 - Cards group distinct financial information; nested tables do not need
   another card or shadow. Table cells use 16px horizontal / 12px vertical padding.
 
@@ -85,12 +89,31 @@ Expo Image for the original mark, Expo Haptics for section selection, and
 Reanimated for reduced-motion-aware loading transitions. Native colors passed
 to icons and navigation are defined in `apps/mobile/src/theme/colors.ts`.
 
-- Primary mobile buttons and fields share a 52px minimum height. Larger text
-  can increase the height; labels and amounts are allowed to wrap.
-- Home separates the financial overview from grouped workspace navigation.
-  Quick actions stay above the overview. Employee screens use employee-scoped
-  data and actions; company management remains admin-only.
-- Workspace groups: Spend & pay, Money & reports, People, and Your work.
+- Direction K1 (2026-11-11, `docs/handoffs/mobile-k1-redesign.md`): coral top with
+  a pill header, a coral-gradient card peeking behind a white sheet, the big
+  figure, one trend line, round quick actions, soft grey groups. The shared
+  pieces live in `apps/mobile/src/components/` (`CoralScreen`, `CoralHeader`,
+  `GradientCard`, `MoneyFigure`, `TrendLine`, `QuickActions`, `SoftGroup`/
+  `ItemRow`, `SectionHeader`, `FilterPills`, `TabScreen`, `DetailHeader`,
+  `KvGroup`, `TabBar`).
+- Native type scale: figure 46 Regular with the currency code and cents
+  20/26 muted; tab-root titles 30 SemiBold; section headings 18 SemiBold; row
+  titles 16 SemiBold over 14 Regular meta; buttons 17 SemiBold; tab labels 11.
+- Native geometry: primary and secondary buttons 56px with 16px corners
+  (secondary is a gray-100 fill); soft groups 24px corners on gray-50 with
+  hairlines between rows; gradient cards 22px; row icons 20px, stroke 1.75,
+  in 44px circles (white on grey groups, error-50 when overdue); quick
+  actions 24px icons in 60px gray-100 circles. Fields keep 52px.
+- Selected states: the active tab is a coral-700 outline icon on a coral-50
+  pill with a coral-700 SemiBold label; a selected filter pill is coral-500
+  with a gray-900 label, the same pairing as the primary button.
+- No gray-900 cards on coral. White text only on the darker part of a
+  gradient card.
+- Navigation: admins get five tabs, Home · Bills · Expenses · Payroll ·
+  Company; employees and accountants get Home · Petty cash · Pay · Profile.
+  Wallet, team, payees, export, floats, switching company and signing out
+  live on the Company tab (Profile for employees). Employee screens use
+  employee-scoped data; company management remains admin-only.
 - Sign-in and verification use the original logo and a centered, scrollable,
   keyboard-aware form. Native headers use the same cool-gray workspace surface.
 - Wallet and overview balances use tabular figures, distinct amount and label

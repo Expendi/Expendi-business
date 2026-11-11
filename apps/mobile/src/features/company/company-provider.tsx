@@ -39,7 +39,7 @@ export type CompanyState =
       company: Company;
     };
 
-interface CompanyContextValue {
+export interface CompanyContextValue {
   state: CompanyState;
   selectCompany: (organizationId: string) => void;
   retry: () => void;
@@ -141,6 +141,19 @@ export function CompanyProvider({
     [state, selectCompany, retry],
   );
 
+  return (
+    <CompanyContext.Provider value={value}>{children}</CompanyContext.Provider>
+  );
+}
+
+/** Supplies a fixed session, e.g. a signed-in admin in dev previews. */
+export function StaticCompanyProvider({
+  value,
+  children,
+}: {
+  value: CompanyContextValue;
+  children: ReactNode;
+}): JSX.Element {
   return (
     <CompanyContext.Provider value={value}>{children}</CompanyContext.Provider>
   );

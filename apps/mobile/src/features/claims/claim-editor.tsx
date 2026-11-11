@@ -16,6 +16,7 @@ import {
 } from "@expendi-business/shared";
 
 import type { ClaimDraft, DraftField, DraftState, FieldSource } from "./draft";
+import type { ClaimEvidence } from "./evidence";
 import type { AttachedSms } from "./sms-evidence";
 import type { ReadingStatus } from "./use-receipt-reading";
 import type { ReceiptSlot } from "./use-receipt-slots";
@@ -93,6 +94,8 @@ interface ClaimEditorProps {
   currentCategory?: Pick<Category, "id" | "name">;
   /** Shown above the form, e.g. why the claim was rejected. */
   intro?: ReactNode;
+  /** The way of adding proof to open straight away, from Home's quick actions. */
+  startWith?: ClaimEvidence;
   submitLabel: string;
   submitting: boolean;
   submitError: unknown;
@@ -111,6 +114,7 @@ export function ClaimEditor({
   initialTyped = [],
   currentCategory,
   intro,
+  startWith,
   submitLabel,
   submitting,
   submitError,
@@ -138,7 +142,7 @@ export function ClaimEditor({
       ? [...categoryList.data, { ...currentCategory, etimsNotRequired: false }]
       : categoryList.data;
   const [sms, setSms] = useState<AttachedSms | null>(initialSms);
-  const [scanning, setScanning] = useState(false);
+  const [scanning, setScanning] = useState(startWith === "etims");
   const [qrNote, setQrNote] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [review, setReview] = useState<{
@@ -215,11 +219,16 @@ export function ClaimEditor({
   return (
     <>
       {intro}
-      <ReceiptPicker receipts={receipts} error={fieldErrors.receipts} />
+      <ReceiptPicker
+        receipts={receipts}
+        error={fieldErrors.receipts}
+        autoOpenCamera={startWith === "receipt"}
+      />
       <ReadingNotice status={reading.status} onStop={reading.stop} />
       <SmsEvidence
         organizationId={organizationId}
         attached={sms}
+        startOpen={startWith === "sms"}
         onAttach={(attached, prefill) => {
           setSms(attached);
           setForm((current) => applyChosenPrefill(current, prefill));
@@ -549,7 +558,7 @@ function ClaimReview({
         />
         {duplicate?.expenseId && duplicate.kind === "claim" ? (
           <Button
-            label="Open the earlier claim"
+            label="Open the earlier reimbursement"
             variant="secondary"
             onPress={() => {
               if (duplicate.expenseId) onOpenClaim(duplicate.expenseId);
