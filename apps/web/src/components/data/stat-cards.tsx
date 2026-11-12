@@ -33,7 +33,7 @@ export interface StatTrend {
 }
 
 const cardClass =
-  "min-w-0 gap-3 bg-linear-to-t from-primary/5 to-card shadow-xs dark:bg-card max-[600px]:gap-1.5 max-[600px]:py-3";
+  "min-w-0 gap-3 shadow-xs max-[600px]:gap-1.5 max-[600px]:py-3";
 
 /**
  * Company-wide numbers as the template's KPI cards, at most four, never
