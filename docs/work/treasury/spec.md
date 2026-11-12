@@ -462,23 +462,35 @@ The policy rules, the wallet columns, creating and checking the Treasury wallet,
 
 ### T2: Ledger, reservation and the deposit watcher
 
-The two entry types, the shared "available" function, the watcher crediting Treasury deliveries and refunds, the fee cover check.
+The two entry types, the `treasury_moves` table, the two quote purposes, the shared "available" function, the watcher crediting Treasury deliveries and refunds, the fee cover check, and the history labels.
+
+_Changed 2026-11-13:_ the `treasury_moves` table and the quote purposes moved here from T3, because the reservation and the watcher can't be built without them. T2 doesn't write `to_treasury` debits: T3 does, when it settles a send.
 
 - [ ] Money on its way to Treasury can't be spent by a payout, a float or a withdrawal
 - [ ] A Treasury delivery is credited once, and an ordinary internal transfer is still skipped
-- [ ] The ledger equals what the company wallet and transit wallet hold after every test move
 
-**Depends on:** T0. **Files:** `packages/shared/src/wallet.ts`, `db/schema/wallet-transactions.ts`, `services/wallet/ledger.ts`, `services/wallet/near-deposits.ts`, `services/intents/quote-deposit.ts`, the three callers. **Scope:** M.
+**Depends on:** T0. **Files:** `packages/shared/src/wallet.ts`, `db/schema/wallet-transactions.ts`, new `db/schema/treasury-moves.ts`, `db/schema/intent-quotes.ts`, `services/wallet/ledger.ts`, `services/wallet/near-deposits.ts`, `services/intents/quote-deposit.ts`, the callers that work out what's available, the wallet history service and displays. **Scope:** M.
 
 ### T3: Move to Treasury
 
-`treasury_moves`, `treasury_earn_actions`, the new quote purposes, the `treasury-moves` job for this direction, preview and start routes.
+`treasury_earn_actions`, writing `to_treasury` debits, the `treasury-moves` job for this direction, the `move_to_treasury` passkey purpose, preview and start routes.
 
 - [ ] A move over the cap goes in parts, one at a time, and every part is within the cap
+- [ ] The ledger equals what the company wallet and transit wallet hold after every test move
 - [ ] Every row in section 11 that concerns this direction has a test
 - [ ] Killing the API at any step and restarting it never sends or deposits twice
 
 **Depends on:** T1, T2. **Files:** `db/schema/`, `services/treasury/`, `services/intents/`, `station/`. **Scope:** L.
+
+**What T1 and T2 left for T3** (2026-11-13):
+
+- Starting a move takes the same wallet-row lock payout approval takes before it reads `availableUsdc`, so a payout and a move started together can't both spend the same money.
+- Refuse a move unless `wallets.treasury_turned_on_at` is set.
+- Write each `to_treasury` debit with both `treasury_move_id` and `intent_quote_id`. The database allows one debit per quote.
+- Nothing sets a Treasury quote's status yet. T3's own settler must mark a `to_treasury` quote `refunded`, or the deposit watcher keeps holding the company's deposits behind it. Treasury quotes need their own refresh job (through `intent_quotes_to_refresh`).
+- Credit a refunded part before marking the move `returned`. A move in `needs_review` keeps its reservation, and the staff resolve path settles only the quote, not the move.
+- The Earn calls (`deposit`, `withdraw`, `vaultPosition`, `vaultDetails`, `actions.get`) aren't on `PrivyWalletsShape` yet, nor in its fakes.
+- `verifyApproval` uses up the passkey challenge before the work runs, so a failure after confirming asks the admin to confirm again.
 
 ### T4: Move to wallet
 

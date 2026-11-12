@@ -11,8 +11,8 @@ The chain where every company's money sits at rest. It is NEAR.
 _Avoid_: Home chain, primary network, settlement chain
 
 **Company wallet**:
-The one account on the main chain that holds a single company's USDC. Never shared between companies.
-_Avoid_: Treasury, main wallet, NEAR wallet
+The one account on the main chain that holds a single company's USDC. Never shared between companies. What it holds is what the company can spend now; Treasury is never part of it.
+_Avoid_: Main wallet, NEAR wallet
 
 **Transit wallet**:
 A company's own account on Base that holds nothing at rest. Money passes through it on the way to a cash-out, and refunds return to it.
@@ -51,6 +51,32 @@ _Avoid_: Bridge, bridging, swap
 **Sweep**:
 Returning whatever sits in a transit wallet to the company wallet.
 _Avoid_: Reverse bridge, drain
+
+### Treasury
+
+**Treasury**:
+Money a company's admin has moved out of its company wallet to earn yield. It can't be spent until it is moved back. It is listed under Accounts next to the company wallet.
+_Avoid_: Savings, Earn, investment, vault balance
+
+**Treasury wallet**:
+A company's own account on Base that holds its Treasury as a position in the vault. It holds no USDC at rest.
+_Avoid_: Earn wallet, vault wallet, yield wallet, savings wallet
+
+**Move to Treasury**:
+Moving an amount of a company's USDC from its company wallet into its Treasury.
+_Avoid_: Deposit, invest, stake
+
+**Move to wallet**:
+Moving an amount of a company's Treasury back to its company wallet.
+_Avoid_: Withdraw, redeem, unstake
+
+**Yield**:
+What a company's Treasury has earned: what it is worth now, less what was moved in, plus what was moved out.
+_Avoid_: Interest, returns, rewards, APY
+
+**Vault**:
+The lending market Expendi has chosen to hold every company's Treasury. Each company has its own position in it.
+_Avoid_: Pool, strategy, fund
 
 ### Cards
 
