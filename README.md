@@ -67,7 +67,7 @@ You should see every test pass. The NEAR behaviour lives in these files under `a
 
 _Last reviewed against source code and recorded handoffs: 2026-11-03._
 
-**The Kenya spending MVP is implemented through Phase 3B. Pilot acceptance testing and distribution remain pending.** The full platform in the [implementation guide](docs/implementation-guide.md) still needs customer invoicing, advanced expense management and global contractor/employee payroll.
+**The Kenya spending MVP is implemented through Phase 3B. Pilot acceptance testing and distribution remain pending.** The full platform in the [implementation guide](docs/implementation-guide.md) still needs the rest of customer invoicing (a first USDC version is built), advanced expense management and global contractor/employee payroll.
 
 “Implemented” means code exists, not that every real-provider or device acceptance check has passed. Deployment and test results below are recorded evidence from prior sessions, not checks rerun for this README update.
 
@@ -195,17 +195,17 @@ Existing claims, receipt capture, basic rules, approvals and payouts provide the
 - [ ] **Broader reimbursement choices:** employee-selected stablecoin/bank/mobile-money destinations and currencies beyond the current claim-to-M-Pesa flow.
 - [ ] **Additional integrations:** QuickBooks, Xero, bank export formats and outbound integration webhooks beyond the current Zoho/CSV exports.
 
-### Part 2 · Crypto invoicing — not implemented
+### Part 2 · Crypto invoicing — first version on NEAR
 
-Wallet deposits, supplier bill attachments and recurring outgoing payments are reusable foundations. The [customer invoicing system](docs/implementation-guide.md#part-2-crypto-invoicing-acctual-inspired) still needs:
+Built on NEAR Intents and modelled on Acctual ([decision record](docs/decisions/crypto-invoicing.md)). Admins create customers and USD invoices (line items, one tax rate, terms, numbering), send them by email and track draft/open/paid/void, with overdue shown on open invoices. The customer opens a public pay link with no account, picks Base, Ethereum, Arbitrum or Solana, and sends USDC to a 1Click deposit address; the deposit watcher credits it to the company wallet and marks the invoice paid in the same transaction, and the customer gets a receipt. Admins can also mark an invoice paid outside Expendi or match it to a deposit by hand.
 
-- [ ] **Data model and builder:** clients, invoice numbering, itemized charges, taxes/discounts, currencies, branding, terms and due dates; draft/sent/viewed/partial/paid/overdue/cancelled/refunded lifecycle.
-- [ ] **Delivery and client portal:** send, duplicate, cancel and remind actions; public payment links, invoice viewing and payment-method selection.
-- [ ] **Payment acceptance:** expiring FX/fee quotes, invoice-specific crypto addresses and QR instructions, fiat virtual accounts/bank references, card checkout and mobile-money collections.
-- [ ] **Payment matching and settlement:** invoice-linked incoming payment detection, confirmations, partial payments, receipts, conversion/swaps and settlement to the company's chosen wallet/bank/mobile-money destination.
-- [ ] **Additional assets/rails:** USDT/DAI and the required additional fiat currencies/chains; the current engine operates on NEAR USDC, with Base for cash-outs, and Kenyan payout rails.
-- [ ] **Automation and reconciliation:** recurring customer invoices, automatic sending and overdue reminders, accounting sync and receivables reports.
-- [ ] **API and UI:** invoice/client CRUD, public payment options/initiation, recurring-invoice endpoints and collection-provider webhooks, with tenant isolation and end-to-end tests.
+Still to build from the [guide](docs/implementation-guide.md#part-2-crypto-invoicing-acctual-inspired):
+
+- [ ] **Other assets and rails:** USDT and other tokens, card checkout, bank (ACH/SEPA) and mobile-money collection.
+- [ ] **Other invoice currencies:** KES and others, with a stored exchange rate.
+- [ ] **Automation:** recurring invoices and scheduled overdue reminders.
+- [ ] **Documents and reconciliation:** PDF invoices, Zoho Books invoices and customer payments, receivables reports.
+- [ ] **Fees:** an Expendi fee on invoice payments, if wanted (1Click supports one per quote).
 
 ### Kenya eTIMS invoice issuance — not implemented
 

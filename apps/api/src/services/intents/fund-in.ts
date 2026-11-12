@@ -8,7 +8,11 @@ import type { FundInChain, FundInStatus } from "@expendi-business/shared";
 import { FUND_IN_CHAINS } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
-import type { IntentQuote, IntentQuoteStatus } from "../../db/schema/index.js";
+import type {
+  IntentQuote,
+  IntentQuotePurpose,
+  IntentQuoteStatus,
+} from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
 import type { AuditActor } from "../audit/audit-log.js";
 import type { OneClickError } from "./one-click.js";
@@ -71,7 +75,7 @@ export interface FundInView {
   readonly createdAt: Date;
 }
 
-const chainOfAsset = (originAsset: string): FundInChain | null =>
+export const chainOfAsset = (originAsset: string): FundInChain | null =>
   FUND_IN_CHAINS.find(
     (chain) => ONE_CLICK_FUND_IN_USDC_ASSET_IDS[chain] === originAsset,
   ) ?? null;
@@ -277,6 +281,21 @@ const fundInsOf = (organizationId: string) =>
     eq(intentQuotes.purpose, "fund_in"),
   );
 
+/**
+ * The quotes a customer or company pays into from another chain, which
+ * 1Click settles the same way: refreshed and moved along by this module.
+ */
+const OPEN_DEPOSIT_PURPOSES: readonly IntentQuotePurpose[] = [
+  "fund_in",
+  "invoice_payment",
+];
+
+const depositQuotesOf = (organizationId: string) =>
+  and(
+    eq(intentQuotes.organizationId, organizationId),
+    inArray(intentQuotes.purpose, [...OPEN_DEPOSIT_PURPOSES]),
+  );
+
 const returnQuotes = alias(intentQuotes, "return_quote");
 
 /** Fund-ins matching `where`, each with the status of the quote returning it. */
@@ -384,7 +403,9 @@ export function refreshFundIn(
   return Effect.gen(function* () {
     const refreshed = yield* refreshQuoteStatus(quote);
     const next = nextStatus(refreshed, new Date());
-    if (refreshed.purpose !== "fund_in" || next === null) return refreshed;
+    if (!OPEN_DEPOSIT_PURPOSES.includes(refreshed.purpose) || next === null) {
+      return refreshed;
+    }
     const [moved] = yield* withScope(
       { organizationId: refreshed.organizationId },
       (tx) =>
@@ -401,7 +422,7 @@ export function refreshFundIn(
             .where(
               and(
                 eq(intentQuotes.id, refreshed.id),
-                fundInsOf(refreshed.organizationId),
+                depositQuotesOf(refreshed.organizationId),
                 inArray(intentQuotes.status, [
                   ...UNSETTLED_INTENT_QUOTE_STATUSES,
                 ]),
@@ -427,7 +448,7 @@ export interface FundInRefreshSummary {
 }
 
 /**
- * Refreshes every open fund-in. Only a company with an active company
+ * Refreshes every open fund-in and open invoice payment quote. Only a company with an active company
  * wallet can have one, so the job walks those wallets and reads each
  * company's open fund-ins inside its own scope, least recently checked
  * first. It only reads 1Click and updates our records, so it is always safe
@@ -463,7 +484,7 @@ export function refreshOpenFundIns(): Effect.Effect<
               .from(intentQuotes)
               .where(
                 and(
-                  fundInsOf(organizationId),
+                  depositQuotesOf(organizationId),
                   inArray(intentQuotes.status, [
                     ...UNSETTLED_INTENT_QUOTE_STATUSES,
                   ]),

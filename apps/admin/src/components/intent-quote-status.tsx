@@ -13,6 +13,7 @@ export const INTENT_QUOTE_PURPOSE_LABELS: Record<IntentQuotePurpose, string> = {
   sweep: "Sweep",
   fund_in: "Fund-in",
   fund_in_return: "Fund-in return",
+  invoice_payment: "Invoice payment",
 };
 
 const TONES: Partial<Record<IntentQuoteStatus, StatusTone>> = {

@@ -12,6 +12,7 @@ import type { AuditActor } from "../audit/audit-log.js";
 import type { FastNearError, FastNearTransfer } from "../chain/fast-near.js";
 import type { NearRpcError } from "../chain/near-rpc.js";
 import type { NearUsdcReceiptTransfer } from "../chain/near.js";
+import type { EmailSender } from "../email/email-sender.js";
 import type { OneClick } from "../intents/one-click.js";
 import {
   intentQuotes,
@@ -32,6 +33,10 @@ import {
   quotesToRecheck,
   refreshQuoteStatus,
 } from "../intents/quote-status.js";
+import {
+  recordLinkPayment,
+  sendInvoiceReceipt,
+} from "../invoices/link-payment.js";
 
 /**
  * The deposit watcher (docs/decisions/near-main-chain.md, "The ledger" and
@@ -116,7 +121,8 @@ type WatcherDeps =
   | NearRpc
   | NearChain
   | NearRelayer
-  | OneClick;
+  | OneClick
+  | EmailSender;
 
 type WatcherError = DatabaseError | FastNearError | NearRpcError;
 
@@ -192,7 +198,7 @@ function refreshQuotes(
     let allAnswered = true;
     for (const quote of quotes) {
       const exit = yield* Effect.exit(
-        quote.purpose === "fund_in"
+        quote.purpose === "fund_in" || quote.purpose === "invoice_payment"
           ? refreshFundIn(quote)
           : refreshQuoteStatus(quote),
       );
@@ -211,14 +217,16 @@ function refreshQuotes(
 /** The quote whose delivery a deposit is, when 1Click lists the transfer. */
 interface DeliveringQuote {
   readonly id: string;
-  readonly purpose: "fund_in" | "fund_in_return";
+  readonly purpose: "fund_in" | "fund_in_return" | "invoice_payment";
 }
 
 function deliveringQuote(quote: {
   readonly id: string;
   readonly purpose: string;
 }): DeliveringQuote | null {
-  return quote.purpose === "fund_in" || quote.purpose === "fund_in_return"
+  return quote.purpose === "fund_in" ||
+    quote.purpose === "fund_in_return" ||
+    quote.purpose === "invoice_payment"
     ? { id: quote.id, purpose: quote.purpose }
     : null;
 }
@@ -227,58 +235,86 @@ function creditDeposit(
   wallet: WatchedWallet,
   transfer: NearUsdcReceiptTransfer,
   delivering: DeliveringQuote | null,
-): Effect.Effect<Verdict, DatabaseError, DatabaseService | AuditLog> {
-  return withScope({ organizationId: wallet.organization_id }, (tx) =>
-    Effect.gen(function* () {
-      const audit = yield* AuditLog;
-      const [credit] = yield* query(() =>
-        tx
-          .insert(walletTransactions)
-          .values({
+): Effect.Effect<
+  Verdict,
+  DatabaseError,
+  DatabaseService | AuditLog | EmailSender
+> {
+  return Effect.gen(function* () {
+    const credited = yield* withScope(
+      { organizationId: wallet.organization_id },
+      (tx) =>
+        Effect.gen(function* () {
+          const audit = yield* AuditLog;
+          const [credit] = yield* query(() =>
+            tx
+              .insert(walletTransactions)
+              .values({
+                organizationId: wallet.organization_id,
+                walletId: wallet.wallet_id,
+                type: "deposit",
+                chain: "near",
+                usdcAmount: transfer.amount,
+                txHash: transfer.txHash,
+                receiptId: transfer.receiptId,
+                logIndex: transfer.receiptLogIndex,
+                transferIndex: transfer.transferIndex,
+                // The block that included the transaction, as the RPC reports
+                // it: the receipt that moved the USDC may have run a block or
+                // two later.
+                blockNumber: transfer.blockHeight,
+                counterpartyAddress: transfer.from,
+              })
+              .onConflictDoNothing()
+              .returning({ id: walletTransactions.id }),
+          );
+          if (!credit) return null;
+          // The payment commits with the deposit it records, or not at all.
+          const payment =
+            delivering?.purpose === "invoice_payment"
+              ? yield* recordLinkPayment(tx, {
+                  organizationId: wallet.organization_id,
+                  intentQuoteId: delivering.id,
+                  walletTransactionId: credit.id,
+                  receivedUsdc: transfer.amount,
+                  actor: ACTOR,
+                })
+              : null;
+          yield* audit.record(tx, {
+            actor: ACTOR,
             organizationId: wallet.organization_id,
-            walletId: wallet.wallet_id,
-            type: "deposit",
-            chain: "near",
-            usdcAmount: transfer.amount,
-            txHash: transfer.txHash,
-            receiptId: transfer.receiptId,
-            logIndex: transfer.receiptLogIndex,
-            transferIndex: transfer.transferIndex,
-            // The block that included the transaction, as the RPC reports
-            // it: the receipt that moved the USDC may have run a block or
-            // two later.
-            blockNumber: transfer.blockHeight,
-            counterpartyAddress: transfer.from,
-          })
-          .onConflictDoNothing()
-          .returning({ id: walletTransactions.id }),
-      );
-      if (!credit) return "already_credited" as const;
-      yield* audit.record(tx, {
-        actor: ACTOR,
-        organizationId: wallet.organization_id,
-        action: "wallet.deposit_received",
-        entity: { type: "wallet_transaction", id: credit.id },
-        after: {
-          ...(delivering?.purpose === "fund_in" && {
-            fundInId: delivering.id,
-          }),
-          ...(delivering?.purpose === "fund_in_return" && {
-            fundInReturnId: delivering.id,
-          }),
-          walletId: wallet.wallet_id,
-          chain: "near",
-          usdcAmount: transfer.amount,
-          txHash: transfer.txHash,
-          receiptId: transfer.receiptId,
-          logIndex: transfer.receiptLogIndex,
-          transferIndex: transfer.transferIndex,
-          from: transfer.from,
-        },
-      });
-      return "credited" as const;
-    }),
-  );
+            action: "wallet.deposit_received",
+            entity: { type: "wallet_transaction", id: credit.id },
+            after: {
+              ...(delivering?.purpose === "fund_in" && {
+                fundInId: delivering.id,
+              }),
+              ...(delivering?.purpose === "fund_in_return" && {
+                fundInReturnId: delivering.id,
+              }),
+              ...(payment !== null && {
+                invoiceId: payment.invoiceId,
+                invoicePaymentId: payment.paymentId,
+              }),
+              walletId: wallet.wallet_id,
+              chain: "near",
+              usdcAmount: transfer.amount,
+              txHash: transfer.txHash,
+              receiptId: transfer.receiptId,
+              logIndex: transfer.receiptLogIndex,
+              transferIndex: transfer.transferIndex,
+              from: transfer.from,
+            },
+          });
+          return { receipt: payment?.receipt ?? null };
+        }),
+    );
+    if (credited === null) return "already_credited" as const;
+    if (credited.receipt !== null) {
+      yield* sendInvoiceReceipt(credited.receipt);
+    }
+    return "credited" as const;
+  });
 }
 
 /**
@@ -287,8 +323,8 @@ function creditDeposit(
  *
  * 1. from the gas relayer: its fee cover, internal;
  * 2. in a transaction one of the company's quotes lists: a deposit if that
- *    quote is a fund-in or a fund-in return (money that never reached the
- *    company wallet before), otherwise a hop refund, a sweep or a payout
+ *    quote is a fund-in, a fund-in return or an invoice payment (money that
+ *    never reached the company wallet before), otherwise a hop refund, a sweep or a payout
  *    refund, internal;
  * 3. from NEAR Intents, unexplained, while a quote of the company's is
  *    still unsettled: held, because 1Click may not have listed it yet;
@@ -466,6 +502,7 @@ const QUOTE_PURPOSE_NAMES: Readonly<Record<IntentQuotePurpose, string>> = {
   fund_in: "fund-in",
   usdc_payout: "USDC payout",
   fund_in_return: "fund-in return",
+  invoice_payment: "invoice payment",
 };
 
 function holdExplained(reason: HoldReason): string {

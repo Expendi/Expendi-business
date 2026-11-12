@@ -7,6 +7,7 @@ import {
   CircleCheckIcon,
   CreditCardIcon,
   FileTextIcon,
+  HandCoinsIcon,
   LayoutDashboardIcon,
   ReceiptTextIcon,
   SettingsIcon,
@@ -21,7 +22,7 @@ export interface NavItem {
   title: string;
   href: string;
   icon: LucideIcon;
-  group: "Workspace" | "Spend & pay" | "Manage" | "Insights";
+  group: "Workspace" | "Spend & pay" | "Get paid" | "Manage" | "Insights";
   count?: NavCountKey;
 }
 
@@ -71,6 +72,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: BanknoteIcon,
     group: "Spend & pay",
     count: "payroll",
+  },
+  {
+    title: "Invoices",
+    href: "/invoices",
+    icon: HandCoinsIcon,
+    group: "Get paid",
   },
   { title: "Payees", href: "/payees", icon: Building2Icon, group: "Manage" },
   { title: "Team", href: "/team", icon: UsersIcon, group: "Manage" },

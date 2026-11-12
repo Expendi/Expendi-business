@@ -79,6 +79,11 @@ export function createApiClient({
 
     if (!response.ok) throw toApiError(response.status, payload);
 
+    if (response.status === 204) {
+      const empty = schema.safeParse(undefined);
+      if (empty.success) return empty.data;
+    }
+
     const parsed = z
       .object({ success: z.literal(true), data: schema })
       .safeParse(payload);

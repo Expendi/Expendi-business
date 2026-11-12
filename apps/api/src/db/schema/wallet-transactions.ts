@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -92,6 +93,11 @@ export const walletTransactions = pgTable(
     uniqueIndex("wallet_transactions_near_transfer_unique")
       .on(table.receiptId, table.logIndex, table.transferIndex)
       .where(sql`${table.chain} <> 'base'`),
+    // Target of invoice_payments' composite foreign key.
+    unique("wallet_transactions_id_organization_id_unique").on(
+      table.id,
+      table.organizationId,
+    ),
     index("wallet_transactions_wallet_id_idx").on(table.walletId),
     check(
       "wallet_transactions_amount_sign",

@@ -18,6 +18,9 @@ const publicEnv = readPublicEnv();
  */
 const STANDALONE_PATHS: ReadonlySet<string> = new Set(["/card-reveal"]);
 
+/** Invoice pay links (`/pay/<public ID>`) are opened by customers with no account. */
+const STANDALONE_PATH_PREFIXES: readonly string[] = ["/pay/"];
+
 function makeQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
@@ -46,7 +49,12 @@ export function Providers({ children }: { children: ReactNode }): JSX.Element {
     return <>{children}</>;
   }
 
-  if (STANDALONE_PATHS.has(pathname)) return <>{children}</>;
+  if (
+    STANDALONE_PATHS.has(pathname) ||
+    STANDALONE_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  ) {
+    return <>{children}</>;
+  }
 
   if (!publicEnv.ok) {
     return <MissingConfig invalidKeys={publicEnv.invalidKeys} />;

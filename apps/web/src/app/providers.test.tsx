@@ -51,4 +51,12 @@ describe("Providers", () => {
       dashboard: render("/cards").includes("data-privy"),
     }).toEqual({ reveal: false, dashboard: true });
   });
+
+  it("keeps Privy off invoice pay links but not off similar paths", () => {
+    expect({
+      pay: render("/pay/abc123").includes("data-privy"),
+      payments: render("/payments").includes("data-privy"),
+      payRoot: render("/pay").includes("data-privy"),
+    }).toEqual({ pay: false, payments: true, payRoot: true });
+  });
 });
