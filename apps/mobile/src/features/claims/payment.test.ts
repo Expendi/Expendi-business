@@ -116,7 +116,7 @@ describe("previewRows", () => {
       },
       { label: "Paid to", value: "Jane Wanjiku, M-Pesa ending 5678" },
       { label: "USDC", value: "11.664594 USDC" },
-      { label: "Paycrest fee, at most", value: "0.308918 USDC" },
+      { label: "Cash-out fee, at most", value: "0.308918 USDC" },
       { label: "Total, at most", value: "11.973512 USDC" },
     ]);
   });

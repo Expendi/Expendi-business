@@ -101,7 +101,7 @@ export function BalanceCard({
           Balance
           {rate ? (
             <InfoTip label="Exchange rate">
-              Paycrest rate today: KES {rate} per USDC
+              Rate today: KES {rate} per USDC
             </InfoTip>
           ) : null}
         </p>

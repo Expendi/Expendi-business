@@ -164,8 +164,8 @@ function CostPreview({ approval }: { approval: ClaimApproval }): JSX.Element {
         </View>
       ))}
       <Text className="text-sm text-gray-600">
-        Paycrest states its exact fee when the payment is made. What isn’t used
-        stays in the wallet.
+        The exact fee is known when the cash-out is sent. What isn’t used stays
+        in the wallet.
       </Text>
     </View>
   );

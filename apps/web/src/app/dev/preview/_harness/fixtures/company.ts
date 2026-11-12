@@ -5,7 +5,7 @@
 export const ORGANIZATION_ID = "00000000-0000-4000-8000-0000000000aa";
 export const COMPANY_NAME = "Mwangaza Logistics";
 export const TODAY = "2026-11-06";
-/** KES per USDC, as the wallet reports Paycrest's rate. */
+/** KES per USDC, as the wallet reports today's rate. */
 export const KES_RATE = "129";
 
 export const VIEWER = {

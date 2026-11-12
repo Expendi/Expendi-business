@@ -242,8 +242,8 @@ export function PayrollReview({
       </dl>
       <SheetNote>
         Each person is paid on their own: if one payment fails, the others still
-        go through. Paycrest states its exact fee when each payment is made;
-        what isn’t used stays in the wallet.
+        go through. The exact fee is known when each cash-out is sent; what
+        isn’t used stays in the wallet.
       </SheetNote>
       {payment.cap.withinCap ? null : (
         <div role="alert">

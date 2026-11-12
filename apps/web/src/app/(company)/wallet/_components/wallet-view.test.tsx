@@ -108,7 +108,7 @@ describe("Accounts", () => {
       title: html.includes(">Accounts</h1>"),
       balance: html.includes(">16,420<") && html.includes(">.80<"),
       kes: page.includes("≈ KES") && page.includes("2,118,283 "),
-      rate: page.includes("Paycrest rate today: KES 129 per USDC"),
+      rate: page.includes("Rate today: KES 129 per USDC"),
       moneyIn: page.includes("+6,031.78"),
       moneyOut: page.includes("−4,257.75"),
       chart: html.includes(

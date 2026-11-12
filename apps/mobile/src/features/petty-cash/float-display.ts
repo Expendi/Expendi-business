@@ -124,7 +124,7 @@ export function paymentRows(payment: FloatPaymentPreview): PreviewRow[] {
     },
     { label: "USDC", value: `${formatUsdc(payment.usdc)} USDC` },
     {
-      label: "Paycrest fee, at most",
+      label: "Cash-out fee, at most",
       value: `${formatUsdc(payment.feeAllowanceUsdc)} USDC`,
     },
     {

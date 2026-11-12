@@ -75,7 +75,7 @@ export function usePayee(
   });
 }
 
-/** Kenyan banks Paycrest can pay; the list rarely changes. */
+/** Kenyan banks we can pay; the list rarely changes. */
 export function usePayeeBanks(
   organizationId: string,
   { enabled = true }: { enabled?: boolean } = {},
@@ -90,7 +90,7 @@ export function usePayeeBanks(
   });
 }
 
-/** The bank's name from Paycrest's list, once it has loaded. */
+/** The bank's name from the banks list, once it has loaded. */
 export function useBankName(
   organizationId: string,
   details: PayeeDetails | null,

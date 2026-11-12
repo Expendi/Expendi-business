@@ -69,7 +69,7 @@ const STILL_OWED: readonly BillStatus[] = [
 
 /**
  * A bill's amount in its own currency, "To enter" while a variable bill
- * has none. A USD bill still owed also shows its KES at Paycrest's rate now
+ * has none. A USD bill still owed also shows its KES at today's rate
  * (spec §6.19); a paid one's KES was fixed on its payment day, which the
  * bill doesn't carry, so none is shown.
  */

@@ -152,7 +152,7 @@ describe("billPreviewRows", () => {
       },
       { label: "Paid to", value: "Paybill 888880, account A-17" },
       { label: "USDC", value: "19.435 USDC" },
-      { label: "Paycrest fee, at most", value: "0.347175 USDC" },
+      { label: "Cash-out fee, at most", value: "0.347175 USDC" },
       { label: "Total, at most", value: "19.782175 USDC" },
     ]);
   });
