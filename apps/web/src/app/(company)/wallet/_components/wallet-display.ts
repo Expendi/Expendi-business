@@ -122,7 +122,14 @@ export function maxWithdrawal(baseUnits: string): string {
 }
 
 export type TxKind =
-  "deposit" | "topup" | "withdrawal" | "refund" | "payment" | "salary";
+  | "deposit"
+  | "topup"
+  | "withdrawal"
+  | "refund"
+  | "payment"
+  | "salary"
+  | "to_treasury"
+  | "from_treasury";
 
 export function txKind(item: WalletHistoryItem): TxKind {
   if (item.type === "payout") {
@@ -141,6 +148,10 @@ export function txTitle(item: WalletHistoryItem): string {
       return "Withdrawal";
     case "refund":
       return "Refund";
+    case "to_treasury":
+      return "Moved to Treasury";
+    case "from_treasury":
+      return "Moved to wallet";
     case "payment":
     case "salary":
       return item.payout?.recipientName ?? "Payment";
@@ -179,6 +190,10 @@ export function txDetail(item: WalletHistoryItem): string {
       return payout
         ? `${payout.recipientName} payment failed, money returned`
         : "A payment failed, money returned";
+    case "to_treasury":
+      return "To Treasury";
+    case "from_treasury":
+      return "From Treasury";
     case "payment":
     case "salary": {
       if (!payout) return "Payment";

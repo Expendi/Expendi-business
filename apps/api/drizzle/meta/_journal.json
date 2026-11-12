@@ -617,6 +617,34 @@
       "when": 1794494837366,
       "tag": "0087_invoice_last_emailed_at_grant",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1794520570544,
+      "tag": "0088_treasury_wallet",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1794520659569,
+      "tag": "0089_treasury_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1794520677334,
+      "tag": "0090_treasury_moves_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1794520709073,
+      "tag": "0091_treasury_turn_on_purpose",
+      "breakpoints": true
     }
   ]
 }

@@ -38,6 +38,7 @@ import type { StoredObject } from "../../services/storage/file-storage.js";
 import type {
   CreateNearWalletInput,
   CreatePolicyInput,
+  CreateTreasuryPolicyInput,
   CreateWalletInput,
   NearSigningWallet,
   PrivyWalletRecord,
@@ -112,6 +113,7 @@ export const randomAddress = (): string =>
 
 type FailingCall =
   | "createPolicy"
+  | "createTreasuryPolicy"
   | "createWallet"
   | "findWalletByExternalId"
   | "createNearWallet"
@@ -161,7 +163,10 @@ interface FakeNearWallet extends PrivyWalletRecord {
  * chain (helpers/near.ts).
  */
 export function makeFakePrivyWallets() {
-  const policies = new Map<string, { id: string; input: CreatePolicyInput }>();
+  const policies = new Map<
+    string,
+    { id: string; input: CreatePolicyInput | CreateTreasuryPolicyInput }
+  >();
   const wallets = new Map<
     string,
     PrivyWalletRecord & { readonly input: CreateWalletInput }
@@ -171,6 +176,7 @@ export function makeFakePrivyWallets() {
   const nearSigningRequests = new Map<string, number>();
   const calls: Record<FailingCall, number> = {
     createPolicy: 0,
+    createTreasuryPolicy: 0,
     createWallet: 0,
     findWalletByExternalId: 0,
     createNearWallet: 0,
@@ -287,6 +293,16 @@ export function makeFakePrivyWallets() {
   const layer = Layer.succeed(PrivyWallets, {
     createPolicy: (input) =>
       maybeFail("createPolicy").pipe(
+        Effect.map(() => {
+          const existing = policies.get(input.idempotencyKey);
+          if (existing) return { policyId: existing.id };
+          const id = `policy-${policies.size + 1}-${randomBytes(4).toString("hex")}`;
+          policies.set(input.idempotencyKey, { id, input });
+          return { policyId: id };
+        }),
+      ),
+    createTreasuryPolicy: (input) =>
+      maybeFail("createTreasuryPolicy").pipe(
         Effect.map(() => {
           const existing = policies.get(input.idempotencyKey);
           if (existing) return { policyId: existing.id };

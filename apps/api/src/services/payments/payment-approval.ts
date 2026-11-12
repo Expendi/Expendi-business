@@ -20,7 +20,7 @@ import {
 } from "../paycrest/amounts.js";
 import { discardUnapprovedPayout } from "../payout/discard.js";
 import { livePayoutOf } from "../payout/prepare.js";
-import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
+import { availableUsdc } from "../wallet/ledger.js";
 
 /**
  * The steps every Approve & pay shares, whatever it pays (claims, bills,
@@ -126,10 +126,7 @@ export function walletCover(
             ),
           ),
       );
-      const free = wallet
-        ? (yield* ledgerBalance(tx, wallet.id)) -
-          (yield* reservedForPayouts(tx, wallet.id))
-        : 0n;
+      const free = wallet ? yield* availableUsdc(tx, wallet.id) : 0n;
       const available = free > 0n ? free : 0n;
       const needed = batch.reduce(
         (sum, payout) => sum + payout.maxDebitUsdc,

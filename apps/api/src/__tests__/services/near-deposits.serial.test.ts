@@ -7,7 +7,11 @@ import type { AppRuntime } from "../../runtime.js";
 import type { NearTransactionOutcome } from "../../services/chain/near.js";
 import type { FundedCompany } from "../helpers/money-in.js";
 import { DatabaseService } from "../../db/client.js";
-import { wallets } from "../../db/schema/index.js";
+import {
+  intentQuotes,
+  wallets,
+  walletTransactions,
+} from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 import { runAlerts } from "../../services/alerts/run-alerts.js";
 import { createFundIn } from "../../services/intents/fund-in.js";
@@ -22,6 +26,7 @@ import {
   ledgerOf,
   readQuote,
   saveQuote,
+  saveTreasuryMove,
 } from "../helpers/money-in.js";
 import {
   FAKE_RELAYER_ACCOUNT,
@@ -643,6 +648,199 @@ describe("watchNearDeposits", () => {
       failed: first.failed,
       ledger: (await ledger()).map((row) => row.usdcAmount),
     }).toEqual({ failed: 1, ledger: [4_000_000n] });
+  });
+});
+
+describe("watchNearDeposits, for Treasury", () => {
+  /** What the ledger holds, with the move each Treasury row names. */
+  const treasuryRows = () =>
+    runInScope(db, { organizationId: funded.company.organizationId }, (tx) =>
+      tx
+        .select({
+          type: walletTransactions.type,
+          usdcAmount: walletTransactions.usdcAmount,
+          move: walletTransactions.treasuryMoveId,
+        })
+        .from(walletTransactions)
+        .where(eq(walletTransactions.walletId, funded.walletId))
+        .orderBy(walletTransactions.createdAt, walletTransactions.id),
+    );
+
+  it("credits a move to the wallet's delivery as from_treasury, once, and audits it", async () => {
+    // #given a move to the wallet whose quote 1Click lists the delivery of
+    const move = await saveTreasuryMove(db, funded, {
+      direction: "to_wallet",
+      status: "open",
+    });
+    const quote = await saveQuote(runtime, db, funded, "from_treasury", {
+      row: {
+        treasuryMoveId: move.id,
+        status: "depositing",
+        depositStartedAt: new Date(),
+      },
+    });
+    const delivery = arrived(NEAR_INTENTS_ACCOUNT_ID, quote.amountOut);
+    oneClick.state.setStatus(quote.depositAddress, {
+      status: "SUCCESS",
+      destinationChainTxHashes: [delivery.txHash],
+    });
+
+    // #when the watcher runs, and then reads the same transfer again
+    const first = await watch();
+    await forgetPosition();
+    const second = await watch();
+
+    // #then it was credited once, to its move
+    expect({
+      credited: first.credited,
+      alreadyCredited: second.alreadyCredited,
+      ledger: await treasuryRows(),
+      audit: (
+        await owner.query(
+          "SELECT after->>'treasuryMoveId' AS move FROM audit_log WHERE organization_id = $1 AND action = 'wallet.treasury_returned'",
+          [funded.company.organizationId],
+        )
+      ).rows,
+    }).toEqual({
+      credited: 1,
+      alreadyCredited: 1,
+      ledger: [
+        {
+          type: "from_treasury",
+          usdcAmount: quote.amountOut,
+          move: move.id,
+        },
+      ],
+      audit: [{ move: move.id }],
+    });
+  });
+
+  it("credits a refunded move to Treasury's return as from_treasury", async () => {
+    // #given a part 1Click refunded, which the company wallet received
+    const move = await saveTreasuryMove(db, funded, { status: "open" });
+    const refund = arrived(NEAR_INTENTS_ACCOUNT_ID, 5_000_000n);
+    await saveQuote(runtime, db, funded, "to_treasury", {
+      row: {
+        treasuryMoveId: move.id,
+        status: "refunded",
+        settledAt: new Date(),
+        depositStartedAt: new Date(),
+        nearTxHashes: [refund.txHash],
+      },
+    });
+
+    // #when
+    const summary = await watch();
+
+    // #then
+    expect({
+      credited: summary.credited,
+      ledger: await treasuryRows(),
+    }).toEqual({
+      credited: 1,
+      ledger: [
+        { type: "from_treasury", usdcAmount: 5_000_000n, move: move.id },
+      ],
+    });
+  });
+
+  it("waits at a transfer a to_treasury quote lists until that quote has settled, then credits it", async () => {
+    // #given the refund is listed, but the quote hasn't been settled as refunded
+    const move = await saveTreasuryMove(db, funded, { status: "open" });
+    const refund = arrived(NEAR_INTENTS_ACCOUNT_ID, 5_000_000n);
+    const quote = await saveQuote(runtime, db, funded, "to_treasury", {
+      row: {
+        treasuryMoveId: move.id,
+        status: "depositing",
+        depositStartedAt: new Date(),
+        nearTxHashes: [refund.txHash],
+      },
+    });
+    oneClick.state.setStatus(quote.depositAddress, {
+      status: "REFUNDED",
+      nearTxHashes: [refund.txHash],
+    });
+
+    // #when
+    const waiting = await watch();
+    const waitingLedger = await treasuryRows();
+    await runInScope(
+      db,
+      { organizationId: funded.company.organizationId },
+      (tx) =>
+        tx
+          .update(intentQuotes)
+          .set({ status: "refunded", settledAt: new Date() })
+          .where(eq(intentQuotes.id, quote.id)),
+    );
+    const settled = await watch();
+
+    // #then
+    expect({
+      held: waiting.held,
+      before: waitingLedger,
+      credited: settled.credited,
+      after: (await treasuryRows()).map((row) => row.type),
+    }).toEqual({
+      held: 1,
+      before: [],
+      credited: 1,
+      after: ["from_treasury"],
+    });
+  });
+
+  it("treats what a succeeded move to Treasury quote lists as internal", async () => {
+    // #given
+    const move = await saveTreasuryMove(db, funded, { status: "open" });
+    const stray = arrived(randomNearAccount(), 1_000_000n);
+    await saveQuote(runtime, db, funded, "to_treasury", {
+      row: {
+        treasuryMoveId: move.id,
+        status: "succeeded",
+        settledAt: new Date(),
+        depositStartedAt: new Date(),
+        nearTxHashes: [stray.txHash],
+      },
+    });
+
+    // #when
+    const summary = await watch();
+
+    // #then
+    expect({
+      internal: summary.internal,
+      ledger: await treasuryRows(),
+    }).toEqual({ internal: 1, ledger: [] });
+  });
+
+  it("still skips a hop refund and a sweep while a move is open", async () => {
+    // #given
+    await saveTreasuryMove(db, funded, { status: "open" });
+    const sweep = arrived(NEAR_INTENTS_ACCOUNT_ID, 4_995_535n);
+    await saveQuote(runtime, db, funded, "sweep", {
+      row: {
+        status: "succeeded",
+        settledAt: new Date(Date.now() - 60 * 60_000),
+        destinationChainTxHashes: [sweep.txHash],
+      },
+    });
+    const hopRefund = arrived(NEAR_INTENTS_ACCOUNT_ID, 60_000n);
+    await saveQuote(runtime, db, funded, "base_hop", {
+      row: {
+        status: "succeeded",
+        settledAt: new Date(Date.now() - 60 * 60_000),
+        nearTxHashes: [hopRefund.txHash],
+      },
+    });
+
+    // #when
+    const summary = await watch();
+
+    // #then
+    expect({
+      internal: summary.internal,
+      ledger: await treasuryRows(),
+    }).toEqual({ internal: 2, ledger: [] });
   });
 });
 

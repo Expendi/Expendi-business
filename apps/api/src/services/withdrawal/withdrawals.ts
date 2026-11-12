@@ -26,7 +26,7 @@ import {
   preparePayouts,
   requestPayoutApproval,
 } from "../payout/payout-service.js";
-import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
+import { availableUsdc } from "../wallet/ledger.js";
 
 /**
  * Withdrawals (spec §6.9): the admin moves the company's USDC to an address
@@ -145,9 +145,7 @@ export function requestWithdrawal(input: {
         if (!wallet) {
           return yield* reject("no_wallet", "This company has no wallet yet.");
         }
-        const available =
-          (yield* ledgerBalance(tx, wallet.id)) -
-          (yield* reservedForPayouts(tx, wallet.id));
+        const available = yield* availableUsdc(tx, wallet.id);
         if (amountUsdc > available) {
           return yield* reject(
             "insufficient_balance",

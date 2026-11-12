@@ -36,6 +36,8 @@ export * from "./push.js";
 export * from "./recurring.js";
 export * from "./reports.js";
 export * from "./staff.js";
+export * from "./treasury.js";
+export * from "./treasury-move.js";
 export * from "./wallet-history.js";
 export * from "./wallet.js";
 export * from "./withdrawal.js";

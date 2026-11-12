@@ -30,6 +30,7 @@ import {
 } from "../../services/payout/payout-service.js";
 import { sendUsdcFromCompanyWallet } from "../../services/wallet/company-wallet-send.js";
 import { randomAddress, TEST_ORIGIN } from "../helpers/fakes.js";
+import { saveTreasuryMove } from "../helpers/money-in.js";
 import {
   createNearPayingCompany,
   deliverHop,
@@ -703,6 +704,43 @@ describe("the gas relayer's fee cover", () => {
       secondHop.amountIn - secondHop.amountOut - buffer,
     );
   });
+});
+
+describe("a Base hop's fee cover while a Treasury move may have left USDC uncredited", () => {
+  it.each([
+    ["is open", { status: "open" as const }],
+    [
+      "settled a minute ago",
+      { status: "returned" as const, settledAt: new Date() },
+    ],
+  ])(
+    "doesn't read USDC above the ledger as Expendi's surplus when a move %s",
+    async (_name, move) => {
+      // #given a finished hop that left a refunded buffer at the company
+      // wallet, and a move to Treasury whose refund may be waiting to be credited
+      await pay(claimRequest());
+      const firstHop = await onlyHop();
+      deliverHop(world, paying, firstHop);
+      await resume(firstHop);
+      const buffer = firstHop.amountIn - (firstHop.minAmountIn ?? 0n);
+      near.state.balances.set(paying.accountId, companyUsdc() + buffer);
+      await saveTreasuryMove(
+        db,
+        { company: paying.company, walletId: paying.wallet.id },
+        { requestedUsdc: 1n * USDC, ...move },
+      );
+
+      // #when the next cash-out hops
+      await pay(claimRequest());
+      const [, secondHop] = await hops();
+      if (!secondHop) throw new Error("no second hop");
+
+      // #then the relayer covers the full difference
+      expect(secondHop.feeCoverUsdc).toBe(
+        secondHop.amountIn - secondHop.amountOut,
+      );
+    },
+  );
 });
 
 describe("resuming a Base hop after a crash", () => {

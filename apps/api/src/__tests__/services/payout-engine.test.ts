@@ -39,6 +39,7 @@ import {
   makeFakePrivyWallets,
   TEST_ORIGIN,
 } from "../helpers/fakes.js";
+import { saveTreasuryMove } from "../helpers/money-in.js";
 import { makeTestRuntime } from "../helpers/runtime.js";
 import { TEST_DATABASE_URL_MIGRATE } from "../setup/test-database.js";
 
@@ -407,6 +408,27 @@ describe("payout engine", () => {
         orders: 0,
         status: "awaiting_approval",
       });
+    });
+
+    it("rejects a payout that would spend what an open move to Treasury has reserved", async () => {
+      // #given 95 of the wallet's 100 USDC reserved for a move to Treasury,
+      // and a claim that needs about 11.6
+      await saveTreasuryMove(
+        db,
+        { company, walletId: wallet.id },
+        { requestedUsdc: 95n * USDC },
+      );
+      const [payout] = await prepare(claim());
+      if (!payout) throw new Error("nothing prepared");
+
+      // #when
+      const exit = await pay([payout]);
+
+      // #then
+      expect({
+        reason: rejection(exit),
+        orders: paycrest.state.created.length,
+      }).toEqual({ reason: "insufficient_balance", orders: 0 });
     });
 
     it("rejects a payout over the daily cap", async () => {

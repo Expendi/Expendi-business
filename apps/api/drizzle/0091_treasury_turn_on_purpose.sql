@@ -1,0 +1,1 @@
+ALTER TYPE "public"."webauthn_purpose" ADD VALUE 'turn_on_treasury';

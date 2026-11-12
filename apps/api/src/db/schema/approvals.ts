@@ -55,6 +55,7 @@ export const webauthnPurpose = pgEnum("webauthn_purpose", [
   "manage_cards",
   "load_card_balance",
   "reveal_card",
+  "turn_on_treasury",
 ]);
 
 /**

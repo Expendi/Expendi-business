@@ -47,6 +47,7 @@ import {
   createIsolationFixture,
   expectRouteIsolation,
 } from "../helpers/isolation.js";
+import { saveTreasuryMove } from "../helpers/money-in.js";
 import {
   createNearUsdcPayingCompany,
   followPayout,
@@ -790,6 +791,27 @@ describe("POST /organizations/:id/bills/payment", () => {
         reason: (await errorOf(response)).details?.reason,
       }).toEqual({ status: 409, reason: "currency_mismatch" });
     });
+  });
+
+  it("counts what an open move to Treasury still has to send as spent, and sends nothing", async () => {
+    // #given 5 USDC more than a bill needs, 7 of which a move to Treasury
+    // has reserved: 2 USDC short
+    await setUpCompany(BILL_MAX_DEBIT + 5n * USDC);
+    await saveTreasuryMove(
+      db,
+      { company: paying.company, walletId: paying.wallet.id },
+      { requestedUsdc: 7n * USDC },
+    );
+    const billId = await bill(await tillPayee());
+
+    // #when
+    const payment = await paymentFor([billId]);
+    const response = await confirm(payment);
+
+    // #then
+    expect(payment.wallet.topUpKes).toBe("25800");
+    expect(response.status).toBe(409);
+    expect(moneyMoved()).toEqual({ orders: 0, sends: 0 });
   });
 
   it("shows Top up KES X when the wallet is short, and sends nothing", async () => {

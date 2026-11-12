@@ -22,6 +22,8 @@ const TILES: Partial<Record<TxKind, LucideIcon>> = {
   topup: ArrowDownLeftIcon,
   withdrawal: LandmarkIcon,
   refund: Undo2Icon,
+  to_treasury: LandmarkIcon,
+  from_treasury: ArrowDownLeftIcon,
 };
 
 /** A tile for the wallet's own movements; initials for whoever was paid. */

@@ -137,6 +137,33 @@ describe("a ledger row", () => {
     ]);
   });
 
+  it("names a move to and from Treasury, with no payout behind it", () => {
+    // #given
+    const deposit = find("Deposit");
+    const moves: WalletHistoryItem[] = [
+      { ...deposit, type: "to_treasury", usdcAmount: "-5000000", payout: null },
+      {
+        ...deposit,
+        type: "from_treasury",
+        usdcAmount: "5000000",
+        payout: null,
+      },
+    ];
+
+    // #when
+    const lines = moves.map((row) => [
+      txTitle(row),
+      txDetail(row),
+      rowBadge(row),
+    ]);
+
+    // #then
+    expect(lines).toEqual([
+      ["Moved to Treasury", "To Treasury", null],
+      ["Moved to wallet", "From Treasury", null],
+    ]);
+  });
+
   it("badges payments still moving or failed, never paid ones or refunds", () => {
     // #when
     const badges = [

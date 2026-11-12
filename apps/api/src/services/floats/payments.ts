@@ -39,7 +39,7 @@ import {
   retryPayout,
 } from "../payout/payout-service.js";
 import { requireConfirmedPayoutPhone } from "../phone-verification/payout-phone.js";
-import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
+import { availableUsdc } from "../wallet/ledger.js";
 import {
   floatNotFound,
   readFloatSummary,
@@ -335,9 +335,7 @@ function freeUsdc(tx: Transaction, organizationId: string) {
         ),
     );
     if (!wallet) return 0n;
-    const free =
-      (yield* ledgerBalance(tx, wallet.id)) -
-      (yield* reservedForPayouts(tx, wallet.id));
+    const free = yield* availableUsdc(tx, wallet.id);
     return free > 0n ? free : 0n;
   });
 }

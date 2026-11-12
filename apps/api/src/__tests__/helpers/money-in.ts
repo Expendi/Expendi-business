@@ -7,11 +7,15 @@ import type {
   IntentQuote,
   IntentQuotePurpose,
   NewIntentQuote,
+  NewTreasuryMove,
+  NewWalletTransaction,
+  TreasuryMove,
 } from "../../db/schema/index.js";
 import type { AppRuntime } from "../../runtime.js";
 import type { TestCompany } from "./db.js";
 import {
   intentQuotes,
+  treasuryMoves,
   wallets,
   walletTransactions,
 } from "../../db/schema/index.js";
@@ -90,11 +94,23 @@ const QUOTE_ROUTES: Readonly<
     originAsset: ONE_CLICK_FUND_IN_USDC_ASSET_IDS.arbitrum,
     destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
   },
+  to_treasury: {
+    swapType: "EXACT_INPUT",
+    originAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+    destinationAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+  },
+  from_treasury: {
+    swapType: "EXACT_INPUT",
+    originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+    destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+  },
 };
 
 /**
  * A quote taken from the (fake) 1Click and saved for the company, as the
- * code that runs hops, sweeps and USDC payouts saves one.
+ * code that runs hops, sweeps and USDC payouts saves one. A Treasury quote
+ * stands the transit wallet's Base address in for the Treasury wallet's, and
+ * needs its move in `options.row.treasuryMoveId`.
  */
 export async function saveQuote(
   runtime: AppRuntime,
@@ -108,7 +124,7 @@ export async function saveQuote(
 ): Promise<IntentQuote> {
   const route = QUOTE_ROUTES[purpose];
   const intents = purpose === "fund_in_return";
-  const fromCompanyWallet = purpose !== "sweep";
+  const fromCompanyWallet = purpose !== "sweep" && purpose !== "from_treasury";
   const recipient =
     fromCompanyWallet && !intents ? funded.transitAddress : funded.accountId;
   const refundTo = fromCompanyWallet ? funded.accountId : funded.transitAddress;
@@ -196,5 +212,51 @@ export function ledgerOf(db: Database, funded: FundedCompany) {
         .from(walletTransactions)
         .where(eq(walletTransactions.walletId, funded.walletId))
         .orderBy(walletTransactions.createdAt, walletTransactions.id),
+  );
+}
+
+/** A move between the company wallet and Treasury, as the move flow will save it. */
+export async function saveTreasuryMove(
+  db: Database,
+  target: { readonly company: TestCompany; readonly walletId: string },
+  row: Partial<NewTreasuryMove> = {},
+): Promise<TreasuryMove> {
+  const [saved] = await runInScope(
+    db,
+    { organizationId: target.company.organizationId },
+    (tx) =>
+      tx
+        .insert(treasuryMoves)
+        .values({
+          organizationId: target.company.organizationId,
+          walletId: target.walletId,
+          direction: "to_treasury",
+          requestedUsdc: 5_000_000n,
+          confirmedBy: target.company.admin.id,
+          approvalId: randomUUID(),
+          ...row,
+        })
+        .returning(),
+  );
+  if (!saved) throw new Error("treasury move insert returned no row");
+  return saved;
+}
+
+/** Puts a row in the company wallet's ledger directly, as a test's starting balance. */
+export async function addLedgerRow(
+  db: Database,
+  target: { readonly company: TestCompany; readonly walletId: string },
+  row: Pick<NewWalletTransaction, "type" | "usdcAmount"> &
+    Partial<NewWalletTransaction>,
+): Promise<void> {
+  await runInScope(
+    db,
+    { organizationId: target.company.organizationId },
+    (tx) =>
+      tx.insert(walletTransactions).values({
+        organizationId: target.company.organizationId,
+        walletId: target.walletId,
+        ...row,
+      }),
   );
 }

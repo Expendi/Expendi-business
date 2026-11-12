@@ -18,6 +18,8 @@ export const TRANSACTION_TYPES: Record<
   refund: { label: "Refund", icon: "↺" },
   payout: { label: "Payment", icon: "↑" },
   withdrawal: { label: "Withdrawal", icon: "↗" },
+  to_treasury: { label: "Moved to Treasury", icon: "↗" },
+  from_treasury: { label: "Moved to wallet", icon: "↙" },
 };
 
 export const PAYOUT_STATUS_LABELS: Record<
@@ -56,6 +58,8 @@ export function describeCounterparty(item: WalletHistoryItem): string | null {
   if (payout) {
     return `KES ${formatKesCents(payout.amountKesCents)} · ${payout.recipientName} · ${payout.recipientDetail}`;
   }
+  if (item.type === "to_treasury") return "To Treasury";
+  if (item.type === "from_treasury") return "From Treasury";
   return item.counterpartyAddress
     ? `From ${shortAddress(item.counterpartyAddress)}`
     : null;

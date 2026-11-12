@@ -33,7 +33,7 @@ import { startApproval, verifyApproval } from "../approval/passkeys.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { cardLoadsTodayKes } from "../cards/balance.js";
 import { fromMicro } from "../paycrest/amounts.js";
-import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
+import { availableUsdc } from "../wallet/ledger.js";
 import { payoutIntentHash } from "./intent.js";
 import { PayoutRejected } from "./payout-errors.js";
 import { approveSubjects } from "./subjects.js";
@@ -352,9 +352,7 @@ export function approvePayouts(input: {
           (sum, payout) => sum + payout.maxDebitUsdc,
           0n,
         );
-        const available =
-          (yield* ledgerBalance(tx, wallet.id)) -
-          (yield* reservedForPayouts(tx, wallet.id));
+        const available = yield* availableUsdc(tx, wallet.id);
         if (available < needed) {
           return yield* Effect.fail(
             new PayoutRejected({

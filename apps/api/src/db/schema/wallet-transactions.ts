@@ -16,8 +16,10 @@ import {
 
 import { WALLET_TRANSACTION_TYPES } from "@expendi-business/shared";
 
+import { intentQuotes } from "./intent-quotes.js";
 import { organizations } from "./organizations.js";
 import { payouts } from "./payouts.js";
+import { treasuryMoves } from "./treasury-moves.js";
 import { walletChain, wallets } from "./wallets.js";
 
 export const walletTransactionType = pgEnum(
@@ -73,6 +75,14 @@ export const walletTransactions = pgTable(
     /** The sender of a credit, or the recipient of a debit. */
     counterpartyAddress: text("counterparty_address"),
     payoutId: uuid("payout_id").references(() => payouts.id),
+    /** The move to or from Treasury a `to_treasury` or `from_treasury` row belongs to. */
+    treasuryMoveId: uuid("treasury_move_id"),
+    /**
+     * The 1Click quote whose send a `to_treasury` debit records, and only
+     * that. A refund coming back is a `from_treasury` row with no quote
+     * link, so one quote has at most one debit but may also have its refund.
+     */
+    intentQuoteId: uuid("intent_quote_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -93,16 +103,43 @@ export const walletTransactions = pgTable(
     uniqueIndex("wallet_transactions_near_transfer_unique")
       .on(table.receiptId, table.logIndex, table.transferIndex)
       .where(sql`${table.chain} <> 'base'`),
+    foreignKey({
+      name: "wallet_transactions_treasury_move_organization_fk",
+      columns: [table.treasuryMoveId, table.organizationId],
+      foreignColumns: [treasuryMoves.id, treasuryMoves.organizationId],
+    }),
+    foreignKey({
+      name: "wallet_transactions_intent_quote_organization_fk",
+      columns: [table.intentQuoteId, table.organizationId],
+      foreignColumns: [intentQuotes.id, intentQuotes.organizationId],
+    }),
     // Target of invoice_payments' composite foreign key.
     unique("wallet_transactions_id_organization_id_unique").on(
       table.id,
       table.organizationId,
     ),
     index("wallet_transactions_wallet_id_idx").on(table.walletId),
+    // The Treasury types are compared as text: an enum value can't be used
+    // in the transaction that adds it.
     check(
       "wallet_transactions_amount_sign",
-      sql`(${table.type} IN ('deposit', 'refund', 'topup') AND ${table.usdcAmount} > 0) OR (${table.type} IN ('payout', 'withdrawal') AND ${table.usdcAmount} < 0)`,
+      sql`(${table.type}::text IN ('deposit', 'refund', 'topup', 'from_treasury') AND ${table.usdcAmount} > 0) OR (${table.type}::text IN ('payout', 'withdrawal', 'to_treasury') AND ${table.usdcAmount} < 0)`,
     ),
+    // Exactly the two Treasury types name their move, and a debit to
+    // Treasury names the quote it paid.
+    check(
+      "wallet_transactions_treasury_has_move",
+      sql`(${table.type}::text IN ('to_treasury', 'from_treasury')) = (${table.treasuryMoveId} IS NOT NULL)`,
+    ),
+    check(
+      "wallet_transactions_to_treasury_has_quote",
+      sql`(${table.type}::text = 'to_treasury') = (${table.intentQuoteId} IS NOT NULL)`,
+    ),
+    // A quote's send is debited once. The predicate has no enum literal:
+    // an index predicate must be immutable, and a cast of an enum isn't.
+    uniqueIndex("wallet_transactions_to_treasury_quote_unique")
+      .on(table.intentQuoteId)
+      .where(sql`${table.intentQuoteId} IS NOT NULL`),
     check(
       "wallet_transactions_payout_has_payout",
       sql`${table.type} <> 'payout' OR ${table.payoutId} IS NOT NULL`,

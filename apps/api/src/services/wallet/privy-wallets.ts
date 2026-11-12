@@ -12,7 +12,10 @@ import {
 } from "../chain/base.js";
 import { implicitAccountPublicKey } from "../chain/near.js";
 import { PrivyClientLive, PrivyClientService } from "../privy/privy-client.js";
-import { companyWalletPolicyRules } from "./wallet-policy.js";
+import {
+  companyWalletPolicyRules,
+  treasuryWalletPolicyRules,
+} from "./wallet-policy.js";
 
 export class PrivyWalletError extends Data.TaggedError("PrivyWalletError")<{
   readonly message: string;
@@ -69,6 +72,11 @@ export interface CreatePolicyInput {
   readonly idempotencyKey: string;
 }
 
+export interface CreateTreasuryPolicyInput extends CreatePolicyInput {
+  /** Privy's ID for the Earn vault (not the contract address). */
+  readonly vaultId: string;
+}
+
 export interface CreateWalletInput {
   /** Write-once in Privy; lets a retry find a wallet whose ID was lost. */
   readonly externalId: string;
@@ -92,7 +100,14 @@ export interface PrivyWalletsShape {
   readonly createPolicy: (
     input: CreatePolicyInput,
   ) => Effect.Effect<{ readonly policyId: string }, PrivyWalletError>;
-  /** An Ethereum wallet bound by a policy: a company's transit wallet. */
+  /** A Treasury wallet's policy: Earn into one vault, and the capped transfer. */
+  readonly createTreasuryPolicy: (
+    input: CreateTreasuryPolicyInput,
+  ) => Effect.Effect<{ readonly policyId: string }, PrivyWalletError>;
+  /**
+   * An Ethereum wallet bound by a policy: a company's transit wallet, or its
+   * Treasury wallet.
+   */
   readonly createWallet: (
     input: CreateWalletInput,
   ) => Effect.Effect<PrivyWalletRecord, PrivyWalletError>;
@@ -263,6 +278,21 @@ export const makePrivyWallets = (
         name: input.name,
         owner_id: input.ownerQuorumId,
         rules: companyWalletPolicyRules(input.perTransactionMaxUsdc),
+        idempotency_key: input.idempotencyKey,
+      }),
+    ).pipe(Effect.map((policy) => ({ policyId: policy.id }))),
+
+  createTreasuryPolicy: (input) =>
+    privyCall("Failed to create the Treasury policy", () =>
+      client.policies().create({
+        chain_type: "ethereum",
+        version: "1.0",
+        name: input.name,
+        owner_id: input.ownerQuorumId,
+        rules: treasuryWalletPolicyRules(
+          input.vaultId,
+          input.perTransactionMaxUsdc,
+        ),
         idempotency_key: input.idempotencyKey,
       }),
     ).pipe(Effect.map((policy) => ({ policyId: policy.id }))),

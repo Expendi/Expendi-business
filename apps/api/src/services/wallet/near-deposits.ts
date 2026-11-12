@@ -126,23 +126,32 @@ type WatcherDeps =
 
 type WatcherError = DatabaseError | FastNearError | NearRpcError;
 
+/** A company quote whose 1Click record lists a transaction. */
+interface ListedQuote {
+  readonly id: string;
+  readonly purpose: IntentQuotePurpose;
+  readonly status: IntentQuoteStatus;
+  readonly treasuryMoveId: string | null;
+}
+
 /**
- * The purposes of the company's quotes whose 1Click record lists `txHash`.
+ * The company's quotes whose 1Click record lists `txHash`.
  * NEAR hashes are case-sensitive, so they are compared exactly.
  */
 function quotesListing(
   organizationId: string,
   txHash: string,
-): Effect.Effect<
-  readonly { readonly id: string; readonly purpose: string }[],
-  DatabaseError,
-  DatabaseService
-> {
+): Effect.Effect<readonly ListedQuote[], DatabaseError, DatabaseService> {
   const hash = sql`ARRAY[${txHash}]::text[]`;
   return withScope({ organizationId }, (tx) =>
     query(() =>
       tx
-        .select({ id: intentQuotes.id, purpose: intentQuotes.purpose })
+        .select({
+          id: intentQuotes.id,
+          purpose: intentQuotes.purpose,
+          status: intentQuotes.status,
+          treasuryMoveId: intentQuotes.treasuryMoveId,
+        })
         .from(intentQuotes)
         .where(
           and(
@@ -214,21 +223,71 @@ function refreshQuotes(
   });
 }
 
-/** The quote whose delivery a deposit is, when 1Click lists the transfer. */
-interface DeliveringQuote {
-  readonly id: string;
-  readonly purpose: "fund_in" | "fund_in_return" | "invoice_payment";
-}
+/**
+ * The quote whose delivery a credit is, when 1Click lists the transfer: new
+ * money (a fund-in, its return or an invoice payment), or the company's own
+ * USDC coming back from Treasury, either delivered by a `from_treasury`
+ * quote or returned by a refunded `to_treasury` one. The Treasury kind
+ * carries its move.
+ */
+type DeliveringQuote =
+  | {
+      readonly id: string;
+      readonly purpose: "fund_in" | "fund_in_return" | "invoice_payment";
+    }
+  | {
+      readonly id: string;
+      readonly purpose: "to_treasury" | "from_treasury";
+      readonly treasuryMoveId: string;
+    };
 
-function deliveringQuote(quote: {
-  readonly id: string;
-  readonly purpose: string;
-}): DeliveringQuote | null {
-  return quote.purpose === "fund_in" ||
-    quote.purpose === "fund_in_return" ||
-    quote.purpose === "invoice_payment"
-    ? { id: quote.id, purpose: quote.purpose }
-    : null;
+/** What a listed quote says about a transfer in the transaction it lists. */
+type QuoteReading =
+  | { readonly kind: "credit"; readonly quote: DeliveringQuote }
+  | { readonly kind: "internal" }
+  | { readonly kind: "unsettled_return"; readonly quote: ListedQuote };
+
+/**
+ * A `from_treasury` quote's delivery, and a refunded `to_treasury` quote's
+ * return, are the company's money arriving at the company wallet, the one
+ * case a Treasury quote's transfer is credited. A `to_treasury` quote that
+ * isn't settled may still turn out to have refunded, so what it lists can't
+ * be judged yet; once it has succeeded or failed it lists nothing inbound.
+ * Every other quote's transfer, other than a deposit's, is internal.
+ */
+function readQuote(quote: ListedQuote): QuoteReading {
+  switch (quote.purpose) {
+    case "fund_in":
+    case "fund_in_return":
+    case "invoice_payment":
+      return {
+        kind: "credit",
+        quote: { id: quote.id, purpose: quote.purpose },
+      };
+    case "from_treasury":
+    case "to_treasury": {
+      if (quote.treasuryMoveId === null) return { kind: "internal" };
+      if (quote.purpose === "to_treasury" && quote.status !== "refunded") {
+        return UNSETTLED_INTENT_QUOTE_STATUSES.some(
+          (status) => status === quote.status,
+        )
+          ? { kind: "unsettled_return", quote }
+          : { kind: "internal" };
+      }
+      return {
+        kind: "credit",
+        quote: {
+          id: quote.id,
+          purpose: quote.purpose,
+          treasuryMoveId: quote.treasuryMoveId,
+        },
+      };
+    }
+    case "base_hop":
+    case "sweep":
+    case "usdc_payout":
+      return { kind: "internal" };
+  }
 }
 
 function creditDeposit(
@@ -246,13 +305,19 @@ function creditDeposit(
       (tx) =>
         Effect.gen(function* () {
           const audit = yield* AuditLog;
+          const fromTreasury =
+            delivering?.purpose === "to_treasury" ||
+            delivering?.purpose === "from_treasury"
+              ? delivering
+              : null;
           const [credit] = yield* query(() =>
             tx
               .insert(walletTransactions)
               .values({
                 organizationId: wallet.organization_id,
                 walletId: wallet.wallet_id,
-                type: "deposit",
+                type: fromTreasury ? "from_treasury" : "deposit",
+                treasuryMoveId: fromTreasury?.treasuryMoveId ?? null,
                 chain: "near",
                 usdcAmount: transfer.amount,
                 txHash: transfer.txHash,
@@ -283,9 +348,16 @@ function creditDeposit(
           yield* audit.record(tx, {
             actor: ACTOR,
             organizationId: wallet.organization_id,
-            action: "wallet.deposit_received",
+            action: fromTreasury
+              ? "wallet.treasury_returned"
+              : "wallet.deposit_received",
             entity: { type: "wallet_transaction", id: credit.id },
             after: {
+              ...(fromTreasury && {
+                treasuryMoveId: fromTreasury.treasuryMoveId,
+                treasuryQuoteId: fromTreasury.id,
+                treasuryQuotePurpose: fromTreasury.purpose,
+              }),
               ...(delivering?.purpose === "fund_in" && {
                 fundInId: delivering.id,
               }),
@@ -324,8 +396,12 @@ function creditDeposit(
  * 1. from the gas relayer: its fee cover, internal;
  * 2. in a transaction one of the company's quotes lists: a deposit if that
  *    quote is a fund-in, a fund-in return or an invoice payment (money that
- *    never reached the company wallet before), otherwise a hop refund, a sweep or a payout
- *    refund, internal;
+ *    never reached the company wallet before); a `from_treasury` credit if
+ *    it is a `from_treasury` quote's delivery or a refunded `to_treasury`
+ *    quote's return (the company's own money, credited because it left the
+ *    ledger when it was sent to Treasury); held while a `to_treasury` quote
+ *    that could still turn out refunded lists it; otherwise a hop refund, a
+ *    sweep or a payout refund, internal;
  * 3. from NEAR Intents, unexplained, while a quote of the company's is
  *    still unsettled: held, because 1Click may not have listed it yet;
  * 4. anything else: a deposit.
@@ -339,19 +415,33 @@ function settleTransfer(
     const relayer = yield* NearRelayer;
     if (transfer.from === relayer.accountId) return "internal";
 
-    const explained = (
-      listing: readonly { readonly id: string; readonly purpose: string }[],
-    ) => {
+    const explained = (listing: readonly ListedQuote[]) => {
       if (listing.length === 0) return null;
-      const delivering = listing.map(deliveringQuote);
-      return delivering.every((quote) => quote !== null)
-        ? creditDeposit(wallet, transfer, delivering[0] ?? null)
+      const readings = listing.map(readQuote);
+      const waiting = readings.find(
+        (reading) => reading.kind === "unsettled_return",
+      );
+      if (waiting) {
+        return Effect.succeed<Held>(
+          held({ kind: "unsettled_quote", quote: waiting.quote }),
+        );
+      }
+      const [first] = readings;
+      return readings.every((reading) => reading.kind === "credit") &&
+        first?.kind === "credit"
+        ? creditDeposit(wallet, transfer, first.quote)
         : Effect.succeed<Verdict>("internal");
     };
 
-    const known = explained(
-      yield* quotesListing(organizationId, transfer.txHash),
-    );
+    const isWaitingOnTreasuryQuote = (listing: readonly ListedQuote[]) =>
+      listing.some((quote) => readQuote(quote).kind === "unsettled_return");
+
+    let listing = yield* quotesListing(organizationId, transfer.txHash);
+    if (isWaitingOnTreasuryQuote(listing)) {
+      yield* refreshQuotes(organizationId);
+      listing = yield* quotesListing(organizationId, transfer.txHash);
+    }
+    const known = explained(listing);
     if (known !== null) return yield* known;
 
     if (transfer.from === NEAR_INTENTS_ACCOUNT_ID) {
@@ -503,6 +593,8 @@ const QUOTE_PURPOSE_NAMES: Readonly<Record<IntentQuotePurpose, string>> = {
   usdc_payout: "USDC payout",
   fund_in_return: "fund-in return",
   invoice_payment: "invoice payment",
+  to_treasury: "move to Treasury",
+  from_treasury: "move to wallet",
 };
 
 function holdExplained(reason: HoldReason): string {
