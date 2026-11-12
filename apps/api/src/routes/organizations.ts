@@ -22,9 +22,11 @@ import { createCardPurchaseRoutes } from "./card-purchases.js";
 import { createCardRoutes } from "./cards.js";
 import { createCategoryRoutes } from "./categories.js";
 import { createClaimRoutes } from "./claims.js";
+import { createCustomerRoutes } from "./customers.js";
 import { createExpenseRoutes } from "./expenses.js";
 import { createFloatRoutes } from "./floats.js";
 import { createCompanyImportRoutes } from "./imports.js";
+import { createInvoiceRoutes } from "./invoices.js";
 import { createMemberRoutes } from "./members.js";
 import { createOverviewRoutes } from "./overview.js";
 import { createPaidFromAccountRoutes } from "./paid-from-accounts.js";
@@ -106,9 +108,11 @@ export function createOrganizationRoutes(
     .route("/categories", createCategoryRoutes(runtime))
     .route("/claims", createClaimRoutes(runtime))
     .route("/company-spending", createCompanySpendingRoutes(runtime))
+    .route("/customers", createCustomerRoutes(runtime))
     .route("/expenses", createExpenseRoutes(runtime))
     .route("/floats", createFloatRoutes(runtime))
     .route("/imports", createCompanyImportRoutes(runtime))
+    .route("/invoices", createInvoiceRoutes(runtime))
     .route("/members", createMemberRoutes(runtime))
     .route("/me", createMyCompanyRoutes(runtime))
     .route("/overview", createOverviewRoutes(runtime))

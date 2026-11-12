@@ -32,6 +32,7 @@ import {
   randomEmail,
 } from "../helpers/db.js";
 import { makeFakeFileStorage } from "../helpers/fakes.js";
+import { createCustomerAndInvoice } from "../helpers/invoices.js";
 import {
   addEmployeePayee,
   billsOfRun,
@@ -69,6 +70,8 @@ interface Books {
   readonly ids: {
     readonly billId: string;
     readonly claimId: string;
+    readonly customerId: string;
+    readonly invoiceId: string;
     readonly floatId: string;
     readonly cardId: string;
     readonly itemId: string;
@@ -230,6 +233,7 @@ async function seedBooks(): Promise<Books> {
     payeeId,
     categoryId: officeId,
   });
+  const invoice = await createCustomerAndInvoice(db, company);
   const claimId = await submitClaim(company, amina.user, officeId);
   const spendingId = await recordCompanySpending(company, officeId);
   const floatId = await openFloat(company, amina.membershipId);
@@ -247,6 +251,8 @@ async function seedBooks(): Promise<Books> {
     ids: {
       billId,
       claimId,
+      customerId: invoice.customerId,
+      invoiceId: invoice.invoiceId,
       itemId,
       payeeId,
       runId: run.id,
@@ -390,6 +396,13 @@ describe("company routes for an accountant", () => {
         `GET ${COMPANY_ROUTES}/claims`,
         `POST ${COMPANY_ROUTES}/claims`,
         `POST ${COMPANY_ROUTES}/claims/approval`,
+        `GET ${COMPANY_ROUTES}/customers`,
+        `POST ${COMPANY_ROUTES}/customers`,
+        `PATCH ${COMPANY_ROUTES}/customers/:customerId`,
+        `GET ${COMPANY_ROUTES}/invoices`,
+        `GET ${COMPANY_ROUTES}/invoices/:invoiceId`,
+        `POST ${COMPANY_ROUTES}/invoices/:invoiceId/send`,
+        `POST ${COMPANY_ROUTES}/invoices/:invoiceId/void`,
         `GET ${COMPANY_ROUTES}/expenses`,
         `GET ${COMPANY_ROUTES}/expenses/:expenseId`,
         `GET ${COMPANY_ROUTES}/overview`,
@@ -497,6 +510,8 @@ describe("company routes for an accountant", () => {
       salaries: await read("/salaries"),
       run: await read(`/payroll-runs/${ids.runId}`),
       bills: await read("/bills"),
+      invoices: await read("/invoices"),
+      customers: await read("/customers"),
       recurring: await read("/recurring-items"),
       claims: await read("/claims"),
       spending: await read("/company-spending"),
@@ -515,6 +530,8 @@ describe("company routes for an accountant", () => {
     expect(seen.salaries).toContain(ids.salaryId);
     expect(seen.run).toContain(aminaPay?.id);
     expect(seen.bills).toContain(ids.billId);
+    expect(seen.invoices).toContain(ids.invoiceId);
+    expect(seen.customers).toContain(ids.customerId);
     expect(seen.recurring).toContain(ids.itemId);
     expect(seen.claims).toContain(ids.claimId);
     expect(seen.spending).toContain(ids.spendingId);
@@ -545,12 +562,14 @@ describe("company routes for an accountant", () => {
       salaries: (await answer(companyPath(company, "/salaries"), amina.user))
         .status,
       bills: (await answer(companyPath(company, "/bills"), amina.user)).status,
+      invoices: (await answer(companyPath(company, "/invoices"), amina.user))
+        .status,
     };
 
     // #then
     expect(seen.aminaClaims).toContain(ids.claimId);
     expect(seen.colleagueClaims).toMatchObject({ claims: [] });
-    expect([seen.salaries, seen.bills]).toEqual([403, 403]);
+    expect([seen.salaries, seen.bills, seen.invoices]).toEqual([403, 403, 403]);
   });
 
   it("refuses a removed accountant on their very next request", async () => {

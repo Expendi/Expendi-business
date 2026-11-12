@@ -17,6 +17,7 @@ import {
   createOrganizationRoutes,
   createSignUpRoutes,
 } from "./routes/organizations.js";
+import { createPayRoutes } from "./routes/pay.js";
 import { createPaycrestWebhookRoutes } from "./routes/paycrest-webhook.js";
 import { createReportDownloadRoutes } from "./routes/reports.js";
 
@@ -59,6 +60,11 @@ export function createApp({ runtime }: { readonly runtime: AppRuntime }): App {
     "/organizations/:organizationId",
     createOrganizationRoutes(runtime),
   );
+
+  // The pay link's customer has no Expendi login: the invoice's public ID is
+  // the credential. The pay page runs on the dashboard's origin.
+  app.use("/pay/*", customerCors);
+  app.route("/pay", createPayRoutes(runtime));
 
   // Staff login, separate from customer login (spec §6.15).
   app.route("/internal", createInternalRoutes(runtime));
