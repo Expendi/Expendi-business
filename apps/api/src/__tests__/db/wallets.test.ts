@@ -601,8 +601,12 @@ describe("wallet_transactions", () => {
         const change = client.query(statement);
 
         // #then
+        // invoice_payments references the table, so Postgres refuses a
+        // TRUNCATE before the trigger gets to.
         await expect(change).rejects.toThrow(
-          `wallet_transactions is append-only: ${operation} is not allowed`,
+          operation === "TRUNCATE"
+            ? /append-only: TRUNCATE is not allowed|referenced in a foreign key/
+            : `wallet_transactions is append-only: ${operation} is not allowed`,
         );
       } finally {
         await client.query("ROLLBACK");

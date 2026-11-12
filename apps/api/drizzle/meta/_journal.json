@@ -589,6 +589,34 @@
       "when": 1794395676611,
       "tag": "0083_fund_in_returns",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1794494144758,
+      "tag": "0084_crypto_invoicing",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1794494152429,
+      "tag": "0085_invoices_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1794494836055,
+      "tag": "0086_invoice_last_emailed_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1794494837366,
+      "tag": "0087_invoice_last_emailed_at_grant",
+      "breakpoints": true
     }
   ]
 }

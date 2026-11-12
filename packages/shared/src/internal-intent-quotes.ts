@@ -27,7 +27,8 @@ const blankIsAbsent = (value: unknown) => (value === "" ? undefined : value);
  * for a cash-out), `sweep` (transit wallet back to the company wallet),
  * `fund_in` (a company adding money), `usdc_payout` (company wallet to a
  * USDC payee on Base or Solana) and `fund_in_return` (a refunded fund-in,
- * from the company's NEAR Intents account back to its company wallet).
+ * from the company's NEAR Intents account back to its company wallet) and
+ * `invoice_payment` (a customer paying an invoice).
  */
 export const INTENT_QUOTE_PURPOSES = [
   "base_hop",
@@ -35,6 +36,7 @@ export const INTENT_QUOTE_PURPOSES = [
   "fund_in",
   "usdc_payout",
   "fund_in_return",
+  "invoice_payment",
 ] as const;
 export const intentQuotePurposeSchema = z.enum(INTENT_QUOTE_PURPOSES);
 export type IntentQuotePurpose = z.infer<typeof intentQuotePurposeSchema>;
