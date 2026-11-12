@@ -17,12 +17,14 @@ import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { Tenant } from "../../middleware/tenant.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import type { CashCheck, CashObligationView } from "./cash-check.js";
 import { query, withScope } from "../../db/scope.js";
 import { NotFound } from "../../errors.js";
 import { nairobiDate } from "../bills/status.js";
+import { activeKesRateOrNull } from "../cash-out/active-rate.js";
 import { listFloats } from "../floats/views.js";
-import { liveKesRate, readCashCheck } from "./cash-check.js";
+import { readCashCheck } from "./cash-check.js";
 import { readSpendingPayments } from "./payments.js";
 
 /**
@@ -257,13 +259,17 @@ export function getSpendingOverview(
   tenant: Tenant,
   selectedMonth?: string,
   now: Date = new Date(),
-): Effect.Effect<SpendingOverview, DatabaseError, DatabaseService | Paycrest> {
+): Effect.Effect<
+  SpendingOverview,
+  DatabaseError,
+  DatabaseService | Paycrest | Pretium
+> {
   return Effect.gen(function* () {
     const { organizationId } = tenant;
     const today = nairobiDate(now);
     const month = selectedMonth ?? today.slice(0, 7);
     const bounds = monthBounds(month);
-    const rate = yield* liveKesRate;
+    const rate = yield* activeKesRateOrNull("overview");
     return yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
         const payments = yield* readSpendingPayments(tx, organizationId, {

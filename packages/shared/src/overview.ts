@@ -170,7 +170,7 @@ export function cashFootnote(cash: SpendingOverview["cash"]): string {
     cash.unknownAmounts === 0
       ? ""
       : ` Not counting ${String(cash.unknownAmounts)} ${cash.unknownAmounts === 1 ? "payment" : "payments"} with no amount yet.`;
-  return `${overviewKes(cash.totalKes)} to pay through Expendi by ${cash.through}, overdue included.${unknown} Paycrest's fees and bills paid outside Expendi aren't counted.`;
+  return `${overviewKes(cash.totalKes)} to pay through Expendi by ${cash.through}, overdue included.${unknown} Cash-out fees and bills paid outside Expendi aren't counted.`;
 }
 
 /** Null when nothing's due outside Expendi, so the line is left out. */

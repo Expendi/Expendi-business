@@ -1497,7 +1497,7 @@ describe("Card loads", () => {
     expect(await balanceOf()).toMatchObject({ loadedUsdCents: "0" });
   });
 
-  it("says so when Paycrest has no rate", async () => {
+  it("says so, naming no provider, when Paycrest has no rate", async () => {
     // #given
     paycrest.state.failRate = true;
 
@@ -1506,7 +1506,9 @@ describe("Card loads", () => {
 
     // #then
     expect(response.status).toBe(503);
-    expect((await errorOf(response)).message).toContain("Paycrest");
+    expect((await errorOf(response)).message).toBe(
+      "Couldn't get today's KES rate. Try again in a minute.",
+    );
   });
 });
 

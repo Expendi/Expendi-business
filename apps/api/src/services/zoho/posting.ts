@@ -397,9 +397,10 @@ function paidThroughExpendi(
     if (amountKes === null) {
       return yield* notPostable("This bill's payment can't be found.");
     }
-    // Paycrest's M-Pesa or bank receipt; an on-chain hash wouldn't fit.
+    // A cash-out's M-Pesa or bank receipt, whichever provider paid it; an
+    // on-chain hash wouldn't fit.
     const reference =
-      payout?.provider === "paycrest" ? payout.providerReference : null;
+      payout && payout.provider !== "onchain" ? payout.providerReference : null;
     return { amountKes, reference };
   });
 }

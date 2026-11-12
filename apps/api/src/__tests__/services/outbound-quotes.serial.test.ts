@@ -13,10 +13,12 @@ import {
   preparePayouts,
   requestPayoutApproval,
 } from "../../services/payout/payout-service.js";
+import { reconcilePretiumPayouts } from "../../services/payout/pretium-fund.js";
 import {
   APPROVAL_LAPSE_MS,
   reconcilePaycrestPayouts,
 } from "../../services/payout/sync.js";
+import { mineCompanySends } from "../helpers/base-mining.js";
 import { randomTxHash } from "../helpers/chain.js";
 import { randomAddress, TEST_ORIGIN } from "../helpers/fakes.js";
 import {
@@ -41,7 +43,7 @@ import {
  */
 
 const world = makeNearPayoutWorld();
-const { runtime, privy, oneClick } = world;
+const { runtime, privy, oneClick, pretium } = world;
 let db: Database;
 let paying: NearPayingCompany;
 
@@ -337,6 +339,103 @@ describe("reconciliation and a cash-out waiting for its hop", () => {
       status: "failed",
       reason: "Funding never started after approval. Nothing was sent.",
       orderRequested: null,
+    });
+  });
+});
+
+describe("a Pretium cash-out waiting for its hop", () => {
+  const longAgo = () => new Date(Date.now() - APPROVAL_LAPSE_MS - 60_000);
+
+  beforeEach(async () => {
+    pretium.state.reset();
+    await mineCompanySends(
+      privy,
+      world.base.state.receipts,
+      db,
+      paying.company,
+    );
+  });
+
+  /** An approved cash-out that approval locked to Pretium, its hop under way. */
+  async function approvedForPretium() {
+    const [payout] = await payClaims(runtime, db, paying, [claimRequest()]);
+    if (!payout) throw new Error("no payout");
+    await updatePayout(db, paying.company, payout.id, { provider: "pretium" });
+    return payout;
+  }
+
+  const transitSends = () =>
+    privy.state.sends.filter(
+      (send) => send.privyWalletId === paying.transitPrivyWalletId,
+    );
+
+  it("is funded, once, by the job when its hop settled before a crash", async () => {
+    // #given a hop already settled as delivered, its payout still approved
+    const payout = await approvedForPretium();
+    const hop = await onlyQuote();
+    deliverHop(world, paying, hop);
+    await runtime.runPromise(advanceBaseHop(hop));
+
+    // #when the job runs, and runs again
+    const summary = await job();
+    await job();
+
+    // #then it was sent and Pretium told exactly once
+    expect({
+      status: (await readPayout(db, paying.company, payout.id)).status,
+      caughtUp: summary.caughtUp > 0,
+      sends: transitSends().length,
+      pays: pretium.state.payRequests.filter(
+        (request) => request.reference === payout.id,
+      ).length,
+    }).toEqual({ status: "paying", caughtUp: true, sends: 1, pays: 1 });
+  });
+
+  it("is left alone by reconciliation while the hop is still moving its USDC", async () => {
+    // #given
+    const payout = await approvedForPretium();
+    await updatePayout(db, paying.company, payout.id, {
+      approvedAt: longAgo(),
+    });
+
+    // #when
+    await runtime.runPromise(reconcilePretiumPayouts(500));
+
+    // #then
+    expect((await readPayout(db, paying.company, payout.id)).status).toBe(
+      "approved",
+    );
+  });
+
+  it("is released by reconciliation when never funded long after its hop settled", async () => {
+    // #given
+    const payout = await approvedForPretium();
+    const hop = await onlyQuote();
+    deliverHop(world, paying, hop);
+    await runtime.runPromise(advanceBaseHop(hop));
+    await updateQuote(db, paying.company, hop.id, { settledAt: longAgo() });
+    await updatePayout(db, paying.company, payout.id, {
+      approvedAt: longAgo(),
+    });
+
+    // #when
+    await runtime.runPromise(reconcilePretiumPayouts(500));
+
+    // #then the payout failed with nothing sent; its USDC waits in the
+    // transit wallet for the sweep
+    const failed = await readPayout(db, paying.company, payout.id);
+    expect({
+      status: failed.status,
+      reason: failed.failureReason,
+      sends: transitSends().length,
+      pays: pretium.state.payRequests.filter(
+        (request) => request.reference === payout.id,
+      ).length,
+    }).toEqual({
+      status: "failed",
+      reason: "Funding never started after approval. Nothing was sent.",
+      sends: 0,
+      pays: 0,
     });
   });
 });

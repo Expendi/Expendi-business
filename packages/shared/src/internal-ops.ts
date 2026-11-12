@@ -62,6 +62,15 @@ export const companySearchResponseSchema = z.object({
 
 export type CompanySearchResponse = z.infer<typeof companySearchResponseSchema>;
 
+/**
+ * The companies a cash-out can go through. The active one, chosen by staff
+ * for every company at once, takes each new cash-out; `onchain` pays USDC
+ * and is never one of them.
+ */
+export const CASH_OUT_PROVIDERS = ["paycrest", "pretium"] as const;
+export const cashOutProviderSchema = z.enum(CASH_OUT_PROVIDERS);
+export type CashOutProvider = z.infer<typeof cashOutProviderSchema>;
+
 /** A payout as staff see it in lists. */
 export const staffPayoutSummarySchema = z.object({
   id: z.uuid(),
@@ -77,7 +86,7 @@ export const staffPayoutSummarySchema = z.object({
   subjectId: z.uuid(),
   /** Set when the payout is one person's pay in a payroll run. */
   payrollRunId: z.uuid().nullable(),
-  provider: z.enum(["paycrest", "onchain"]),
+  provider: z.enum(["paycrest", "pretium", "onchain"]),
   method: payoutMethodSchema,
   status: payoutStatusSchema,
   /** What the recipient receives, KES cents. */
@@ -93,7 +102,7 @@ export const staffPayoutSummarySchema = z.object({
   txHash: z.string().nullable(),
   /** The M-Pesa or bank receipt, or the tx hash for a USDC payout. */
   providerReference: z.string().nullable(),
-  /** Paycrest's last reported order status, and when we asked. */
+  /** The provider's last reported status, and when we asked. */
   providerStatus: z.string().nullable(),
   providerCheckedAt: z.iso.datetime().nullable(),
   failureReason: z.string().nullable(),
@@ -214,6 +223,13 @@ export const staffPayoutDetailSchema = staffPayoutSummarySchema.extend({
    * not the payout.
    */
   heldByIntentQuoteId: z.uuid().nullable(),
+  /**
+   * A Pretium cash-out whose shillings weren't paid: when Pretium was asked
+   * for the USDC back, and the Base hash it gave for the refund. Always
+   * null for Paycrest, which refunds by itself.
+   */
+  refundRequestedAt: z.iso.datetime().nullable(),
+  refundTxHash: z.string().nullable(),
   /** The payout's ledger rows: its debit and any refund. */
   ledger: z.array(ledgerEntrySchema),
   /** The payout's audit entries, newest first. */
@@ -226,7 +242,8 @@ export type StaffPayoutDetail = z.infer<typeof staffPayoutDetailSchema>;
 export const payoutRefetchResponseSchema = z.object({
   previousStatus: payoutStatusSchema,
   status: payoutStatusSchema,
-  paycrestStatus: z.string(),
+  /** The status the payout's cash-out provider reported just now. */
+  providerStatus: z.string(),
 });
 
 export type PayoutRefetchResponse = z.infer<typeof payoutRefetchResponseSchema>;
@@ -281,10 +298,66 @@ const transferSchema = z.object({
   usdcAmount: digits,
 });
 
+/**
+ * What Pretium said of a cash-out just now. A failed read is `unreadable`,
+ * never `not_found`: only a successful search that found nothing says
+ * Pretium has no transaction for the transfer.
+ */
+export const pretiumTransactionEvidenceSchema = z.discriminatedUnion("state", [
+  z.object({
+    state: z.literal("found"),
+    /** By the payout's transaction code, or by the transfer's hash. */
+    lookedUpBy: z.enum(["code", "hash"]),
+    transactionCode: z.string(),
+    /** As Pretium sends it: PENDING, PROCESSING, COMPLETE, FAILED, … */
+    status: z.string(),
+    /** The Base transfer Pretium paid against, lowercased. */
+    transactionHash: z.string().nullable(),
+    /** The M-Pesa or bank receipt, once paid. */
+    receiptNumber: z.string().nullable(),
+    message: z.string().nullable(),
+    /** Whether it is for this payout's transfer, by hash or else by code. */
+    isThisPayouts: z.boolean(),
+  }),
+  z.object({ state: z.literal("not_found"), lookedUpBy: z.literal("hash") }),
+  z.object({
+    state: z.literal("unreadable"),
+    lookedUpBy: z.enum(["code", "hash"]),
+    message: z.string(),
+  }),
+  /** No transaction code and no transfer to look one up by. */
+  z.object({ state: z.literal("not_asked") }),
+]);
+
+export type PretiumTransactionEvidence = z.infer<
+  typeof pretiumTransactionEvidenceSchema
+>;
+
+export const pretiumEvidenceSchema = z.object({
+  /** Pretium's Base settlement address as pinned in the API, lowercased. */
+  settlementAddress: z.string(),
+  /** Whether the payout's deposit address is that pinned address. */
+  depositAddressIsSettlement: z.boolean(),
+  /**
+   * The Base transfer Pretium is matched by: the payout's saved hash, or
+   * else the one transfer found on chain. Null when neither exists.
+   */
+  transferHash: z.string().nullable(),
+  transaction: pretiumTransactionEvidenceSchema,
+  refundRequestedAt: z.iso.datetime().nullable(),
+  refundTxHash: z.string().nullable(),
+  /** The refunds credited to the ledger for this payout; null when none. */
+  refundCreditedUsdc: digits.nullable(),
+});
+
+export type PretiumEvidence = z.infer<typeof pretiumEvidenceSchema>;
+
 /** What the API checked before allowing an outcome. */
 export const payoutEvidenceSchema = z.object({
-  /** Paycrest's status, fetched just now; null for a USDC payout. */
+  /** Paycrest's status, fetched just now; null unless a Paycrest order. */
   paycrestStatus: z.string().nullable(),
+  /** What Pretium and the ledger say of a Pretium cash-out; else null. */
+  pretium: pretiumEvidenceSchema.nullable(),
   /** Every USDC transfer from the company wallet to the deposit address. */
   depositTransfers: z.array(transferSchema),
   /** False when funding never started, so nothing can have been sent. */
@@ -370,3 +443,73 @@ export const controlsResponseSchema = z.object({
 });
 
 export type ControlsResponse = z.infer<typeof controlsResponseSchema>;
+
+// Cash-out provider
+
+/** One cash-out provider, and whether cash-outs could go through it now. */
+export const cashOutProviderReadinessSchema = z.object({
+  provider: cashOutProviderSchema,
+  active: z.boolean(),
+  ready: z.boolean(),
+  /** Plain sentences, one per problem; empty when ready. */
+  problems: z.array(z.string()),
+});
+
+export type CashOutProviderReadiness = z.infer<
+  typeof cashOutProviderReadinessSchema
+>;
+
+/** `GET /internal/controls/cash-out-provider`: readiness is checked live. */
+export const cashOutProviderControlSchema = z.object({
+  activeProvider: cashOutProviderSchema,
+  /** When staff last changed it; null while it has never been changed. */
+  changedAt: z.iso.datetime().nullable(),
+  providers: z.array(cashOutProviderReadinessSchema),
+});
+
+export type CashOutProviderControl = z.infer<
+  typeof cashOutProviderControlSchema
+>;
+
+/** `POST /internal/controls/cash-out-provider/prepare`. */
+export const cashOutProviderPrepareRequestSchema = z.object({
+  provider: z.enum(CASH_OUT_PROVIDERS, {
+    error: "Choose Paycrest or Pretium.",
+  }),
+  reason: staffReasonSchema,
+});
+
+export type CashOutProviderPrepareRequest = z.input<
+  typeof cashOutProviderPrepareRequestSchema
+>;
+
+export const cashOutProviderPreparedSchema = z.object({
+  token: z.string(),
+  expiresAt: z.iso.datetime(),
+  /** The provider confirming will make active. */
+  provider: cashOutProviderSchema,
+  currentProvider: cashOutProviderSchema,
+  reason: z.string(),
+  /** Cash-outs waiting for approval, at every company: they follow the change. */
+  waitingForApproval: z.number().int().nonnegative(),
+  /** Cash-outs approved or in flight, by the provider they finish with. */
+  inFlight: z.object({
+    paycrest: z.number().int().nonnegative(),
+    pretium: z.number().int().nonnegative(),
+  }),
+  consequences: z.array(z.string()),
+});
+
+export type CashOutProviderPrepared = z.infer<
+  typeof cashOutProviderPreparedSchema
+>;
+
+/** `POST /internal/controls/cash-out-provider/confirm`. */
+export const cashOutProviderConfirmedSchema = z.object({
+  activeProvider: cashOutProviderSchema,
+  previousProvider: cashOutProviderSchema,
+});
+
+export type CashOutProviderConfirmed = z.infer<
+  typeof cashOutProviderConfirmedSchema
+>;

@@ -113,8 +113,11 @@ describe("pausing every company's payouts", () => {
     ];
 
     // #then
-    await expect(attempts[0]).rejects.toThrow("Payouts are paused");
-    await expect(attempts[1]).rejects.toThrow("Payouts are paused");
+    await Promise.all(
+      attempts.map((attempt) =>
+        expect(attempt).rejects.toThrow("Payouts are paused"),
+      ),
+    );
     expect(paycrest.state.created).toHaveLength(0);
   });
 

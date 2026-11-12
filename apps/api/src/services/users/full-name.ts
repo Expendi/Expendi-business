@@ -17,8 +17,8 @@ const PROFILE = {
 };
 
 /**
- * The signed-in person sets their own name (spec §6.2): Paycrest pays M-Pesa
- * in the recipient's name, and a company's creator has none until they give
+ * The signed-in person sets their own name (spec §6.2): a cash-out pays
+ * M-Pesa in the recipient's name, and a company's creator has none until they give
  * it. Like `user.linked`, the audit entry belongs to the person, not a
  * company. Setting the name it already has changes and records nothing.
  */

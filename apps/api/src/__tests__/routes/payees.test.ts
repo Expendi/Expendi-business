@@ -29,6 +29,7 @@ import {
   confirmAllowlistChange,
   requestAllowlistChange,
 } from "../../services/allowlist/allowlist.js";
+import { CASH_OUT_BANKS } from "../../services/cash-out/banks.js";
 import { insertBill } from "../helpers/bills.js";
 import { addCategory } from "../helpers/claims.js";
 import { addMember, createUser } from "../helpers/db.js";
@@ -462,7 +463,7 @@ describe("validation", () => {
         accountName: "Kenya Power",
       },
     ],
-    ["a bank Paycrest can't pay", { ...bank, bankCode: "NOTABANK" }],
+    ["a bank the catalogue doesn't know", { ...bank, bankCode: "NOTABANK" }],
     ["a missing account name", { ...bank, accountName: " " }],
     [
       "a Base address with a bad checksum",
@@ -484,17 +485,17 @@ describe("validation", () => {
     expect(response.status).toBe(400);
   });
 
-  it("lists the banks Paycrest can pay, without mobile money", async () => {
+  it("lists every bank in the catalogue, without mobile money", async () => {
     // #when
     const banks = await dataOf<{ code: string }[]>(
       await send("GET", `${base()}/banks`),
     );
 
     // #then
-    expect(banks.map((bankRow) => bankRow.code)).toEqual([
-      "KCBLKENX",
-      "EQBLKENA",
-    ]);
+    expect(banks.map((bankRow) => bankRow.code)).toEqual(
+      CASH_OUT_BANKS.map((bank) => bank.code),
+    );
+    expect(banks.map((bankRow) => bankRow.code)).not.toContain("SAFAKEPC");
   });
 });
 

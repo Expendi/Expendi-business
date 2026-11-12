@@ -3,6 +3,7 @@ import { Effect, Layer } from "effect";
 
 import type { Database } from "../../db/client.js";
 import type { IntentQuote } from "../../db/schema/index.js";
+import type { ExternalLayers } from "../../layers/main.js";
 import type { AppRuntime } from "../../runtime.js";
 import type { TestCompany, TestWallet } from "./db.js";
 import { SoftwarePasskey } from "../../../scripts/lib/software-passkey.js";
@@ -25,6 +26,7 @@ import {
   callKey,
   makeFakeBaseRpc,
   makeFakePaycrest,
+  makeFakePretium,
   makeFakePrivyWallets,
   TEST_ORIGIN,
 } from "./fakes.js";
@@ -38,17 +40,18 @@ const USDC = 1_000_000n;
 /**
  * Everything a company on NEAR pays through, in memory: Privy, the NEAR
  * chain with the real gas relayer on it, its transfers indexer, 1Click,
- * Base and Paycrest. The fake 1Click never moves money, so a test that
+ * Base, Paycrest and Pretium. The fake 1Click never moves money, so a test that
  * needs a hop delivered sets the transit wallet's balance and 1Click's
- * status itself.
+ * status itself. `extra` adds fakes a test needs beyond these.
  */
-export function makeNearPayoutWorld() {
+export function makeNearPayoutWorld(extra: Partial<ExternalLayers> = {}) {
   const privy = makeFakePrivyWallets();
   const near = makeFakeNearRpc();
   const relayer = nearRelayerOnFakeChain(privy.state, near);
   const oneClick = makeFakeOneClick();
   const base = makeFakeBaseRpc();
   const paycrest = makeFakePaycrest();
+  const pretium = makeFakePretium();
   const fastNear = makeFakeFastNear();
   near.state.fundWithUsdc(relayer.accountId, 1_000n * USDC);
 
@@ -79,6 +82,8 @@ export function makeNearPayoutWorld() {
       oneClick: oneClickLayer,
       baseRpc: base.layer,
       paycrest: paycrest.layer,
+      pretium: pretium.layer,
+      ...extra,
     },
     { NEAR_RELAYER_ACCOUNT_ID: relayer.accountId },
   );
@@ -97,6 +102,7 @@ export function makeNearPayoutWorld() {
     oneClick,
     base,
     paycrest,
+    pretium,
     fastNear,
     /** What a Base address holds in USDC, as the chain reports it. */
     setBaseUsdc(address: string, amount: bigint) {

@@ -5,6 +5,7 @@ import type { DatabaseService } from "../../db/client.js";
 import type { DatabaseError } from "../../errors.js";
 import type { AuditLog } from "../audit/audit-log.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import { cardPurchases } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { Lithic } from "../lithic/lithic-client.js";
@@ -32,7 +33,7 @@ export function reconcileCardPurchases(
 ): Effect.Effect<
   ReconcileCardPurchasesSummary,
   DatabaseError,
-  DatabaseService | Lithic | Paycrest | AuditLog
+  DatabaseService | Lithic | Paycrest | Pretium | AuditLog
 > {
   return Effect.gen(function* () {
     const lithic = yield* Lithic;

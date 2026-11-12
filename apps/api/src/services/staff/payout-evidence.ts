@@ -15,6 +15,7 @@ import type { BaseRpcError } from "../chain/base-rpc.js";
 import type { UsdcTransfer } from "../chain/base.js";
 import type { NearRpc } from "../chain/near-rpc.js";
 import type { NearChain } from "../chain/near.js";
+import type { PretiumTransaction } from "../pretium/pretium-client.js";
 import type { NearEvidence, NearSendEvidence } from "./near-send-evidence.js";
 import { walletTransactions } from "../../db/schema/index.js";
 import { query } from "../../db/scope.js";
@@ -22,6 +23,8 @@ import { Conflict, ServiceUnavailable } from "../../errors.js";
 import { BaseRpc } from "../chain/base-rpc.js";
 import { fromMicro } from "../paycrest/amounts.js";
 import { Paycrest } from "../paycrest/paycrest-client.js";
+import { Pretium } from "../pretium/pretium-client.js";
+import { PRETIUM_BASE_SETTLEMENT_ADDRESS } from "../pretium/settlement.js";
 import {
   gatherNearSends,
   SEND_RELEASE_MARGIN_BLOCKS,
@@ -30,8 +33,9 @@ import {
 /**
  * What must be true before staff may close a payout under review (README
  * rule 4, spec §6.8): the ledger keeps matching the chain, and nothing is
- * ever sent or re-sent. The evidence is gathered fresh from Paycrest and
- * the chain each time, and an outcome it doesn't support is refused.
+ * ever sent or re-sent. The evidence is gathered fresh from the cash-out
+ * provider (Paycrest or Pretium, read only) and the chain each time, and an
+ * outcome it doesn't support is refused.
  */
 
 /** Paycrest paid the recipient (it says to notify at validated). */
@@ -40,6 +44,14 @@ const PAYCREST_PAID = new Set(["validated", "settled"]);
 const PAYCREST_PAYING_OR_PAID = new Set(["validated", "settling", "settled"]);
 /** Paycrest closed the order without taking a deposit. */
 const PAYCREST_CLOSED = new Set(["expired", "cancelled"]);
+/** Pretium paid the recipient. */
+const PRETIUM_PAID = new Set(["COMPLETE", "COMPLETED"]);
+/** Pretium is paying, or has paid, the recipient. */
+const PRETIUM_PAYING_OR_PAID = new Set(["PROCESSING", "COMPLETE", "COMPLETED"]);
+/** Pretium closed the transaction without paying the recipient. */
+const PRETIUM_CLOSED_UNPAID = new Set(["FAILED", "REVERSED", "REFUNDED"]);
+
+const PRETIUM_SETTLEMENT = PRETIUM_BASE_SETTLEMENT_ADDRESS.toLowerCase();
 
 /**
  * How long after funding started a transfer could still land. Past this,
@@ -57,9 +69,40 @@ export type LedgerRow = Pick<
   "id" | "type" | "usdcAmount" | "chain" | "txHash" | "createdAt"
 >;
 
+/**
+ * What Pretium said of a cash-out just now. A failed read is `unreadable`,
+ * never `not_found`: a cash-out Pretium couldn't be asked about may still
+ * have been paid.
+ */
+export type PretiumLookup =
+  | {
+      readonly state: "found";
+      readonly lookedUpBy: "code" | "hash";
+      readonly transaction: PretiumTransaction;
+    }
+  | { readonly state: "not_found"; readonly lookedUpBy: "hash" }
+  | {
+      readonly state: "unreadable";
+      readonly lookedUpBy: "code" | "hash";
+      readonly message: string;
+    }
+  | { readonly state: "not_asked" };
+
+export interface PretiumEvidence {
+  readonly depositAddressIsSettlement: boolean;
+  /**
+   * The Base transfer Pretium is matched by: the payout's saved hash, or
+   * else the one transfer found on chain, lowercased.
+   */
+  readonly transferHash: string | null;
+  readonly lookup: PretiumLookup;
+}
+
 export interface PayoutEvidence {
   /** Paycrest's status fetched just now; null for a USDC payout or no order. */
   readonly paycrestStatus: string | null;
+  /** Pretium's view of a Pretium cash-out; null for any other payout. */
+  readonly pretium: PretiumEvidence | null;
   readonly fundingStarted: boolean;
   /**
    * Every USDC transfer from the wallet that funds the payout to the
@@ -155,7 +198,12 @@ function nearDepositTransfers(
 
 type ChainEvidence = Pick<
   PayoutEvidence,
-  "paycrestStatus" | "fundingStarted" | "depositTransfers" | "chain" | "near"
+  | "paycrestStatus"
+  | "pretium"
+  | "fundingStarted"
+  | "depositTransfers"
+  | "chain"
+  | "near"
 >;
 
 /**
@@ -185,20 +233,112 @@ export function baseTransfersSince(input: {
   });
 }
 
-/** Paycrest's view of the order and the chain's view of the funding. */
+/**
+ * Pretium's transaction for a cash-out, by the code Pretium gave or else
+ * by the transfer's hash. It only reads: a failure is reported as
+ * unreadable rather than failing the evidence, since nothing in it says
+ * whether Pretium paid.
+ */
+function lookUpPretium(
+  payout: Payout,
+  transferHash: string | null,
+): Effect.Effect<PretiumLookup, never, Pretium> {
+  return Effect.gen(function* () {
+    const pretium = yield* Pretium;
+    const code = payout.providerOrderId;
+    if (code !== null) {
+      return yield* pretium.status(code).pipe(
+        Effect.map((transaction): PretiumLookup => ({
+          state: "found",
+          lookedUpBy: "code",
+          transaction,
+        })),
+        Effect.catchAll((error) =>
+          Effect.succeed<PretiumLookup>({
+            state: "unreadable",
+            lookedUpBy: "code",
+            message: `asked for transaction ${code}: ${error.code}`,
+          }),
+        ),
+      );
+    }
+    const since = payout.fundingStartedAt;
+    if (transferHash === null || since === null) {
+      return { state: "not_asked" } as const;
+    }
+    return yield* pretium.findByHash({ txHash: transferHash, since }).pipe(
+      Effect.map((transaction): PretiumLookup =>
+        transaction
+          ? { state: "found", lookedUpBy: "hash", transaction }
+          : { state: "not_found", lookedUpBy: "hash" },
+      ),
+      Effect.catchAll((error) =>
+        Effect.succeed<PretiumLookup>({
+          state: "unreadable",
+          lookedUpBy: "hash",
+          message: `searched for ${transferHash}: ${error.code}`,
+        }),
+      ),
+    );
+  });
+}
+
+function gatherPretium(
+  payout: Payout,
+  depositTransfers: readonly UsdcTransfer[],
+): Effect.Effect<PretiumEvidence, never, Pretium> {
+  const [onlyTransfer] = depositTransfers.length === 1 ? depositTransfers : [];
+  const transferHash =
+    (payout.txHash ?? onlyTransfer?.txHash)?.toLowerCase() ?? null;
+  return lookUpPretium(payout, transferHash).pipe(
+    Effect.map((lookup) => ({
+      depositAddressIsSettlement:
+        payout.depositAddress?.toLowerCase() === PRETIUM_SETTLEMENT,
+      transferHash,
+      lookup,
+    })),
+  );
+}
+
+/**
+ * Whether Pretium's transaction is this payout's: by the hash of the
+ * transfer it paid against when both are known, since Pretium's listings
+ * hold another product's transactions too, and else by the code Pretium
+ * gave this payout.
+ */
+export function isPayoutsPretiumTransaction(
+  payout: Pick<Payout, "providerOrderId">,
+  transferHash: string | null,
+  transaction: Pick<PretiumTransaction, "transactionCode" | "transactionHash">,
+): boolean {
+  if (transaction.transactionHash !== null && transferHash !== null) {
+    return transaction.transactionHash === transferHash;
+  }
+  return (
+    payout.providerOrderId !== null &&
+    transaction.transactionCode === payout.providerOrderId
+  );
+}
+
+/**
+ * The provider's view of the payout and the chain's view of the funding:
+ * Paycrest's order, or Pretium's transaction for the transfer sent to its
+ * settlement address.
+ */
 export function gatherChainAndPaycrest(
   payout: Payout,
   wallet: FundingWallet,
 ): Effect.Effect<
   ChainEvidence,
   ServiceUnavailable | Conflict | DatabaseError,
-  DatabaseService | Paycrest | BaseRpc | NearRpc | NearChain
+  DatabaseService | Paycrest | Pretium | BaseRpc | NearRpc | NearChain
 > {
   return Effect.gen(function* () {
     if (isPaidOnNear(payout, wallet)) {
       const near = yield* gatherNearSends(payout.organizationId, payout.id);
       return {
         paycrestStatus: null,
+        pretium: null,
         fundingStarted: payout.fundingStartedAt !== null,
         depositTransfers:
           wallet.address === null
@@ -236,12 +376,17 @@ export function gatherChainAndPaycrest(
       }
       paycrestStatus = order.status.toLowerCase();
     }
+    const withPretium = (depositTransfers: readonly UsdcTransfer[]) =>
+      payout.provider === "pretium"
+        ? gatherPretium(payout, depositTransfers)
+        : Effect.succeed(null);
 
     const fundingStartedAt = payout.fundingStartedAt;
     if (!fundingStartedAt) {
       return {
         ...base,
         paycrestStatus,
+        pretium: yield* withPretium([]),
         fundingStarted: false,
         depositTransfers: [],
       };
@@ -265,7 +410,13 @@ export function gatherChainAndPaycrest(
         ),
       ),
     );
-    return { ...base, paycrestStatus, fundingStarted: true, depositTransfers };
+    return {
+      ...base,
+      paycrestStatus,
+      pretium: yield* withPretium(depositTransfers),
+      fundingStarted: true,
+      depositTransfers,
+    };
   });
 }
 
@@ -292,6 +443,10 @@ export interface ResolutionPlan {
 }
 
 const refuse = (message: string) => Effect.fail(new Conflict({ message }));
+
+/** The USDC the payout's refund rows credited back. */
+export const refundedUsdc = (refunds: readonly LedgerRow[]): bigint =>
+  refunds.reduce((sum, row) => sum + row.usdcAmount, 0n);
 
 const usdc = (amount: bigint) => `${fromMicro(amount)} USDC`;
 
@@ -397,13 +552,35 @@ export const strayTransfers = (near: NearEvidence): number =>
 
 /**
  * The NEAR Intents quote a payout waits on, if any: a cash-out's Base hop
- * until it has asked Paycrest for an order, and a USDC payout's delivery
- * quote throughout. What became of the quote decides what became of the
- * payout's money, so the quote is what staff resolve.
+ * until it has asked Paycrest for an order, or for Pretium until funding
+ * starts (Pretium is told of the cash-out only after the USDC is sent),
+ * and a USDC payout's delivery quote throughout. What became of the quote
+ * decides what became of the payout's money, so the quote is what staff
+ * resolve.
  */
-export const quoteHolding = (payout: Payout): string | null =>
+export const quoteHolding = (
+  payout: Pick<
+    Payout,
+    | "provider"
+    | "deliveryQuoteId"
+    | "baseHopQuoteId"
+    | "orderRequestedAt"
+    | "fundingStartedAt"
+  >,
+): string | null =>
   payout.deliveryQuoteId ??
-  (payout.orderRequestedAt === null ? payout.baseHopQuoteId : null);
+  (heldByBaseHop(payout) ? payout.baseHopQuoteId : null);
+
+/**
+ * Whether a cash-out's Base hop still decides where its money is: until
+ * Paycrest is asked for an order, or for Pretium until funding starts.
+ */
+export const heldByBaseHop = (
+  payout: Pick<Payout, "provider" | "orderRequestedAt" | "fundingStartedAt">,
+): boolean =>
+  payout.provider === "pretium"
+    ? payout.fundingStartedAt === null
+    : payout.orderRequestedAt === null;
 
 /**
  * Whether `outcome` may close `payout` given `evidence`, and what closing
@@ -455,6 +632,84 @@ export function planResolution(
   );
 }
 
+const PRETIUM_PAID_ONLY =
+  "A Pretium payout is marked paid only once Pretium reports it COMPLETE.";
+
+const pretiumUnreadable = (message: string) =>
+  `Pretium couldn't be read (${message}). Nothing was changed; try again shortly.`;
+
+/**
+ * Why a Pretium cash-out can't be closed at all: its USDC went somewhere
+ * other than the pinned settlement address, or Pretium's transaction for
+ * its code pays against another transfer.
+ */
+function pretiumMismatch(
+  payout: Payout,
+  pretium: PretiumEvidence,
+): string | null {
+  if (payout.depositAddress !== null && !pretium.depositAddressIsSettlement) {
+    return `This payout's deposit address ${payout.depositAddress} isn't Pretium's pinned settlement address ${PRETIUM_SETTLEMENT}. That needs checking by hand, not a resolution.`;
+  }
+  const { lookup } = pretium;
+  if (
+    lookup.state === "found" &&
+    !isPayoutsPretiumTransaction(
+      payout,
+      pretium.transferHash,
+      lookup.transaction,
+    )
+  ) {
+    return `Pretium's transaction ${lookup.transaction.transactionCode} pays against ${lookup.transaction.transactionHash ?? "an unknown transfer"}, which isn't this payout's transfer ${pretium.transferHash ?? "(none found)"}. Check it by hand.`;
+  }
+  return null;
+}
+
+/** Why Pretium doesn't show this cash-out paid, or null when it does. */
+function pretiumNotPaid(pretium: PretiumEvidence): string | null {
+  const { lookup } = pretium;
+  switch (lookup.state) {
+    case "unreadable":
+      return pretiumUnreadable(lookup.message);
+    case "not_asked":
+      return `Pretium has no transaction code for this payout and no transfer was found to look one up by. ${PRETIUM_PAID_ONLY}`;
+    case "not_found":
+      return `Pretium has no transaction for ${pretium.transferHash ?? "this payout's transfer"}. ${PRETIUM_PAID_ONLY}`;
+    case "found": {
+      const { transactionCode, status } = lookup.transaction;
+      return PRETIUM_PAID.has(status.toUpperCase())
+        ? null
+        : `Pretium reports transaction ${transactionCode} ${status}. ${PRETIUM_PAID_ONLY}`;
+    }
+  }
+}
+
+/**
+ * Why Pretium may have paid, or may still pay, this cash-out, so it can't
+ * be closed as failed; null when it can't. Pretium only pays against a
+ * transfer it received, so with none on chain and no transaction there is
+ * nothing it can pay.
+ */
+function pretiumMayPay(
+  pretium: PretiumEvidence,
+  transfer: UsdcTransfer | null,
+): string | null {
+  const { lookup } = pretium;
+  if (lookup.state === "unreadable") return pretiumUnreadable(lookup.message);
+  if (lookup.state !== "found") return null;
+  const { transactionCode, status } = lookup.transaction;
+  const upper = status.toUpperCase();
+  if (PRETIUM_PAYING_OR_PAID.has(upper)) {
+    return `Pretium reports transaction ${transactionCode} ${status}: the recipient is being or has been paid.`;
+  }
+  if (!transfer) {
+    return `Pretium has transaction ${transactionCode} for this payout, but no transfer to its settlement address was found on chain. Check it by hand.`;
+  }
+  if (!PRETIUM_CLOSED_UNPAID.has(upper)) {
+    return `Pretium reports transaction ${transactionCode} ${status}, so it may still pay the recipient. Resolve it once Pretium reports it FAILED, REVERSED or REFUNDED.`;
+  }
+  return null;
+}
+
 function planOutcome(
   payout: Payout,
   outcome: ResolveOutcome,
@@ -466,6 +721,14 @@ function planOutcome(
       `Only a payout under review can be resolved; this one is ${payout.status}.`,
     );
   }
+  const { pretium } = evidence;
+  if (payout.provider === "pretium" && !pretium) {
+    return refuse(
+      "Pretium wasn't asked about this payout, so it can't be resolved. Try again.",
+    );
+  }
+  const mismatch = pretium && pretiumMismatch(payout, pretium);
+  if (mismatch) return refuse(mismatch);
   const transfers = evidence.depositTransfers;
   if (transfers.length > 1) {
     return refuse(
@@ -503,6 +766,9 @@ function planOutcome(
           `Paycrest reports the order ${paycrestStatus ?? "missing"}. A Paycrest payout is marked paid only once Paycrest reports it validated or settled.`,
         );
       }
+    } else if (pretium) {
+      const notPaid = pretiumNotPaid(pretium);
+      if (notPaid) return refuse(notPaid);
     } else if (!transfer) {
       return refuse(
         `No transfer from the company wallet to ${payout.depositAddress ?? "the recipient"} was found on chain.`,
@@ -534,11 +800,22 @@ function planOutcome(
       `Paycrest reports the order ${paycrestStatus}: the recipient is being or has been paid.`,
     );
   }
+  const mayPay = pretium && pretiumMayPay(pretium, transfer);
+  if (mayPay) return refuse(mayPay);
   const released = `The ${usdc(payout.maxDebitUsdc)} held back for it is released, and the company's admin can retry it as a new payout.`;
   if (refunded) {
     if (!transfer) {
       return refuse(
         "A refund came back but the transfer it returns wasn't found on chain, so the ledger can't be matched to the chain.",
+      );
+    }
+    const credited = refundedUsdc(evidence.refunds);
+    // Paycrest refunds the deposit less its fee by itself; Pretium is asked
+    // for the USDC back, and only the whole of it closes the cash-out.
+    const sent = payout.amountToTransferUsdc ?? transfer.amount;
+    if (pretium && credited < sent) {
+      return refuse(
+        `Pretium's refund of ${usdc(credited)} is less than the ${usdc(sent)} sent. Check it by hand before resolving it as failed.`,
       );
     }
     return Effect.succeed({
@@ -547,14 +824,17 @@ function planOutcome(
       consequences: [
         "The payout is marked failed. Nothing is sent or re-sent.",
         ledgerLine,
-        `The refund of ${usdc(evidence.refunds.reduce((sum, row) => sum + row.usdcAmount, 0n))} already in the ledger stays.`,
+        `The refund of ${usdc(credited)} already in the ledger stays.`,
         released,
       ],
     });
   }
   if (transfer) {
+    const asked = payout.refundRequestedAt
+      ? `; Pretium was asked for it at ${payout.refundRequestedAt.toISOString()}`
+      : "";
     return refuse(
-      `${usdc(transfer.amount)} went to the deposit address in ${transfer.txHash} and no refund has come back. Wait for the refund before resolving it as failed.`,
+      `${usdc(transfer.amount)} went to the deposit address in ${transfer.txHash} and no refund has come back${asked}. Wait for the refund before resolving it as failed.`,
     );
   }
   // A NEAR send has an expiry the chain enforces, checked with the send

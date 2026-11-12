@@ -221,13 +221,29 @@ describe("internal routes", () => {
 
 /** Modules that create, approve, fund, send or retry a payout or withdrawal. */
 const MONEY_MOVING_MODULES = [
-  /^services\/payout\/(approve|fund|prepare|retry|onchain|payout-service)\.ts$/,
+  /^services\/payout\/(approve|fund|prepare|retry|onchain|payout-service|pretium-fund)\.ts$/,
   /^services\/withdrawal\//,
   /^services\/wallet\/privy-wallets\.ts$/,
 ];
 
-/** Privy's send and Paycrest's order creation. */
-const MONEY_MOVING_CALL = /\.(sendUsdc|createOrder)\s*\(/;
+/**
+ * Privy's send, Paycrest's order creation, and Pretium's pay and refund
+ * (Pretium is told to pay, or to refund, after the USDC is already sent).
+ */
+const MONEY_MOVING_CALL = /\.(sendUsdc|createOrder|pay|refund)\s*\(/;
+
+/**
+ * Whether `source` calls money-moving code. Comment lines are left out,
+ * since they may name a call (e.g. the Gateway's `refund()`) without
+ * making it.
+ */
+const callsMoneyMovingCode = (source: string): boolean =>
+  source
+    .split("\n")
+    .some(
+      (line) =>
+        !/^\s*(\/\/|\/\*|\*)/.test(line) && MONEY_MOVING_CALL.test(line),
+    );
 
 const isMoneyMoving = (module: string) =>
   MONEY_MOVING_MODULES.some((pattern) => pattern.test(module));
@@ -247,6 +263,7 @@ describe("the code behind the internal routes", () => {
         "routes/internal/payouts.ts",
         "services/staff/resolve.ts",
         "services/payout/sync.ts",
+        "services/payout/pretium-sync.ts",
         "services/staff/intent-quote-resolve.ts",
         "services/intents/quote-settle.ts",
       ]),
@@ -261,8 +278,17 @@ describe("the code behind the internal routes", () => {
 
     // #then
     expect([...fromThePayoutEngine.keys()].filter(isMoneyMoving)).toEqual(
-      expect.arrayContaining(["services/payout/fund.ts"]),
+      expect.arrayContaining([
+        "services/payout/fund.ts",
+        "services/payout/pretium-fund.ts",
+      ]),
     );
+    expect(
+      ["services/payout/fund.ts", "services/payout/pretium-fund.ts"].filter(
+        (module) =>
+          !callsMoneyMovingCode(fromThePayoutEngine.get(module) ?? ""),
+      ),
+    ).toEqual([]);
   });
 
   it("never reaches code that creates, approves, funds, sends or retries a payout or withdrawal", () => {
@@ -270,10 +296,10 @@ describe("the code behind the internal routes", () => {
     expect([...modules.keys()].filter(isMoneyMoving)).toEqual([]);
   });
 
-  it("never calls Privy's send or Paycrest's order creation", () => {
+  it("never calls Privy's send, Paycrest's order creation or Pretium's pay or refund", () => {
     // #when
     const callers = [...modules]
-      .filter(([, source]) => MONEY_MOVING_CALL.test(source))
+      .filter(([, source]) => callsMoneyMovingCode(source))
       .map(([module]) => module);
 
     // #then

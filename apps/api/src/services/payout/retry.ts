@@ -6,6 +6,7 @@ import type { Payout } from "../../db/schema/index.js";
 import type { AuditActor } from "../audit/audit-log.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
 import type { PayoutRecipient } from "../paycrest/recipient.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import type { PayoutRequest, PrepareError } from "./prepare.js";
 import { payouts } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
@@ -17,7 +18,9 @@ import { preparePayouts } from "./prepare.js";
  * Retry after a failure (spec §6.8): a new payout for the same subject and
  * amount, with a new idempotency key, waiting for a fresh passkey approval
  * like any other. The failed payout stays as it was. Pass `recipient` when
- * the payee's details were corrected; otherwise the original is reused.
+ * the payee's details were corrected; otherwise the original is reused. A
+ * cash-out is retried through the cash-out provider active now, which
+ * `preparePayouts` reads, not the one that failed.
  */
 export function retryPayout(input: {
   readonly organizationId: string;
@@ -25,7 +28,11 @@ export function retryPayout(input: {
   readonly idempotencyKey: string;
   readonly actor: AuditActor;
   readonly recipient?: PayoutRecipient;
-}): Effect.Effect<Payout, PrepareError, DatabaseService | AuditLog | Paycrest> {
+}): Effect.Effect<
+  Payout,
+  PrepareError,
+  DatabaseService | AuditLog | Paycrest | Pretium
+> {
   const { organizationId } = input;
   return Effect.gen(function* () {
     const [failed] = yield* withScope({ organizationId }, (tx) =>

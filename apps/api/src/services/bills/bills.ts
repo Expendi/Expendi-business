@@ -46,6 +46,8 @@ import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { Tenant } from "../../middleware/tenant.js";
 import type { AuditActor } from "../audit/audit-log.js";
+import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import type { FileStorage } from "../storage/file-storage.js";
 import type { BillFileView } from "./files.js";
 import {
@@ -67,9 +69,9 @@ import {
   ServiceUnavailable,
 } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { activeKesRate } from "../cash-out/active-rate.js";
 import { recordBillSpending } from "../expenses/company.js";
 import { kesCentsFor } from "../paycrest/amounts.js";
-import { Paycrest } from "../paycrest/paycrest-client.js";
 import { onRecurringBillSettled } from "../recurring/next-bill.js";
 import { recurringItemState } from "../recurring/recurring-items.js";
 import { enqueuePaidBill } from "../zoho/enqueue.js";
@@ -216,14 +218,11 @@ const futurePayment = new BadRequest({
 });
 const rateUnavailable = new ServiceUnavailable({
   message:
-    "Couldn't get today's KES rate from Paycrest to record this USD bill in KES. Try again in a minute.",
+    "Couldn't get today's KES rate to record this USD bill in KES. Try again in a minute.",
 });
 const changedMeanwhile = new Conflict({
   message: "This bill changed while you were marking it paid. Try again.",
 });
-
-/** Paycrest's marginal rate, as the payout engine values USDC in KES. */
-const RATE_PROBE_USDC = "1";
 
 const CURRENCY_NAMES: Readonly<Record<BillCurrency, string>> = {
   kes: "KES",
@@ -982,9 +981,10 @@ export function attachBillInvoices(
 }
 
 /**
- * Paycrest's KES rate now, when the bill is in USD: its company spending
- * record is in KES at the rate of the day it's recorded (spec §6.19).
- * Asked before the bill is locked, so no lock waits on Paycrest.
+ * The active cash-out provider's KES rate now, when the bill is in USD: its
+ * company spending record is in KES at the rate of the day it's recorded
+ * (spec §6.19), as the payout engine values USDC in KES. Asked before the
+ * bill is locked, so no lock waits on the provider.
  */
 function rateForUsdBill(
   tenant: Tenant,
@@ -992,7 +992,7 @@ function rateForUsdBill(
 ): Effect.Effect<
   string | null,
   ServiceUnavailable | DatabaseError,
-  DatabaseService | Paycrest
+  DatabaseService | Paycrest | Pretium
 > {
   return Effect.gen(function* () {
     const [bill] = yield* withScope(tenant, (tx) =>
@@ -1009,11 +1009,12 @@ function rateForUsdBill(
       ),
     );
     if (bill?.currency !== "usd") return null;
-    const paycrest = yield* Paycrest;
-    const { rate } = yield* paycrest
-      .rate(RATE_PROBE_USDC)
-      .pipe(Effect.mapError(() => rateUnavailable));
-    return rate;
+    return yield* activeKesRate().pipe(
+      Effect.catchTags({
+        PaycrestError: () => Effect.fail(rateUnavailable),
+        PretiumError: () => Effect.fail(rateUnavailable),
+      }),
+    );
   });
 }
 
@@ -1022,7 +1023,7 @@ function rateForUsdBill(
  * (spec §6.20): records who, the day it was paid, an optional note and
  * proof. The bill needs its amount first. Company spending (T41) records
  * the matching spending entry in this same transaction, in KES: a USD
- * bill's at Paycrest's rate today. The bill, not that entry, is queued for
+ * bill's at the active cash-out provider's rate today. The bill, not that entry, is queued for
  * Zoho Books (T44), so the payment is posted once.
  */
 export function markBillPaidOutside(
@@ -1030,7 +1031,7 @@ export function markBillPaidOutside(
   billId: string,
   fields: MarkBillPaidOutsideFields,
   now: Date = new Date(),
-): Effect.Effect<BillDetailView, BillError, BillDeps | Paycrest> {
+): Effect.Effect<BillDetailView, BillError, BillDeps | Paycrest | Pretium> {
   const { organizationId } = tenant;
   return Effect.gen(function* () {
     if (fields.paidOn > nairobiDate(now)) {

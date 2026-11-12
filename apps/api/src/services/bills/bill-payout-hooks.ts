@@ -18,6 +18,7 @@ import {
 import { query } from "../../db/scope.js";
 import { canonicalJson } from "../approval/passkeys.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { cashOutLimits } from "../cash-out/quote.js";
 import { notify } from "../notification/notify.js";
 import { resolveApprovedPayeeRecipient } from "../payees/payment-guard.js";
 import { PayoutRejected } from "../payout/payout-errors.js";
@@ -176,27 +177,43 @@ function paymentsOf(
   );
 }
 
-/** One order of a bill's payment: a salary over Paycrest's largest order has several. */
+/**
+ * One order of a bill's payment: a salary over the largest cash-out of the
+ * provider paying it has several.
+ */
 interface Order {
   readonly part: number;
   readonly amount: BillAmount;
 }
 
-function ordersOf(bill: BillRow, amount: BillAmount): Order[] {
-  if (bill.payrollRunId === null || amount.currency === "usd") {
+/**
+ * The orders a bill is paid in through `provider`, split as
+ * `payrollPayoutRequests` split them for that provider.
+ */
+function ordersOf(
+  bill: BillRow,
+  amount: BillAmount,
+  provider: Payout["provider"],
+): Order[] {
+  if (
+    bill.payrollRunId === null ||
+    amount.currency === "usd" ||
+    provider === "onchain"
+  ) {
     return [{ part: 1, amount }];
   }
-  return salaryParts(amount.amountKes).map((amountKes, index) => ({
+  const { maxKesCents } = cashOutLimits(provider);
+  return salaryParts(amount.amountKes, maxKesCents).map((amountKes, index) => ({
     part: index + 1,
     amount: { currency: "kes", amountKes },
   }));
 }
 
-/** Whether `payment` pays exactly `amount`: KES through Paycrest, or the exact USDC on chain. */
+/** Whether `payment` pays exactly `amount`: KES as a cash-out, or the exact USDC on chain. */
 function paysAmount(payment: BillPayment, amount: BillAmount): boolean {
   return amount.currency === "usd"
     ? payment.provider === "onchain" && payment.quotedUsdc === amount.amountUsdc
-    : payment.provider === "paycrest" &&
+    : payment.provider !== "onchain" &&
         payment.requestedKesCents === amount.amountKes;
 }
 
@@ -281,7 +298,13 @@ function approveBill(
       const paidBefore = payments.filter(
         (payment) => payment.status === "paid",
       );
-      if (!coversOrders(ordersOf(bill, amount), approvedNow, paidBefore)) {
+      if (
+        !coversOrders(
+          ordersOf(bill, amount, payout.provider),
+          approvedNow,
+          paidBefore,
+        )
+      ) {
         return yield* refuse(
           "This bill changed after the payment was prepared. Nothing was sent. Review it and pay again.",
         );
@@ -412,7 +435,11 @@ function followPayout(
       if (amount === null) {
         return yield* Effect.dieMessage(`paying bill ${bill.id} has no amount`);
       }
-      const next = settledStatus(ordersOf(bill, amount), payments, outcome);
+      const next = settledStatus(
+        ordersOf(bill, amount, payout.provider),
+        payments,
+        outcome,
+      );
       if (next === null) return;
 
       const paidAt = payout.paidAt ?? new Date();

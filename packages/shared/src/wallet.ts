@@ -52,8 +52,8 @@ export const activeWalletSchema = z.object({
   chain: walletChainSchema,
   usdcBalance: usdcBaseUnits,
   /**
-   * The balance in KES cents at Paycrest's current sell rate, rounded down;
-   * null while Paycrest is unavailable.
+   * The balance in KES cents at the active cash-out provider's rate now,
+   * rounded down; null while that rate is unavailable.
    */
   kesEquivalent: z
     .object({ kesCents: z.string().regex(/^\d+$/), rate: z.string() })

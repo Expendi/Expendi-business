@@ -10,20 +10,21 @@ import type { NewPayee, PayeeRow } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { KesRecipient } from "../paycrest/recipient.js";
-import { BadRequest, Conflict, ServiceUnavailable } from "../../errors.js";
+import { BadRequest, Conflict } from "../../errors.js";
 import { isAllowlisted } from "../allowlist/allowlist.js";
 import { canonicalJson } from "../approval/passkeys.js";
 import { toKenyanMobile } from "../auth/phone.js";
+import { bankByCode } from "../cash-out/banks.js";
 import {
   INVALID_PAYEE_ADDRESS,
   normalisePayeeAddress,
 } from "../chain/address.js";
-import { Paycrest } from "../paycrest/paycrest-client.js";
 import {
   InvalidRecipient,
   PAYOUT_MEMO,
   toPaycrestRecipient,
 } from "../paycrest/recipient.js";
+import { UNKNOWN_BANK } from "../payout/cash-out-check.js";
 
 /**
  * A payee's payment details (spec §6.19): validated against the same rules
@@ -154,38 +155,19 @@ export const isPayable = (
   details !== undefined && details.method !== "outside";
 
 /**
- * Checks a bank against Paycrest's live KES list, as `preparePayouts`
- * does, and returns its name for the admins' email; null for other methods.
+ * Checks a bank against Expendi's catalogue, as `preparePayouts` does, and
+ * returns its name for the admins' email; null for other methods. Whether
+ * the active cash-out provider can pay it is checked when a payment is
+ * prepared, so a provider change never stops anyone saving a payee.
  */
 export function checkBank(
   details: PayeeDetails | undefined,
-): Effect.Effect<string | null, BadRequest | ServiceUnavailable, Paycrest> {
+): Effect.Effect<string | null, BadRequest> {
   if (details?.method !== "bank") return Effect.succeed(null);
-  const { bankCode } = details;
-  return Effect.flatMap(Paycrest, (paycrest) => paycrest.institutions()).pipe(
-    Effect.catchTag("PaycrestError", () =>
-      Effect.fail(
-        new ServiceUnavailable({
-          message:
-            "We can't check the list of banks right now. Try again soon.",
-        }),
-      ),
-    ),
-    Effect.flatMap((institutions) => {
-      const bank = institutions.find(
-        (institution) =>
-          institution.type === "bank" && institution.code === bankCode,
-      );
-      return bank
-        ? Effect.succeed(bank.name)
-        : Effect.fail(
-            new BadRequest({
-              message:
-                "Paycrest can't pay that bank. Choose one from the list.",
-            }),
-          );
-    }),
-  );
+  const bank = bankByCode(details.bankCode);
+  return bank
+    ? Effect.succeed(bank.name)
+    : Effect.fail(new BadRequest({ message: UNKNOWN_BANK }));
 }
 
 /**

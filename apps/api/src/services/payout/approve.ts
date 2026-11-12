@@ -19,6 +19,7 @@ import type {
   ApprovalChallenge,
   ApprovalSettings,
 } from "../approval/passkeys.js";
+import type { CashOutProvider } from "../cash-out/provider.js";
 import {
   memberships,
   organizations,
@@ -32,8 +33,14 @@ import { isAllowlisted } from "../allowlist/allowlist.js";
 import { startApproval, verifyApproval } from "../approval/passkeys.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { cardLoadsTodayKes } from "../cards/balance.js";
+import { activeCashOutProvider } from "../cash-out/active-provider.js";
 import { fromMicro } from "../paycrest/amounts.js";
 import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
+import {
+  cashOutRecipientProblem,
+  withinCashOutLimits,
+} from "./cash-out-check.js";
+import { discardUnapprovedPayout } from "./discard.js";
 import { payoutIntentHash } from "./intent.js";
 import { PayoutRejected } from "./payout-errors.js";
 import { approveSubjects } from "./subjects.js";
@@ -255,12 +262,98 @@ function checkCaps(
   });
 }
 
+const CASH_OUT_UNAVAILABLE =
+  "Some of these payments can't be sent the way they were prepared any more. Nothing was sent. Start again to prepare them afresh.";
+
+const WITHDRAWN =
+  "Withdrawn at approval: it can't be sent the way it was prepared any more. Nothing was sent.";
+
+/**
+ * Whether a cash-out prepared under another provider can be approved for
+ * `provider` as it stands. A part of a split salary never moves: the parts
+ * were sized for the provider they were prepared under, so they are
+ * prepared again instead.
+ */
+function movesTo(
+  provider: CashOutProvider,
+  payout: Payout,
+  batch: readonly Payout[],
+): boolean {
+  if (payout.recipient.method === "usdc") return false;
+  const split =
+    payout.subjectPart > 1 ||
+    batch.some(
+      (other) =>
+        other.id !== payout.id &&
+        other.subjectType === payout.subjectType &&
+        other.subjectId === payout.subjectId,
+    );
+  return (
+    !split &&
+    cashOutRecipientProblem(provider, payout.recipient) === null &&
+    withinCashOutLimits(provider, payout.amountKes, payout.quotedUsdc)
+  );
+}
+
+/**
+ * The batch's cash-outs take the active cash-out provider here, in the
+ * transaction that read the pause, so a change of provider and an approval
+ * can't interleave. The quote and the approved maximum stay as prepared:
+ * funding re-quotes and refuses a cost above that maximum. Returns the
+ * cash-outs the active provider can't pay; then nothing changes.
+ */
+function lockCashOutProvider(
+  tx: Transaction,
+  organizationId: string,
+  userId: string,
+  batch: readonly Payout[],
+): Effect.Effect<readonly Payout[], DatabaseError, AuditLog> {
+  return Effect.gen(function* () {
+    const provider = yield* activeCashOutProvider(tx);
+    const moving = batch.filter(
+      (payout) => payout.provider !== "onchain" && payout.provider !== provider,
+    );
+    const stranded = moving.filter(
+      (payout) => !movesTo(provider, payout, batch),
+    );
+    if (stranded.length > 0) return stranded;
+    const audit = yield* AuditLog;
+    for (const payout of moving) {
+      yield* query(() =>
+        tx
+          .update(payouts)
+          .set({ provider })
+          .where(
+            and(
+              eq(payouts.id, payout.id),
+              eq(payouts.status, "awaiting_approval"),
+            ),
+          ),
+      );
+      yield* audit.record(tx, {
+        actor: { type: "user", id: userId },
+        organizationId,
+        action: "payout.provider_changed",
+        entity: { type: "payout", id: payout.id },
+        before: { provider: payout.provider },
+        after: { provider },
+      });
+    }
+    return [];
+  });
+}
+
 /**
  * Step 4 of Approve & pay (spec §6.7, §7): verifies the admin's passkey,
  * then, holding the company wallet's row lock so concurrent approvals queue,
- * checks the approval still matches the payouts, both pause flags, the
+ * checks the approval still matches the payouts, both pause flags, that
+ * the active cash-out provider can pay each cash-out (locking it in), the
  * balance net of what's already promised, and the right cap. Only then are
  * the payouts approved; nothing is ordered or sent here.
+ *
+ * Cash-outs the active provider can't pay refuse the whole approval and are
+ * withdrawn afterwards, so the flow that prepared them prepares them again
+ * under the active provider on its next request.
  */
 export function approvePayouts(input: {
   readonly organizationId: string;
@@ -281,6 +374,7 @@ export function approvePayouts(input: {
       purpose: "approve_payouts",
     });
     const audit = yield* AuditLog;
+    let stranded: readonly Payout[] = [];
 
     return yield* withScope(scope, (tx) =>
       Effect.gen(function* () {
@@ -347,6 +441,15 @@ export function approvePayouts(input: {
             "Payouts are paused. Nothing was sent.",
           );
         }
+        stranded = yield* lockCashOutProvider(
+          tx,
+          organizationId,
+          userId,
+          batch,
+        );
+        if (stranded.length > 0) {
+          return yield* reject("cash_out_unavailable", CASH_OUT_UNAVAILABLE);
+        }
 
         const needed = batch.reduce(
           (sum, payout) => sum + payout.maxDebitUsdc,
@@ -409,15 +512,26 @@ export function approvePayouts(input: {
       Effect.tapError((error) =>
         error instanceof PayoutRejected
           ? withScope(scope, (tx) =>
-              audit.record(tx, {
-                actor: { type: "user", id: userId },
-                organizationId,
-                action: "payout.approval_rejected",
-                entity: { type: "approval", id: approval.approvalId },
-                after: {
-                  reason: error.reason,
-                  payoutIds: approval.payoutIds,
-                },
+              Effect.gen(function* () {
+                yield* audit.record(tx, {
+                  actor: { type: "user", id: userId },
+                  organizationId,
+                  action: "payout.approval_rejected",
+                  entity: { type: "approval", id: approval.approvalId },
+                  after: {
+                    reason: error.reason,
+                    payoutIds: approval.payoutIds,
+                  },
+                });
+                if (error.reason !== "cash_out_unavailable") return;
+                for (const payout of stranded) {
+                  yield* discardUnapprovedPayout(tx, {
+                    organizationId,
+                    payoutId: payout.id,
+                    reason: WITHDRAWN,
+                    actor: { type: "user", id: userId },
+                  });
+                }
               }),
             )
           : Effect.void,

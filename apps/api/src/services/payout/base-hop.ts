@@ -86,7 +86,7 @@ export function packIntoHops(
 }
 
 const waitingForHop = and(
-  eq(payouts.provider, "paycrest"),
+  inArray(payouts.provider, ["paycrest", "pretium"]),
   eq(payouts.status, "approved"),
   isNull(payouts.orderRequestedAt),
 );
@@ -292,7 +292,7 @@ export function settleHopPayouts<R>(input: {
         case "needs_review":
           yield* reviewPayout(
             payout,
-            `The Base hop's outcome is unclear (quote ${quote.id}): ${quote.failure ?? "check NEAR Intents."} Nothing was sent to Paycrest. Resolve the hop before doing anything.`,
+            `The Base hop's outcome is unclear (quote ${quote.id}): ${quote.failure ?? "check NEAR Intents."} Nothing was sent to the cash-out provider. Resolve the hop before doing anything.`,
             ACTOR,
           );
           break;

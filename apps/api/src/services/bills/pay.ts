@@ -27,6 +27,7 @@ import type {
   PayoutEngineDeps,
   UsdcPayoutRequest,
 } from "../payout/payout-service.js";
+import type { PretiumError } from "../pretium/pretium-client.js";
 import type { BillAmount } from "./payable.js";
 import {
   bills,
@@ -73,6 +74,7 @@ import { assertBillPayable } from "./payable.js";
 export type BillPaymentError =
   | PayoutRejected
   | PaycrestError
+  | PretiumError
   | AmountTooSmall
   | Conflict
   | NotFound
@@ -266,7 +268,7 @@ function pays(payout: Payout, { request }: PayableBill): boolean {
     "amountUsdc" in request
       ? payout.provider === "onchain" &&
         payout.quotedUsdc === request.amountUsdc
-      : payout.provider === "paycrest" &&
+      : payout.provider !== "onchain" &&
         payout.requestedKesCents === request.amountKesCents;
   return (
     sameAmount &&
@@ -281,7 +283,12 @@ function payoutFor(
   bill: PayableBill,
 ): Effect.Effect<
   Payout,
-  PayoutRejected | PaycrestError | AmountTooSmall | Conflict | DatabaseError,
+  | PayoutRejected
+  | PaycrestError
+  | PretiumError
+  | AmountTooSmall
+  | Conflict
+  | DatabaseError,
   PayoutEngineDeps
 > {
   return awaitingPayoutFor({

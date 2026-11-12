@@ -617,6 +617,34 @@
       "when": 1794494837366,
       "tag": "0087_invoice_last_emailed_at_grant",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1794517986115,
+      "tag": "0088_pretium_cash_out",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1794518013474,
+      "tag": "0089_pretium_cash_out_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1794519589337,
+      "tag": "0090_pretium_ops_alerts",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1794521754367,
+      "tag": "0091_pretium_cash_outs_awaiting_funding",
+      "breakpoints": true
     }
   ]
 }
