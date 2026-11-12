@@ -70,7 +70,7 @@ importers:
         version: link:../../packages/shared
       '@privy-io/react-auth':
         specifier: ^3.50.0
-        version: 3.51.0(@solana-program/system@0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana-program/token@0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@solana/sysvars@5.5.1(typescript@5.9.3))(@stripe/stripe-js@1.54.2)(@tanstack/query-core@5.90.19)(@tanstack/react-query@5.90.19(react@19.1.4))(@types/react@19.1.17)(bufferutil@4.1.0)(expo-crypto@15.0.9(expo@54.0.38))(expo-web-browser@15.0.11(expo@54.0.38)(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.4)(utf-8-validate@5.0.10)))(immer@11.2.9)(react-dom@19.1.4(react@19.1.4))(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.4)(utf-8-validate@5.0.10))(react@19.1.4)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.1.4))(utf-8-validate@5.0.10)(zod@4.6.7)
+        version: 3.51.0(@solana-program/system@0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana-program/token@0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@solana/sysvars@5.5.1(typescript@5.9.3))(@stripe/stripe-js@1.54.2)(@tanstack/query-core@5.90.19)(@tanstack/react-query@5.90.19(react@19.1.4))(@types/react@19.1.17)(bufferutil@4.1.0)(expo-crypto@15.0.9(expo@54.0.38))(expo-web-browser@15.0.11(expo@54.0.38)(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.4)(utf-8-validate@5.0.10)))(immer@11.2.9)(react-dom@19.1.4(react@19.1.4))(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.4)(utf-8-validate@5.0.10))(react@19.1.4)(typescript@5.9.3)(use-sync-external-store@1.7.0(react@19.1.4))(utf-8-validate@5.0.10)(zod@4.6.7)
       '@tanstack/react-query':
         specifier: 5.90.19
         version: 5.90.19(react@19.1.4)
@@ -115,7 +115,7 @@ importers:
         version: 4.6.7
       zustand:
         specifier: ^5.1.0
-        version: 5.1.0(@types/react@19.1.17)(immer@11.2.9)(react@19.1.4)(use-sync-external-store@1.4.0(react@19.1.4))
+        version: 5.1.0(@types/react@19.1.17)(immer@11.2.9)(react@19.1.4)(use-sync-external-store@1.7.0(react@19.1.4))
     devDependencies:
       '@expendi-business/eslint-config':
         specifier: workspace:*
@@ -442,7 +442,7 @@ importers:
         version: link:../../packages/shared
       '@privy-io/react-auth':
         specifier: ^3.50.0
-        version: 3.51.0(@solana-program/system@0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana-program/token@0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@solana/sysvars@5.5.1(typescript@5.9.3))(@stripe/stripe-js@1.54.2)(@tanstack/query-core@5.90.19)(@tanstack/react-query@5.90.19(react@19.1.4))(@types/react@19.1.17)(bufferutil@4.1.0)(expo-crypto@15.0.9(expo@54.0.38))(expo-web-browser@15.0.11(expo@54.0.38)(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.4)(utf-8-validate@5.0.10)))(immer@11.2.9)(react-dom@19.1.4(react@19.1.4))(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.4)(utf-8-validate@5.0.10))(react@19.1.4)(typescript@5.9.3)(use-sync-external-store@1.7.0(react@19.1.4))(utf-8-validate@5.0.10)(zod@4.6.7)
+        version: 3.51.0(@solana-program/system@0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana-program/token@0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@solana/sysvars@5.5.1(typescript@5.9.3))(@stripe/stripe-js@1.54.2)(@tanstack/query-core@5.90.19)(@tanstack/react-query@5.90.19(react@19.1.4))(@types/react@19.1.17)(bufferutil@4.1.0)(expo-crypto@15.0.9(expo@54.0.38))(expo-web-browser@15.0.11(expo@54.0.38)(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.4)(utf-8-validate@5.0.10)))(immer@11.2.9)(react-dom@19.1.4(react@19.1.4))(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.17)(bufferutil@4.1.0)(react@19.1.4)(utf-8-validate@5.0.10))(react@19.1.4)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.1.4))(utf-8-validate@5.0.10)(zod@4.6.7)
       '@simplewebauthn/browser':
         specifier: ^13.3.0
         version: 13.3.0
@@ -479,6 +479,9 @@ importers:
       react-dom:
         specifier: 19.1.4
         version: 19.1.4(react@19.1.4)
+      react-qr-code:
+        specifier: ^2.2.0
+        version: 2.2.0(react@19.1.4)
       recharts:
         specifier: ^3.10.1
         version: 3.10.1(@types/react@19.1.17)(react-dom@19.1.4(react@19.1.4))(react-is@19.3.1)(react@19.1.4)(redux@5.0.1)
@@ -493,7 +496,7 @@ importers:
         version: 4.6.7
       zustand:
         specifier: ^5.1.0
-        version: 5.1.0(@types/react@19.1.17)(immer@11.2.9)(react@19.1.4)(use-sync-external-store@1.7.0(react@19.1.4))
+        version: 5.1.0(@types/react@19.1.17)(immer@11.2.9)(react@19.1.4)(use-sync-external-store@1.4.0(react@19.1.4))
     devDependencies:
       '@expendi-business/eslint-config':
         specifier: workspace:*
@@ -8370,6 +8373,9 @@ packages:
     resolution: {integrity: sha512-BbubeCEyTuQjVMakvJQ/Sxbc93F2pwmbsxONT/ZRrwU7Ua38d8unYTwXpTVLAKJ4BDuH9IGztCjQcd/N/39Dvg==}
     engines: {node: '>=16.0.0'}
 
+  qrcode-generator@2.0.4:
+    resolution: {integrity: sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==}
+
   qrcode-terminal@0.11.0:
     resolution: {integrity: sha512-Uu7ii+FQy4Qf82G4xu7ShHhjhGahEpCWc3x8UavY3CTcWV+ufmmCtwkr7ZKsX42jdL0kr1B5FKUeqJvAn51jzQ==}
     hasBin: true
@@ -8556,6 +8562,11 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
+
+  react-qr-code@2.2.0:
+    resolution: {integrity: sha512-e5nS0UUN22K3Nf8KBRUzemfdJ6OmnN5w+kbnj1lvJaol9RyVRFeGl05bCkxSN2ZegbLxjjYjX1+mmAoX9+fAhw==}
+    peerDependencies:
+      react: '*'
 
   react-redux@9.3.1:
     resolution: {integrity: sha512-vxMLT0lalUjbZPkoTepWyKAZbjIIFssNx/CEL9lTfwQBU6XpkGSmCNdcCIrkOBUgB68uftZMnbXVb6DwGnhRKQ==}
@@ -20892,6 +20903,8 @@ snapshots:
 
   pvutils@1.2.0: {}
 
+  qrcode-generator@2.0.4: {}
+
   qrcode-terminal@0.11.0: {}
 
   qrcode@1.5.3:
@@ -21304,6 +21317,12 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+
+  react-qr-code@2.2.0(react@19.1.4):
+    dependencies:
+      prop-types: 15.8.1
+      qrcode-generator: 2.0.4
+      react: 19.1.4
 
   react-redux@9.3.1(@types/react@19.1.17)(react@19.1.4)(redux@5.0.1):
     dependencies:

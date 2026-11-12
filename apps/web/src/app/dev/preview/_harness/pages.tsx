@@ -5,6 +5,7 @@ import { ApprovalsView } from "~/app/(company)/approvals/_components/approvals-v
 import { BillsView } from "~/app/(company)/bills/_components/bills-view";
 import { CardsView } from "~/app/(company)/cards/_components/cards-view";
 import { ExpensesView } from "~/app/(company)/expenses/_components/expenses-view";
+import { InvoicesView } from "~/app/(company)/invoices/_components/invoices-view";
 import { OverviewView } from "~/app/(company)/overview/_components/overview-view";
 import { PayeesView } from "~/app/(company)/payees/_components/payees-view";
 import { PayrollView } from "~/app/(company)/payroll/_components/payroll-view";
@@ -29,6 +30,7 @@ export const PAGE_PREVIEWS: Readonly<Record<string, PagePreview>> = {
   bills: { path: "/bills", View: BillsView },
   cards: { path: "/cards", View: CardsView },
   expenses: { path: "/expenses", View: ExpensesView },
+  invoices: { path: "/invoices", View: InvoicesView },
   overview: { path: "/overview", View: OverviewView },
   payees: { path: "/payees", View: PayeesView },
   payroll: { path: "/payroll", View: PayrollView },

@@ -84,7 +84,7 @@ describe("the sidebar's badges", () => {
     expect(count).toBe(2);
   });
 
-  it("follow the founder's list: no Recurring, the wallet as Accounts", () => {
+  it("follow the founder's list: no Recurring, the wallet as Accounts, Invoices under Get paid", () => {
     // #when
     const titles = NAV_ITEMS.map((item) => item.title);
     const counted = NAV_ITEMS.flatMap((item) =>
@@ -101,6 +101,7 @@ describe("the sidebar's badges", () => {
         "Cards",
         "Bills",
         "Payroll",
+        "Invoices",
         "Payees",
         "Team",
         "Settings",

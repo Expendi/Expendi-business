@@ -18,6 +18,7 @@ import {
 const GROUPS: readonly NavItem["group"][] = [
   "Workspace",
   "Spend & pay",
+  "Get paid",
   "Manage",
   "Insights",
 ];
