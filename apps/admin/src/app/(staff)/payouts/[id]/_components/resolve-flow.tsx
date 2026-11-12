@@ -1,13 +1,15 @@
 "use client";
 
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type {
   PayoutEvidence,
+  PretiumEvidence,
   ResolveOutcome,
   ResolvePrepared,
+  StaffPayoutSummary,
 } from "@expendi-business/shared";
 import {
   PAYEE_CHAIN_NAMES,
@@ -15,6 +17,7 @@ import {
 } from "@expendi-business/shared";
 
 import { PageError } from "~/components/page-state";
+import { providerName } from "~/components/payout-columns";
 import { SecondConfirmation } from "~/components/second-confirmation";
 import {
   inputClass,
@@ -23,27 +26,54 @@ import {
 } from "~/components/styles";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
-import { formatUsdc } from "~/lib/format";
+import { formatNairobiTime, formatUsdc } from "~/lib/format";
 
-const OUTCOMES: { value: ResolveOutcome; label: string; hint: string }[] = [
-  {
-    value: "paid",
-    label: "Paid",
-    hint: "The recipient got the money. Needs Paycrest to report the order settled (or, for a USDC payout, the transfer on chain).",
-  },
-  {
-    value: "failed",
-    label: "Failed",
-    hint: "Nothing reached the recipient: either nothing left the wallet, or the USDC came back as a refund. The company's admin can then retry.",
-  },
-];
+type Provider = StaffPayoutSummary["provider"];
+
+/** What the API needs before it allows each outcome, for this payout's provider. */
+const PAID_HINTS: Record<Provider, string> = {
+  paycrest:
+    "The recipient got the money. Needs Paycrest to report the order settled.",
+  pretium:
+    "The recipient got the money. Needs Pretium to report this payout's transaction COMPLETE.",
+  onchain: "The recipient got the money. Needs the transfer on chain.",
+};
+
+const FAILED_HINTS: Record<Provider, string> = {
+  paycrest:
+    "Nothing reached the recipient: either nothing left the wallet, or the USDC came back as a refund. The company's admin can then retry.",
+  pretium:
+    "Nothing reached the recipient: either nothing was sent to Pretium, or Pretium's refund of all of it is back in the ledger. The company's admin can then retry.",
+  onchain:
+    "Nothing reached the recipient: nothing left the wallet. The company's admin can then retry.",
+};
+
+function checkingLabel(provider: Provider): string {
+  const name = providerName(provider);
+  return name ? `Checking ${name} and the chain…` : "Checking the chain…";
+}
+
+function outcomes(
+  provider: Provider,
+): { value: ResolveOutcome; label: string; hint: string }[] {
+  return [
+    { value: "paid", label: "Paid", hint: PAID_HINTS[provider] },
+    { value: "failed", label: "Failed", hint: FAILED_HINTS[provider] },
+  ];
+}
 
 /**
  * Closes a payout under review as paid or failed (spec §6.8, §6.15): the
  * outcome and a reason, then the evidence and consequences the API found,
  * then a second confirmation. Nothing is ever sent.
  */
-export function ResolveFlow({ payoutId }: { payoutId: string }) {
+export function ResolveFlow({
+  payoutId,
+  provider,
+}: {
+  payoutId: string;
+  provider: Provider;
+}) {
   const { api } = useStaffAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -110,7 +140,7 @@ export function ResolveFlow({ payoutId }: { payoutId: string }) {
     >
       <fieldset>
         <legend className="text-sm font-medium">Outcome</legend>
-        {OUTCOMES.map((option) => (
+        {outcomes(provider).map((option) => (
           <label
             key={option.value}
             className="mt-3 flex gap-3 rounded-lg border border-border p-3 text-sm has-checked:border-primary has-checked:bg-accent/40"
@@ -151,7 +181,7 @@ export function ResolveFlow({ payoutId }: { payoutId: string }) {
           disabled={prepare.isPending}
           className={primaryButton}
         >
-          {prepare.isPending ? "Checking Paycrest and the chain…" : "Review"}
+          {prepare.isPending ? checkingLabel(provider) : "Review"}
         </button>
         <button
           type="button"
@@ -168,11 +198,95 @@ export function ResolveFlow({ payoutId }: { payoutId: string }) {
   );
 }
 
+/** Pretium's answer, so "couldn't be read" is never shown as "not found". */
+function pretiumSays(pretium: PretiumEvidence): ReactNode {
+  const { transaction } = pretium;
+  switch (transaction.state) {
+    case "found":
+      return (
+        <>
+          {transaction.status} for transaction{" "}
+          <span className="font-mono text-xs break-all">
+            {transaction.transactionCode}
+          </span>
+          {transaction.receiptNumber
+            ? `, receipt ${transaction.receiptNumber}`
+            : ""}
+          {transaction.isThisPayouts ? null : (
+            <span className="block text-destructive">
+              It pays against{" "}
+              <span className="font-mono text-xs break-all">
+                {transaction.transactionHash ?? "an unknown transfer"}
+              </span>
+              , not this payout&rsquo;s transfer.
+            </span>
+          )}
+        </>
+      );
+    case "not_found":
+      return "No transaction for this payout's transfer";
+    case "unreadable":
+      return (
+        <span className="text-destructive">
+          Couldn&rsquo;t be read ({transaction.message}). This doesn&rsquo;t
+          mean Pretium has no transaction.
+        </span>
+      );
+    case "not_asked":
+      return "Not asked: Pretium gave no transaction code and nothing was sent to look one up by";
+  }
+}
+
+function PretiumEvidenceRows({ pretium }: { pretium: PretiumEvidence }) {
+  return (
+    <>
+      <dt className="text-muted-foreground">Pretium says</dt>
+      <dd>{pretiumSays(pretium)}</dd>
+      <dt className="text-muted-foreground">Sent to</dt>
+      <dd>
+        {pretium.depositAddressIsSettlement ? (
+          "Pretium's pinned settlement address"
+        ) : (
+          <span className="text-destructive">
+            Not Pretium&rsquo;s pinned settlement address (
+            <span className="font-mono text-xs break-all">
+              {pretium.settlementAddress}
+            </span>
+            )
+          </span>
+        )}
+      </dd>
+      <dt className="text-muted-foreground">Refund from Pretium</dt>
+      <dd>
+        {pretium.refundRequestedAt
+          ? `Asked for ${formatNairobiTime(pretium.refundRequestedAt)}`
+          : "Not asked for"}
+        {pretium.refundTxHash ? (
+          <span className="block font-mono text-xs break-all">
+            {pretium.refundTxHash}
+          </span>
+        ) : null}
+        <span className="block">
+          {pretium.refundCreditedUsdc
+            ? `${formatUsdc(pretium.refundCreditedUsdc)} credited to the ledger`
+            : "Nothing credited to the ledger yet"}
+        </span>
+      </dd>
+    </>
+  );
+}
+
 function EvidenceSummary({ evidence }: { evidence: PayoutEvidence }) {
   return (
     <dl className="mt-4 grid grid-cols-1 gap-x-4 gap-y-3 text-sm sm:grid-cols-[12rem_minmax(0,1fr)]">
-      <dt className="text-muted-foreground">Paycrest says</dt>
-      <dd>{evidence.paycrestStatus ?? "— (no Paycrest order)"}</dd>
+      {evidence.pretium ? (
+        <PretiumEvidenceRows pretium={evidence.pretium} />
+      ) : (
+        <>
+          <dt className="text-muted-foreground">Paycrest says</dt>
+          <dd>{evidence.paycrestStatus ?? "— (no Paycrest order)"}</dd>
+        </>
+      )}
       <dt className="text-muted-foreground">
         Transfers to the deposit address
       </dt>

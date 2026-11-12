@@ -8,6 +8,7 @@ import { ApiError } from "~/lib/api";
 import { OPS_ALERTS, SYSTEM_HEALTH } from "./fixtures/alerts";
 import { AUDIT_ENTRIES } from "./fixtures/audit";
 import { COMPANIES, companyDetail, CONTROLS } from "./fixtures/companies";
+import { CASH_OUT_PROVIDER } from "./fixtures/controls";
 import {
   INTENT_QUOTE_EVIDENCE,
   INTENT_QUOTES,
@@ -42,6 +43,10 @@ const ROUTES: readonly Route[] = [
   { pattern: /^\/internal\/alerts$/, respond: () => OPS_ALERTS },
   { pattern: /^\/internal\/health$/, respond: () => SYSTEM_HEALTH },
   { pattern: /^\/internal\/controls$/, respond: () => CONTROLS },
+  {
+    pattern: /^\/internal\/controls\/cash-out-provider$/,
+    respond: () => CASH_OUT_PROVIDER,
+  },
   {
     pattern: /^\/internal\/companies$/,
     respond: (_match, query) => {

@@ -34,11 +34,12 @@ export function PagePreview({
       </main>
     );
   }
-  const { View, path } = preview;
+  const { View, path, seed } = preview;
   return (
     <PreviewProviders
       staff={role === "ops_viewer" ? VIEWER_STAFF : STAFF}
       currentPath={path}
+      seed={seed}
     >
       <Suspense>
         <View />

@@ -29,8 +29,9 @@ import { jobColumns, minutesAgo } from "./columns";
 const REFRESH_MS = 60_000;
 
 /**
- * The station jobs and the Paycrest webhook (spec §6.16): what the
- * "reconciliation stopped" and "webhook signature failure" alerts watch.
+ * The station jobs, and each cash-out provider's reconciliation and
+ * webhook (spec §6.16): what the "reconciliation stopped" and "webhook
+ * signature failure" alerts watch.
  */
 export function HealthView() {
   const { api } = useStaffAuth();
@@ -58,8 +59,26 @@ export function HealthView() {
             .
           </p>
           <HealthFigures health={result.data} />
-          <Reconciliation health={result.data} />
-          <PaycrestWebhook health={result.data} />
+          <Reconciliation
+            provider="Paycrest"
+            reconciliation={result.data.reconciliation}
+            checkedAt={result.data.checkedAt}
+          />
+          <Reconciliation
+            provider="Pretium"
+            reconciliation={result.data.pretiumReconciliation}
+            checkedAt={result.data.checkedAt}
+          />
+          <ProviderWebhook
+            provider="Paycrest"
+            webhook={result.data.paycrestWebhook}
+            checkedAt={result.data.checkedAt}
+          />
+          <ProviderWebhook
+            provider="Pretium"
+            webhook={result.data.pretiumWebhook}
+            checkedAt={result.data.checkedAt}
+          />
           <Jobs health={result.data} />
         </>
       )}
@@ -84,37 +103,60 @@ function Status({ ok, label }: { ok: boolean; label: string }) {
   return <StatusBadge tone={ok ? "paid" : "failed"}>{label}</StatusBadge>;
 }
 
+type Provider = "Paycrest" | "Pretium";
+
+/** The providers whose entry is in trouble, e.g. "Paycrest, Pretium". */
+function named(entries: readonly [Provider, boolean][]): string {
+  return entries
+    .filter(([, troubled]) => troubled)
+    .map(([provider]) => provider)
+    .join(", ");
+}
+
 function HealthFigures({ health }: { health: SystemHealth }) {
-  const { reconciliation, paycrestWebhook, jobs } = health;
-  const failing = paycrestWebhook.signatureFailures?.open === true;
+  const stopped = named([
+    ["Paycrest", health.reconciliation.stale],
+    ["Pretium", health.pretiumReconciliation.stale],
+  ]);
+  const failing = named([
+    ["Paycrest", health.paycrestWebhook.signatureFailures?.open === true],
+    ["Pretium", health.pretiumWebhook.signatureFailures?.open === true],
+  ]);
   return (
     <StatCards label="Health summary" columns={3}>
       <StatCard
         icon={ActivityIcon}
-        tone={reconciliation.stale ? "danger" : "clear"}
-        label="Payout reconciliation"
-        value={reconciliation.stale ? "Stopped" : "Running"}
+        tone={stopped ? "danger" : "clear"}
+        label="Cash-out reconciliation"
+        value={stopped ? `Stopped: ${stopped}` : "Running"}
       />
       <StatCard
         icon={WebhookIcon}
         tone={failing ? "danger" : "clear"}
-        label="Paycrest webhook signatures"
-        value={failing ? "Failing" : "No open failures"}
+        label="Provider webhook signatures"
+        value={failing ? `Failing: ${failing}` : "No open failures"}
       />
       <StatCard
         icon={ClockIcon}
         tone="total"
         label="Station jobs"
-        value={jobs.length}
+        value={health.jobs.length}
       />
     </StatCards>
   );
 }
 
-function Reconciliation({ health }: { health: SystemHealth }) {
-  const { reconciliation, checkedAt } = health;
+function Reconciliation({
+  provider,
+  reconciliation,
+  checkedAt,
+}: {
+  provider: Provider;
+  reconciliation: SystemHealth["reconciliation"];
+  checkedAt: string;
+}) {
   return (
-    <Card title="Payout reconciliation">
+    <Card title={`${provider} reconciliation`}>
       <p className="mt-2 text-sm">
         <Status
           ok={!reconciliation.stale}
@@ -132,30 +174,37 @@ function Reconciliation({ health }: { health: SystemHealth }) {
         )}
       </p>
       <p className="mt-2 text-sm text-muted-foreground">
-        Checks payouts against Paycrest every minute. With no finished run in{" "}
-        {reconciliation.staleAfterMinutes} minutes, the &ldquo;Reconciliation
-        stopped&rdquo; alert fires.
+        Checks cash-outs against {provider} every minute. With no finished run
+        in {reconciliation.staleAfterMinutes} minutes, the &ldquo;{provider}{" "}
+        reconciliation has stopped&rdquo; alert fires.
       </p>
     </Card>
   );
 }
 
-function PaycrestWebhook({ health }: { health: SystemHealth }) {
-  const { signatureFailures, resolvesAfterQuietMinutes } =
-    health.paycrestWebhook;
+function ProviderWebhook({
+  provider,
+  webhook,
+  checkedAt,
+}: {
+  provider: Provider;
+  webhook: SystemHealth["paycrestWebhook"];
+  checkedAt: string;
+}) {
+  const { signatureFailures, resolvesAfterQuietMinutes } = webhook;
   return (
-    <Card title="Paycrest webhook signatures">
+    <Card title={`${provider} webhook signatures`}>
       {signatureFailures === null ? (
         <p className="mt-2 text-sm">
-          <Status ok label="No failures" /> No webhook has failed its signature
-          check.
+          <Status ok label="No failures" /> No {provider} webhook has failed its
+          signature check.
         </p>
       ) : signatureFailures.open ? (
         <p className="mt-2 text-sm">
           <Status ok={false} label="Failing" /> {signatureFailures.count} failed{" "}
           {signatureFailures.count === 1 ? "signature" : "signatures"} since{" "}
           {formatNairobiTime(signatureFailures.firstSeenAt)}; the last{" "}
-          {minutesAgo(signatureFailures.lastSeenAt, health.checkedAt)}.
+          {minutesAgo(signatureFailures.lastSeenAt, checkedAt)}.
         </p>
       ) : (
         <p className="mt-2 text-sm">
@@ -171,8 +220,9 @@ function PaycrestWebhook({ health }: { health: SystemHealth }) {
         </p>
       )}
       <p className="mt-2 text-sm text-muted-foreground">
-        A failure opens the &ldquo;Webhook signature failure&rdquo; alert. It
-        resolves after {resolvesAfterQuietMinutes} minutes without another.
+        A failure opens the &ldquo;{provider} webhook failed signature
+        verification&rdquo; alert. It resolves after {resolvesAfterQuietMinutes}{" "}
+        minutes without another.
       </p>
     </Card>
   );
