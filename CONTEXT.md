@@ -81,3 +81,21 @@ _Avoid_: Card claim
 **Bank card**:
 A card from the company's own bank, used outside Expendi. What's spent on it is recorded as company spending.
 _Avoid_: Company card
+
+### Getting paid
+
+**Customer**:
+Someone a company invoices. Not a payee: a payee is someone the company pays.
+_Avoid_: Client, buyer
+
+**Invoice**:
+What a company sends a customer to be paid in US dollars, settled as USDC in its company wallet. Draft, open, paid or void; overdue is an open invoice past its due date, not a status.
+_Avoid_: Sales invoice, bill (a bill is what the company owes)
+
+**Pay link**:
+The public page where a customer sees an invoice and pays it, with no account.
+_Avoid_: Checkout, payment page
+
+**Invoice payment**:
+Money recorded against an invoice: paid through the pay link, matched by hand to a deposit, or marked paid outside Expendi.
+_Avoid_: Receipt, settlement
