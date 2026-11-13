@@ -1,0 +1,79 @@
+{
+  "capturedAt": "2026-11-13",
+  "source": "POST /v0/generate-intent on mainnet, from scripts/spike-confidential-intents.ts --step intent. Never signed or submitted.",
+  "companyAccount": "31b95d2eb4c4aaa56d63b85728c30cbd243b7850f04510624692af892d8026f8",
+  "legs": [
+    {
+      "leg": "exact amount in, to Base",
+      "swapType": "EXACT_INPUT",
+      "destinationAsset": "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
+      "quote": {
+        "amountIn": "100000",
+        "minAmountIn": "100000",
+        "amountOut": "95178",
+        "minAmountOut": "94226",
+        "depositAddress": "269e0d2e5b0d34d095691fa9fb1be4fb028360b027b26c79be38c4669986e329",
+        "deadline": "2026-11-16T08:19:27.521Z"
+      },
+      "generated": {
+        "intent": {
+          "standard": "nep413",
+          "payload": {
+            "message": "{\"deadline\":\"2026-11-16T08:19:27.521Z\",\"intents\":[{\"intent\":\"transfer\",\"receiver_id\":\"269e0d2e5b0d34d095691fa9fb1be4fb028360b027b26c79be38c4669986e329\",\"tokens\":{\"imt:51e8f94d77b5e90dc9852ca6113771e11e8382ce69473a75e313e41665de7cbe:nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1\":\"100000\"}}],\"signer_id\":\"31b95d2eb4c4aaa56d63b85728c30cbd243b7850f04510624692af892d8026f8\"}",
+            "nonce": "Vij2xgDhEPMXQKrcWrR46BiC3wIETEPvXnOFhLItR5w=",
+            "recipient": "intents.far"
+          }
+        },
+        "correlationId": "1183c38c-8b42-46f2-b5c7-733e8e34857a"
+      }
+    },
+    {
+      "leg": "exact amount out, to Base",
+      "swapType": "EXACT_OUTPUT",
+      "destinationAsset": "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
+      "quote": {
+        "amountIn": "105882",
+        "minAmountIn": "104823",
+        "amountOut": "100000",
+        "minAmountOut": "100000",
+        "depositAddress": "f28489d6e987689427854a4781051b4ec145070c7e5b961ef44d126d068280a7",
+        "deadline": "2026-11-16T08:19:28.752Z"
+      },
+      "generated": {
+        "intent": {
+          "standard": "nep413",
+          "payload": {
+            "message": "{\"deadline\":\"2026-11-16T08:19:28.752Z\",\"intents\":[{\"intent\":\"transfer\",\"receiver_id\":\"f28489d6e987689427854a4781051b4ec145070c7e5b961ef44d126d068280a7\",\"tokens\":{\"imt:51e8f94d77b5e90dc9852ca6113771e11e8382ce69473a75e313e41665de7cbe:nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1\":\"105882\"}}],\"signer_id\":\"31b95d2eb4c4aaa56d63b85728c30cbd243b7850f04510624692af892d8026f8\"}",
+            "nonce": "Vij2xgDhEPMXADw8pLR46BgD1aYtfUL9rwIGxE+ovTo=",
+            "recipient": "intents.far"
+          }
+        },
+        "correlationId": "2a90208e-bb9a-4168-9eb7-acaa7bb7af10"
+      }
+    },
+    {
+      "leg": "exact amount in, to USDC on NEAR",
+      "swapType": "EXACT_INPUT",
+      "destinationAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+      "quote": {
+        "amountIn": "100000",
+        "minAmountIn": "100000",
+        "amountOut": "100000",
+        "minAmountOut": "100000",
+        "depositAddress": "1aababadf92f7f380e653d688f8ddd49d77698f7a82ad0aa329199a156ec16cd",
+        "deadline": "2026-11-16T08:19:29.791Z"
+      },
+      "generated": {
+        "intent": {
+          "standard": "nep413",
+          "payload": {
+            "message": "{\"deadline\":\"2026-11-16T08:19:29.791Z\",\"intents\":[{\"intent\":\"transfer\",\"receiver_id\":\"1aababadf92f7f380e653d688f8ddd49d77698f7a82ad0aa329199a156ec16cd\",\"tokens\":{\"imt:51e8f94d77b5e90dc9852ca6113771e11e8382ce69473a75e313e41665de7cbe:nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1\":\"100000\"}}],\"signer_id\":\"31b95d2eb4c4aaa56d63b85728c30cbd243b7850f04510624692af892d8026f8\"}",
+            "nonce": "Vij2xgDhEPMXwB0q4rR46Bik1wtyCBpJ9mXP7Rfjtik=",
+            "recipient": "intents.far"
+          }
+        },
+        "correlationId": "dae7dbff-bb66-4b06-a17d-0fb05da1cd21"
+      }
+    }
+  ]
+}
