@@ -1,20 +1,22 @@
 "use client";
 
 import type { JSX, ReactNode } from "react";
-import { KeyRoundIcon, TriangleAlertIcon } from "lucide-react";
+import { cn } from "cn";
+import { KeyRoundIcon, SnowflakeIcon, TriangleAlertIcon } from "lucide-react";
+import Link from "next/link";
 import { useId, useState } from "react";
 
 import type { ExpendiCard } from "@expendi-business/shared";
 
 import type { PasskeyState } from "~/features/payment-ui";
-import { personName } from "~/app/(company)/expenses/_components/expense-labels";
-import { TextLinkButton } from "~/components/data/actions";
+import { TextLinkButton, textLinkClass } from "~/components/data/actions";
 import {
   Callout,
   DetailItem,
   DetailList,
   DetailSheet,
   ReadOnlyNote,
+  SectionLabel,
   SheetActions,
   SheetPosition,
 } from "~/components/data/detail-sheet";
@@ -27,6 +29,7 @@ import {
   SheetForm,
   SheetNote,
 } from "~/features/payment-ui";
+import { STATE_LABELS } from "~/features/recurring/recurring-draft";
 import { describeApprovalError } from "~/lib/approval";
 import { formatNairobiDate } from "~/lib/dates";
 import {
@@ -38,17 +41,22 @@ import {
 import {
   CARD_STATE,
   formatUsd,
+  holderName,
   limitChangeOf,
   maskedLastFour,
+  paymentsDeclinedWhenFrozen,
 } from "./cards-display";
+import { RevealCardNumber } from "./reveal-card-number";
 import { Usd } from "./usd";
 
-type Step = "details" | "limit" | "close";
+type Step = "details" | "limit" | "close" | "freeze";
 
 /**
  * One card in the right side sheet. Admins raise the limit and unfreeze
  * with their passkey; lowering the limit, freezing and closing need none.
- * Everyone here sees only the last four digits.
+ * A person's card shows only its last four digits here; a company-held
+ * card's number is shown to any admin with a fresh passkey, and its sheet
+ * lists the recurring payments it pays.
  */
 export function CardSheet({
   organizationId,
@@ -92,6 +100,7 @@ export function CardSheet({
       ? null
       : limitChangeOf(card.monthlyLimitUsdCents, typed);
   const raising = change?.ok === true && change.direction === "raise";
+  const declinedWhenFrozen = paymentsDeclinedWhenFrozen(card);
 
   function resetAttempts() {
     action.reset();
@@ -112,7 +121,10 @@ export function CardSheet({
     resetAttempts();
     setNotice(null);
     freeze.mutate(card.id, {
-      onSuccess: () => setNotice("Card frozen. New purchases are declined."),
+      onSuccess: () => {
+        setNotice("Card frozen. New purchases are declined.");
+        setStep("details");
+      },
     });
   }
 
@@ -234,6 +246,21 @@ export function CardSheet({
         </Button>
       </SheetActions>
     );
+  } else if (step === "freeze") {
+    footer = (
+      <SheetActions kind="primary">
+        <Button disabled={busy} onClick={freezeCard}>
+          {freeze.isPending ? "Freezing…" : "Freeze card"}
+        </Button>
+        <Button
+          variant="outline"
+          disabled={busy}
+          onClick={() => goTo("details")}
+        >
+          Keep it open
+        </Button>
+      </SheetActions>
+    );
   } else {
     footer = (
       <>
@@ -258,7 +285,11 @@ export function CardSheet({
               variant="outline"
               size="md"
               disabled={busy}
-              onClick={freezeCard}
+              onClick={
+                declinedWhenFrozen.length > 0
+                  ? () => goTo("freeze")
+                  : freezeCard
+              }
             >
               {freeze.isPending ? "Freezing…" : "Freeze"}
             </Button>
@@ -291,7 +322,7 @@ export function CardSheet({
       open
       onClose={onClose}
       dismissible={!busy}
-      eyebrow="Expendi card"
+      eyebrow={card.companyHeld ? "Company-held card" : "Expendi card"}
       title={card.nickname}
       stepKey={card.id}
       headerExtra={
@@ -340,17 +371,34 @@ export function CardSheet({
           icon={TriangleAlertIcon}
           title="This can't be undone"
         >
-          <p>
-            Closing {card.nickname} ({maskedLastFour(card.lastFour)}) stops it
-            for good. It can&apos;t be reopened; {personName(card.holder)} would
-            need a new card.
-          </p>
+          {card.holder === null ? (
+            <p>
+              Closing {card.nickname} ({maskedLastFour(card.lastFour)}) stops it
+              for good. It can&apos;t be reopened. A recurring payment it still
+              pays has to move to another card or way of paying first.
+            </p>
+          ) : (
+            <p>
+              Closing {card.nickname} ({maskedLastFour(card.lastFour)}) stops it
+              for good. It can&apos;t be reopened; {holderName(card.holder)}{" "}
+              would need a new card.
+            </p>
+          )}
         </Callout>
       ) : null}
 
+      {step === "freeze" ? <FreezeConfirm card={card} /> : null}
+
       <DetailList>
-        <DetailItem label="Cardholder" sub={card.holder.email}>
-          {personName(card.holder)}
+        <DetailItem
+          label="Cardholder"
+          sub={
+            card.holder === null
+              ? "Pays recurring payments. It doesn't close when anyone leaves."
+              : card.holder.email
+          }
+        >
+          {holderName(card.holder)}
         </DetailItem>
         <DetailItem label="Card">{maskedLastFour(card.lastFour)}</DetailItem>
         <DetailItem label="Monthly limit">
@@ -398,20 +446,105 @@ export function CardSheet({
         </SheetForm>
       ) : null}
 
+      {card.companyHeld ? <CardRecurringPayments card={card} /> : null}
+
       {step === "details" ? (
         <>
           {card.state === "frozen" && canAct && passkey === "missing" ? (
             <PasskeySetupCallout />
           ) : null}
-          <p className="text-muted-foreground">
-            Only the last four digits show here. The cardholder sees the full
-            number in the app.{" "}
-            <TextLinkButton onClick={onViewPurchases}>
-              See this card&apos;s purchases
-            </TextLinkButton>
-          </p>
+          {card.companyHeld ? (
+            <>
+              <p className="text-muted-foreground">
+                Any admin can see its full number with a fresh passkey, e.g. to
+                enter it at a merchant.{" "}
+                <TextLinkButton onClick={onViewPurchases}>
+                  See this card&apos;s purchases
+                </TextLinkButton>
+              </p>
+              {canAct && card.state !== "closed" ? (
+                <RevealCardNumber
+                  organizationId={organizationId}
+                  cardId={card.id}
+                />
+              ) : null}
+            </>
+          ) : (
+            <p className="text-muted-foreground">
+              Only the last four digits show here. The cardholder sees the full
+              number in the app.{" "}
+              <TextLinkButton onClick={onViewPurchases}>
+                See this card&apos;s purchases
+              </TextLinkButton>
+            </p>
+          )}
         </>
       ) : null}
     </DetailSheet>
+  );
+}
+
+/** Before a company-held card is frozen: the recurring payments whose Card purchases it will decline. */
+export function FreezeConfirm({ card }: { card: ExpendiCard }): JSX.Element {
+  return (
+    <Callout
+      tone="warn"
+      icon={SnowflakeIcon}
+      title="Its recurring payments will be declined"
+    >
+      <p>
+        While {card.nickname} is frozen, every Card purchase on it is declined,
+        including these recurring payments:
+      </p>
+      <ul className="mt-1 list-disc pl-5">
+        {paymentsDeclinedWhenFrozen(card).map((payment) => (
+          <li key={payment.id}>{payment.payeeName}</li>
+        ))}
+      </ul>
+      <p className="mt-1">
+        Their bills stay owed, and go overdue if nothing pays them.
+      </p>
+    </Callout>
+  );
+}
+
+/** The recurring payments a company-held card pays, each linking to it under Bills. */
+function CardRecurringPayments({ card }: { card: ExpendiCard }): JSX.Element {
+  return (
+    <section
+      aria-label="Recurring payments it pays"
+      className="flex flex-col gap-2"
+    >
+      <SectionLabel>Recurring payments it pays</SectionLabel>
+      {card.recurringPayments.length === 0 ? (
+        <p className="rounded-control border border-dashed border-input px-4 py-3.5 text-muted-foreground">
+          None yet. Pick this card when you set up a recurring payment under
+          Bills.
+        </p>
+      ) : (
+        <ul className="flex flex-col rounded-control border border-border">
+          {card.recurringPayments.map((payment) => {
+            const state = STATE_LABELS[payment.state];
+            return (
+              <li
+                key={payment.id}
+                className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 first:border-t-0"
+              >
+                <Link
+                  href={`/bills?recurring=${payment.id}`}
+                  className={cn(
+                    "min-w-0 [overflow-wrap:anywhere]",
+                    textLinkClass,
+                  )}
+                >
+                  {payment.payeeName}
+                </Link>
+                <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

@@ -18,9 +18,13 @@ import type * as DetailSheetModule from "~/components/data/detail-sheet";
 import type { PasskeyState } from "~/features/payment-ui";
 import { DashboardProvider } from "~/contexts/dashboard-context";
 import { queryKeys } from "~/lib/query-keys";
+import { FreezeConfirm } from "./card-sheet";
+import { afterPurchaseAnswered, useReviewCardPurchase } from "./cards-api";
+import { answerSavedText } from "./cards-display";
 import { CardsView } from "./cards-view";
 import { IssueCardSheet } from "./issue-card-sheet";
 import { LoadSheet } from "./load-sheet";
+import { AnswerForm, SavedAnswer } from "./purchase-sheet";
 
 const navigation = vi.hoisted(() => ({ params: new URLSearchParams() }));
 
@@ -93,9 +97,11 @@ const card = (overrides: Partial<ExpendiCard> = {}): ExpendiCard => ({
   state: "open",
   monthlyLimitUsdCents: "150000",
   spentThisMonthUsdCents: "61200",
+  companyHeld: false,
   holder,
   yours: false,
   defaultCategory: category,
+  recurringPayments: [],
   issuedAt: "2026-10-21T08:30:00.000Z",
   closedAt: null,
   ...overrides,
@@ -106,9 +112,12 @@ const purchase = (overrides: Partial<CardPurchase> = {}): CardPurchase => ({
   kind: "purchase",
   status: "settled",
   card: { id: id(1), nickname: "Marketing subscriptions", lastFour: "0001" },
+  companyHeld: false,
   holder,
   yours: false,
   merchant: "Canva",
+  merchantKey: null,
+  match: null,
   mcc: "5734",
   holdUsdCents: "0",
   settledUsdCents: "4500",
@@ -144,12 +153,17 @@ interface Setup {
   purchases?: readonly CardPurchase[];
   loads?: CardLoadList["loads"];
   enrolled?: boolean;
+  /** `GET …/cards/purchases?needsReview=true`. */
+  waiting?: readonly CardPurchase[];
+  /** Anything else the cache holds before the page draws. */
+  seed?: (client: QueryClient) => void;
 }
 
 const NO_FILTERS = {
   cardId: null,
   status: null,
   needsReceipt: null,
+  needsReview: null,
 } as const;
 
 function render({
@@ -160,6 +174,8 @@ function render({
   purchases = [purchase(), refund],
   loads = [],
   enrolled = true,
+  waiting,
+  seed,
 }: Setup = {}): string {
   navigation.params = new URLSearchParams(url);
   const client = new QueryClient({
@@ -185,10 +201,20 @@ function render({
     pages: [page],
     pageParams: [null],
   });
+  if (waiting) {
+    client.setQueryData(
+      queryKeys.cardPurchases(ORG, { ...NO_FILTERS, needsReview: "true" }),
+      {
+        pages: [{ purchases: [...waiting], nextCursor: null }],
+        pageParams: [null],
+      },
+    );
+  }
   client.setQueryData(queryKeys.approvalPasskey, {
     enrolled,
     enrolledAt: enrolled ? "2026-10-01T09:00:00.000Z" : null,
   });
+  seed?.(client);
   return renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <DashboardProvider
@@ -786,3 +812,427 @@ describe("Issue card", () => {
     expect(page.includes("No one can hold a card yet")).toBe(true);
   });
 });
+
+describe("company-held cards", () => {
+  const companyCard = card({
+    id: id(5),
+    nickname: "Software subscriptions",
+    lastFour: "0004",
+    companyHeld: true,
+    holder: null,
+    recurringPayments: [
+      { id: id(30), payeeName: "Vercel", state: "active" },
+      { id: id(31), payeeName: "Notion", state: "paused" },
+    ],
+  });
+  const onCompanyCard = {
+    card: { id: id(5), nickname: "Software subscriptions", lastFour: "0004" },
+    companyHeld: true,
+    holder: null,
+    amountKes: null,
+    usdKesRate: null,
+  } as const;
+  const waiting = purchase({
+    ...onCompanyCard,
+    id: id(40),
+    merchant: "LINEAR.APP",
+    expenseId: null,
+    needsReceipt: false,
+    match: {
+      state: "needs_review",
+      recurringItemId: null,
+      billId: null,
+      payeeName: null,
+    },
+  });
+  const paidBill = purchase({
+    ...onCompanyCard,
+    id: id(41),
+    merchant: "VERCEL INC.",
+    expenseId: null,
+    needsReceipt: true,
+    match: {
+      state: "matched",
+      recurringItemId: id(30),
+      billId: id(50),
+      payeeName: "Vercel",
+    },
+  });
+  const oneOff = purchase({
+    ...onCompanyCard,
+    id: id(42),
+    merchant: "FIGMA",
+    match: {
+      state: "one_off",
+      recurringItemId: null,
+      billId: null,
+      payeeName: null,
+    },
+  });
+  const companyPurchases = [waiting, paidBill, oneOff];
+
+  it("shows Company-held where the cardholder goes", () => {
+    // #when
+    const page = text(render({ cards: [card(), companyCard] }));
+
+    // #then
+    expect({
+      person: page.includes("Jane Wanjiku"),
+      company: page.includes("Company-held"),
+    }).toEqual({ person: true, company: true });
+  });
+
+  it("lists the recurring payments a company-held card pays and offers any admin its number", () => {
+    // #when
+    const html = sheetOf(render({ url: `id=${id(5)}`, cards: [companyCard] }));
+    const sheet = text(html);
+
+    // #then
+    expect({
+      eyebrow: sheet.includes("Company-held card"),
+      holder: sheet.includes(
+        "Cardholder Company-held Pays recurring payments. It doesn't close when anyone leaves.",
+      ),
+      payments: sheet.includes(
+        "Recurring payments it pays Vercel Active Notion Paused",
+      ),
+      linked: html.includes(`href="/bills?recurring=${id(30)}"`),
+      number: html.includes("Show card number"),
+      buttons: buttonsIn(html),
+    }).toEqual({
+      eyebrow: true,
+      holder: true,
+      payments: true,
+      linked: true,
+      number: true,
+      buttons: ["Freeze", "Change limit", "Close card"],
+    });
+  });
+
+  it("shows an accountant the payments but not the number", () => {
+    // #when
+    const html = sheetOf(
+      render({ role: "accountant", url: `id=${id(5)}`, cards: [companyCard] }),
+    );
+
+    // #then
+    expect({
+      payments: text(html).includes("Vercel Active"),
+      number: html.includes("Show card number"),
+    }).toEqual({ payments: true, number: false });
+  });
+
+  it("keeps a person's card to its last four digits", () => {
+    // #when
+    const html = sheetOf(render({ url: `id=${id(1)}` }));
+
+    // #then
+    expect({
+      appOnly: text(html).includes("The cardholder sees the full number"),
+      number: html.includes("Show card number"),
+      payments: html.includes("Recurring payments it pays"),
+    }).toEqual({ appOnly: true, number: false, payments: false });
+  });
+
+  it("lists, before freezing, the recurring payments whose Card purchases will be declined", () => {
+    // #when
+    const page = text(
+      renderToStaticMarkup(<FreezeConfirm card={companyCard} />),
+    );
+
+    // #then
+    expect({
+      title: page.includes("Its recurring payments will be declined"),
+      vercel: page.includes("Vercel"),
+      paused: page.includes("Notion"),
+      owed: page.includes("Their bills stay owed"),
+    }).toEqual({ title: true, vercel: true, paused: false, owed: true });
+  });
+
+  it("marks purchases that need an answer and says what a matched one paid", () => {
+    // #when
+    const html = render({
+      url: "tab=purchases",
+      cards: [companyCard],
+      purchases: companyPurchases,
+    });
+    const page = text(html);
+
+    // #then
+    expect({
+      holder: page.includes("Company-held"),
+      needsAnswer: page.includes("Needs an answer"),
+      pays: html.includes(`href="/bills?billId=${id(50)}"`),
+      paysText: page.includes("Pays Vercel"),
+      answerFilter: html.includes('aria-label="Filter by answer"'),
+      receiptFlags: (page.match(/Needs receipt/g) ?? []).length,
+    }).toEqual({
+      holder: true,
+      needsAnswer: true,
+      pays: true,
+      paysText: true,
+      answerFilter: true,
+      receiptFlags: 2,
+    });
+  });
+
+  it("says on the page when purchases need an answer", () => {
+    // #when
+    const admin = render({ cards: [companyCard], waiting: [waiting] });
+    const accountant = render({
+      role: "accountant",
+      cards: [companyCard],
+      waiting: [waiting],
+    });
+    const none = render({ cards: [companyCard], waiting: [] });
+
+    // #then
+    expect({
+      admin: text(admin).includes("A purchase needs an answer"),
+      answer: admin.includes(">Answer</button>"),
+      accountant: accountant.includes(">See them</button>"),
+      none: text(none).includes("needs an answer"),
+    }).toEqual({ admin: true, answer: true, accountant: true, none: false });
+  });
+
+  it("asks an admin to answer for a new merchant's purchase", () => {
+    // #when
+    const admin = sheetOf(
+      render({
+        url: `tab=purchases&purchase=${id(40)}`,
+        cards: [companyCard],
+        purchases: companyPurchases,
+      }),
+    );
+    const accountant = sheetOf(
+      render({
+        role: "accountant",
+        url: `tab=purchases&purchase=${id(40)}`,
+        cards: [companyCard],
+        purchases: companyPurchases,
+      }),
+    );
+
+    // #then
+    expect({
+      callout: text(admin).includes(
+        "Software subscriptions •••• 0004 hadn't been charged by LINEAR.APP before",
+      ),
+      answer: admin.includes(">Answer</button>"),
+      viewOnly: text(accountant).includes(
+        "View only. Only admins answer for purchases and waive receipts.",
+      ),
+      accountantAnswer: accountant.includes(">Answer</button>"),
+    }).toEqual({
+      callout: true,
+      answer: true,
+      viewOnly: true,
+      accountantAnswer: false,
+    });
+  });
+
+  it("lets an admin change a one-off, and keeps a bill's purchase off receipts", () => {
+    // #when
+    const oneOffSheet = sheetOf(
+      render({
+        url: `tab=purchases&purchase=${id(42)}`,
+        cards: [companyCard],
+        purchases: companyPurchases,
+      }),
+    );
+    const billSheet = sheetOf(
+      render({
+        url: `tab=purchases&purchase=${id(41)}`,
+        cards: [companyCard],
+        purchases: companyPurchases,
+      }),
+    );
+
+    // #then
+    expect({
+      change: oneOffSheet.includes(">Change answer</button>"),
+      oneOff: text(oneOffSheet).includes("Answer A one-off purchase"),
+      pays: text(billSheet).includes("Pays Vercel Open the bill"),
+      bill: billSheet.includes(`href="/bills?billId=${id(50)}"`),
+      receipt: text(billSheet).includes("Needs a receipt"),
+      receipts: text(billSheet).includes("Receipts"),
+      buttons: buttonsIn(billSheet),
+    }).toEqual({
+      change: true,
+      oneOff: true,
+      pays: true,
+      bill: true,
+      receipt: false,
+      receipts: false,
+      buttons: [],
+    });
+  });
+
+  it("offers the three answers, linking only to the card's own recurring payments", () => {
+    // #given
+    const client = new QueryClient();
+    const answer = (forCard: ExpendiCard) =>
+      text(
+        renderToStaticMarkup(
+          <QueryClientProvider client={client}>
+            <AnswerFormHarness card={forCard} purchase={waiting} />
+          </QueryClientProvider>,
+        ),
+      );
+
+    // #when
+    const withPayments = answer(companyCard);
+    const withNone = answer({ ...companyCard, recurringPayments: [] });
+
+    // #then
+    expect({
+      choices: [
+        "It’s one of this card’s recurring payments",
+        "It’s a one-off purchase",
+        "I don’t recognise it",
+        "this merchant will be declined on this card from now on",
+      ].every((part) => withPayments.includes(part)),
+      none: withNone.includes("This card pays no recurring payment yet."),
+    }).toEqual({ choices: true, none: true });
+  });
+
+  it("keeps an answered purchase's sheet open once the Needs an answer filter leaves it out", () => {
+    // #given the answer is saved and the filtered list no longer holds it
+    const answered: CardPurchase = {
+      ...waiting,
+      match: {
+        state: "not_recognised",
+        recurringItemId: null,
+        billId: null,
+        payeeName: null,
+      },
+    };
+    const url = `tab=purchases&review=true&purchase=${id(40)}`;
+
+    // #when
+    const kept = sheetOf(
+      render({
+        url,
+        cards: [companyCard],
+        waiting: [],
+        seed: (client) => void afterPurchaseAnswered(client, ORG, answered),
+      }),
+    );
+    const notKept = sheetOf(render({ url, cards: [companyCard], waiting: [] }));
+
+    // #then
+    expect({
+      open: text(kept).includes("LINEAR.APP"),
+      answer: text(kept).includes(
+        "Answer Not recognised: this merchant is declined on this card",
+      ),
+      withoutTheCache: notKept,
+    }).toEqual({ open: true, answer: true, withoutTheCache: "" });
+  });
+
+  it("offers to freeze the card after an answer the API saved as not recognised", () => {
+    // #given
+    const saved = {
+      ...waiting,
+      match: {
+        state: "not_recognised",
+        recurringItemId: null,
+        billId: null,
+        payeeName: null,
+      },
+    } as const;
+
+    // #when
+    const html = renderToStaticMarkup(
+      <SavedAnswer
+        saved={{
+          text: answerSavedText({ decision: "not_recognised" }, saved, ""),
+          freeze: true,
+        }}
+        card={companyCard}
+        freezing={false}
+        onFreeze={vi.fn()}
+      />,
+    );
+
+    // #then
+    expect({
+      saved: text(html).includes(
+        "Saved. LINEAR.APP is declined on Software subscriptions from now on.",
+      ),
+      freeze: html.includes(">Freeze this card</button>"),
+      declines: text(html).includes(
+        "Freezing also declines its recurring payments: Vercel.",
+      ),
+    }).toEqual({ saved: true, freeze: true, declines: true });
+  });
+
+  it("lets an admin add a receipt to a company-held card's one-off purchase", () => {
+    // #when
+    const admin = sheetOf(
+      render({
+        url: `tab=purchases&purchase=${id(42)}`,
+        cards: [companyCard],
+        purchases: companyPurchases,
+      }),
+    );
+    const accountant = sheetOf(
+      render({
+        role: "accountant",
+        url: `tab=purchases&purchase=${id(42)}`,
+        cards: [companyCard],
+        purchases: companyPurchases,
+      }),
+    );
+    const personsCard = sheetOf(
+      render({ url: `tab=purchases&purchase=${id(20)}` }),
+    );
+
+    // #then
+    expect({
+      admin: admin.includes(">Add receipt</button>"),
+      waiver: admin.includes(">No receipt</button>"),
+      accountant: accountant.includes(">Add receipt</button>"),
+      personsCard: personsCard.includes(">Add receipt</button>"),
+    }).toEqual({
+      admin: true,
+      waiver: true,
+      accountant: false,
+      personsCard: false,
+    });
+  });
+
+  it("issues a company-held card with no cardholder field", () => {
+    // #when
+    const page = text(renderSheet("issue", { members: [] }));
+
+    // #then
+    expect({
+      person: page.includes("For a person"),
+      company: page.includes(
+        "Company-held It pays recurring payments, with no cardholder, and doesn't close when anyone leaves.",
+      ),
+      nobody: page.includes("or issue a company-held card"),
+    }).toEqual({ person: true, company: true, nobody: true });
+  });
+});
+
+function AnswerFormHarness({
+  card: forCard,
+  purchase: forPurchase,
+}: {
+  card: ExpendiCard;
+  purchase: CardPurchase;
+}) {
+  const review = useReviewCardPurchase(ORG);
+  return (
+    <AnswerForm
+      id="answer"
+      purchase={forPurchase}
+      card={forCard}
+      cardsLoading={false}
+      review={review}
+      onAnswered={vi.fn()}
+    />
+  );
+}

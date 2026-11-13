@@ -6,6 +6,7 @@ import { Effect } from "effect";
 import type {
   attachCardReceiptRequestSchema,
   CardPurchaseKind,
+  CardPurchaseMatchState,
   CardPurchaseStatus,
   listCardPurchasesQuerySchema,
   waiveCardReceiptRequestSchema,
@@ -22,13 +23,16 @@ import type { DatabaseError, ServiceUnavailable } from "../../errors.js";
 import type { Tenant } from "../../middleware/tenant.js";
 import type { AuditActor } from "../audit/audit-log.js";
 import type { FileStorage } from "../storage/file-storage.js";
+import type { CardHolderView } from "./views.js";
 import {
   cardPurchases,
   cards,
   categories,
   expenses,
   memberships,
+  payees,
   receiptFiles,
+  recurringItems,
   users,
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
@@ -40,6 +44,7 @@ import {
   checkAttachableReceipts,
 } from "../expenses/receipts.js";
 import { enqueueRecordedSpending } from "../zoho/enqueue.js";
+import { cardHolderView } from "./views.js";
 
 /**
  * Card purchases as people read them, and the receipts and waivers that
@@ -57,13 +62,13 @@ export interface CardPurchaseView {
     readonly nickname: string;
     readonly lastFour: string;
   };
-  readonly holder: {
-    readonly membershipId: string;
-    readonly name: string | null;
-    readonly email: string;
-  };
+  readonly companyHeld: boolean;
+  /** Null exactly when the card is company-held. */
+  readonly holder: CardHolderView | null;
   readonly yours: boolean;
   readonly merchant: string;
+  readonly merchantKey: string | null;
+  readonly match: CardPurchaseMatchView | null;
   readonly mcc: string;
   readonly holdUsdCents: bigint;
   readonly settledUsdCents: bigint;
@@ -77,6 +82,14 @@ export interface CardPurchaseView {
   readonly noReceiptReason: string | null;
   readonly needsReceipt: boolean;
   readonly changedAfterExpense: boolean;
+}
+
+/** `CardPurchaseMatch`: what a purchase on a company-held card is. */
+export interface CardPurchaseMatchView {
+  readonly state: CardPurchaseMatchState;
+  readonly recurringItemId: string | null;
+  readonly billId: string | null;
+  readonly payeeName: string | null;
 }
 
 export interface CardPurchasesPageView {
@@ -112,8 +125,14 @@ const alreadyWaived = new Conflict({
 
 const receiptCount = sql<number>`(SELECT count(*)::int FROM ${receiptFiles} WHERE ${receiptFiles.cardPurchaseId} = ${cardPurchases.id})`;
 
-/** A spend with no receipt yet and no admin waiver. Needs `expenses` joined. */
-export const needsReceiptSql = sql<boolean>`(${cardPurchases.kind} = 'purchase' AND ${cardPurchases.status} NOT IN ('declined', 'voided', 'expired') AND ${receiptCount} = 0 AND ${expenses.noReceiptReason} IS NULL)`;
+/**
+ * A spend with no receipt yet and no admin waiver. A purchase that pays, or
+ * will pay, a recurring payment's bill never needs one: the bill is the
+ * record. Nor does one waiting for an admin's answer about its merchant,
+ * since it may yet pay a bill, nor one from a merchant admins didn't
+ * recognise, since nobody has its receipt. Needs `expenses` joined.
+ */
+export const needsReceiptSql = sql<boolean>`(${cardPurchases.kind} = 'purchase' AND ${cardPurchases.status} NOT IN ('declined', 'voided', 'expired') AND ${cardPurchases.recurringItemId} IS NULL AND ${cardPurchases.reviewState} IS DISTINCT FROM 'needs_review' AND ${cardPurchases.reviewState} IS DISTINCT FROM 'not_recognised' AND ${receiptCount} = 0 AND ${expenses.noReceiptReason} IS NULL)`;
 
 const selectPurchases = (tx: Transaction, where: SQL | undefined) =>
   tx
@@ -124,10 +143,16 @@ const selectPurchases = (tx: Transaction, where: SQL | undefined) =>
       cardId: cards.id,
       cardNickname: cards.nickname,
       cardLastFour: cards.lastFour,
+      companyHeld: cards.companyHeld,
       membershipId: cardPurchases.membershipId,
       holderName: users.fullName,
       holderEmail: users.email,
       merchant: cardPurchases.merchant,
+      merchantKey: cardPurchases.merchantKey,
+      recurringItemId: cardPurchases.recurringItemId,
+      billId: cardPurchases.billId,
+      reviewState: cardPurchases.reviewState,
+      payeeName: payees.name,
       mcc: cardPurchases.mcc,
       holdUsdCents: cardPurchases.holdUsdCents,
       settledUsdCents: cardPurchases.settledUsdCents,
@@ -147,13 +172,33 @@ const selectPurchases = (tx: Transaction, where: SQL | undefined) =>
     })
     .from(cardPurchases)
     .innerJoin(cards, eq(cards.id, cardPurchases.cardId))
-    .innerJoin(memberships, eq(memberships.id, cardPurchases.membershipId))
-    .innerJoin(users, eq(users.id, memberships.userId))
+    .leftJoin(memberships, eq(memberships.id, cardPurchases.membershipId))
+    .leftJoin(users, eq(users.id, memberships.userId))
     .innerJoin(categories, eq(categories.id, cardPurchases.categoryId))
     .leftJoin(expenses, eq(expenses.id, cardPurchases.expenseId))
+    .leftJoin(
+      recurringItems,
+      eq(recurringItems.id, cardPurchases.recurringItemId),
+    )
+    .leftJoin(payees, eq(payees.id, recurringItems.payeeId))
     .where(where);
 
 type PurchaseRow = Awaited<ReturnType<typeof selectPurchases>>[number];
+
+/** Null until a company-held card's purchase is matched or flagged. */
+function matchOf(row: PurchaseRow): CardPurchaseMatchView | null {
+  if (!row.companyHeld) return null;
+  const state: CardPurchaseMatchState | null =
+    row.recurringItemId !== null ? "matched" : row.reviewState;
+  return state === null
+    ? null
+    : {
+        state,
+        recurringItemId: row.recurringItemId,
+        billId: row.billId,
+        payeeName: row.payeeName,
+      };
+}
 
 function toPurchaseView(tenant: Tenant, row: PurchaseRow): CardPurchaseView {
   return {
@@ -165,13 +210,13 @@ function toPurchaseView(tenant: Tenant, row: PurchaseRow): CardPurchaseView {
       nickname: row.cardNickname,
       lastFour: row.cardLastFour,
     },
-    holder: {
-      membershipId: row.membershipId,
-      name: row.holderName,
-      email: row.holderEmail,
-    },
-    yours: row.membershipId === tenant.membershipId,
+    companyHeld: row.companyHeld,
+    holder: cardHolderView(row.membershipId, row.holderName, row.holderEmail),
+    yours:
+      row.membershipId !== null && row.membershipId === tenant.membershipId,
     merchant: row.merchant,
+    merchantKey: row.merchantKey,
+    match: matchOf(row),
     mcc: row.mcc,
     holdUsdCents: row.holdUsdCents,
     settledUsdCents: row.settledUsdCents,
@@ -245,6 +290,11 @@ export function listCardPurchases(
               : options.needsReceipt
                 ? needsReceiptSql
                 : sql`NOT ${needsReceiptSql}`,
+            options.needsReview === undefined
+              ? undefined
+              : options.needsReview
+                ? eq(cardPurchases.reviewState, "needs_review")
+                : sql`${cardPurchases.reviewState} IS DISTINCT FROM 'needs_review'`,
             after === null
               ? undefined
               : sql`(${cardPurchases.authorizedAt}, ${cardPurchases.id}) < (${after.at}::timestamptz, ${after.id}::uuid)`,

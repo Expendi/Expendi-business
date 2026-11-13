@@ -7,7 +7,9 @@ import { createBill } from "./bills-api";
 import {
   describeUploadError,
   invalidInvoiceFile,
+  invalidReceiptImage,
   uploadBillFile,
+  uploadReceiptImage,
 } from "./invoice-upload";
 
 const ORG = "00000000-0000-4000-8000-0000000000aa";
@@ -147,5 +149,68 @@ describe("invalidInvoiceFile", () => {
       "That file is empty.",
       "That file is too large. Keep it under 8 MB.",
     ]);
+  });
+});
+
+describe("uploading a Card purchase's receipt from the desktop", () => {
+  it("asks for a receipt upload, as the app does, and sends the image straight to storage", async () => {
+    // #given
+    const imageBytes = new TextEncoder().encode("jpeg receipt");
+    const image = new File([imageBytes], "receipt.jpg", {
+      type: "image/jpeg",
+    });
+    const fetcher: Fetcher = vi.fn((url: string) =>
+      Promise.resolve(
+        url === UPLOAD_URL ? new Response(null, { status: 200 }) : upload(),
+      ),
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    // #when
+    const fileId = await uploadReceiptImage(client(), ORG, image);
+
+    // #then
+    expect({
+      fileId,
+      urls: fetcher.mock.calls.map(([url, init]) => [init.method, url]),
+      uploadRequest: jsonBody(fetcher.mock.calls[0]?.[1]),
+    }).toEqual({
+      fileId: FILE_ID,
+      urls: [
+        ["POST", `${API}/organizations/${ORG}/receipts/upload-url`],
+        ["PUT", UPLOAD_URL],
+      ],
+      uploadRequest: {
+        contentType: "image/jpeg",
+        byteSize: imageBytes.byteLength,
+        sha256: createHash("sha256").update(imageBytes).digest("hex"),
+        kind: "photo",
+      },
+    });
+  });
+
+  it("refuses a PDF before asking to upload it", async () => {
+    // #given
+    const fetcher: Fetcher = vi.fn(() => Promise.resolve(upload()));
+    vi.stubGlobal("fetch", fetcher);
+
+    // #when
+    const error = await uploadReceiptImage(client(), ORG, pdf).catch(
+      (cause: unknown) => cause,
+    );
+
+    // #then
+    expect({
+      message: describeUploadError(error),
+      calls: fetcher.mock.calls.length,
+      checks: [
+        invalidReceiptImage({ type: "image/png", size: 1 }),
+        invalidReceiptImage({ type: "image/png", size: 0 }),
+      ],
+    }).toEqual({
+      message: "Upload a JPEG, PNG, WebP or HEIC image.",
+      calls: 0,
+      checks: [null, "That file is empty."],
+    });
   });
 });

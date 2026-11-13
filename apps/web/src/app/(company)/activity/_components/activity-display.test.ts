@@ -154,6 +154,15 @@ describe("describeChanges", () => {
     ]);
   });
 
+  it("calls a bill a Card purchase paid Paid by card", () => {
+    // #then
+    expect(showValue("status", "paid_by_card", "bill")).toEqual({
+      kind: "status",
+      label: "Paid by card",
+      tone: "paid",
+    });
+  });
+
   it("shows a transaction hash as it is written and nothing when there is none", () => {
     // #given
     const hash = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";

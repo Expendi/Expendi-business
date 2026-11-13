@@ -33,6 +33,11 @@ export function formatKesCents(cents: string): string {
   return `KES ${formatFixed(cents, 2)}`;
 }
 
+/** US cents as e.g. "USD 1,500.50", as Expendi cards show amounts. */
+export function formatUsdCents(cents: string): string {
+  return `USD ${formatFixed(cents, 2)}`;
+}
+
 /** USDC base units (6 decimals) as e.g. "12.500000 USDC". */
 export function formatUsdc(baseUnits: string): string {
   return `${formatFixed(baseUnits, 6)} USDC`;

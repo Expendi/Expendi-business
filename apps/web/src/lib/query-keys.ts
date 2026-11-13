@@ -11,6 +11,8 @@ export interface CardPurchaseFilters {
   readonly cardId: string | null;
   readonly status: CardPurchaseStatus | null;
   readonly needsReceipt: "true" | "false" | null;
+  /** Purchases on company-held cards that wait for an admin's answer. */
+  readonly needsReview: "true" | null;
 }
 
 export const queryKeys = {
@@ -39,6 +41,10 @@ export const queryKeys = {
     ["cards", organizationId, "program"] as const,
   cardList: (organizationId: string) =>
     ["cards", organizationId, "list"] as const,
+  companyHeldCards: (organizationId: string) =>
+    ["cards", organizationId, "company-held"] as const,
+  cardPurchase: (organizationId: string, purchaseId: string) =>
+    ["cards", organizationId, "purchase", purchaseId] as const,
   cardLoads: (organizationId: string) =>
     ["cards", organizationId, "loads"] as const,
   cardPurchases: (organizationId: string, filters: CardPurchaseFilters) =>

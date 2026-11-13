@@ -127,6 +127,8 @@ describe("internal routes", () => {
         "POST /internal/controls/unpause/confirm",
         "GET /internal/companies/:organizationId/zoho/syncs",
         "POST /internal/companies/:organizationId/zoho/syncs/:syncId/requeue",
+        "GET /internal/companies/:organizationId/card-simulations",
+        "POST /internal/companies/:organizationId/card-simulations",
       ]),
     );
   });
@@ -269,6 +271,9 @@ describe("the code behind the internal routes", () => {
         "services/payout/pretium-sync.ts",
         "services/staff/intent-quote-resolve.ts",
         "services/intents/quote-settle.ts",
+        "routes/internal/card-simulations.ts",
+        "services/card-simulations/simulate.ts",
+        "services/card-simulations/lithic-simulator.ts",
       ]),
     );
   });

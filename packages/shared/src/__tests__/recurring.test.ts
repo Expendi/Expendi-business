@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createRecurringItemRequestSchema,
   describeSchedule,
+  updateRecurringItemRequestSchema,
 } from "../recurring.js";
 
 describe("describeSchedule", () => {
@@ -77,5 +78,139 @@ describe("createRecurringItemRequestSchema", () => {
       createRecurringItemRequestSchema.safeParse({ ...valid, ...overrides })
         .success,
     ).toBe(false);
+  });
+
+  describe("paid by a company-held card", () => {
+    const cardId = "33333333-3333-4333-8333-333333333333";
+    const byCard = {
+      ...valid,
+      amountKes: undefined,
+      amountUsd: "20",
+      payVia: "card",
+      cardId,
+    } as const;
+
+    it("takes the card and a USD estimate", () => {
+      // #when
+      const parsed = createRecurringItemRequestSchema.parse(byCard);
+
+      // #then
+      expect(parsed).toMatchObject({
+        payVia: "card",
+        cardId,
+        amountUsd: 20_000_000n,
+      });
+    });
+
+    it("takes no estimate when it's variable", () => {
+      // #when
+      const parsed = createRecurringItemRequestSchema.safeParse({
+        ...byCard,
+        amountUsd: null,
+        variable: true,
+      });
+
+      // #then
+      expect(parsed.success).toBe(true);
+    });
+
+    it("needs the card", () => {
+      // #when
+      const parsed = createRecurringItemRequestSchema.safeParse({
+        ...byCard,
+        cardId: undefined,
+      });
+
+      // #then
+      expect(parsed.error?.issues).toEqual([
+        expect.objectContaining({
+          path: ["cardId"],
+          message: "Pick the company-held card that pays it.",
+        }),
+      ]);
+    });
+
+    it("refuses an estimate in KES", () => {
+      // #when
+      const parsed = createRecurringItemRequestSchema.safeParse({
+        ...byCard,
+        amountUsd: undefined,
+        amountKes: "2,600",
+      });
+
+      // #then
+      expect(parsed.error?.issues).toEqual([
+        expect.objectContaining({ path: ["amountKes"] }),
+      ]);
+    });
+
+    it.each(["expendi", "outside"] as const)(
+      "refuses a card on a payment made %s",
+      (payVia) => {
+        // #when
+        const parsed = createRecurringItemRequestSchema.safeParse({
+          ...valid,
+          payVia,
+          cardId,
+        });
+
+        // #then
+        expect(parsed.error?.issues).toEqual([
+          expect.objectContaining({
+            path: ["cardId"],
+            message: "Only a payment by company-held card has a card.",
+          }),
+        ]);
+      },
+    );
+  });
+});
+
+describe("updateRecurringItemRequestSchema", () => {
+  const cardId = "33333333-3333-4333-8333-333333333333";
+
+  it("switches a payment to a company-held card", () => {
+    // #when
+    const parsed = updateRecurringItemRequestSchema.parse({
+      payVia: "card",
+      cardId,
+      amountUsd: "20",
+    });
+
+    // #then
+    expect(parsed).toEqual({
+      payVia: "card",
+      cardId,
+      amountUsd: 20_000_000n,
+    });
+  });
+
+  it("changes the amount alone", () => {
+    // #then
+    expect(
+      updateRecurringItemRequestSchema.safeParse({ amountUsd: "25" }).success,
+    ).toBe(true);
+  });
+
+  it.each([
+    ["no card when switching to one", { payVia: "card" }, ["cardId"]],
+    ["a card without switching to one", { cardId }, ["cardId"]],
+    [
+      "a card when switching to Expendi",
+      { payVia: "expendi", cardId },
+      ["cardId"],
+    ],
+    [
+      "a KES estimate for a card",
+      { payVia: "card", cardId, amountKes: "2,600" },
+      ["amountKes"],
+    ],
+    ["both currencies", { amountKes: "2,600", amountUsd: "20" }, ["amountUsd"]],
+  ] as const)("refuses %s", (_case, request, path) => {
+    // #when
+    const parsed = updateRecurringItemRequestSchema.safeParse(request);
+
+    // #then
+    expect(parsed.error?.issues).toEqual([expect.objectContaining({ path })]);
   });
 });

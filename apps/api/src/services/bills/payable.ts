@@ -14,6 +14,7 @@ import type {
 
 export type BillNotPayableReason =
   | "not_unpaid"
+  | "paid_by_card_recurring"
   | "paid_outside_payee"
   | "paid_outside_recurring"
   | "no_amount"
@@ -33,14 +34,22 @@ export interface PayableBillCheck {
     "id" | "status" | "currency" | "amountKes" | "amountUsdc" | "reference"
   >;
   readonly payee: Pick<PayeeRow, "name" | "kind" | "method">;
-  /** The recurring payment the bill came from, if any. */
-  readonly recurringItem?: Pick<RecurringItemRow, "payVia"> | null;
+  /**
+   * The recurring payment the bill came from, if any, with the last four
+   * digits of the company-held card that pays it.
+   */
+  readonly recurringItem?:
+    | (Pick<RecurringItemRow, "payVia"> & {
+        readonly cardLastFour?: string | null;
+      })
+    | null;
 }
 
 const STATUS_MESSAGES: Partial<Record<BillStatus, string>> = {
   paying: "This bill is already being paid.",
   paid: "This bill is already paid.",
   paid_outside: "This bill was already marked paid.",
+  paid_by_card: "This bill was already paid by card.",
   cancelled: "This bill is cancelled.",
 };
 
@@ -86,9 +95,10 @@ const needsReference = (payee: PayableBillCheck["payee"]): boolean =>
  * pay.
  *
  * - Only an unpaid bill can be paid: upcoming, due, overdue, or failed.
- * - A payee paid outside Expendi (e.g. a card-only subscription) never is,
- *   nor is a recurring payment set up as paid outside: the admin marks
- *   those bills paid instead.
+ * - A recurring payment paid by a company-held card never is: a Card
+ *   purchase pays its bills, whoever the payee.
+ * - A payee paid outside Expendi never is, nor is a recurring payment set
+ *   up as paid outside: the admin marks those bills paid instead.
  * - A variable bill needs its amount first, and a statutory payment its
  *   reference.
  * - The amount is in the payee's currency: USD for a payee paid in USDC,
@@ -107,6 +117,16 @@ export function assertBillPayable({
     return refuse(
       "not_unpaid",
       STATUS_MESSAGES[bill.status] ?? "This bill can't be paid now.",
+    );
+  }
+  if (recurringItem?.payVia === "card") {
+    const card =
+      recurringItem.cardLastFour == null
+        ? "its company-held card"
+        : `card •••• ${recurringItem.cardLastFour}`;
+    return refuse(
+      "paid_by_card_recurring",
+      `This bill is paid automatically by ${card}.`,
     );
   }
   if (payee.method === "outside") {

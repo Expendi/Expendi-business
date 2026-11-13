@@ -14,11 +14,17 @@ import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
 import { Text } from "~/components/text";
 import { formatBillAmount } from "~/features/bills/bill-amount";
-import { BillStatusBadge, HEADING_LABELS } from "~/features/bills/bill-status";
+import { formatEstimate } from "~/features/bills/bill-card";
+import { BillBadges, HEADING_LABELS } from "~/features/bills/bill-status";
 import { ReviewRow } from "~/features/claims/claim-editor";
 import { formatIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
 import {
+  nextBillBadgeFields,
+  nextBillCardDeclined,
+  payViaInWords,
+  recurringAmount,
+  reminderInWords,
   scheduleInWords,
   STATE_LABELS,
 } from "~/features/recurring/recurring-draft";
@@ -93,7 +99,7 @@ function ItemSummary({ item }: { item: RecurringItem }): JSX.Element {
           {item.payee.name}
         </Text>
         <Text className="text-3xl font-bold text-gray-900">
-          {formatBillAmount(item) ?? "Variable amount"}
+          {recurringAmount(item, "Variable amount")}
         </Text>
         <Badge label={state.label} tone={state.tone} />
       </View>
@@ -111,22 +117,8 @@ function ItemSummary({ item }: { item: RecurringItem }): JSX.Element {
             value={`Due ${formatIsoDate(item.nextDueOn)}`}
           />
         ) : null}
-        <ReviewRow
-          label="How it’s paid"
-          value={
-            item.payVia === "outside"
-              ? "Outside Expendi. Mark each bill paid once you’ve paid it."
-              : "Through Expendi"
-          }
-        />
-        <ReviewRow
-          label="Reminder"
-          value={
-            item.reminderDays === 0
-              ? "On the due date"
-              : `${item.reminderDays} ${item.reminderDays === 1 ? "day" : "days"} before it’s due`
-          }
-        />
+        <ReviewRow label="How it’s paid" value={payViaInWords(item)} />
+        <ReviewRow label="Reminder" value={reminderInWords(item)} />
         <ReviewRow label="Overview heading" value={heading} />
         <ReviewRow label="Category" value={item.category.name} />
       </View>
@@ -137,9 +129,13 @@ function ItemSummary({ item }: { item: RecurringItem }): JSX.Element {
 function NextBill({ item }: { item: RecurringItem }): JSX.Element | null {
   const router = useRouter();
   const bill = item.nextBill;
-  if (bill === null) return null;
+  const badgeFields = nextBillBadgeFields(item);
+  if (bill === null || badgeFields === null) return null;
+  const byCard = item.payVia === "card";
   const formatted = formatBillAmount({ ...bill, currency: item.currency });
-  const amount = formatted ?? "Amount to enter";
+  const amount = byCard
+    ? formatEstimate({ ...bill, currency: item.currency })
+    : (formatted ?? "Amount to enter");
   return (
     <View className="gap-3">
       <Text
@@ -150,7 +146,11 @@ function NextBill({ item }: { item: RecurringItem }): JSX.Element | null {
       </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Next bill, due ${formatIsoDate(bill.dueOn)}, ${amount}`}
+        accessibilityLabel={[
+          `Next bill, due ${formatIsoDate(bill.dueOn)}`,
+          amount,
+          ...(nextBillCardDeclined(item) ? ["card declined"] : []),
+        ].join(", ")}
         onPress={() =>
           router.push({
             pathname: "/bills/[billId]",
@@ -164,16 +164,29 @@ function NextBill({ item }: { item: RecurringItem }): JSX.Element | null {
             Due {formatIsoDate(bill.dueOn)}
           </Text>
           <Text
-            className={`text-base font-semibold ${formatted === null ? "text-amber-800" : "text-gray-900"}`}
+            className={`text-base font-semibold ${formatted === null && !byCard ? "text-amber-800" : "text-gray-900"}`}
           >
             {amount}
           </Text>
         </View>
-        <BillStatusBadge status={bill.status} />
+        <BillBadges bill={badgeFields} />
       </Pressable>
     </View>
   );
 }
+
+/**
+ * Pausing or ending declines the payee's charges on a company-held card,
+ * but doesn't cancel with the payee (spec §6.20).
+ */
+const CARD_CONSEQUENCES: Record<
+  Exclude<RecurringItemAction, "resume">,
+  (payee: string) => string
+> = {
+  pause: (payee) => `Card purchases from ${payee} are declined meanwhile.`,
+  end: (payee) =>
+    `Card purchases from ${payee} are declined from now on. Cancel with ${payee} too.`,
+};
 
 const CONFIRMATIONS: Record<
   Exclude<RecurringItemAction, "resume">,
@@ -210,6 +223,12 @@ function ItemActions({
   }
 
   const confirmation = confirming ? CONFIRMATIONS[confirming] : null;
+  const message =
+    confirming === null
+      ? ""
+      : item.payVia === "card"
+        ? `${CONFIRMATIONS[confirming].message(item.payee.name)} ${CARD_CONSEQUENCES[confirming](item.payee.name)}`
+        : CONFIRMATIONS[confirming].message(item.payee.name);
 
   return (
     <View className="gap-3">
@@ -250,7 +269,7 @@ function ItemActions({
       <ConfirmSheet
         visible={confirmation !== null}
         title={confirmation?.title ?? ""}
-        message={confirmation?.message(item.payee.name) ?? ""}
+        message={message}
         confirmLabel={confirmation?.confirm ?? ""}
         dismissLabel="Keep it"
         busy={action.isPending}

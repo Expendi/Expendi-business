@@ -19,6 +19,7 @@ import { Money } from "~/components/data/money";
 import { StatusBadge } from "~/components/data/status-badge";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
+import { CardEstimate } from "./card-estimate";
 import {
   dayMonth,
   expenseMeta,
@@ -145,6 +146,18 @@ interface RowView {
 }
 
 function amountOf(row: CashObligation): ReactNode {
+  if (row.card) {
+    return (
+      <CardEstimate
+        row={row}
+        none={
+          <span className="text-sm font-normal text-muted-foreground">
+            No estimate
+          </span>
+        }
+      />
+    );
+  }
   if (row.amountKes !== null) {
     return <Money amount={row.amountKes} currency="KES" />;
   }
@@ -267,7 +280,9 @@ export function CaughtUp({
         {next ? (
           <p className="mt-0.5 text-muted-foreground tabular-nums">
             Next payment: {next.name},{" "}
-            {next.amountKes === null ? (
+            {next.card ? (
+              <CardEstimate row={next} none="no estimate" about="about" />
+            ) : next.amountKes === null ? (
               "amount not entered"
             ) : (
               <Money amount={next.amountKes} currency="KES" />

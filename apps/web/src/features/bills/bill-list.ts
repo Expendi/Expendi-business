@@ -220,7 +220,8 @@ const URGENCY: Readonly<Record<BillStatus, number>> = {
   paying: 4,
   paid: 5,
   paid_outside: 6,
-  cancelled: 7,
+  paid_by_card: 7,
+  cancelled: 8,
 };
 
 /** A bill's amount in KES cents, a USD one at today's rate; -1 while it has none. */

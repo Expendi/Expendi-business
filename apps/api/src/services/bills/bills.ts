@@ -21,6 +21,7 @@ import type {
   BillMethodFilter,
   BillSource,
   BillStatus,
+  CardState,
   CashOutReceipt,
   CreateBillFields,
   MarkBillPaidOutsideFields,
@@ -53,6 +54,8 @@ import type { FileStorage } from "../storage/file-storage.js";
 import type { BillFileView } from "./files.js";
 import {
   bills,
+  cardPurchases,
+  cards,
   categories,
   expenses,
   paidFromAccounts,
@@ -147,11 +150,23 @@ export interface BillView {
     readonly schedule: RecurringSchedule;
     readonly scheduleDay: number;
     readonly startsOn: string;
+    /** False while paused, which `state` doesn't say once it has ended. */
+    readonly active: boolean;
   } | null;
   readonly paidFromAccount: {
     readonly id: string;
     readonly name: string;
   } | null;
+  /** The company-held card that pays it, or paid it. */
+  readonly card: {
+    readonly id: string;
+    readonly nickname: string;
+    readonly lastFour: string;
+    readonly state: CardState;
+  } | null;
+  readonly cardDeclinedAt: Date | null;
+  readonly cardDeclineReason: string | null;
+  readonly cardPurchaseId: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -163,6 +178,8 @@ export interface BillDetailView extends BillView {
     readonly status: PayoutStatus;
     readonly failureReason: string | null;
   } | null;
+  /** KES cents paying it came to, as recorded; null until it's paid. */
+  readonly paidAmountKes: bigint | null;
 }
 
 /** What `GET …/bills` and `GET …/bills/summary` both filter by. */
@@ -240,6 +257,7 @@ const SETTLED_MESSAGES: Partial<Record<BillStatus, string>> = {
   paying: "This bill is being paid, so it can't be changed.",
   paid: "This bill is paid, so it can't be changed.",
   paid_outside: "This bill was marked paid, so it can't be changed.",
+  paid_by_card: "This bill was paid by card, so it can't be changed.",
   cancelled: "This bill is cancelled, so it can't be changed.",
 };
 
@@ -258,8 +276,17 @@ const userActor = (tenant: Tenant): AuditActor => ({
 
 const markedBy = alias(users, "marked_by");
 const cancelledBy = alias(users, "cancelled_by");
-/** The company spending a bill marked paid outside Expendi recorded; at most one. */
+/** The spending a bill marked paid outside Expendi, or paid by card, recorded; at most one. */
 const billSpending = alias(expenses, "bill_spending");
+const paidByPurchase = alias(cardPurchases, "paid_by_purchase");
+const billCard = alias(cards, "bill_card");
+
+/**
+ * The company-held card behind a bill: the card whose purchase paid it, or
+ * else its recurring payment's card while it's still to be settled. Needs
+ * `recurringItems` and `paidByPurchase` joined.
+ */
+const billCardId = sql`coalesce(${paidByPurchase.cardId}, CASE WHEN ${notInArray(bills.status, [...SETTLED_BILL_STATUSES])} THEN ${recurringItems.cardId} END)`;
 
 const billColumns = {
   bill: bills,
@@ -280,6 +307,11 @@ const billColumns = {
   recurringStartsOn: recurringItems.startsOn,
   accountId: paidFromAccounts.id,
   accountName: paidFromAccounts.name,
+  cardId: billCard.id,
+  cardNickname: billCard.nickname,
+  cardLastFour: billCard.lastFour,
+  cardState: billCard.state,
+  spendingKes: billSpending.amountKes,
 };
 
 const selectBills = (tx: Transaction, where: SQL | undefined) =>
@@ -296,6 +328,8 @@ const selectBills = (tx: Transaction, where: SQL | undefined) =>
       paidFromAccounts,
       eq(paidFromAccounts.id, billSpending.paidFromAccountId),
     )
+    .leftJoin(paidByPurchase, eq(paidByPurchase.id, bills.cardPurchaseId))
+    .leftJoin(billCard, sql`${billCard.id} = ${billCardId}`)
     .where(where);
 
 type SelectedBill = Awaited<ReturnType<typeof selectBills>>[number];
@@ -369,11 +403,27 @@ function toBillView(
             schedule: row.recurringSchedule,
             scheduleDay: row.recurringScheduleDay,
             startsOn: row.recurringStartsOn,
+            active: row.recurringActive,
           },
     paidFromAccount:
       row.accountId === null || row.accountName === null
         ? null
         : { id: row.accountId, name: row.accountName },
+    card:
+      row.cardId === null ||
+      row.cardNickname === null ||
+      row.cardLastFour === null ||
+      row.cardState === null
+        ? null
+        : {
+            id: row.cardId,
+            nickname: row.cardNickname,
+            lastFour: row.cardLastFour,
+            state: row.cardState,
+          },
+    cardDeclinedAt: bill.cardDeclinedAt,
+    cardDeclineReason: bill.cardDeclineReason,
+    cardPurchaseId: bill.cardPurchaseId,
     createdAt: bill.createdAt,
     updatedAt: bill.updatedAt,
   };
@@ -474,6 +524,12 @@ const totalsWhere = (condition: SQL) => ({
 });
 
 /**
+ * A bill a company-held card pays has nobody to enter its amount: the Card
+ * purchase brings it. Needs `recurringItems` joined.
+ */
+const notPaidByCard = sql`${recurringItems.payVia} IS DISTINCT FROM 'card'`;
+
+/**
  * How many bills each tab of the Bills page holds with `filters`, and the
  * numbers on its cards over every bill still to pay, whatever the filters.
  * Salary bills are Payroll's, so neither counts them.
@@ -499,7 +555,12 @@ export function billsSummary(
           ),
           toPay: totalsWhere(unpaid),
           withoutAmount: countWhere(
-            allOf(unpaid, isNull(bills.amountKes), isNull(bills.amountUsdc)),
+            allOf(
+              unpaid,
+              isNull(bills.amountKes),
+              isNull(bills.amountUsdc),
+              notPaidByCard,
+            ),
           ),
           overdue: totalsWhere(eq(bills.status, "overdue")),
           dueToday: totalsWhere(eq(bills.status, "due")),
@@ -507,6 +568,7 @@ export function billsSummary(
         })
         .from(bills)
         .innerJoin(payees, eq(payees.id, bills.payeeId))
+        .leftJoin(recurringItems, eq(recurringItems.id, bills.recurringItemId))
         .where(
           and(
             eq(bills.organizationId, tenant.organizationId),
@@ -533,9 +595,38 @@ export function billsSummary(
   );
 }
 
+/** The KES a bill's paid payouts delivered: a USD bill's KES equivalent. */
+function deliveredKes(
+  tx: Transaction,
+  organizationId: string,
+  billId: string,
+): Effect.Effect<bigint | null, DatabaseError> {
+  return query(() =>
+    tx
+      .select({
+        total: sql<string | null>`sum(${payouts.amountKes})::text`,
+      })
+      .from(payouts)
+      .where(
+        and(
+          eq(payouts.organizationId, organizationId),
+          eq(payouts.subjectType, "bill"),
+          eq(payouts.subjectId, billId),
+          eq(payouts.status, "paid"),
+        ),
+      ),
+  ).pipe(
+    Effect.map(([row]) =>
+      row?.total === null || row?.total === undefined
+        ? null
+        : BigInt(row.total),
+    ),
+  );
+}
+
 /**
  * A bill with short-lived links to its invoice and any proof of payment,
- * and its latest payment through Expendi.
+ * its latest payment through Expendi, and what paying it came to in KES.
  */
 export function getBill(
   tenant: Tenant,
@@ -546,56 +637,67 @@ export function getBill(
   DatabaseService | FileStorage
 > {
   return Effect.gen(function* () {
-    const { row, files, payout, receipts } = yield* withScope(tenant, (tx) =>
-      Effect.gen(function* () {
-        const [row] = yield* query(() =>
-          selectBills(
-            tx,
-            and(
-              eq(bills.organizationId, tenant.organizationId),
-              eq(bills.id, billId),
-            ),
-          ).limit(1),
-        );
-        if (!row) return yield* Effect.fail(billNotFound);
-        const payoutId = row.bill.payoutId;
-        const [payout] =
-          payoutId === null
-            ? []
-            : yield* query(() =>
-                tx
-                  .select({
-                    id: payouts.id,
-                    status: payouts.status,
-                    failureReason: payouts.failureReason,
-                  })
-                  .from(payouts)
-                  .where(
-                    and(
-                      eq(payouts.organizationId, tenant.organizationId),
-                      eq(payouts.id, payoutId),
+    const { row, files, payout, receipts, paidAmountKes } = yield* withScope(
+      tenant,
+      (tx) =>
+        Effect.gen(function* () {
+          const [row] = yield* query(() =>
+            selectBills(
+              tx,
+              and(
+                eq(bills.organizationId, tenant.organizationId),
+                eq(bills.id, billId),
+              ),
+            ).limit(1),
+          );
+          if (!row) return yield* Effect.fail(billNotFound);
+          const payoutId = row.bill.payoutId;
+          const [payout] =
+            payoutId === null
+              ? []
+              : yield* query(() =>
+                  tx
+                    .select({
+                      id: payouts.id,
+                      status: payouts.status,
+                      failureReason: payouts.failureReason,
+                    })
+                    .from(payouts)
+                    .where(
+                      and(
+                        eq(payouts.organizationId, tenant.organizationId),
+                        eq(payouts.id, payoutId),
+                      ),
                     ),
-                  ),
-              );
-        const files = yield* readBillFiles(tx, tenant.organizationId, billId);
-        const receipts = yield* paymentReceiptsBySubject(
-          tx,
-          tenant.organizationId,
-          "bill",
-          [billId],
-        );
-        return {
-          row,
-          files,
-          payout: payout ?? null,
-          receipts: receipts.get(billId) ?? [],
-        };
-      }),
+                );
+          const files = yield* readBillFiles(tx, tenant.organizationId, billId);
+          const receipts = yield* paymentReceiptsBySubject(
+            tx,
+            tenant.organizationId,
+            "bill",
+            [billId],
+          );
+          const paidAmountKes =
+            row.bill.status === "paid"
+              ? yield* deliveredKes(tx, tenant.organizationId, billId)
+              : row.bill.status === "paid_outside" ||
+                  row.bill.status === "paid_by_card"
+                ? row.spendingKes
+                : null;
+          return {
+            row,
+            files,
+            payout: payout ?? null,
+            receipts: receipts.get(billId) ?? [],
+            paidAmountKes,
+          };
+        }),
     );
     return {
       ...toBillView(row, receipts),
       files: yield* billFileLinks(files),
       payout,
+      paidAmountKes,
     };
   });
 }
@@ -704,6 +806,34 @@ function checkCurrency(
     }),
   );
 }
+
+/**
+ * Whether a company-held card pays the bill: its recurring payment is paid
+ * by card. Its amount is then the estimate in USD whoever the payee, as the
+ * Card purchase will be.
+ */
+function paidByCard(
+  tx: Transaction,
+  row: BillRow,
+): Effect.Effect<boolean, DatabaseError> {
+  const { recurringItemId } = row;
+  if (recurringItemId === null) return Effect.succeed(false);
+  return query(() =>
+    tx
+      .select({ payVia: recurringItems.payVia })
+      .from(recurringItems)
+      .where(
+        and(
+          eq(recurringItems.organizationId, row.organizationId),
+          eq(recurringItems.id, recurringItemId),
+        ),
+      ),
+  ).pipe(Effect.map(([item]) => item?.payVia === "card"));
+}
+
+const cardEstimateInUsd = new BadRequest({
+  message: "A company-held card pays this bill, so enter its amount in USD.",
+});
 
 /** The amount columns for `value` in `currency`; the other currency's is null. */
 const amountColumns = (currency: BillCurrency, value: bigint | null) => ({
@@ -915,8 +1045,12 @@ export function updateBill(
           payeeChanged && changes.payeeId !== undefined
             ? yield* findPayee(tx, organizationId, changes.payeeId)
             : yield* payeeOfBill(tx, row);
-        const currency = currencyForPayeeMethod(payee.method);
+        const byCard = yield* paidByCard(tx, row);
+        const currency = byCard ? "usd" : currencyForPayeeMethod(payee.method);
         const typed = typedAmount(changes);
+        if (byCard && typed !== undefined && typed.currency !== "usd") {
+          return yield* Effect.fail(cardEstimateInUsd);
+        }
         yield* checkCurrency(payee, currency, typed);
         const switching = currency !== row.currency;
         const current = currency === "usd" ? row.amountUsdc : row.amountKes;
@@ -1069,8 +1203,10 @@ function rateForUsdBill(
 /**
  * The admin paid the bill some other way, e.g. by card or from the bank
  * (spec §6.20): records who, the day it was paid, an optional note and
- * proof. The bill needs its amount first. Company spending (T41) records
- * the matching spending entry in this same transaction, in KES: a USD
+ * proof. The bill needs its amount first. A bill a company-held card pays
+ * can be marked paid too, which forgets the card's last decline. Company
+ * spending (T41) records the matching spending entry in this same
+ * transaction, in KES: a USD
  * bill's at the active cash-out provider's rate today. The bill, not that entry, is queued for
  * Zoho Books (T44), so the payment is posted once.
  */
@@ -1109,6 +1245,8 @@ export function markBillPaidOutside(
               paidAt: sql`now()`,
               markedPaidBy: tenant.userId,
               paidOutsideNote: fields.note ?? null,
+              cardDeclinedAt: null,
+              cardDeclineReason: null,
             })
             .where(eq(bills.id, row.id))
             .returning({ paidAt: bills.paidAt }),
@@ -1120,13 +1258,21 @@ export function markBillPaidOutside(
           fields.receiptFileIds,
           "proof",
         );
+        const declined = row.cardDeclinedAt !== null;
         yield* audit.record(tx, {
           actor: userActor(tenant),
           organizationId,
           action: "bill.marked_paid_outside",
           entity: { type: "bill", id: row.id },
-          before: { status: row.status },
+          before: {
+            status: row.status,
+            ...(declined && {
+              cardDeclinedAt: row.cardDeclinedAt,
+              cardDeclineReason: row.cardDeclineReason,
+            }),
+          },
           after: {
+            ...(declined && { cardDeclinedAt: null, cardDeclineReason: null }),
             status: "paid_outside",
             currency: row.currency,
             amountKes: row.amountKes,
@@ -1181,17 +1327,27 @@ export function cancelBill(
               cancelledReason: reason,
               cancelledBy: tenant.userId,
               cancelledAt: sql`now()`,
+              cardDeclinedAt: null,
+              cardDeclineReason: null,
             })
             .where(eq(bills.id, row.id))
             .returning({ cancelledAt: bills.cancelledAt }),
         );
+        const declined = row.cardDeclinedAt !== null;
         yield* audit.record(tx, {
           actor: userActor(tenant),
           organizationId,
           action: "bill.cancelled",
           entity: { type: "bill", id: row.id },
-          before: { status: row.status },
+          before: {
+            status: row.status,
+            ...(declined && {
+              cardDeclinedAt: row.cardDeclinedAt,
+              cardDeclineReason: row.cardDeclineReason,
+            }),
+          },
           after: {
+            ...(declined && { cardDeclinedAt: null, cardDeclineReason: null }),
             status: "cancelled",
             reason,
             cancelledBy: tenant.userId,

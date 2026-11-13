@@ -29,6 +29,7 @@ import { DatabaseService } from "../../db/client.js";
 import {
   accountingSyncs,
   bills,
+  cardPurchases,
   expenses,
   payouts,
   receiptFiles,
@@ -46,6 +47,7 @@ import {
 import { kesDecimal } from "../../services/zoho/posting.js";
 import { syncAccountingItem } from "../../services/zoho/sync.js";
 import { insertBill, insertPayee, readBill } from "../helpers/bills.js";
+import { addCompanyHeldCard } from "../helpers/card-purchases.js";
 import { claimFlow, makePayable } from "../helpers/claim-flow.js";
 import {
   addCategory,
@@ -81,6 +83,7 @@ import {
   insertSalary,
   runsOf,
 } from "../helpers/payroll.js";
+import { insertRecurringItem } from "../helpers/recurring.js";
 import { makeTestRuntime } from "../helpers/runtime.js";
 import { createStaff } from "../helpers/staff.js";
 import {
@@ -985,6 +988,114 @@ describe("bills in Zoho Books", () => {
     expect((await onlySync(setUp.company)).lastError).toContain(
       "without saying which account paid it",
     );
+  });
+
+  it("posts a bill paid by a company-held card once, as the bill, from its spending row", async () => {
+    // #given a USD 21.50 Card purchase paid the bill, recorded at KES 2,770
+    const setUp = await connected();
+    const { company, officeId } = setUp;
+    const { cardId } = await addCompanyHeldCard(db, company, {
+      defaultCategoryId: officeId,
+    });
+    const payeeId = await insertPayee(db, company, { name: "Anthropic" });
+    const itemId = await insertRecurringItem(db, company, {
+      payeeId,
+      categoryId: officeId,
+      currency: "usd",
+      amountKes: null,
+      amountUsdc: 20n * USDC,
+      payVia: "card",
+      cardId,
+    });
+    const today = nairobiDate(new Date());
+    const { billId, spendingId } = await runInScope(
+      db,
+      asAdmin(company),
+      async (tx) => {
+        const [purchase] = await tx
+          .insert(cardPurchases)
+          .values({
+            organizationId: company.organizationId,
+            cardId,
+            lithicTransactionToken: randomUUID(),
+            status: "settled",
+            merchant: "ANTHROPIC",
+            mcc: "5734",
+            settledUsdCents: 2_150n,
+            authorizedAt: new Date(),
+            categoryId: officeId,
+            recurringItemId: itemId,
+          })
+          .returning({ id: cardPurchases.id });
+        if (!purchase) throw new Error("purchase insert returned no row");
+        const [bill] = await tx
+          .insert(bills)
+          .values({
+            organizationId: company.organizationId,
+            payeeId,
+            recurringItemId: itemId,
+            overviewHeading: "subscriptions",
+            categoryId: officeId,
+            currency: "usd",
+            amountUsdc: 21_500_000n,
+            dueOn: today,
+            status: "paid_by_card",
+            paidOn: today,
+            paidAt: new Date(),
+            cardPurchaseId: purchase.id,
+          })
+          .returning({ id: bills.id });
+        if (!bill) throw new Error("bill insert returned no row");
+        const [spending] = await tx
+          .insert(expenses)
+          .values({
+            organizationId: company.organizationId,
+            membershipId: company.adminMembershipId,
+            kind: "card",
+            status: "recorded",
+            overviewHeading: "subscriptions",
+            paidFromAccountId: setUp.kcbId,
+            billId: bill.id,
+            categoryId: officeId,
+            merchant: "ANTHROPIC",
+            amountKes: 277_000n,
+            spentOn: today,
+          })
+          .returning({ id: expenses.id });
+        if (!spending) throw new Error("spending insert returned no row");
+        return { billId: bill.id, spendingId: spending.id };
+      },
+    );
+
+    // #when
+    await runtime.runPromise(
+      withScope(asAdmin(company), (tx) =>
+        Effect.zipRight(
+          enqueueRecordedSpending(tx, company.organizationId, spendingId),
+          enqueuePaidBill(tx, company.organizationId, billId),
+        ),
+      ),
+    );
+    const outcomes = await runSync(company);
+
+    // #then
+    expect(outcomes).toEqual(["synced"]);
+    expect(
+      (await syncsOf(company)).map(({ subjectType, subjectId }) => [
+        subjectType,
+        subjectId,
+      ]),
+    ).toEqual([["bill", billId]]);
+    expect(zoho.state.expenses.map(({ draft }) => draft)).toEqual([
+      {
+        accountId: "acc-travel",
+        paidThroughAccountId: "acc-kcb",
+        date: today,
+        amount: "2770.00",
+        referenceNumber: billId,
+        description: "Anthropic · USD 21.50",
+      },
+    ]);
   });
 
   it("never queues a bill that isn't paid, or a salary payment", async () => {

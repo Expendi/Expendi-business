@@ -38,16 +38,68 @@ const isUnpaid = (status: BillStatus): boolean =>
   (UNPAID_BILL_STATUSES as readonly BillStatus[]).includes(status);
 
 /**
+ * A bill still owed that a company-held card pays when its merchant
+ * charges it (spec §6.20): nobody pays it through Expendi.
+ */
+export function automaticCardOf(
+  bill: Pick<Bill, "status" | "card">,
+): NonNullable<Bill["card"]> | null {
+  return isUnpaid(bill.status) ? (bill.card ?? null) : null;
+}
+
+/**
+ * A payment whose schedule ended still has its card pay the bill it left
+ * owed, unless it's paused; an API that doesn't say whether it's paused
+ * is taken to have it declined.
+ */
+const endedWithLastBill = (bill: Pick<Bill, "recurring">): boolean =>
+  bill.recurring?.state === "ended" && bill.recurring.active === true;
+
+/**
+ * Why a bill a company-held card was to pay won't be paid by it: its
+ * recurring payment is paused, or has ended and is paused too, so the card
+ * declines the merchant, or the card is frozen or closed. Null while the
+ * card will pay it.
+ */
+export function cardWontPayReason(
+  bill: Pick<Bill, "status" | "card" | "recurring" | "payee">,
+): string | null {
+  const card = automaticCardOf(bill);
+  if (card === null) return null;
+  const state = bill.recurring?.state;
+  if (state === "paused") {
+    return `Paused: card purchases from ${bill.payee.name} are declined.`;
+  }
+  if (state === "ended" && !endedWithLastBill(bill)) {
+    return `Ended: card purchases from ${bill.payee.name} are declined.`;
+  }
+  if (card.state === "frozen" || card.state === "closed") {
+    return `Card •••• ${card.lastFour} is ${card.state}.`;
+  }
+  return null;
+}
+
+/** "Card •••• 1234 pays this last bill, and nothing after it." on an ended payment's last bill. */
+export function lastCardBillNote(
+  bill: Pick<Bill, "status" | "card" | "recurring">,
+): string | null {
+  const card = automaticCardOf(bill);
+  if (card?.state !== "open" || !endedWithLastBill(bill)) return null;
+  return `Card •••• ${card.lastFour} pays this last bill, and nothing after it.`;
+}
+
+/**
  * Whether the dashboard offers to pay the bill through Expendi: unpaid,
- * not a salary (those go with their payroll run), a payee Expendi can pay,
- * and its amount entered in the payee's currency. The API checks it all
- * again.
+ * not a salary (those go with their payroll run), not paid by a
+ * company-held card, a payee Expendi can pay, and its amount entered in
+ * the payee's currency. The API checks it all again.
  */
 export function isPayable(bill: Bill): boolean {
   const { method } = bill.payee;
   return (
     isUnpaid(bill.status) &&
     bill.payrollRunId === null &&
+    automaticCardOf(bill) === null &&
     method !== null &&
     method !== "outside" &&
     !bill.payee.archived &&
@@ -56,9 +108,10 @@ export function isPayable(bill: Bill): boolean {
   );
 }
 
-/** Why an unpaid bill can't be paid through Expendi yet, or null. */
+/** Why an unpaid bill can't be paid through Expendi yet, or null; a card-paid one explains itself. */
 export function unpayableReason(bill: Bill): string | null {
   if (!isUnpaid(bill.status) || isPayable(bill)) return null;
+  if (automaticCardOf(bill) !== null) return null;
   if (bill.payrollRunId !== null) return "Paid with its payroll run.";
   if (bill.payee.archived) return "The payee is archived.";
   const { method } = bill.payee;

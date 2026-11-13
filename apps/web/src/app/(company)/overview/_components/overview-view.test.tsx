@@ -2,7 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { MeResponse, SpendingOverview } from "@expendi-business/shared";
+import type {
+  CashObligation,
+  MeResponse,
+  SpendingOverview,
+} from "@expendi-business/shared";
 
 import {
   OPEN_FLOATS,
@@ -173,6 +177,35 @@ describe("OverviewView", () => {
     expect(html).toContain("Short by KES 12,000 in the next 30 days");
   });
 
+  it("warns when the Card balance won't cover the card-paid bills due, and only then", () => {
+    const withCardBills = (
+      cardBills: SpendingOverview["cash"]["cardBills"],
+    ): string =>
+      render(
+        "admin",
+        client({
+          overview: { ...OVERVIEW, cash: { ...OVERVIEW.cash, cardBills } },
+        }),
+      );
+    const short = withCardBills({
+      dueUsdCents: "6500",
+      availableUsdCents: "2000",
+      short: true,
+    });
+    const covered = withCardBills({
+      dueUsdCents: "6500",
+      availableUsdCents: "306051",
+      short: false,
+    });
+    expect(short).toContain(
+      "Card balance short: USD 65.00 due by company-held card, USD 20.00 left on it.",
+    );
+    expect(short).toMatch(/href="\/cards"[^>]*>Load the Card balance\.<\/a>/);
+    expect(covered).not.toContain("Card balance short");
+    expect(withCardBills(null)).not.toContain("Card balance short");
+    expect(render()).not.toContain("Card balance short");
+  });
+
   it("lists floats lowest first and what's coming up, each linked", () => {
     const html = render();
     const floats = html.slice(html.indexOf("Petty cash floats"));
@@ -255,6 +288,93 @@ describe("OverviewView", () => {
     expect(html).toContain("Next payment: KRA,");
     expect(html).toContain("212,400");
     expect(html).toContain("9 Nov");
+  });
+
+  it("shows a company-held card's payment as its USD estimate, never in KES", () => {
+    const byCard = (fields: Partial<CashObligation>): CashObligation => ({
+      id: "00000000-0000-4000-8000-000000001290",
+      kind: "bill",
+      name: "Vercel",
+      notes: null,
+      schedule: null,
+      people: null,
+      dueOn: "2026-11-07",
+      amountKes: "257360",
+      status: "upcoming",
+      payVia: "outside",
+      needsAmount: false,
+      heading: "subscriptions",
+      card: { id: "card-1", nickname: "Software", lastFour: "0004" },
+      amountUsdCents: "2000",
+      ...fields,
+    });
+    const notion = byCard({
+      id: "00000000-0000-4000-8000-000000001291",
+      name: "Notion",
+      dueOn: "2026-11-08",
+      amountKes: null,
+      amountUsdCents: null,
+    });
+    const text = (html: string) => html.replace(/<[^>]+>/g, "");
+    const quiet = {
+      overdue: [],
+      dueToday: [],
+      claims: [],
+      noReceipt: [],
+      noEtims: [],
+    };
+    const comingUp = text(
+      render(
+        "admin",
+        client({
+          overview: {
+            ...OVERVIEW,
+            cash: { ...OVERVIEW.cash, obligations: [byCard({}), notion] },
+          },
+        }),
+      ),
+    );
+    const overdue = text(
+      render(
+        "admin",
+        client({
+          overview: {
+            ...OVERVIEW,
+            outstanding: {
+              ...OVERVIEW.outstanding,
+              overdue: [byCard({ dueOn: "2026-11-04", status: "overdue" })],
+            },
+          },
+        }),
+      ),
+    );
+    const caughtUp = text(
+      render(
+        "admin",
+        client({
+          overview: {
+            ...OVERVIEW,
+            outstanding: quiet,
+            cash: { ...OVERVIEW.cash, obligations: [byCard({})] },
+          },
+        }),
+      ),
+    );
+    expect({
+      comingUp: [
+        comingUp.includes("About USD 20.00"),
+        comingUp.includes("No estimate"),
+        comingUp.includes("2,573"),
+      ],
+      overdue: [overdue.includes("About USD 20.00"), overdue.includes("2,573")],
+      caughtUp: caughtUp.includes(
+        "Next payment: Vercel, about USD 20.00 on 7 Nov.",
+      ),
+    }).toEqual({
+      comingUp: [true, true, false],
+      overdue: [true, false],
+      caughtUp: true,
+    });
   });
 
   it("offers to try again when the overview didn't load", () => {

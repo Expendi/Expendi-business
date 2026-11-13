@@ -14,6 +14,7 @@ export const OPEN_BILL_STATUSES = OPEN_BILL_GROUPS.map((group) => group.status);
 export const HISTORY_BILL_STATUSES = [
   "paid",
   "paid_outside",
+  "paid_by_card",
   "cancelled",
 ] as const satisfies readonly BillStatus[];
 

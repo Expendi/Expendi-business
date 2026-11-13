@@ -129,12 +129,12 @@ describe("the bills page", () => {
       recurring: text.includes("Recurring payments"),
       newBill: text.includes("New bill"),
       toPay: text.includes(
-        "To pay ≈ KES 339,792 13 bills · 1 without an amount",
+        "To pay ≈ KES 342,372 15 bills · 1 without an amount",
       ),
-      overdue: text.includes("Overdue 2 KES 80,500"),
+      overdue: text.includes("Overdue 3 KES 80,500"),
       dueToday: text.includes("Due today 2 ≈ KES 12,804"),
       failed: text.includes("Payment failed 1 KES 4,100"),
-      tabs: ["To pay 13", "Being paid 1", "History 9"].every((tab) =>
+      tabs: ["To pay 15", "Being paid 1", "History 10"].every((tab) =>
         text.includes(tab),
       ),
       chips: [
@@ -326,7 +326,7 @@ describe("the bills page", () => {
     expect({
       title: text.includes("Bills didn't load"),
       retry: text.includes("Try again"),
-      stats: text.includes("339,792"),
+      stats: text.includes("342,372"),
     }).toEqual({ title: true, retry: true, stats: true });
   });
 });
@@ -394,7 +394,7 @@ describe("the bills page's side sheet", () => {
     // #then
     expect({
       note: sheet?.includes("View only. Only admins add and pay bills."),
-      position: sheet?.includes("3 of 13"),
+      position: sheet?.includes("3 of 15"),
       edit: sheet?.includes("Edit bill"),
     }).toEqual({ note: true, position: true, edit: false });
   });
@@ -479,5 +479,165 @@ describe("the bills page's side sheet", () => {
       ),
       accountant,
     }).toEqual({ form: true, accountant: null });
+  });
+});
+
+/** The side sheet's markup, for its links and buttons. */
+const sheetHtmlOf = (html: string) => html.slice(html.indexOf("data-sheet"));
+
+describe("bills a company-held card pays", () => {
+  it("labels them Automatic with the card's last four in To pay, with no checkbox to pay them", () => {
+    // #when
+    const html = render("admin");
+    const table = textOf(tableOf(html));
+
+    // #then
+    expect({
+      automatic: table.includes("Automatic · card •••• 0004"),
+      declined: table.includes("Card declined"),
+      paidBy: table.includes("Company-held card •••• 0004"),
+      estimate: table.includes("About USD 20.00"),
+      noEstimate: table.includes("No estimate"),
+      vercel: html.includes('aria-label="Select Vercel"'),
+      notion: html.includes('aria-label="Select Notion"'),
+      figma: html.includes('aria-label="Select Figma"'),
+    }).toEqual({
+      automatic: true,
+      declined: true,
+      paidBy: true,
+      estimate: true,
+      noEstimate: true,
+      vercel: false,
+      notion: false,
+      figma: true,
+    });
+  });
+
+  it("says an automatic bill is paid when the payee charges the card, with its estimate and no Pay", () => {
+    // #when
+    const html = sheetHtmlOf(render("admin", { query: `billId=${id(15)}` }));
+    const sheet = textOf(html);
+
+    // #then
+    expect({
+      missing: [
+        "Estimate USD 20.00",
+        "Upcoming Automatic · card •••• 0004",
+        "Paid automatically It's paid when Vercel charges Software subscriptions (•••• 0004). Nobody has to pay it.",
+        "Paid by Company-held card, Software subscriptions •••• 0004",
+        "Edit bill",
+        "Add invoice",
+        "Mark paid outside",
+        "Cancel bill",
+      ].filter((part) => !sheet.includes(part)),
+      pay: html.includes(">Pay</button>"),
+    }).toEqual({ missing: [], pay: false });
+  });
+
+  it("says why the card declined a bill, when, and what to do, with the way to Cards", () => {
+    // #when
+    const html = sheetHtmlOf(render("admin", { query: `billId=${id(16)}` }));
+    const sheet = textOf(html);
+
+    // #then
+    expect({
+      missing: [
+        "Card declined It's over the card's monthly limit.",
+        "Software subscriptions (•••• 0004) declined Notion's Card purchase on 4 Nov 2026, 09:00. The bill stays owed.",
+        "Load the Card balance, raise the card's limit or unfreeze it",
+        "Go to Cards",
+      ].filter((part) => !sheet.includes(part)),
+      cards: html.includes(`href="/cards?id=${id(9304)}"`),
+      pay: html.includes(">Pay</button>"),
+    }).toEqual({ missing: [], cards: true, pay: false });
+  });
+
+  it("shows a bill paid by card in History with the card, the amount, the day and its Card purchase", () => {
+    // #when
+    const history = textOf(render("admin", { query: "view=history" }));
+    const html = sheetHtmlOf(
+      render("admin", { query: `view=history&billId=${id(30)}` }),
+    );
+    const sheet = textOf(html);
+
+    // #then
+    expect({
+      listed: history.includes("Paid by card"),
+      missing: [
+        "USD 19.80 KES 2,554",
+        "Paid by card",
+        "Paid by Card •••• 0004, Software subscriptions See the Card purchase",
+        "Paid on 20 Oct 2026",
+        "Add invoice",
+      ].filter((part) => !sheet.includes(part)),
+      purchase: html.includes(
+        `href="/cards?tab=purchases&amp;purchase=${id(9406)}"`,
+      ),
+      paidOutside: sheet.includes("Mark paid outside"),
+      cancel: sheet.includes("Cancel bill"),
+    }).toEqual({
+      listed: true,
+      missing: [],
+      purchase: true,
+      paidOutside: false,
+      cancel: false,
+    });
+  });
+
+  it("lists a card-paid recurring payment with its card's last four", () => {
+    // #when
+    const list = sheetOf(render("admin", { query: "recurring=all" }));
+
+    // #then
+    expect(
+      [
+        "Vercel Monthly on the 20th · USD 20.00 · Card •••• 0004",
+        "Notion Monthly on the 4th · No estimate · Card •••• 0004",
+      ].filter((part) => !list?.includes(part)),
+    ).toEqual([]);
+  });
+
+  it("opens a card-paid recurring payment with its card, and its number for admins", () => {
+    // #when
+    const admin = sheetOf(render("admin", { query: `recurring=${id(315)}` }));
+
+    // #then
+    expect(
+      [
+        "Estimate USD 20.00",
+        "Paid automatically when Vercel charges the card. Nobody has to pay each bill.",
+        "How it’s paid By company-held card, Software subscriptions •••• 0004 See the card",
+        "Reminder Only if a bill goes overdue",
+        "Show card number",
+      ].filter((part) => !admin?.includes(part)),
+    ).toEqual([]);
+  });
+
+  it("badges a recurring payment's next bill Card declined, in the list and its detail", () => {
+    // #when
+    const list = sheetOf(render("admin", { query: "recurring=all" }));
+    const notion = sheetOf(render("admin", { query: `recurring=${id(316)}` }));
+    const vercel = sheetOf(render("admin", { query: `recurring=${id(315)}` }));
+
+    // #then
+    expect({
+      list: list?.match(/Card declined/g)?.length,
+      notionRow: list?.includes("Overdue Card declined"),
+      notion: notion?.includes("Overdue Card declined"),
+      vercel: vercel?.includes("Card declined"),
+    }).toEqual({ list: 1, notionRow: true, notion: true, vercel: false });
+  });
+
+  it("shows an accountant a card-paid recurring payment without the card's number", () => {
+    // #when
+    const accountant = sheetOf(
+      render("accountant", { query: `recurring=${id(315)}` }),
+    );
+
+    // #then
+    expect({
+      card: accountant?.includes("Software subscriptions •••• 0004"),
+      number: accountant?.includes("Show card number"),
+    }).toEqual({ card: true, number: false });
   });
 });

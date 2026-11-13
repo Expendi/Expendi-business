@@ -1,13 +1,14 @@
 "use client";
 
 import type { FormEvent, JSX, ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useIsMutating, useQuery } from "@tanstack/react-query";
 import { CalendarIcon } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
 
 import type {
   CreateRecurringItemRequest,
+  ExpendiCard,
   Payee,
   PayeeKind,
   PayeeMethod,
@@ -22,13 +23,18 @@ import {
   defaultBillHeading,
   describeSchedule,
   maxScheduleDay,
+  RECURRING_PAY_VIA,
   RECURRING_SCHEDULES,
   REMINDER_DAYS_MAX,
   updateRecurringItemRequestSchema,
   WEEKDAY_NAMES,
 } from "@expendi-business/shared";
 
-import type { RecurringDraft } from "~/features/recurring/recurring-draft";
+import type {
+  PayViaMemory,
+  RecurringDraft,
+} from "~/features/recurring/recurring-draft";
+import { issueCompanyCardKey } from "~/app/(company)/cards/_components/cards-api";
 import { textLinkClass } from "~/components/data/actions";
 import { RowCheckbox } from "~/components/data/cells";
 import { Callout } from "~/components/data/detail-sheet";
@@ -45,7 +51,7 @@ import {
   NativeSelectOption,
 } from "~/components/ui/native-select";
 import { useAuth } from "~/contexts/auth-context";
-import { CURRENCY_LABELS, currencyOfPayee } from "~/features/bills/bill-amount";
+import { CURRENCY_LABELS } from "~/features/bills/bill-amount";
 import { HEADING_LABELS, headingLabel } from "~/features/bills/bill-status";
 import { useCashOutLimits } from "~/features/bills/bills-api";
 import {
@@ -58,8 +64,10 @@ import { KIND_LABELS } from "~/features/payees/payee-display";
 import { ACTIVE_PAYEES, usePayees } from "~/features/payees/payees-api";
 import {
   defaultScheduleDay,
+  draftCurrency,
   firstDueOn,
   scheduleInWords,
+  switchPayVia,
   toCreateRequest,
   toUpdateRequest,
 } from "~/features/recurring/recurring-draft";
@@ -67,7 +75,9 @@ import { describeApiError } from "~/lib/api";
 import { formatIsoDate } from "~/lib/dates";
 import { queryKeys } from "~/lib/query-keys";
 import { fieldErrorsOf, focusFirstError } from "./form-errors";
+import { LoadAgain } from "./load-again";
 import { Note } from "./note";
+import { CompanyHeldCardField, issuedCardNote } from "./recurring-card-field";
 import { SheetFooterPortal } from "./sheet-footer";
 
 type RecurringField =
@@ -78,6 +88,7 @@ type RecurringField =
   | "scheduleDay"
   | "endsOn"
   | "payVia"
+  | "cardId"
   | "reminderDays"
   | "heading"
   | "categoryId";
@@ -92,6 +103,7 @@ const REQUEST_FIELDS: Readonly<Record<string, RecurringField>> = {
   startsOn: "startsOn",
   endsOn: "endsOn",
   payVia: "payVia",
+  cardId: "cardId",
   reminderDays: "reminderDays",
   overviewHeading: "heading",
   categoryId: "categoryId",
@@ -105,6 +117,7 @@ const FIELD_ORDER: readonly RecurringField[] = [
   "scheduleDay",
   "endsOn",
   "payVia",
+  "cardId",
   "reminderDays",
   "heading",
   "categoryId",
@@ -120,7 +133,27 @@ const SCHEDULE_LABELS: Record<RecurringSchedule, string> = {
 export const PAY_VIA_LABELS: Record<RecurringPayVia, string> = {
   expendi: "Through Expendi",
   outside: "Outside Expendi",
+  card: "By company-held card",
 };
+
+const PAY_VIA_HINTS: Record<RecurringPayVia, string> = {
+  expendi: "you pay each bill from the wallet",
+  outside: "e.g. by bank card or bank transfer; you mark each bill paid",
+  card: "charged automatically; nobody pays each bill",
+};
+
+/**
+ * The ways a payment can be paid. A new one can be paid any way; an
+ * existing one can only move to or from a company-held card (spec §6.20).
+ */
+export function payViaChoices(
+  current: RecurringPayVia | null,
+): readonly RecurringPayVia[] {
+  if (current === null || current === "card") {
+    return ["expendi", "outside", "card"];
+  }
+  return [current, "card"];
+}
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -132,7 +165,8 @@ type RecurringFormProps = {
   submitError: unknown;
   /** The side sheet's footer, where the buttons go. */
   footerSlot: HTMLElement | null;
-  onCancel: () => void;
+  /** With the company-held card issued during this edit, which stays issued. */
+  onCancel: (issued: ExpendiCard | null) => void;
 } & (
   | {
       /** A new recurring payment; its first bill is created with it. */
@@ -149,8 +183,8 @@ type RecurringFormProps = {
 /**
  * The new and edit recurring payment form (spec §6.20), as the app has it
  * (`apps/mobile/src/features/recurring/recurring-form.tsx`). The payee,
- * schedule, start date and how it's paid are set once; changes apply to
- * bills still to come.
+ * schedule and start date are set once; how it's paid can move to or from
+ * a company-held card. Changes apply to bills still to come.
  */
 export function RecurringForm(props: RecurringFormProps): JSX.Element {
   const {
@@ -169,12 +203,21 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
   const [payeeKind, setPayeeKind] = useState<PayeeKind | null>(
     props.item?.payee.kind ?? null,
   );
-  const [payeeOutside, setPayeeOutside] = useState(false);
+  const [payeeOutside, setPayeeOutside] = useState(
+    props.item?.payee.method === "outside",
+  );
   const [payeeMethod, setPayeeMethod] = useState<PayeeMethod | null>(
     props.item?.payee.method ?? null,
   );
+  const [payeeName, setPayeeName] = useState<string | null>(
+    props.item?.payee.name ?? null,
+  );
   /** The save error last seen before an edit: its field message no longer applies. */
   const [editedSince, setEditedSince] = useState<unknown>(null);
+  const [payViaMemory, setPayViaMemory] = useState<PayViaMemory>({});
+  const [issuedCard, setIssuedCard] = useState<ExpendiCard | null>(null);
+  const issuing =
+    useIsMutating({ mutationKey: issueCompanyCardKey(organizationId) }) > 0;
   const cashOutLimits = useCashOutLimits(organizationId);
   const amountLimits =
     draft.payVia === "expendi" && !draft.variable
@@ -195,20 +238,32 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
     });
   }
 
-  function choosePayee(payee: Pick<Payee, "id" | "kind" | "details">) {
-    const currency = currencyOfPayee(payee.details?.method, "kes");
+  function choosePayee(payee: Pick<Payee, "id" | "kind" | "name" | "details">) {
+    const currency = draftCurrency(draft.payVia, payee.details?.method, "kes");
     const outside = payee.details?.method === "outside";
     setPayeeKind(payee.kind);
     setPayeeOutside(outside);
     setPayeeMethod(payee.details?.method ?? null);
+    setPayeeName(payee.name);
     update(
       {
         payeeId: payee.id,
         ...(currency !== draft.currency && { currency, amount: "" }),
-        ...(outside && { payVia: "outside" as const }),
+        ...(outside &&
+          draft.payVia === "expendi" && { payVia: "outside" as const }),
       },
       "payeeId",
     );
+  }
+
+  /** A card's estimate is in USD whoever the payee is, so each way of paying keeps its own amount. */
+  function choosePayVia(payVia: RecurringPayVia) {
+    const fallback =
+      props.item && props.item.payVia !== "card" ? props.item.currency : "kes";
+    const currency = draftCurrency(payVia, payeeMethod, fallback);
+    const switched = switchPayVia(draft, payViaMemory, payVia, currency);
+    setPayViaMemory(switched.memory);
+    update(switched.changes, "payVia");
   }
 
   function invalid(
@@ -256,7 +311,8 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
     props.onSubmit(request);
   }
 
-  const amountShown = !draft.variable;
+  const byCard = draft.payVia === "card";
+  const amountShown = byCard || !draft.variable;
   const serverIssues = serverFieldIssues(submitError, REQUEST_FIELDS);
   const serverErrors: FieldErrors =
     submitError === editedSince
@@ -281,6 +337,34 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
       />
       <FieldDescription>Leave blank to keep going.</FieldDescription>
       {errorOf("endsOn")}
+    </Field>
+  );
+
+  const headingField = (
+    <Field>
+      <FieldLabel htmlFor={idOf("heading")}>Overview heading</FieldLabel>
+      <NativeSelect
+        id={idOf("heading")}
+        className="w-full"
+        value={
+          draft.heading ??
+          (payeeKind ? defaultBillHeading(payeeKind) : "transactions")
+        }
+        onChange={(event) => {
+          const heading = BILL_HEADINGS.find(
+            (option) => option === event.target.value,
+          );
+          if (heading) update({ heading }, "heading");
+        }}
+        {...invalidProps("heading")}
+      >
+        {BILL_HEADINGS.map((heading) => (
+          <NativeSelectOption key={heading} value={heading}>
+            {HEADING_LABELS[heading]}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+      {errorOf("heading")}
     </Field>
   );
 
@@ -317,28 +401,32 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
           </Field>
         )}
 
-        <label className="flex cursor-pointer items-start gap-2.5">
-          <RowCheckbox
-            className="mt-px"
-            checked={draft.variable}
-            onChange={(event) =>
-              update({ variable: event.target.checked }, "amount")
-            }
-          />
-          <span>
-            <span className="block text-sm font-(--w-ui) text-foreground">
-              Variable amount
+        {byCard ? null : (
+          <label className="flex cursor-pointer items-start gap-2.5">
+            <RowCheckbox
+              className="mt-px"
+              checked={draft.variable}
+              onChange={(event) =>
+                update({ variable: event.target.checked }, "amount")
+              }
+            />
+            <span>
+              <span className="block text-sm font-(--w-ui) text-foreground">
+                Variable amount
+              </span>
+              <span className="block text-xs leading-4 text-muted-foreground">
+                Entered on each bill, e.g. PAYE or electricity.
+              </span>
             </span>
-            <span className="block text-xs leading-4 text-muted-foreground">
-              Entered on each bill, e.g. PAYE or electricity.
-            </span>
-          </span>
-        </label>
+          </label>
+        )}
 
         {amountShown ? (
           <Field>
             <FieldLabel htmlFor={idOf("amount")}>
-              Amount ({CURRENCY_LABELS[draft.currency]})
+              {byCard
+                ? "Estimate (USD, optional)"
+                : `Amount (${CURRENCY_LABELS[draft.currency]})`}
             </FieldLabel>
             <Input
               id={idOf("amount")}
@@ -348,11 +436,28 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
               onChange={(event) =>
                 update({ amount: event.target.value }, "amount")
               }
-              placeholder={draft.currency === "usd" ? "120.00" : "45,000.00"}
+              placeholder={
+                byCard
+                  ? "20.00"
+                  : draft.currency === "usd"
+                    ? "120.00"
+                    : "45,000.00"
+              }
               className="tabular-nums"
               {...invalidProps("amount")}
             />
-            {draft.currency === "usd" ? (
+            {byCard ? (
+              <FieldDescription>
+                Each bill takes the actual amount the card is charged. Leave it
+                blank if it changes every time.
+              </FieldDescription>
+            ) : null}
+            {byCard && draft.amount.trim() === "" ? (
+              <FieldDescription>
+                No estimate: the bill takes whatever {payeeName ?? "the payee"}{" "}
+                charges, and the Card balance check can’t count it.
+              </FieldDescription>
+            ) : !byCard && draft.currency === "usd" ? (
               <FieldDescription>
                 This payee is paid in USDC: each bill pays exactly this many
                 USDC.
@@ -384,90 +489,96 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
           />
         )}
 
-        {props.item ? null : (
-          <Field>
-            <FieldLabel htmlFor={idOf("payVia")}>How it’s paid</FieldLabel>
-            <NativeSelect
-              id={idOf("payVia")}
-              className="w-full"
-              value={draft.payVia}
-              onChange={(event) =>
-                update(
-                  {
-                    payVia:
-                      event.target.value === "outside" ? "outside" : "expendi",
-                  },
-                  "payVia",
-                )
-              }
-              {...invalidProps("payVia")}
-            >
-              <NativeSelectOption value="expendi" disabled={payeeOutside}>
-                {PAY_VIA_LABELS.expendi}: you pay each bill from the wallet
+        <Field>
+          <FieldLabel htmlFor={idOf("payVia")}>How it’s paid</FieldLabel>
+          <NativeSelect
+            id={idOf("payVia")}
+            className="w-full"
+            value={draft.payVia}
+            onChange={(event) => {
+              const payVia = RECURRING_PAY_VIA.find(
+                (option) => option === event.target.value,
+              );
+              if (payVia) choosePayVia(payVia);
+            }}
+            {...invalidProps("payVia")}
+          >
+            {payViaChoices(props.item?.payVia ?? null).map((payVia) => (
+              <NativeSelectOption
+                key={payVia}
+                value={payVia}
+                disabled={payVia === "expendi" && payeeOutside}
+              >
+                {PAY_VIA_LABELS[payVia]}: {PAY_VIA_HINTS[payVia]}
               </NativeSelectOption>
-              <NativeSelectOption value="outside">
-                {PAY_VIA_LABELS.outside}: e.g. by card; you mark each bill paid
-              </NativeSelectOption>
-            </NativeSelect>
-            {payeeOutside ? (
-              <FieldDescription>
-                This payee is paid outside Expendi.
-              </FieldDescription>
-            ) : null}
-            {errorOf("payVia")}
-          </Field>
-        )}
-
-        <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
-          <Field>
-            <FieldLabel htmlFor={idOf("reminderDays")}>
-              Remind admins (days before it’s due)
-            </FieldLabel>
-            <Input
-              id={idOf("reminderDays")}
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={REMINDER_DAYS_MAX}
-              value={draft.reminderDays}
-              onChange={(event) =>
-                update({ reminderDays: event.target.value }, "reminderDays")
-              }
-              className="tabular-nums"
-              {...invalidProps("reminderDays")}
-            />
+            ))}
+          </NativeSelect>
+          {payeeOutside ? (
             <FieldDescription>
-              Up to {String(REMINDER_DAYS_MAX)} days. Admins are also reminded
-              on the due date, and once if it’s overdue.
+              This payee is paid outside Expendi.
             </FieldDescription>
-            {errorOf("reminderDays")}
-          </Field>
+          ) : null}
+          {byCard ? (
+            <FieldDescription>
+              The card is charged automatically; nobody has to pay each bill.
+              Admins hear when a Card purchase is declined or a bill goes
+              overdue.
+            </FieldDescription>
+          ) : null}
+          {errorOf("payVia")}
+        </Field>
+
+        {byCard ? (
           <Field>
-            <FieldLabel htmlFor={idOf("heading")}>Overview heading</FieldLabel>
-            <NativeSelect
-              id={idOf("heading")}
-              className="w-full"
-              value={
-                draft.heading ??
-                (payeeKind ? defaultBillHeading(payeeKind) : "transactions")
-              }
-              onChange={(event) => {
-                const heading = BILL_HEADINGS.find(
-                  (option) => option === event.target.value,
-                );
-                if (heading) update({ heading }, "heading");
+            <CompanyHeldCardField
+              organizationId={organizationId}
+              id={idOf("cardId")}
+              value={draft.cardId}
+              payment={{
+                payeeName,
+                estimate: draft.amount,
+                schedule: draft.schedule,
+                categoryId: draft.categoryId,
+                itemId: props.item?.id ?? null,
               }}
-              {...invalidProps("heading")}
-            >
-              {BILL_HEADINGS.map((heading) => (
-                <NativeSelectOption key={heading} value={heading}>
-                  {HEADING_LABELS[heading]}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-            {errorOf("heading")}
+              issued={issuedCard}
+              onChange={(cardId) => update({ cardId }, "cardId")}
+              onIssued={setIssuedCard}
+            />
+            {errorOf("cardId")}
           </Field>
-        </div>
+        ) : null}
+
+        {byCard ? (
+          headingField
+        ) : (
+          <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
+            <Field>
+              <FieldLabel htmlFor={idOf("reminderDays")}>
+                Remind admins (days before it’s due)
+              </FieldLabel>
+              <Input
+                id={idOf("reminderDays")}
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={REMINDER_DAYS_MAX}
+                value={draft.reminderDays}
+                onChange={(event) =>
+                  update({ reminderDays: event.target.value }, "reminderDays")
+                }
+                className="tabular-nums"
+                {...invalidProps("reminderDays")}
+              />
+              <FieldDescription>
+                Up to {String(REMINDER_DAYS_MAX)} days. Admins are also reminded
+                on the due date, and once if it’s overdue.
+              </FieldDescription>
+              {errorOf("reminderDays")}
+            </Field>
+            {headingField}
+          </div>
+        )}
 
         <Field>
           <FieldLabel htmlFor={idOf("categoryId")}>Category</FieldLabel>
@@ -492,20 +603,25 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
             <p role="alert">{describeApiError(submitError)}</p>
           </Callout>
         ) : null}
+        {submitError && issuedCard ? (
+          <Callout tone="neutral">
+            <p>{issuedCardNote(issuedCard)}</p>
+          </Callout>
+        ) : null}
       </form>
       <SheetFooterPortal slot={footerSlot}>
         <Button
           type="submit"
           form={`${uid}form`}
-          disabled={submitting || unchanged}
+          disabled={submitting || unchanged || issuing}
         >
           {submitting ? "Saving…" : submitLabel}
         </Button>
         <Button
           type="button"
           variant="outline"
-          onClick={onCancel}
-          disabled={submitting}
+          onClick={() => onCancel(issuedCard)}
+          disabled={submitting || issuing}
         >
           Cancel
         </Button>
@@ -520,7 +636,6 @@ function SetOnce({ item }: { item: RecurringItem }): JSX.Element {
     ["Pay to", item.payee.name],
     ["When", scheduleInWords(item)],
     ["Starts", formatIsoDate(item.startsOn)],
-    ["How it’s paid", PAY_VIA_LABELS[item.payVia]],
   ] as const;
   return (
     <div className="flex flex-col gap-3 rounded-control bg-muted/60 px-4 py-3.5">
@@ -536,8 +651,8 @@ function SetOnce({ item }: { item: RecurringItem }): JSX.Element {
         ))}
       </dl>
       <FieldDescription>
-        To change who it’s paid to, when, or how, end this payment and set up a
-        new one.
+        To change who it’s paid to or when, end this payment and set up a new
+        one.
       </FieldDescription>
     </div>
   );
@@ -693,31 +808,6 @@ function ScheduleFields({
         </div>
       ) : null}
     </>
-  );
-}
-
-function LoadAgain({
-  error,
-  label,
-  onRetry,
-}: {
-  error: unknown;
-  label: string;
-  onRetry: () => void;
-}): JSX.Element {
-  return (
-    <div role="alert">
-      <Callout
-        tone="error"
-        action={
-          <Button variant="outline" size="md" onClick={onRetry}>
-            {label}
-          </Button>
-        }
-      >
-        <p>{describeApiError(error)}</p>
-      </Callout>
-    </div>
   );
 }
 

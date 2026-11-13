@@ -24,8 +24,10 @@ import { notify } from "./notify.js";
 
 /**
  * The daily reminders (spec §6.10, §6.20): each unpaid bill's due-soon,
- * due-today and overdue reminder, and a warning when the wallet won't cover
- * what's due in the next 7 days. All by Nairobi date.
+ * due-today and overdue reminder, and a warning when the wallet, or the
+ * Card balance, won't cover what's due in the next 7 days. All by Nairobi
+ * date. A bill a company-held card pays gets only the overdue one: the
+ * purchase comes without anyone acting, so only its not arriving is news.
  *
  * Each goes out once: its outbox rows carry a `dedupeKey` (bill and stage,
  * or company and day) that the outbox's unique index allows once, so a
@@ -84,7 +86,8 @@ export function alreadyQueued(
 /**
  * Queues each unpaid bill's reminder for `today`, in the caller's admin
  * scope. A one-off bill is reminded 3 days ahead, a recurring one by its
- * own lead time. Returns how many bills it newly reminded.
+ * own lead time, and a card-paid one only once overdue. Returns how many
+ * bills it newly reminded.
  */
 export function queueBillReminders(
   tx: Transaction,
@@ -98,6 +101,7 @@ export function queueBillReminders(
           id: bills.id,
           dueOn: bills.dueOn,
           leadDays: recurringItems.reminderDays,
+          payVia: recurringItems.payVia,
         })
         .from(bills)
         .leftJoin(recurringItems, eq(recurringItems.id, bills.recurringItemId))
@@ -115,9 +119,9 @@ export function queueBillReminders(
         bill.dueOn,
         bill.leadDays ?? REMINDER_DAYS_DEFAULT,
       );
-      return kind === null
-        ? []
-        : [{ kind, billId: bill.id, key: `${kind}:${bill.id}` }];
+      if (kind === null) return [];
+      if (bill.payVia === "card" && kind !== "bill_overdue") return [];
+      return [{ kind, billId: bill.id, key: `${kind}:${bill.id}` }];
     });
     const queued = yield* alreadyQueued(
       tx,
@@ -132,40 +136,82 @@ export function queueBillReminders(
   });
 }
 
+export interface BalanceWarnings {
+  readonly wallet: boolean;
+  readonly card: boolean;
+}
+
 /**
  * Warns the admins once a Nairobi day while the wallet is short for what's
- * due in the next 7 days, by T42's cash check. Nothing when the cash-out
- * provider's rate is unavailable: the check can't tell. Returns whether it warned.
+ * due in the next 7 days, by T42's cash check, and once a day while the
+ * Card balance is short for what company-held cards will pay in them. The
+ * wallet can't be checked when the cash-out provider's rate is unavailable;
+ * the Card balance, in USD, still can. Returns which it warned about.
  */
-export function queueWalletShortReminder(
+export function queueBalanceWarnings(
   organizationId: string,
   today: string,
-): Effect.Effect<boolean, DatabaseError, DatabaseService | Paycrest | Pretium> {
+): Effect.Effect<
+  BalanceWarnings,
+  DatabaseError,
+  DatabaseService | Paycrest | Pretium
+> {
   return Effect.gen(function* () {
     const admin = { organizationId, role: "admin" } as const;
-    const dedupeKey = `wallet_short:${today}`;
+    const walletKey = `wallet_short:${today}`;
+    const cardKey = `card_balance_short:${today}`;
     const warned = yield* withScope(admin, (tx) =>
-      alreadyQueued(tx, organizationId, [dedupeKey]),
+      alreadyQueued(tx, organizationId, [walletKey, cardKey]),
     );
-    if (warned.size > 0) return false;
+    if (warned.has(walletKey) && warned.has(cardKey)) {
+      return { wallet: false, card: false };
+    }
     const cash = yield* checkCash({
       organizationId,
       today,
       days: WALLET_SHORT_WINDOW_DAYS,
     });
-    if (cash.status !== "short" || cash.shortKes === null) return false;
-    const shortKes = cash.shortKes;
+    const shortKes =
+      !warned.has(walletKey) && cash.status === "short" ? cash.shortKes : null;
+    const cardBills =
+      !warned.has(cardKey) && cash.cardBills?.short ? cash.cardBills : null;
+    if (shortKes === null && cardBills === null) {
+      return { wallet: false, card: false };
+    }
     yield* withScope(admin, (tx) =>
-      notify(tx, {
-        kind: "wallet_short",
-        organizationId,
-        today,
-        through: cash.through,
-        shortKes,
+      Effect.gen(function* () {
+        if (shortKes !== null) {
+          yield* notify(tx, {
+            kind: "wallet_short",
+            organizationId,
+            today,
+            through: cash.through,
+            shortKes,
+          });
+        }
+        if (cardBills !== null) {
+          yield* notify(tx, {
+            kind: "card_balance_short",
+            organizationId,
+            today,
+            dueUsdCents: cardBills.dueUsdCents,
+            availableUsdCents: cardBills.availableUsdCents,
+          });
+        }
       }),
     );
-    return true;
+    return { wallet: shortKes !== null, card: cardBills !== null };
   });
+}
+
+/** `queueBalanceWarnings`, answering whether it warned about the wallet. */
+export function queueWalletShortReminder(
+  organizationId: string,
+  today: string,
+): Effect.Effect<boolean, DatabaseError, DatabaseService | Paycrest | Pretium> {
+  return queueBalanceWarnings(organizationId, today).pipe(
+    Effect.map((warnings) => warnings.wallet),
+  );
 }
 
 export interface RemindersRun {
@@ -175,6 +221,7 @@ export interface RemindersRun {
   /** Bills newly reminded. */
   readonly bills: number;
   readonly walletWarnings: number;
+  readonly cardBalanceWarnings: number;
   readonly failed: number;
 }
 
@@ -205,6 +252,7 @@ export function runSpendingReminders(
 
     let billCount = 0;
     let walletWarnings = 0;
+    let cardBalanceWarnings = 0;
     let failed = 0;
     const outcome = <A>(
       organizationId: string,
@@ -226,16 +274,20 @@ export function runSpendingReminders(
         ),
       );
       billCount += outcome(organizationId, "bill reminders", reminded) ?? 0;
-      const warned = yield* Effect.exit(
-        queueWalletShortReminder(organizationId, today),
+      const warned = outcome(
+        organizationId,
+        "balance check",
+        yield* Effect.exit(queueBalanceWarnings(organizationId, today)),
       );
-      if (outcome(organizationId, "wallet check", warned)) walletWarnings += 1;
+      if (warned?.wallet) walletWarnings += 1;
+      if (warned?.card) cardBalanceWarnings += 1;
     }
     return {
       today,
       companies: rows.length,
       bills: billCount,
       walletWarnings,
+      cardBalanceWarnings,
       failed,
     };
   });

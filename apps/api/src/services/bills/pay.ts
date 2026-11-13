@@ -31,6 +31,7 @@ import type { PretiumError } from "../pretium/pretium-client.js";
 import type { BillAmount } from "./payable.js";
 import {
   bills,
+  cards,
   payees,
   payouts,
   recurringItems,
@@ -143,10 +144,12 @@ function lockBill(tx: Transaction, organizationId: string, billId: string) {
         bill: bills,
         payee: { name: payees.name, kind: payees.kind, method: payees.method },
         recurringPayVia: recurringItems.payVia,
+        cardLastFour: cards.lastFour,
       })
       .from(bills)
       .innerJoin(payees, eq(payees.id, bills.payeeId))
       .leftJoin(recurringItems, eq(recurringItems.id, bills.recurringItemId))
+      .leftJoin(cards, eq(cards.id, recurringItems.cardId))
       .where(
         and(eq(bills.organizationId, organizationId), eq(bills.id, billId)),
       )
@@ -188,7 +191,10 @@ function readPayableBills(
           recurringItem:
             found.recurringPayVia === null
               ? null
-              : { payVia: found.recurringPayVia },
+              : {
+                  payVia: found.recurringPayVia,
+                  cardLastFour: found.cardLastFour,
+                },
         }).pipe(
           Effect.catchTag("BillNotPayable", (error) =>
             Effect.fail(

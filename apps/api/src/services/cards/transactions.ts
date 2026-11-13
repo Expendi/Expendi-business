@@ -14,7 +14,6 @@ import type { LithicTransaction } from "../lithic/lithic-client.js";
 import type { Paycrest, PaycrestError } from "../paycrest/paycrest-client.js";
 import type { Pretium, PretiumError } from "../pretium/pretium-client.js";
 import {
-  cardPrograms,
   cardPurchases,
   cards,
   categories,
@@ -23,6 +22,7 @@ import {
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { markBillCardDeclined, payBillByCard } from "../bills/card-payment.js";
 import { nairobiDate } from "../bills/status.js";
 import { activeKesRate } from "../cash-out/active-rate.js";
 import { etimsStatusFor } from "../expenses/etims.js";
@@ -34,13 +34,17 @@ import {
   lockCardProgram,
   readCardBalance,
 } from "./balance.js";
+import { cardExpenseSource, NOT_RECOGNISED_REASON } from "./card-expense.js";
+import { matchCompanyHeldPurchase, merchantKeyOf } from "./merchants.js";
 
 /**
  * Applies one Lithic transaction, always freshly fetched from Lithic, to its
  * Card purchase (spec §6.25). Both the signed webhook and the reconcile job
  * end here, so it's safe to apply the same state any number of times: the
  * purchase is simply brought in line with what Lithic says now, and the
- * Card expense is recorded at most once, when the money has really left.
+ * money is recorded at most once, when it has really left: as a Card
+ * expense, or, on a company-held card, as the payment of the bill its
+ * recurring payment is owed.
  */
 
 const ACTOR = { type: "system", id: "lithic-sync" } as const;
@@ -216,7 +220,7 @@ export const owesExpense = (
   purchase.settledUsdCents > 0n &&
   purchase.expenseId === null;
 
-function purchaseReceiptCount(
+export function purchaseReceiptCount(
   tx: Transaction,
   organizationId: string,
   purchaseId: string,
@@ -234,17 +238,41 @@ function purchaseReceiptCount(
   ).pipe(Effect.map(([row]) => row?.count ?? 0));
 }
 
-/** Under the program lock, so a check against the Card balance waits for this. */
+/**
+ * Under the program lock, so a check against the Card balance waits for
+ * this, and two purchases from a merchant a company-held card hasn't seen
+ * can't both ask admins about it.
+ */
 function upsertPurchase(
   tx: Transaction,
   ref: CardRef,
   transaction: LithicTransaction,
-): Effect.Effect<CardPurchase | null, DatabaseError> {
+): Effect.Effect<CardPurchase | null, DatabaseError, AuditLog> {
   const { organization_id: organizationId, card_id: cardId } = ref;
   return Effect.gen(function* () {
     if (!(yield* lockCardProgram(tx, organizationId))) {
       return yield* Effect.dieMessage(`card ${cardId} has no card program`);
     }
+    const [card] = yield* query(() =>
+      tx
+        .select({
+          membershipId: cards.membershipId,
+          defaultCategoryId: cards.defaultCategoryId,
+          companyHeld: cards.companyHeld,
+        })
+        .from(cards)
+        .where(
+          and(eq(cards.id, cardId), eq(cards.organizationId, organizationId)),
+        )
+        .limit(1),
+    );
+    if (!card) return yield* Effect.dieMessage(`card ${cardId} vanished`);
+    const merchantKey = card.companyHeld
+      ? merchantKeyOf(
+          transaction.merchant.acceptor_id,
+          transaction.merchant.descriptor,
+        )
+      : null;
     const [existing] = yield* query(() =>
       tx
         .select()
@@ -261,8 +289,10 @@ function upsertPurchase(
         existing.holdUsdCents !== facts.holdUsdCents ||
         existing.settledUsdCents !== facts.settledUsdCents;
       moved = amountsMoved;
+      const keyMissing = existing.merchantKey === null && merchantKey !== null;
       if (
         !amountsMoved &&
+        !keyMissing &&
         existing.status === facts.status &&
         existing.kind === facts.kind &&
         existing.declineReason === facts.declineReason
@@ -274,6 +304,7 @@ function upsertPurchase(
             .update(cardPurchases)
             .set({
               ...facts,
+              ...(keyMissing && { merchantKey }),
               ...(amountsMoved &&
                 existing.expenseId !== null &&
                 existing.changedAfterExpenseAt === null && {
@@ -288,19 +319,6 @@ function upsertPurchase(
       }
     } else {
       if (!worthARow(facts)) return null;
-      const [card] = yield* query(() =>
-        tx
-          .select({
-            membershipId: cards.membershipId,
-            defaultCategoryId: cards.defaultCategoryId,
-          })
-          .from(cards)
-          .where(
-            and(eq(cards.id, cardId), eq(cards.organizationId, organizationId)),
-          )
-          .limit(1),
-      );
-      if (!card) return yield* Effect.dieMessage(`card ${cardId} vanished`);
       const [inserted] = yield* query(() =>
         tx
           .insert(cardPurchases)
@@ -311,6 +329,7 @@ function upsertPurchase(
             lithicTransactionToken: transaction.token,
             authorizedAt: new Date(transaction.created),
             categoryId: card.defaultCategoryId,
+            merchantKey,
             ...facts,
           })
           .returning(),
@@ -319,6 +338,9 @@ function upsertPurchase(
       saved = inserted;
       moved = facts.holdUsdCents > 0n || facts.settledUsdCents > 0n;
     }
+    if (card.companyHeld) {
+      saved = yield* matchCompanyHeldPurchase(tx, saved);
+    }
 
     const event = { organizationId, purchaseId: saved.id };
     const approvedSpend =
@@ -326,15 +348,27 @@ function upsertPurchase(
       (facts.status === "pending" || facts.status === "settled") &&
       facts.holdUsdCents + facts.settledUsdCents > 0n;
     // Also fires for a row the authorization path inserted; the outbox's
-    // dedupe key keeps it to once however many deliveries reach here.
+    // dedupe key keeps it to once however many deliveries reach here. A
+    // purchase that pays a recurring payment's bill never needs a receipt,
+    // nor does one admins didn't recognise, and one waiting for an admin's
+    // answer is asked for once it's a one-off.
     if (
       approvedSpend &&
+      saved.recurringItemId === null &&
+      saved.reviewState !== "needs_review" &&
+      saved.reviewState !== "not_recognised" &&
       (yield* purchaseReceiptCount(tx, organizationId, saved.id)) === 0
     ) {
       yield* notify(tx, { kind: "card_receipt_needed", ...event });
     }
     if (facts.status === "declined" && existing?.status !== "declined") {
-      yield* notify(tx, { kind: "card_purchase_declined", ...event });
+      const billId = yield* markBillCardDeclined(tx, saved);
+      yield* notify(
+        tx,
+        billId === null
+          ? { kind: "card_purchase_declined", ...event }
+          : { kind: "card_bill_declined", billId, ...event },
+      );
     }
     if (facts.kind === "refund" && existing?.kind !== "refund") {
       yield* notify(tx, { kind: "card_refund_received", ...event });
@@ -354,12 +388,32 @@ function upsertPurchase(
   });
 }
 
+/** The purchase, row-locked: whatever records its money re-checks under this. */
+export function lockCardPurchase(
+  tx: Transaction,
+  organizationId: string,
+  purchaseId: string,
+): Effect.Effect<CardPurchase | null, DatabaseError> {
+  return query(() =>
+    tx
+      .select()
+      .from(cardPurchases)
+      .where(
+        and(
+          eq(cardPurchases.id, purchaseId),
+          eq(cardPurchases.organizationId, organizationId),
+        ),
+      )
+      .for("update"),
+  ).pipe(Effect.map(([purchase]) => purchase ?? null));
+}
+
 /**
- * Records the Card expense, in the one transaction that also stamps the
- * purchase and hands it its receipts. Re-checks under the purchase's row
- * lock, so a concurrent apply finds the expense already made and stops.
+ * Records where the money went, in one transaction under the purchase's row
+ * lock, so a concurrent apply finds it already done and stops: the bill of
+ * the recurring payment it's matched to, or else a Card expense.
  */
-function recordCardExpense(
+function recordSettledPurchase(
   tx: Transaction,
   organizationId: string,
   purchaseId: string,
@@ -367,40 +421,49 @@ function recordCardExpense(
   rate: string,
 ): Effect.Effect<boolean, DatabaseError, AuditLog> {
   return Effect.gen(function* () {
-    const audit = yield* AuditLog;
-    const [purchase] = yield* query(() =>
-      tx
-        .select()
-        .from(cardPurchases)
-        .where(
-          and(
-            eq(cardPurchases.id, purchaseId),
-            eq(cardPurchases.organizationId, organizationId),
-          ),
-        )
-        .for("update"),
-    );
+    const purchase = yield* lockCardPurchase(tx, organizationId, purchaseId);
     if (!purchase || !owesExpense(purchase)) return false;
-    const [details] = yield* query(() =>
+    if (purchase.recurringItemId !== null) {
+      yield* payBillByCard(tx, {
+        purchase,
+        settledOn: settlementDate(transaction),
+        rate,
+        cardExpenseId: null,
+      });
+      return true;
+    }
+    return yield* recordCardExpense(tx, purchase, transaction, rate);
+  });
+}
+
+/**
+ * The Card expense, stamped on the purchase, with the receipts it already
+ * has. One from a merchant admins didn't recognise, with none, is complete
+ * without: nobody has its receipt.
+ */
+function recordCardExpense(
+  tx: Transaction,
+  purchase: CardPurchase,
+  transaction: LithicTransaction,
+  rate: string,
+): Effect.Effect<boolean, DatabaseError, AuditLog> {
+  const { organizationId } = purchase;
+  return Effect.gen(function* () {
+    const audit = yield* AuditLog;
+    const source = yield* cardExpenseSource(tx, purchase);
+    const unrecognised =
+      purchase.reviewState === "not_recognised" &&
+      (yield* purchaseReceiptCount(tx, organizationId, purchase.id)) === 0;
+    const [category] = yield* query(() =>
       tx
-        .select({
-          nickname: cards.nickname,
-          lastFour: cards.lastFour,
-          paidFromAccountId: cardPrograms.paidFromAccountId,
-          etimsNotRequired: categories.etimsNotRequired,
-        })
-        .from(cards)
-        .innerJoin(
-          cardPrograms,
-          eq(cardPrograms.organizationId, cards.organizationId),
-        )
-        .innerJoin(categories, eq(categories.id, purchase.categoryId))
-        .where(eq(cards.id, purchase.cardId))
+        .select({ etimsNotRequired: categories.etimsNotRequired })
+        .from(categories)
+        .where(eq(categories.id, purchase.categoryId))
         .limit(1),
     );
-    if (!details) {
+    if (!category) {
       return yield* Effect.dieMessage(
-        `purchase ${purchaseId}: its card, program or category vanished`,
+        `purchase ${purchase.id}: its category vanished`,
       );
     }
     const values = {
@@ -408,14 +471,15 @@ function recordCardExpense(
       status: "recorded" as const,
       source: "app" as const,
       overviewHeading: "transactions" as const,
-      membershipId: purchase.membershipId,
-      paidFromAccountId: details.paidFromAccountId,
+      membershipId: source.membershipId,
+      paidFromAccountId: source.paidFromAccountId,
       merchant: purchase.merchant,
       spentOn: settlementDate(transaction),
       amountKes: kesCentsFromUsdCents(purchase.settledUsdCents, rate),
       categoryId: purchase.categoryId,
-      description: `Expendi card ${details.nickname}, ending ${details.lastFour}`,
-      etimsStatus: etimsStatusFor(null, details),
+      description: source.description,
+      etimsStatus: etimsStatusFor(null, category),
+      ...(unrecognised && { noReceiptReason: NOT_RECOGNISED_REASON }),
     };
     const [expense] = yield* query(() =>
       tx
@@ -455,7 +519,7 @@ function recordCardExpense(
         receiptFileIds: receipts.map((file) => file.id),
       },
     });
-    if (receipts.length > 0) {
+    if (receipts.length > 0 || unrecognised) {
       yield* enqueueRecordedSpending(tx, organizationId, expense.id);
     }
     return true;
@@ -507,7 +571,7 @@ export function applyCardTransaction(
 
     const rate = yield* activeKesRate();
     const expenseRecorded = yield* withScope(scope, (tx) =>
-      recordCardExpense(
+      recordSettledPurchase(
         tx,
         ref.organization_id,
         purchase.id,

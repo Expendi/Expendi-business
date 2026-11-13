@@ -44,6 +44,7 @@ import { Field, FieldError, FieldLabel } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { ROLE_LABELS } from "~/config/roles";
 import { useDashboard } from "~/contexts/dashboard-context";
+import { ChoiceGroup, ChoiceOption } from "~/features/payment-ui";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiDateTime } from "~/lib/nairobi-time";
 import {
@@ -211,54 +212,6 @@ export function InviteBanner({
   );
 }
 
-const RADIO =
-  "m-0 mt-px inline-grid size-[18px] flex-none cursor-pointer appearance-none place-content-center rounded-full border border-gray-500 bg-card transition-[border-color] duration-150 before:size-2 before:scale-0 before:rounded-full before:bg-brand-700 before:transition-transform before:duration-[120ms] before:ease-out-expo before:content-[''] checked:border-brand-700 checked:before:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--focus-ring) motion-reduce:transition-none motion-reduce:before:transition-none";
-
-function RoleOption({
-  name,
-  role,
-  checked,
-  current = false,
-  onChoose,
-}: {
-  name: string;
-  role: MembershipRole;
-  checked: boolean;
-  current?: boolean;
-  onChoose: () => void;
-}): JSX.Element {
-  const id = useId();
-  return (
-    <label
-      htmlFor={id}
-      className="flex cursor-pointer items-start gap-3 rounded-control border border-input bg-card px-3.5 py-3 transition-colors duration-150 hover:border-gray-400 has-[:checked]:border-brand-700 has-[:checked]:bg-brand-50"
-    >
-      <input
-        id={id}
-        type="radio"
-        name={name}
-        value={role}
-        checked={checked}
-        onChange={onChoose}
-        className={RADIO}
-      />
-      <span className="min-w-0">
-        <span className="flex items-center gap-2 text-sm font-(--w-ui) text-foreground">
-          {ROLE_LABELS[role]}
-          {current ? (
-            <span className="text-xs leading-4 font-normal text-muted-foreground">
-              Current
-            </span>
-          ) : null}
-        </span>
-        <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">
-          {keepMpesaWhole(ROLE_DESCRIPTIONS[role])}
-        </span>
-      </span>
-    </label>
-  );
-}
-
 function RoleChoices({
   legend,
   name,
@@ -275,21 +228,26 @@ function RoleChoices({
   onChange: (role: MembershipRole) => void;
 }): JSX.Element {
   return (
-    <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
-      <legend className="mb-1.5 p-0 text-xs leading-4 font-(--w-ui) text-muted-foreground">
-        {legend}
-      </legend>
+    <ChoiceGroup legend={legend}>
       {roles.map((role) => (
-        <RoleOption
+        <ChoiceOption
           key={role}
           name={name}
-          role={role}
+          value={role}
           checked={value === role}
-          current={current === role}
+          title={ROLE_LABELS[role]}
+          badge={
+            current === role ? (
+              <span className="text-xs leading-4 font-normal text-muted-foreground">
+                Current
+              </span>
+            ) : null
+          }
+          description={keepMpesaWhole(ROLE_DESCRIPTIONS[role])}
           onChoose={() => onChange(role)}
         />
       ))}
-    </fieldset>
+    </ChoiceGroup>
   );
 }
 

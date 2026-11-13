@@ -5,6 +5,7 @@ import type {
   ReportSpending,
   SpendingOverview,
 } from "@expendi-business/shared";
+import { USDC_UNITS_PER_US_CENT } from "@expendi-business/shared";
 
 import { kesValue } from "~/lib/chart-scale";
 import { formatIsoDate } from "~/lib/dates";
@@ -172,6 +173,18 @@ export function expenseMeta(
   const where =
     kind === "claim" ? row.categoryName : `${row.personName}'s float`;
   return `${what} on ${dayMonth(row.spentOn)} · ${where}`;
+}
+
+/**
+ * A company-held card's payment, in USDC base units for `Money`: the USD
+ * estimate the Card balance is checked against, or null without one.
+ */
+export function cardEstimateUsdc(
+  row: Pick<CashObligation, "amountUsdCents">,
+): string | null {
+  return row.amountUsdCents == null
+    ? null
+    : (BigInt(row.amountUsdCents) * USDC_UNITS_PER_US_CENT).toString();
 }
 
 /** Due after today, in date order: the "Coming up" list. */

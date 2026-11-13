@@ -17,16 +17,20 @@ import {
 
 import {
   CARD_PURCHASE_KINDS,
+  CARD_PURCHASE_REVIEW_STATES,
   CARD_PURCHASE_STATUSES,
   CARD_STATES,
 } from "@expendi-business/shared";
 
+import { bills } from "./bills.js";
 import { categories } from "./categories.js";
 import { timestamps } from "./columns.js";
 import { expenses } from "./expenses.js";
 import { memberships } from "./memberships.js";
 import { organizations } from "./organizations.js";
 import { paidFromAccounts } from "./paid-from-accounts.js";
+import { recurringItems } from "./recurring-items.js";
+import { staffUsers } from "./staff-users.js";
 import { users } from "./users.js";
 
 export const cardState = pgEnum("card_state", CARD_STATES);
@@ -37,6 +41,10 @@ export const cardPurchaseKind = pgEnum(
 export const cardPurchaseStatus = pgEnum(
   "card_purchase_status",
   CARD_PURCHASE_STATUSES,
+);
+export const cardPurchaseReviewState = pgEnum(
+  "card_purchase_review_state",
+  CARD_PURCHASE_REVIEW_STATES,
 );
 
 /**
@@ -110,6 +118,10 @@ export const cardholders = pgTable(
  * An Expendi card. The number and CVV are never stored: only Lithic's embed
  * shows them. `close_requested_at` is set in the transaction that removes a
  * member, so a card is closed at Lithic even if the first attempt fails.
+ *
+ * A company-held card has no cardholder: it's issued on the company's own
+ * account at Lithic, so nobody leaving closes it, and only it can pay a
+ * recurring payment (spec §6.20).
  */
 export const cards = pgTable(
   "cards",
@@ -118,8 +130,10 @@ export const cards = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id),
-    cardholderId: uuid("cardholder_id").notNull(),
-    membershipId: uuid("membership_id").notNull(),
+    companyHeld: boolean("company_held").notNull().default(false),
+    /** Null exactly when company-held, like `membership_id`. */
+    cardholderId: uuid("cardholder_id"),
+    membershipId: uuid("membership_id"),
     lithicCardToken: text("lithic_card_token").notNull(),
     nickname: text("nickname").notNull(),
     lastFour: text("last_four").notNull(),
@@ -176,6 +190,10 @@ export const cards = pgTable(
       "cards_closed_has_date",
       sql`(${table.state} = 'closed') = (${table.closedAt} IS NOT NULL)`,
     ),
+    check(
+      "cards_holder_unless_company_held",
+      sql`${table.companyHeld} = (${table.cardholderId} IS NULL) AND ${table.companyHeld} = (${table.membershipId} IS NULL)`,
+    ),
   ],
 );
 
@@ -219,6 +237,10 @@ export const cardLoads = pgTable(
  * One Lithic transaction on an Expendi card, updated from its current state
  * however often Lithic tells us about it. A `refund` is its own row: Lithic
  * says most can't be tied to the original purchase.
+ *
+ * On a company-held card (`membership_id` null) a purchase either belongs to
+ * one of the card's recurring payments, and pays its bill once settled, or
+ * has a `review_state` from an admin's answer about its merchant.
  */
 export const cardPurchases = pgTable(
   "card_purchases",
@@ -228,11 +250,22 @@ export const cardPurchases = pgTable(
       .notNull()
       .references(() => organizations.id),
     cardId: uuid("card_id").notNull(),
-    membershipId: uuid("membership_id").notNull(),
+    /** The cardholder's; null on a company-held card. */
+    membershipId: uuid("membership_id"),
     lithicTransactionToken: text("lithic_transaction_token").notNull(),
     kind: cardPurchaseKind("kind").notNull().default("purchase"),
     status: cardPurchaseStatus("status").notNull(),
     merchant: text("merchant").notNull(),
+    /** Lithic's ID for the merchant, once it has charged; the descriptor can change. */
+    merchantKey: text("merchant_key"),
+    /** The company-held card's recurring payment it belongs to. */
+    recurringItemId: uuid("recurring_item_id"),
+    /** The bill it paid, once settled; that bill is `paid_by_card`. */
+    billId: uuid("bill_id"),
+    reviewState: cardPurchaseReviewState("review_state"),
+    /** The admin who answered for its merchant, and when. */
+    reviewedBy: uuid("reviewed_by").references(() => users.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     mcc: text("mcc").notNull(),
     merchantCity: text("merchant_city"),
     merchantCountry: text("merchant_country"),
@@ -278,6 +311,16 @@ export const cardPurchases = pgTable(
       columns: [table.expenseId, table.organizationId],
       foreignColumns: [expenses.id, expenses.organizationId],
     }),
+    foreignKey({
+      name: "card_purchases_recurring_item_organization_fk",
+      columns: [table.recurringItemId, table.organizationId],
+      foreignColumns: [recurringItems.id, recurringItems.organizationId],
+    }),
+    foreignKey({
+      name: "card_purchases_bill_organization_fk",
+      columns: [table.billId, table.organizationId],
+      foreignColumns: [bills.id, bills.organizationId],
+    }),
     unique("card_purchases_id_organization_id_unique").on(
       table.id,
       table.organizationId,
@@ -288,6 +331,14 @@ export const cardPurchases = pgTable(
     uniqueIndex("card_purchases_expense_unique")
       .on(table.expenseId)
       .where(sql`${table.expenseId} IS NOT NULL`),
+    // A bill is paid by one Card purchase at most.
+    uniqueIndex("card_purchases_bill_unique")
+      .on(table.billId)
+      .where(sql`${table.billId} IS NOT NULL`),
+    // Admins' "needs an answer" list.
+    index("card_purchases_needs_review_idx")
+      .on(table.organizationId, table.authorizedAt)
+      .where(sql`${table.reviewState} = 'needs_review'`),
     index("card_purchases_organization_authorized_idx").on(
       table.organizationId,
       table.authorizedAt,
@@ -318,6 +369,113 @@ export const cardPurchases = pgTable(
       "card_purchases_expense_has_rate",
       sql`(${table.expenseId} IS NULL) = (${table.usdKesRate} IS NULL)`,
     ),
+    // Only a company-held card pays recurring payments or asks about merchants.
+    check(
+      "card_purchases_match_on_company_held",
+      sql`${table.membershipId} IS NULL OR (${table.recurringItemId} IS NULL AND ${table.billId} IS NULL AND ${table.reviewState} IS NULL)`,
+    ),
+    // Linked to a recurring payment, or reviewed as something else, never both.
+    check(
+      "card_purchases_linked_or_reviewed",
+      sql`${table.recurringItemId} IS NULL OR ${table.reviewState} IS NULL`,
+    ),
+    check(
+      "card_purchases_bill_is_linked",
+      sql`${table.billId} IS NULL OR ${table.recurringItemId} IS NOT NULL`,
+    ),
+    check(
+      "card_purchases_reviewed_recorded",
+      sql`(${table.reviewedBy} IS NULL) = (${table.reviewedAt} IS NULL)`,
+    ),
+  ],
+);
+
+/**
+ * The merchants a company-held card has seen, by Lithic's merchant ID. A
+ * merchant is linked to one of the card's recurring payments, blocked after
+ * an admin didn't recognise it, or neither: a one-off, or still waiting for
+ * an admin's answer.
+ */
+export const cardMerchants = pgTable(
+  "card_merchants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id),
+    cardId: uuid("card_id").notNull(),
+    merchantKey: text("merchant_key").notNull(),
+    /** The descriptor it first charged under, for people to read. */
+    descriptor: text("descriptor").notNull(),
+    recurringItemId: uuid("recurring_item_id"),
+    blocked: boolean("blocked").notNull().default(false),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      name: "card_merchants_card_organization_fk",
+      columns: [table.cardId, table.organizationId],
+      foreignColumns: [cards.id, cards.organizationId],
+    }),
+    foreignKey({
+      name: "card_merchants_recurring_item_organization_fk",
+      columns: [table.recurringItemId, table.organizationId],
+      foreignColumns: [recurringItems.id, recurringItems.organizationId],
+    }),
+    uniqueIndex("card_merchants_card_merchant_unique").on(
+      table.cardId,
+      table.merchantKey,
+    ),
+    index("card_merchants_recurring_item_idx")
+      .on(table.recurringItemId)
+      .where(sql`${table.recurringItemId} IS NOT NULL`),
+    check(
+      "card_merchants_blocked_unlinked",
+      sql`NOT (${table.blocked} AND ${table.recurringItemId} IS NOT NULL)`,
+    ),
+  ],
+);
+
+/**
+ * Sandbox only: the pretend merchant purchases made on company-held cards,
+ * by the daily job (`run_by_staff` null) or by Expendi staff from ops
+ * admin, so the job never makes two for one bill. Append-only; it goes when
+ * real merchants charge real cards.
+ */
+export const cardSimulations = pgTable(
+  "card_simulations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id),
+    recurringItemId: uuid("recurring_item_id").notNull(),
+    /** The bill it was made for; null when staff ran it with none open. */
+    billId: uuid("bill_id"),
+    lithicTransactionToken: text("lithic_transaction_token").notNull(),
+    amountUsdCents: bigint("amount_usd_cents", { mode: "bigint" }).notNull(),
+    merchantKey: text("merchant_key").notNull(),
+    runByStaff: uuid("run_by_staff").references(() => staffUsers.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      name: "card_simulations_recurring_item_organization_fk",
+      columns: [table.recurringItemId, table.organizationId],
+      foreignColumns: [recurringItems.id, recurringItems.organizationId],
+    }),
+    foreignKey({
+      name: "card_simulations_bill_organization_fk",
+      columns: [table.billId, table.organizationId],
+      foreignColumns: [bills.id, bills.organizationId],
+    }),
+    uniqueIndex("card_simulations_transaction_token_unique").on(
+      table.lithicTransactionToken,
+    ),
+    index("card_simulations_bill_idx").on(table.billId),
+    check("card_simulations_amount_positive", sql`${table.amountUsdCents} > 0`),
   ],
 );
 
@@ -326,3 +484,5 @@ export type Cardholder = typeof cardholders.$inferSelect;
 export type Card = typeof cards.$inferSelect;
 export type CardLoad = typeof cardLoads.$inferSelect;
 export type CardPurchase = typeof cardPurchases.$inferSelect;
+export type CardMerchant = typeof cardMerchants.$inferSelect;
+export type CardSimulation = typeof cardSimulations.$inferSelect;

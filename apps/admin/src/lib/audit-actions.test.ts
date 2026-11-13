@@ -29,6 +29,19 @@ describe("auditActionLabel", () => {
     expect(new Set(labels).size).toBe(TREASURY_ACTIONS.length);
   });
 
+  it("labels both sandbox Card purchase actions apart, one saying its outcome is unknown", () => {
+    // #when
+    const labels = [
+      auditActionLabel("card_simulation.made"),
+      auditActionLabel("card_simulation.outcome_unknown"),
+    ];
+
+    // #then
+    expect(labels[1]).toContain("unknown");
+    expect(new Set(labels).size).toBe(2);
+    expect(labels).not.toContain(null);
+  });
+
   it("has none for an action it doesn't know, so the code is shown alone", () => {
     // #then
     expect(auditActionLabel("payout.resolved")).toBeNull();

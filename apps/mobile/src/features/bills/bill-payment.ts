@@ -17,6 +17,7 @@ import type { PreviewRow } from "../claims/payment";
 import { ApiError } from "../../lib/api";
 import { formatKesCents, formatUsdc } from "../../lib/money";
 import { storedAmount } from "./bill-amount";
+import { automaticCard } from "./bill-card";
 
 /**
  * Pay and Pay all's display logic (spec §6.20): which bills can be paid,
@@ -29,14 +30,16 @@ const isUnpaid = (status: BillStatus): boolean =>
 
 /**
  * Whether the app offers to pay the bill through Expendi: unpaid, not a
- * salary (those go with their payroll run), a payee Expendi can pay, and
- * its amount entered in the payee's currency. The API checks it all again.
+ * salary (those go with their payroll run), not one a company-held card
+ * pays, a payee Expendi can pay, and its amount entered in the payee's
+ * currency. The API checks it all again.
  */
 export function isPayable(bill: Bill): boolean {
   const { method } = bill.payee;
   return (
     isUnpaid(bill.status) &&
     bill.payrollRunId === null &&
+    automaticCard(bill) === null &&
     method !== null &&
     method !== "outside" &&
     !bill.payee.archived &&

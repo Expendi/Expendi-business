@@ -6,6 +6,7 @@ import { Effect } from "effect";
 import type {
   BillCurrency,
   BillStatus,
+  CardState,
   CreateRecurringItemFields,
   OverviewHeading,
   PayeeKind,
@@ -22,14 +23,17 @@ import {
 } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
-import type { RecurringItemRow } from "../../db/schema/index.js";
+import type { BillRow, RecurringItemRow } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { Tenant } from "../../middleware/tenant.js";
 import type { AuditActor } from "../audit/audit-log.js";
+import type { ActiveCashOutLimits } from "../cash-out/active-limits.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { MerchantLinkChanges, PayingCard } from "./paid-by-card.js";
 import {
   bills,
+  cards,
   categories,
   payees,
   recurringItems,
@@ -38,22 +42,33 @@ import { query, withScope } from "../../db/scope.js";
 import { BadRequest, Conflict, NotFound } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { nairobiDate } from "../bills/status.js";
+import { lockCardProgram } from "../cards/balance.js";
 import {
   activeCashOutLimits,
   checkCashOutAmount,
 } from "../cash-out/active-limits.js";
 import { createNextRecurringBill, lockOutstandingBills } from "./next-bill.js";
+import {
+  changedMerchantLinks,
+  lockMerchantsToSwitch,
+  lockPayingCard,
+  moveCardMerchants,
+  releaseCardMerchants,
+} from "./paid-by-card.js";
 import { dueOnOrAfter, firstDueOn } from "./schedule.js";
 
 /**
  * Recurring payments (spec §6.20), for admins only (spec §4): the routes
  * admit admins, and row-level security hides them from any other role.
  *
- * - The payee, schedule, start date and how it's paid are set once. To
- *   change them, end the payment and set up a new one.
+ * - The payee, schedule and start date are set once. To change them, end
+ *   the payment and set up a new one.
  * - Changes to the amount, category, heading, reminder or end date apply to
  *   bills still to come. The bill already created keeps its amount unless
  *   it's changed on the bill itself.
+ * - Changing how it's paid, e.g. from outside Expendi to a company-held
+ *   card, or to another card, also rewrites the bill still to pay, whose
+ *   currency and amount follow the payment's.
  * - Pausing stops new bills until resumed, and the bills already there
  *   stay. Resuming skips the due dates that passed while paused.
  * - Ending is final; the bills already there stay.
@@ -83,6 +98,13 @@ export interface RecurringItemView {
   readonly startsOn: string;
   readonly endsOn: string | null;
   readonly payVia: RecurringPayVia;
+  /** The company-held card that pays it, exactly when `payVia` is `card`. */
+  readonly card: {
+    readonly id: string;
+    readonly nickname: string;
+    readonly lastFour: string;
+    readonly state: CardState;
+  } | null;
   readonly reminderDays: number;
   readonly active: boolean;
   readonly nextDueOn: string | null;
@@ -93,6 +115,7 @@ export interface RecurringItemView {
     readonly currency: BillCurrency;
     readonly amountKes: bigint | null;
     readonly amountUsdc: bigint | null;
+    readonly cardDeclinedAt: Date | null;
   } | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -133,6 +156,26 @@ const ended = new Conflict({
 const payroll = new Conflict({
   message: "This is a salary. Change it in payroll.",
 });
+const pickCard = new BadRequest({
+  message: "Pick the company-held card that pays it.",
+});
+const billBeingPaid = new Conflict({
+  message:
+    "Its bill is being paid through Expendi. Change how it's paid once that payment finishes.",
+});
+const changedMeanwhile = new Conflict({
+  message:
+    "Someone changed how this recurring payment is paid just now. Try again.",
+});
+const billPaymentFailed = new Conflict({
+  message:
+    "Its bill's payment through Expendi failed. Retry it, mark it paid or cancel it before changing how it's paid.",
+});
+
+const paidOutsideOnly = (payeeName: string) =>
+  new BadRequest({
+    message: `${payeeName} is paid outside Expendi, so this payment is too.`,
+  });
 
 const userActor = (tenant: Tenant): AuditActor => ({
   type: "user",
@@ -163,6 +206,10 @@ const itemColumns = {
   nextBillCurrency: nextBill.currency,
   nextBillAmountKes: nextBill.amountKes,
   nextBillAmountUsdc: nextBill.amountUsdc,
+  nextBillCardDeclinedAt: nextBill.cardDeclinedAt,
+  cardNickname: cards.nickname,
+  cardLastFour: cards.lastFour,
+  cardState: cards.state,
 };
 
 /** Each item with its bill still owed; the unique index allows at most one. */
@@ -172,6 +219,7 @@ const selectItems = (tx: Transaction, where: SQL | undefined) =>
     .from(recurringItems)
     .innerJoin(payees, eq(payees.id, recurringItems.payeeId))
     .innerJoin(categories, eq(categories.id, recurringItems.categoryId))
+    .leftJoin(cards, eq(cards.id, recurringItems.cardId))
     .leftJoin(
       nextBill,
       and(
@@ -206,6 +254,18 @@ function toView(row: SelectedItem): RecurringItemView {
     startsOn: item.startsOn,
     endsOn: item.endsOn,
     payVia: item.payVia,
+    card:
+      item.cardId === null ||
+      row.cardNickname === null ||
+      row.cardLastFour === null ||
+      row.cardState === null
+        ? null
+        : {
+            id: item.cardId,
+            nickname: row.cardNickname,
+            lastFour: row.cardLastFour,
+            state: row.cardState,
+          },
     reminderDays: item.reminderDays,
     active: item.active,
     nextDueOn: item.nextDueOn,
@@ -222,6 +282,7 @@ function toView(row: SelectedItem): RecurringItemView {
             currency: row.nextBillCurrency,
             amountKes: row.nextBillAmountKes,
             amountUsdc: row.nextBillAmountUsdc,
+            cardDeclinedAt: row.nextBillCardDeclinedAt,
           },
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
@@ -342,10 +403,20 @@ function checkCategory(
 
 /**
  * A payee paid in USDC is billed in USD, every other payee in KES (spec
- * §6.19). An amount typed in the other currency is refused, not converted.
+ * §6.19), and a payment by company-held card in USD, the card's currency,
+ * whoever the payee. An amount typed in the other currency is refused, not
+ * converted.
  */
+function currencyOf(
+  payVia: RecurringPayVia,
+  payeeMethod: PayeeMethod | null,
+): BillCurrency {
+  return payVia === "card" ? "usd" : currencyForPayeeMethod(payeeMethod);
+}
+
 function checkCurrency(
   payeeName: string,
+  payVia: RecurringPayVia,
   currency: BillCurrency,
   fields: {
     readonly amountKes?: bigint | null | undefined;
@@ -359,14 +430,26 @@ function checkCurrency(
         ? "kes"
         : null;
   if (typedIn === null || typedIn === currency) return Effect.void;
-  return Effect.fail(
-    new BadRequest({
-      message:
-        currency === "usd"
-          ? `${payeeName} is paid in USDC, so enter the amount in USD.`
-          : `${payeeName} is paid in KES, so enter the amount in KES.`,
-    }),
-  );
+  const message =
+    payVia === "card"
+      ? "A payment by company-held card is estimated in USD. Enter the amount in USD."
+      : currency === "usd"
+        ? `${payeeName} is paid in USDC, so enter the amount in USD.`
+        : `${payeeName} is paid in KES, so enter the amount in KES.`;
+  return Effect.fail(new BadRequest({ message }));
+}
+
+/** The card that's to pay it when `payVia` is `card`, held against closing; otherwise none. */
+function payingCardFor(
+  tx: Transaction,
+  organizationId: string,
+  payVia: RecurringPayVia | undefined,
+  cardId: string | null | undefined,
+): Effect.Effect<PayingCard | null, BadRequest | Conflict | DatabaseError> {
+  if (payVia !== "card") return Effect.succeed(null);
+  return cardId == null
+    ? Effect.fail(pickCard)
+    : lockPayingCard(tx, organizationId, cardId);
 }
 
 /** The amount columns for `value` in `currency`; the other currency's is null. */
@@ -446,7 +529,8 @@ const earlier = (a: string, b: string): string => (a < b ? a : b);
 /**
  * Sets up a recurring payment and creates its first bill, due on the
  * schedule's first date on or after the start (spec §6.20). A payee paid
- * outside Expendi can only have payments made outside it.
+ * outside Expendi can only have payments made outside it, or by a
+ * company-held card.
  */
 export function createRecurringItem(
   tenant: Tenant,
@@ -474,17 +558,24 @@ export function createRecurringItem(
     const itemId = yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
         const audit = yield* AuditLog;
+        // The order in `merchants.ts`: a card's first purchase decides which
+        // payment its merchant pays under the card program's lock.
+        if (fields.payVia === "card") {
+          yield* lockCardProgram(tx, organizationId);
+        }
+        const card = yield* payingCardFor(
+          tx,
+          organizationId,
+          fields.payVia,
+          fields.cardId,
+        );
         const payee = yield* findPayee(tx, organizationId, fields.payeeId);
         if (payee.method === "outside" && fields.payVia === "expendi") {
-          return yield* Effect.fail(
-            new BadRequest({
-              message: `${payee.name} is paid outside Expendi, so this payment is too.`,
-            }),
-          );
+          return yield* Effect.fail(paidOutsideOnly(payee.name));
         }
         yield* checkCategory(tx, organizationId, fields.categoryId);
-        const currency = currencyForPayeeMethod(payee.method);
-        yield* checkCurrency(payee.name, currency, fields);
+        const currency = currencyOf(fields.payVia, payee.method);
+        yield* checkCurrency(payee.name, fields.payVia, currency, fields);
         yield* checkCashOutAmount(payee.method, amountKes, limits);
         const values = {
           payeeId: fields.payeeId,
@@ -499,6 +590,7 @@ export function createRecurringItem(
           ),
           ...schedule,
           payVia: fields.payVia,
+          cardId: card?.id ?? null,
           reminderDays: fields.reminderDays,
           nextDueOn,
         };
@@ -527,6 +619,8 @@ export function createRecurringItem(
 }
 
 const CHANGEABLE = [
+  "payVia",
+  "cardId",
   "currency",
   "amountKes",
   "amountUsdc",
@@ -557,11 +651,134 @@ function diff(
   return { before, after };
 }
 
+type BillRewrite = Partial<
+  Pick<
+    BillRow,
+    | "variable"
+    | "currency"
+    | "amountKes"
+    | "amountUsdc"
+    | "cardDeclinedAt"
+    | "cardDeclineReason"
+  >
+>;
+
+/** The payment's new currency, and the amount the request typed, if any. */
+interface SwitchedCurrency {
+  readonly currency: BillCurrency;
+  readonly typed: bigint | null | undefined;
+  /** Set when it's now paid through Expendi: what one cash-out can send. */
+  readonly cashOut: {
+    readonly method: PayeeMethod | null;
+    readonly limits: ActiveCashOutLimits | null;
+  } | null;
+}
+
+/**
+ * How the payment is paid changed: its bill still to pay forgets a decline
+ * by the card that no longer pays it and, if the payment changed its way of
+ * paying, moves to the payment's currency. Its amount is then the one typed,
+ * or none, which makes it variable; if the currency stays, it keeps its own
+ * amount, variable or not. Now paid through Expendi, that amount must be one
+ * a cash-out can send, as when a bill is entered. A bill being paid through
+ * Expendi, or whose payment failed, has to finish first. Its lock is already
+ * held (`lockOutstandingBills`).
+ */
+function rewriteOutstandingBill(
+  tx: Transaction,
+  tenant: Tenant,
+  itemId: string,
+  switched: SwitchedCurrency | null,
+): Effect.Effect<void, BadRequest | Conflict | DatabaseError, AuditLog> {
+  const { organizationId } = tenant;
+  return Effect.gen(function* () {
+    const audit = yield* AuditLog;
+    const [bill] = yield* query(() =>
+      tx
+        .select()
+        .from(bills)
+        .where(
+          and(
+            eq(bills.organizationId, organizationId),
+            eq(bills.recurringItemId, itemId),
+            inArray(bills.status, [...OUTSTANDING_BILL_STATUSES]),
+          ),
+        ),
+    );
+    if (!bill) return;
+    if (bill.status === "paying") return yield* Effect.fail(billBeingPaid);
+    if (bill.status === "payout_failed") {
+      return yield* Effect.fail(billPaymentFailed);
+    }
+    const keepsOwn =
+      switched !== null &&
+      switched.typed === undefined &&
+      switched.currency === bill.currency;
+    const amounts =
+      switched === null
+        ? null
+        : amountColumns(
+            switched.currency,
+            switched.typed !== undefined
+              ? switched.typed
+              : !keepsOwn
+                ? null
+                : switched.currency === "usd"
+                  ? bill.amountUsdc
+                  : bill.amountKes,
+          );
+    if (amounts !== null && switched?.cashOut) {
+      yield* checkCashOutAmount(
+        switched.cashOut.method,
+        amounts.amountKes,
+        switched.cashOut.limits,
+      );
+    }
+    const next: BillRewrite = {
+      ...(amounts && {
+        ...amounts,
+        variable: keepsOwn
+          ? bill.variable
+          : amounts.amountKes === null && amounts.amountUsdc === null,
+      }),
+      cardDeclinedAt: null,
+      cardDeclineReason: null,
+    };
+    const before: BillRewrite = {};
+    const after: BillRewrite = {};
+    for (const key of Object.keys(next) as (keyof BillRewrite)[]) {
+      if (next[key] !== bill[key]) {
+        Object.assign(before, { [key]: bill[key] });
+        Object.assign(after, { [key]: next[key] });
+      }
+    }
+    if (Object.keys(after).length === 0) return;
+    yield* query(() =>
+      tx.update(bills).set(after).where(eq(bills.id, bill.id)),
+    );
+    yield* audit.record(tx, {
+      actor: userActor(tenant),
+      organizationId,
+      action: "bill.updated",
+      entity: { type: "bill", id: bill.id },
+      before,
+      after,
+    });
+  });
+}
+
 /**
  * Changes what the bills still to come will be. An end date before the
  * next due date ends the payment there. A new amount is in the payee's
  * currency as it is now: if their method changed between KES and USDC,
- * entering it moves the payment to that currency.
+ * entering it moves the payment to that currency. A payment by
+ * company-held card is in USD whoever the payee.
+ *
+ * Changing how it's paid moves it to that currency. Its amount carries over
+ * when the currency stays; otherwise it's the one in the request, or none.
+ * The bill still to pay is rewritten to match (`rewriteOutstandingBill`).
+ * Leaving a card releases the merchants linked to the payment on it, and
+ * moving to another card takes them along (`paid-by-card.ts`).
  */
 export function updateRecurringItem(
   tenant: Tenant,
@@ -571,13 +788,41 @@ export function updateRecurringItem(
   const { organizationId } = tenant;
   return Effect.gen(function* () {
     const limits =
-      changes.amountKes !== undefined && changes.amountKes !== null
+      (changes.amountKes !== undefined && changes.amountKes !== null) ||
+      changes.payVia === "expendi"
         ? yield* activeCashOutLimits
         : null;
     yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
         const audit = yield* AuditLog;
+        // The card program, the card, then its merchants, then the bill,
+        // then the item: the order in `merchants.ts`, since settling a bill,
+        // by card or otherwise, locks the bill before its item.
+        if (changes.payVia !== undefined) {
+          yield* lockCardProgram(tx, organizationId);
+        }
+        const card = yield* payingCardFor(
+          tx,
+          organizationId,
+          changes.payVia,
+          changes.cardId,
+        );
+        const lockedCardId =
+          changes.payVia === undefined
+            ? undefined
+            : yield* lockMerchantsToSwitch(
+                tx,
+                organizationId,
+                itemId,
+                card?.id ?? null,
+              );
+        if (changes.payVia !== undefined) {
+          yield* lockOutstandingBills(tx, organizationId, itemId);
+        }
         const row = yield* lockChangeableItem(tx, organizationId, itemId);
+        if (lockedCardId !== undefined && lockedCardId !== row.cardId) {
+          return yield* Effect.fail(changedMeanwhile);
+        }
         if (
           changes.categoryId !== undefined &&
           changes.categoryId !== row.categoryId
@@ -589,24 +834,51 @@ export function updateRecurringItem(
         if (endsOn !== null && endsOn < row.startsOn) {
           return yield* Effect.fail(endsBeforeStart);
         }
+        const payVia = changes.payVia ?? row.payVia;
+        const cardId = payVia === "card" ? (card?.id ?? row.cardId) : null;
+        const switching = payVia !== row.payVia;
         const typed =
           changes.amountUsd !== undefined
             ? changes.amountUsd
             : changes.amountKes;
-        const amounts =
-          typed === undefined
-            ? {}
+        const priced =
+          typed === undefined && !switching
+            ? null
             : yield* Effect.gen(function* () {
                 const payee = yield* payeeOfItem(tx, row);
-                const currency = currencyForPayeeMethod(payee.method);
-                yield* checkCurrency(payee.name, currency, changes);
-                if (row.payVia === "expendi") {
-                  yield* checkCashOutAmount(payee.method, typed, limits);
+                if (
+                  switching &&
+                  payVia === "expendi" &&
+                  payee.method === "outside"
+                ) {
+                  return yield* Effect.fail(paidOutsideOnly(payee.name));
                 }
-                return amountColumns(currency, typed);
+                const currency = currencyOf(payVia, payee.method);
+                yield* checkCurrency(payee.name, payVia, currency, changes);
+                const carried =
+                  currency !== row.currency
+                    ? null
+                    : currency === "usd"
+                      ? row.amountUsdc
+                      : row.amountKes;
+                const columns = amountColumns(
+                  currency,
+                  typed === undefined ? carried : typed,
+                );
+                if (payVia === "expendi") {
+                  yield* checkCashOutAmount(
+                    payee.method,
+                    columns.amountKes,
+                    limits,
+                  );
+                }
+                return { columns, payeeMethod: payee.method };
               });
+        const amounts = priced?.columns ?? null;
         const { before, after } = diff(row, {
           ...amounts,
+          payVia,
+          cardId,
           categoryId: changes.categoryId,
           overviewHeading: changes.overviewHeading,
           reminderDays: changes.reminderDays,
@@ -622,13 +894,41 @@ export function updateRecurringItem(
             .set(after)
             .where(eq(recurringItems.id, row.id)),
         );
+        const howPaidChanged = switching || cardId !== row.cardId;
+        if (howPaidChanged) {
+          yield* rewriteOutstandingBill(
+            tx,
+            tenant,
+            row.id,
+            switching && priced !== null
+              ? {
+                  currency: priced.columns.currency,
+                  typed,
+                  cashOut:
+                    payVia === "expendi"
+                      ? { method: priced.payeeMethod, limits }
+                      : null,
+                }
+              : null,
+          );
+        }
+        const merchants: MerchantLinkChanges | null =
+          row.cardId === null || !howPaidChanged
+            ? null
+            : cardId === null
+              ? yield* releaseCardMerchants(tx, organizationId, row.id)
+              : yield* moveCardMerchants(tx, organizationId, row.id, cardId);
         yield* audit.record(tx, {
           actor: userActor(tenant),
           organizationId,
           action: "recurring_item.updated",
           entity: { type: "recurring_item", id: row.id },
           before,
-          after,
+          after: {
+            ...after,
+            ...(merchants !== null &&
+              changedMerchantLinks(merchants) && { cardMerchants: merchants }),
+          },
         });
       }),
     );

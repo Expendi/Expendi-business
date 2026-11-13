@@ -56,6 +56,7 @@ import {
   BILL_STATUSES,
   BillAmount,
   BillStatusBadge,
+  CardBillBadge,
   HEADING_LABELS,
 } from "~/features/bills/bill-status";
 import { METHOD_LABELS } from "~/features/payees/payee-display";
@@ -357,6 +358,7 @@ function BillPhoneCard({
       flags={
         <>
           <BillStatusBadge status={bill.status} />
+          <CardBillBadge bill={bill} />
           <Markers bill={bill} />
         </>
       }

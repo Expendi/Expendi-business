@@ -13,11 +13,14 @@ import type { PasskeyAssertion } from "~/lib/passkeys";
 import { createApiClient } from "~/lib/api";
 import { approveWithPasskey } from "~/lib/approval";
 import {
+  automaticCardOf,
   billPreviewRows,
+  cardWontPayReason,
   confirmBillPayment,
   describeBillPaymentResult,
   holdFrom,
   isPayable,
+  lastCardBillNote,
   prepareBillPayment,
   toggleSelection,
   unpayableReason,
@@ -310,6 +313,128 @@ describe("isPayable", () => {
         "The payee's payment method changed: enter the amount again.",
       ],
     });
+  });
+
+  it("never offers Pay on a bill a company-held card pays, which explains itself instead", () => {
+    // #given
+    const card = { id: id(80), nickname: "Software", lastFour: "0004" };
+    const usdPayee = { ...makeBill().payee, method: "usdc" as const };
+    const automatic = makeBill({
+      payee: usdPayee,
+      currency: "usd",
+      amountKes: null,
+      amountUsdc: "20000000",
+      card,
+    });
+    const paidByCard = makeBill({ ...automatic, status: "paid_by_card" });
+
+    // #then
+    expect({
+      automatic: [
+        isPayable(automatic),
+        unpayableReason(automatic),
+        automaticCardOf(automatic),
+      ],
+      paidByCard: [isPayable(paidByCard), automaticCardOf(paidByCard)],
+      withoutCard: isPayable({ ...automatic, card: null }),
+    }).toEqual({
+      automatic: [false, null, card],
+      paidByCard: [false, null],
+      withoutCard: true,
+    });
+  });
+
+  it("says why the card won't pay a bill once its recurring payment is paused or has ended, or the card is frozen or closed", () => {
+    // #given
+    const card = { id: id(80), nickname: "Software", lastFour: "0004" };
+    const recurring = {
+      id: id(81),
+      state: "active" as const,
+      schedule: "monthly" as const,
+      scheduleDay: 20,
+      startsOn: "2026-09-20",
+    };
+    const owed = makeBill({ card, recurring });
+    const inState = (state: "active" | "paused" | "ended") =>
+      cardWontPayReason({ ...owed, recurring: { ...recurring, state } });
+
+    // #then
+    expect({
+      active: inState("active"),
+      paused: inState("paused"),
+      ended: inState("ended"),
+      frozen: cardWontPayReason({
+        ...owed,
+        card: { ...card, state: "frozen" },
+      }),
+      closed: cardWontPayReason({
+        ...owed,
+        card: { ...card, state: "closed" },
+      }),
+      open: cardWontPayReason({ ...owed, card: { ...card, state: "open" } }),
+      paid: cardWontPayReason({
+        ...owed,
+        status: "paid_by_card",
+        recurring: { ...recurring, state: "ended" },
+      }),
+    }).toEqual({
+      active: null,
+      paused: "Paused: card purchases from Kenya Power are declined.",
+      ended: "Ended: card purchases from Kenya Power are declined.",
+      frozen: "Card •••• 0004 is frozen.",
+      closed: "Card •••• 0004 is closed.",
+      open: null,
+      paid: null,
+    });
+  });
+
+  it("lets the card pay the last bill of a payment that ended, unless it's paused", () => {
+    // #given
+    const card = {
+      id: id(80),
+      nickname: "Software",
+      lastFour: "0004",
+      state: "open" as const,
+    };
+    const ended = {
+      id: id(81),
+      state: "ended" as const,
+      schedule: "monthly" as const,
+      scheduleDay: 20,
+      startsOn: "2026-09-20",
+    };
+    const lastBill = (
+      active: boolean | undefined,
+      cardState: "open" | "frozen" = "open",
+    ) =>
+      makeBill({
+        card: { ...card, state: cardState },
+        recurring: { ...ended, active },
+      });
+
+    // #when
+    const said = [
+      lastBill(true),
+      lastBill(false),
+      lastBill(undefined),
+      lastBill(true, "frozen"),
+    ].map((bill) => [cardWontPayReason(bill), lastCardBillNote(bill)]);
+
+    // #then
+    expect(said).toEqual([
+      [null, "Card •••• 0004 pays this last bill, and nothing after it."],
+      ["Ended: card purchases from Kenya Power are declined.", null],
+      ["Ended: card purchases from Kenya Power are declined.", null],
+      ["Card •••• 0004 is frozen.", null],
+    ]);
+    expect(
+      lastCardBillNote(
+        makeBill({
+          card,
+          recurring: { ...ended, state: "active", active: true },
+        }),
+      ),
+    ).toBeNull();
   });
 });
 

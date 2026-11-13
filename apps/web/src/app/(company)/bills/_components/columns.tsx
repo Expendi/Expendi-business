@@ -17,7 +17,12 @@ import { DataTableColumnHeader } from "~/components/data/data-table";
 import { storedAmount } from "~/features/bills/bill-amount";
 import { dueHint, rowDate } from "~/features/bills/bill-list";
 import { isPayable } from "~/features/bills/bill-payment";
-import { BillAmount, BillStatusBadge } from "~/features/bills/bill-status";
+import {
+  BillAmount,
+  BillStatusBadge,
+  CardBillBadge,
+  lastFourOf,
+} from "~/features/bills/bill-status";
 import { METHOD_LABELS } from "~/features/payees/payee-display";
 import { formatIsoDate } from "~/lib/dates";
 
@@ -84,6 +89,22 @@ export function Markers({ bill }: { bill: Bill }): JSX.Element {
 
 export const metaOf = (bill: Bill): string =>
   [bill.reference, bill.category.name].filter(Boolean).join(" · ");
+
+/** How it's paid: the company-held card for a bill a card pays, the payee's method otherwise. */
+export function paidByText(bill: Bill): string {
+  if (bill.card) return `Company-held card ${lastFourOf(bill.card)}`;
+  return bill.payee.method ? METHOD_LABELS[bill.payee.method] : "Not set";
+}
+
+/** The status, then whether a company-held card pays it or declined it. */
+export function BillStatusCell({ bill }: { bill: Bill }): JSX.Element {
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      <BillStatusBadge status={bill.status} />
+      <CardBillBadge bill={bill} />
+    </span>
+  );
+}
 
 export function BillCheckbox({
   bill,
@@ -167,10 +188,7 @@ export function billColumns({
       id: "method",
       accessorFn: (bill) => bill.payee.method ?? "",
       header: "Paid by",
-      cell: ({ row }) =>
-        row.original.payee.method
-          ? METHOD_LABELS[row.original.payee.method]
-          : "Not set",
+      cell: ({ row }) => paidByText(row.original),
       enableSorting: false,
       meta: {
         collapse: "lg",
@@ -193,7 +211,7 @@ export function billColumns({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Status" />
       ),
-      cell: ({ row }) => <BillStatusBadge status={row.original.status} />,
+      cell: ({ row }) => <BillStatusCell bill={row.original} />,
       meta: { label: "Status" },
     },
   ];

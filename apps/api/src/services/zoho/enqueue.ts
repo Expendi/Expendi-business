@@ -145,8 +145,8 @@ export function enqueueRecordedSpending(
 }
 
 /**
- * A bill paid through Expendi or marked paid outside. Salary bills reach
- * Zoho as part of their payroll run's one expense.
+ * A bill paid through Expendi, marked paid outside, or paid by card. Salary
+ * bills reach Zoho as part of their payroll run's one expense.
  */
 export function enqueuePaidBill(
   tx: Transaction,
@@ -162,7 +162,7 @@ export function enqueuePaidBill(
           and(
             eq(bills.id, billId),
             eq(bills.organizationId, organizationId),
-            inArray(bills.status, ["paid", "paid_outside"]),
+            inArray(bills.status, ["paid", "paid_outside", "paid_by_card"]),
             isNull(bills.payrollRunId),
           ),
         ),

@@ -15,6 +15,7 @@ import {
   lockCardProgram,
   readCardBalance,
 } from "./balance.js";
+import { merchantKeyOf, merchantRefused } from "./merchants.js";
 import {
   cardByLithicToken,
   companyScope,
@@ -23,8 +24,9 @@ import {
 
 /**
  * Auth Stream Access (spec §6.25): Lithic asks before each spend, and this
- * answers from the Card balance alone, since the sandbox can't hold one. It
- * must answer fast, so it never calls Lithic or Paycrest.
+ * answers from the Card balance alone, since the sandbox can't hold one,
+ * and from the merchants a company-held card turns away. It must answer
+ * fast, so it never calls Lithic or Paycrest.
  *
  * Holds are serialised on the company's card program row, the same lock as
  * Card loads, so two authorizations can't both spend the same balance.
@@ -48,6 +50,7 @@ export const cardAuthorizationRequestSchema = z.looseObject({
     .optional(),
   merchant: z
     .looseObject({
+      acceptor_id: z.string().nullish(),
       descriptor: z.string().nullish(),
       mcc: z.string().nullish(),
       city: z.string().nullish(),
@@ -63,7 +66,11 @@ export type CardAuthorizationRequest = z.infer<
 export type AuthorizationDecision =
   | {
       readonly token: string;
-      readonly result: "APPROVED" | "INSUFFICIENT_FUNDS" | "CARD_PAUSED";
+      readonly result:
+        | "APPROVED"
+        | "INSUFFICIENT_FUNDS"
+        | "CARD_PAUSED"
+        | "UNAUTHORIZED_MERCHANT";
     }
   | {
       readonly token: string;
@@ -106,6 +113,7 @@ function holdSpend(
         .select({
           membershipId: cards.membershipId,
           defaultCategoryId: cards.defaultCategoryId,
+          companyHeld: cards.companyHeld,
           state: cards.state,
           closeRequestedAt: cards.closeRequestedAt,
         })
@@ -132,6 +140,21 @@ function holdSpend(
         ? { token, result: "APPROVED" }
         : { token, result: "INSUFFICIENT_FUNDS" };
     }
+    // A company-held card turns away a merchant admins didn't recognise, or
+    // whose recurring payment is paused, ended or paid another way; any other
+    // merchant passes with nobody present (spec §6.25).
+    const merchantKey = card.companyHeld
+      ? merchantKeyOf(
+          request.merchant?.acceptor_id,
+          request.merchant?.descriptor,
+        )
+      : null;
+    if (
+      merchantKey !== null &&
+      (yield* merchantRefused(tx, cardId, merchantKey))
+    ) {
+      return { token, result: "UNAUTHORIZED_MERCHANT" };
+    }
     const spend = spendCents(request);
     if (spend === 0n) return { token, result: "APPROVED" };
     const totals = yield* readCardBalance(tx, organizationId);
@@ -148,6 +171,7 @@ function holdSpend(
           lithicTransactionToken: token,
           status: "pending",
           merchant: merchantNameOf(request.merchant?.descriptor),
+          merchantKey,
           mcc: request.merchant?.mcc ?? "",
           merchantCity: request.merchant?.city ?? null,
           merchantCountry: request.merchant?.country ?? null,

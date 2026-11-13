@@ -372,7 +372,7 @@ describe("POST /webhooks/lithic", () => {
     const declines = await outboxOf(db, card.company, "card_purchase_declined");
     expect(declines).toHaveLength(2);
     expect(declines.map((row) => row.body)).toContain(
-      "ACME SOFTWARE: It's over this card's monthly limit.",
+      "\"ACME SOFTWARE\": It's over this card's monthly limit.",
     );
   });
 

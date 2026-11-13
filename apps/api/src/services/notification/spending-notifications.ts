@@ -13,10 +13,12 @@ import type { DatabaseError } from "../../errors.js";
 import type { OutgoingNotification } from "./outgoing.js";
 import {
   bills,
+  cards,
   floatMovements,
   floats,
   payees,
   payrollRuns,
+  recurringItems,
 } from "../../db/schema/index.js";
 import { query } from "../../db/scope.js";
 
@@ -82,7 +84,11 @@ function kes(cents: bigint): string {
 
 const NONE: readonly OutgoingNotification[] = [];
 
-/** Due soon, due today, overdue: to admins, by push and email. */
+/**
+ * Due soon, due today, overdue: to admins, by push and email. A bill a
+ * company-held card pays is reminded only once overdue, as a Card purchase
+ * that hasn't arrived.
+ */
 export function billReminderNotifications(
   tx: Transaction,
   event: Extract<SpendingNotificationEvent, { kind: BillReminderKind }>,
@@ -97,9 +103,13 @@ export function billReminderNotifications(
         amountUsdc: bills.amountUsdc,
         payrollRunId: bills.payrollRunId,
         payeeName: payees.name,
+        payVia: recurringItems.payVia,
+        cardLastFour: cards.lastFour,
       })
       .from(bills)
       .innerJoin(payees, eq(payees.id, bills.payeeId))
+      .leftJoin(recurringItems, eq(recurringItems.id, bills.recurringItemId))
+      .leftJoin(cards, eq(cards.id, recurringItems.cardId))
       .where(
         and(
           eq(bills.id, event.billId),
@@ -114,6 +124,8 @@ export function billReminderNotifications(
       ) {
         return NONE;
       }
+      const byCard = bill.payVia === "card";
+      if (byCard && event.kind !== "bill_overdue") return NONE;
       const amount =
         bill.currency === "usd"
           ? bill.amountUsdc === null
@@ -126,8 +138,16 @@ export function billReminderNotifications(
         amount === null
           ? `The bill from ${bill.payeeName}`
           : `${amount} to ${bill.payeeName}`;
-      const { title, body } =
-        event.kind === "bill_due_soon"
+      const card =
+        bill.cardLastFour === null
+          ? "its company-held card"
+          : `card •••• ${bill.cardLastFour}`;
+      const { title, body } = byCard
+        ? {
+            title: "Card payment overdue",
+            body: `${bill.payeeName} hasn't charged ${card} yet for the bill due ${day(bill.dueOn)}. Check the subscription with them, or mark the bill paid if it was paid another way.`,
+          }
+        : event.kind === "bill_due_soon"
           ? {
               title: "Bill due soon",
               body: `${what} is due ${day(bill.dueOn)}.`,

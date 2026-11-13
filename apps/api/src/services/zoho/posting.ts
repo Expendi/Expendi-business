@@ -331,6 +331,11 @@ function expensePosting(
             "Only Expendi card spending recorded in Expendi syncs to Zoho.",
           );
         }
+        if (expense.billId !== null) {
+          return yield* notPostable(
+            "This spending is a bill paid by a company-held card, which syncs as the bill.",
+          );
+        }
         paidThroughAccountId = yield* paidFromAccountOf(
           { name: found.paidFromName, accountId: found.paidFromAccountId },
           expense.paidFromAccountId !== null,
@@ -407,6 +412,54 @@ function paidThroughExpendi(
   });
 }
 
+/**
+ * Marking a bill paid outside, or the Card purchase that paid it, recorded
+ * the payment as spending: its amount in KES and the account it came from.
+ */
+function billSpendingOf(
+  tx: Transaction,
+  organizationId: string,
+  billId: string,
+  missing: string,
+): Effect.Effect<
+  { readonly amountKes: bigint; readonly paidThroughAccountId: string },
+  CannotPost | DatabaseError
+> {
+  return Effect.gen(function* () {
+    const [spending] = yield* query(() =>
+      tx
+        .select({
+          amountKes: expenses.amountKes,
+          source: expenses.paidFromAccountId,
+          paidFromName: paidFromAccounts.name,
+          paidFromAccountId: paidFromAccounts.accountingAccountId,
+        })
+        .from(expenses)
+        .leftJoin(
+          paidFromAccounts,
+          eq(paidFromAccounts.id, expenses.paidFromAccountId),
+        )
+        .where(
+          and(
+            eq(expenses.billId, billId),
+            eq(expenses.organizationId, organizationId),
+          ),
+        ),
+    );
+    if (!spending) return yield* notPostable(missing);
+    return {
+      amountKes: spending.amountKes,
+      paidThroughAccountId: yield* paidFromAccountOf(
+        {
+          name: spending.paidFromName,
+          accountId: spending.paidFromAccountId,
+        },
+        spending.source !== null,
+      ),
+    };
+  });
+}
+
 function billPosting(
   tx: Transaction,
   sync: AccountingSyncRow,
@@ -464,43 +517,31 @@ function billPosting(
         break;
       }
       case "paid_outside": {
-        // Marking it paid outside recorded the payment as company spending:
-        // its amount in KES and the account it came from.
-        const [spending] = yield* query(() =>
-          tx
-            .select({
-              amountKes: expenses.amountKes,
-              source: expenses.paidFromAccountId,
-              paidFromName: paidFromAccounts.name,
-              paidFromAccountId: paidFromAccounts.accountingAccountId,
-            })
-            .from(expenses)
-            .leftJoin(
-              paidFromAccounts,
-              eq(paidFromAccounts.id, expenses.paidFromAccountId),
-            )
-            .where(
-              and(
-                eq(expenses.billId, bill.id),
-                eq(expenses.organizationId, sync.organizationId),
-              ),
-            ),
+        const spending = yield* billSpendingOf(
+          tx,
+          sync.organizationId,
+          bill.id,
+          "This bill's company spending entry can't be found.",
         );
-        if (!spending) {
-          return yield* notPostable(
-            "This bill's company spending entry can't be found.",
-          );
-        }
         amountKes = spending.amountKes;
-        paidThroughAccountId = yield* paidFromAccountOf(
-          {
-            name: spending.paidFromName,
-            accountId: spending.paidFromAccountId,
-          },
-          spending.source !== null,
-        );
+        paidThroughAccountId = spending.paidThroughAccountId;
         description = fitDescription(
           [found.payeeName, bill.notes, bill.paidOutsideNote],
+          [bill.reference ? `Ref ${bill.reference}` : null, usd],
+        );
+        break;
+      }
+      case "paid_by_card": {
+        const spending = yield* billSpendingOf(
+          tx,
+          sync.organizationId,
+          bill.id,
+          "This bill's card spending entry can't be found.",
+        );
+        amountKes = spending.amountKes;
+        paidThroughAccountId = spending.paidThroughAccountId;
+        description = fitDescription(
+          [found.payeeName, bill.notes],
           [bill.reference ? `Ref ${bill.reference}` : null, usd],
         );
         break;

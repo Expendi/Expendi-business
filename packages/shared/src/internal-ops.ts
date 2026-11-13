@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { billStatusSchema } from "./bills.js";
+import { cardStateSchema, usdCentsAmountSchema } from "./cards.js";
 import { auditEntrySchema } from "./internal-audit.js";
 import { membershipRoleSchema, membershipStatusSchema } from "./membership.js";
 import {
@@ -527,3 +529,92 @@ export const cashOutProviderConfirmedSchema = z.object({
 export type CashOutProviderConfirmed = z.infer<
   typeof cashOutProviderConfirmedSchema
 >;
+
+// Sandbox card purchases
+
+/**
+ * Staff run the sandbox Card purchase for one recurring payment paid by a
+ * company-held card now, as the daily job does on its bill's due date (spec
+ * §6.25). Left out, the amount is the payment's estimate and the merchant
+ * its usual pretend one; `newMerchant` charges from one the card hasn't
+ * seen. A sandbox stand-in until real merchants charge real cards.
+ */
+export const runCardSimulationRequestSchema = z.object({
+  recurringItemId: z.uuid({ error: "Choose a recurring payment." }),
+  amountUsd: usdCentsAmountSchema.optional(),
+  newMerchant: z.boolean().optional(),
+});
+
+export type RunCardSimulationRequest = z.input<
+  typeof runCardSimulationRequestSchema
+>;
+
+/**
+ * `unknown`: Lithic made the purchase but didn't say whether the purchase
+ * check approved it, or never confirmed making it at all.
+ */
+export const CARD_SIMULATION_RESULTS = [
+  "approved",
+  "declined",
+  "unknown",
+] as const;
+
+export const cardSimulationResultSchema = z.object({
+  /** Lithic's token for the Card purchase it made. */
+  transactionToken: z.string(),
+  result: z.enum(CARD_SIMULATION_RESULTS),
+  /** The pretend merchant's name, as the purchase shows it. */
+  merchant: z.string(),
+});
+
+export type CardSimulationResult = z.infer<typeof cardSimulationResultSchema>;
+
+/** A recurring payment paid by a company-held card, as staff see it. */
+export const staffCardPaidPaymentSchema = z.object({
+  id: z.uuid(),
+  payeeName: z.string(),
+  /** A paused one's purchases are declined, which is worth simulating too. */
+  state: z.enum(["active", "paused"]),
+  /** US cents per bill; null when it has no estimate. */
+  estimateUsdCents: digits.nullable(),
+  card: z.object({
+    nickname: z.string(),
+    lastFour: z.string(),
+    state: cardStateSchema,
+  }),
+  nextBill: z
+    .object({
+      id: z.uuid(),
+      dueOn: z.iso.date(),
+      status: billStatusSchema,
+      amountUsdCents: digits.nullable(),
+    })
+    .nullable(),
+  lastSimulation: z
+    .object({
+      at: z.iso.datetime(),
+      amountUsdCents: digits,
+      merchantKey: z.string(),
+      /**
+       * Null until the purchase check has seen the purchase; `unknown` when
+       * Lithic never confirmed making it.
+       */
+      result: z.enum(CARD_SIMULATION_RESULTS).nullable(),
+      byStaff: z.boolean(),
+    })
+    .nullable(),
+});
+
+export type StaffCardPaidPayment = z.infer<typeof staffCardPaidPaymentSchema>;
+
+/** `GET /internal/companies/:id/card-simulations`. */
+export const staffCardSimulationsSchema = z.object({
+  /**
+   * False when simulated purchases are turned off on the API
+   * (`CARD_SIMULATIONS_ENABLED`) or it has no Lithic key.
+   */
+  available: z.boolean(),
+  payments: z.array(staffCardPaidPaymentSchema),
+});
+
+export type StaffCardSimulations = z.infer<typeof staffCardSimulationsSchema>;

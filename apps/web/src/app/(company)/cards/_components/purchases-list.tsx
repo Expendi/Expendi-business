@@ -5,8 +5,7 @@ import { useMemo } from "react";
 import type { CardPurchase } from "@expendi-business/shared";
 
 import type { CardPurchaseFilters } from "~/lib/query-keys";
-import { personName } from "~/app/(company)/expenses/_components/expense-labels";
-import { EntityMark, PhoneCard } from "~/components/data/cells";
+import { PhoneCard } from "~/components/data/cells";
 import { DataTable, useDataTable } from "~/components/data/data-table";
 import { ResultsBody, ResultsFoot } from "~/components/data/results";
 import { EmptyState, ErrorState } from "~/components/data/states";
@@ -14,9 +13,16 @@ import { StatusBadge } from "~/components/data/status-badge";
 import { Button } from "~/components/ui/button";
 import { describeApiError } from "~/lib/api";
 import { formatNairobiDate } from "~/lib/dates";
-import { useCardPurchases } from "./cards-api";
-import { hasPurchaseFilter, PURCHASE_STATUS } from "./cards-display";
+import { useCardPurchase, useCardPurchases } from "./cards-api";
 import {
+  hasPurchaseFilter,
+  holderName,
+  NEEDS_ANSWER,
+  needsAnswer,
+  PURCHASE_STATUS,
+} from "./cards-display";
+import {
+  HolderMark,
   PurchaseAmount,
   purchaseColumns,
   PurchaseFlags,
@@ -55,7 +61,15 @@ export function PurchasesResults({
     [purchases.data],
   );
   const ids = rows.map((row) => row.id);
-  const open = openId ? rows.find((row) => row.id === openId) : undefined;
+  const listed = openId ? rows.find((row) => row.id === openId) : undefined;
+  // The sheet stays on the purchase the page has open even when the list
+  // doesn't hold it: a link from a bill can name one past the pages loaded
+  // so far, and a filter drops one once it's answered or has its receipt.
+  // Saving it fills its own query first, so the sheet never closes between.
+  const single = useCardPurchase(organizationId, openId ?? "", {
+    enabled: openId !== null && purchases.isSuccess && listed === undefined,
+  });
+  const open = listed ?? (single.data?.id === openId ? single.data : undefined);
   const index = open ? ids.indexOf(open.id) : -1;
   const filtered = hasPurchaseFilter(filters);
 
@@ -174,12 +188,12 @@ function PurchaseTable({
       renderPhoneCard={(row) => {
         const purchase = row.original;
         const status = PURCHASE_STATUS[purchase.status];
-        const holder = personName(purchase.holder);
+        const holder = holderName(purchase.holder);
         const refund = purchase.kind === "refund";
         return (
           <PhoneCard
             key={row.id}
-            mark={<EntityMark name={holder} kind="person" />}
+            mark={<HolderMark holder={purchase.holder} />}
             title={purchase.merchant}
             sub={
               refund
@@ -192,6 +206,9 @@ function PurchaseTable({
                   <StatusBadge tone="moving">Refund</StatusBadge>
                 ) : null}
                 <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+                {needsAnswer(purchase) ? (
+                  <StatusBadge tone="waiting">{NEEDS_ANSWER}</StatusBadge>
+                ) : null}
                 <PurchaseFlags purchase={purchase} />
               </>
             }

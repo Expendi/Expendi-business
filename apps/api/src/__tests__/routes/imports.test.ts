@@ -394,6 +394,31 @@ describe("spreadsheet import", () => {
     expect(report.errors).toBe(1);
   });
 
+  it("refuses a recurring payment paid by a company-held card, which needs its card picked", async () => {
+    // #given
+    await commit(request("payee", { name: "Anthropic" }));
+
+    // #when
+    const report = await preview(
+      request("recurring", {
+        payee: "Anthropic",
+        category: "Office",
+        heading: "subscriptions",
+        amount: "2500",
+        date: "2027-01-31",
+        scheduleDay: "31",
+        payVia: "card",
+      }),
+    );
+
+    // #then
+    expect(report).toMatchObject({ ready: 0, errors: 1, previewToken: null });
+    expect(report.rows[0]?.message).toBe(
+      "A payment by company-held card can't be imported. Set it up in Expendi and pick its card.",
+    );
+    expect((await readState()).recurring).toHaveLength(0);
+  });
+
   it("imports an open float with correct issued, spent and remaining totals and no payout", async () => {
     await commit(
       request("float", {

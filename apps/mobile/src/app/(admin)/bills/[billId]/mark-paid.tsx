@@ -33,7 +33,7 @@ export default function MarkBillPaidRoute(): JSX.Element {
   );
 }
 
-/** The admin paid the bill another way, e.g. by card or bank transfer (spec §6.20). */
+/** The admin paid the bill another way, e.g. by bank card or bank transfer (spec §6.20). */
 function MarkBillPaidScreen({ company }: { company: Company }): JSX.Element {
   const router = useRouter();
   const { billId } = useLocalSearchParams<{ billId: string }>();
@@ -72,8 +72,9 @@ function MarkBillPaidScreen({ company }: { company: Company }): JSX.Element {
   return (
     <Screen belowHeader>
       <Text className="text-base text-gray-600">
-        Record a bill you paid outside Expendi, e.g. by card or from the bank.
-        Nothing is sent from the wallet. It’s also recorded as company spending.
+        Record a bill you paid outside Expendi, e.g. by bank card or bank
+        transfer. Nothing is sent from the wallet. It’s also recorded as company
+        spending.
       </Text>
 
       <View className="gap-4">
@@ -89,7 +90,7 @@ function MarkBillPaidScreen({ company }: { company: Company }): JSX.Element {
           label="Note (optional)"
           value={note}
           onChangeText={setNote}
-          placeholder="Paid with the company card"
+          placeholder="Paid with the bank card"
           multiline
           maxLength={BILL_NOTES_MAX_LENGTH}
         />

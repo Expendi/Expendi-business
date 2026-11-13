@@ -10,11 +10,13 @@ import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
 import { Text } from "~/components/text";
-import { formatBillAmount } from "~/features/bills/bill-amount";
 import { formatIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
 import {
+  nextBillCardDeclined,
   nextDueDate,
+  payingCardLabel,
+  recurringAmount,
   scheduleInWords,
   STATE_LABELS,
 } from "~/features/recurring/recurring-draft";
@@ -88,7 +90,8 @@ function RecurringRow({
   item: RecurringItem;
   onPress: () => void;
 }): JSX.Element {
-  const amount = formatBillAmount(item) ?? "Variable";
+  const amount = recurringAmount(item, "Variable");
+  const card = payingCardLabel(item);
   const nextDue = nextDueDate(item);
   const when =
     item.state === "ended" && item.nextBill === null
@@ -97,10 +100,19 @@ function RecurringRow({
         ? scheduleInWords(item)
         : `Next due ${formatIsoDate(nextDue)}`;
   const state = STATE_LABELS[item.state];
+  const declined = nextBillCardDeclined(item);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${item.payee.name}, ${amount}, ${scheduleInWords(item)}, ${when}, ${state.label}`}
+      accessibilityLabel={[
+        item.payee.name,
+        amount,
+        scheduleInWords(item),
+        when,
+        ...(card ? [card] : []),
+        state.label,
+        ...(declined ? ["card declined"] : []),
+      ].join(", ")}
       onPress={onPress}
       className="gap-2 rounded-xl border border-gray-200 px-4 py-3 active:bg-gray-50"
     >
@@ -111,14 +123,18 @@ function RecurringRow({
           </Text>
           <Text className="text-sm text-gray-600">{scheduleInWords(item)}</Text>
           <Text className="text-sm text-gray-600">{when}</Text>
+          {card ? <Text className="text-sm text-gray-600">{card}</Text> : null}
         </View>
         <Text
-          className={`text-base font-semibold ${item.variable ? "text-amber-800" : "text-gray-900"}`}
+          className={`text-base font-semibold ${item.variable && item.payVia !== "card" ? "text-amber-800" : "text-gray-900"}`}
         >
           {amount}
         </Text>
       </View>
-      <Badge label={state.label} tone={state.tone} />
+      <View className="flex-row flex-wrap gap-2">
+        <Badge label={state.label} tone={state.tone} />
+        {declined ? <Badge label="Card declined" tone="warning" /> : null}
+      </View>
     </Pressable>
   );
 }

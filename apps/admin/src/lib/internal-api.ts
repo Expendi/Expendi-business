@@ -4,6 +4,7 @@ import type {
   AccountingSyncsResponse,
   AuditSearchQuery,
   AuditSearchResponse,
+  CardSimulationResult,
   CashOutProviderConfirmed,
   CashOutProviderControl,
   CashOutProviderPrepared,
@@ -31,6 +32,8 @@ import type {
   ResolveConfirmed,
   ResolvePrepared,
   ResolvePrepareRequest,
+  RunCardSimulationRequest,
+  StaffCardSimulations,
   StaffIntentQuoteDetail,
   StaffMeResponse,
   StaffPayoutDetail,
@@ -50,6 +53,7 @@ import {
   accountingSyncSchema,
   accountingSyncsResponseSchema,
   auditSearchResponseSchema,
+  cardSimulationResultSchema,
   cashOutProviderConfirmedSchema,
   cashOutProviderControlSchema,
   cashOutProviderPreparedSchema,
@@ -69,6 +73,7 @@ import {
   payoutRefetchResponseSchema,
   resolveConfirmedSchema,
   resolvePreparedSchema,
+  staffCardSimulationsSchema,
   staffIntentQuoteDetailSchema,
   staffMeResponseSchema,
   staffPayoutDetailSchema,
@@ -125,6 +130,13 @@ export interface InternalApi {
       action: StaffTreasuryAction,
       token: string,
     ) => Promise<StaffTreasuryConfirmed>;
+    /** Sandbox only: the company's recurring payments paid by a company-held card. */
+    cardSimulations: (companyId: string) => Promise<StaffCardSimulations>;
+    /** Makes the pretend merchant's Card purchase for one; needs `ops_admin`. */
+    runCardSimulation: (
+      companyId: string,
+      body: RunCardSimulationRequest,
+    ) => Promise<CardSimulationResult>;
     payoutQueue: (query: PayoutQueueQuery) => Promise<PayoutQueueResponse>;
     payout: (payoutId: string) => Promise<StaffPayoutDetail>;
     refetchPayout: (payoutId: string) => Promise<PayoutRefetchResponse>;
@@ -223,6 +235,9 @@ const treasuryActionPath = (
     `/moves/${encodeURIComponent(moveId)}/${TREASURY_ACTION_SEGMENTS[action]}/${step}`,
   );
 
+const cardSimulationsPath = (companyId: string) =>
+  `/internal/companies/${encodeURIComponent(companyId)}/card-simulations` as const;
+
 const zohoPath = (companyId: string, suffix = "") =>
   `/internal/companies/${encodeURIComponent(companyId)}/zoho${suffix}` as const;
 
@@ -293,6 +308,14 @@ export function createInternalApi(client: ApiClient): InternalApi {
           treasuryActionPath(companyId, moveId, action, "confirm"),
           { token },
           staffTreasuryConfirmedSchema,
+        ),
+      cardSimulations: (companyId) =>
+        client.get(cardSimulationsPath(companyId), staffCardSimulationsSchema),
+      runCardSimulation: (companyId, body) =>
+        client.post(
+          cardSimulationsPath(companyId),
+          body,
+          cardSimulationResultSchema,
         ),
       payoutQueue: (query) =>
         client.get(

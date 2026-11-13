@@ -29,6 +29,7 @@ import {
   TestWalletSettings,
 } from "./fakes.js";
 import { makeFakeFastNear } from "./fast-near.js";
+import { makeFakeLithicSimulator } from "./lithic-simulator.js";
 import { makeFakeNearRelayer, makeFakeNearRpc, TestNearChain } from "./near.js";
 import { makeFakeOneClick } from "./one-click.js";
 import { makeFakePushSender } from "./push.js";
@@ -133,6 +134,7 @@ export function makeTestLayer(
     paycrest: makeFakePaycrest().layer,
     pretium: makeFakePretium().layer,
     lithic: makeFakeLithic().layer,
+    lithicSimulator: makeFakeLithicSimulator().layer,
     approvalSettings: TestApprovalSettings,
     emailSender: makeFakeEmailSender().layer,
     otpProvider: makeFakeOtpProvider().layer,

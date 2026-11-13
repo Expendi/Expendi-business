@@ -11,7 +11,10 @@ import {
   BILL_FILE_ACCEPT,
   describeUploadError,
   invalidInvoiceFile,
+  invalidReceiptImage,
+  RECEIPT_IMAGE_ACCEPT,
   uploadBillFile,
+  uploadReceiptImage,
 } from "~/features/bills/invoice-upload";
 import { useApi } from "~/lib/use-api";
 
@@ -24,6 +27,7 @@ export interface UploadedBillFile {
  * Picks invoices (or proof of payment) from the desktop, PDFs included,
  * by choosing or dropping them, and uploads each straight to storage as
  * it's picked. The bill takes the uploaded files' ids when it's saved.
+ * With `receipts`, it takes receipt images only, for a Card purchase.
  */
 export function BillFilesInput({
   organizationId,
@@ -33,6 +37,7 @@ export function BillFilesInput({
   onUploadingChange,
   max,
   disabled,
+  receipts = false,
 }: {
   organizationId: string;
   label: string;
@@ -41,6 +46,7 @@ export function BillFilesInput({
   onUploadingChange: (uploading: boolean) => void;
   max: number;
   disabled: boolean;
+  receipts?: boolean;
 }): JSX.Element {
   const api = useApi();
   const inputId = useId();
@@ -48,6 +54,8 @@ export function BillFilesInput({
   const [error, setError] = useState<string | null>(null);
   const full = files.length >= max;
   const blocked = disabled || uploading || full;
+  const invalidFile = receipts ? invalidReceiptImage : invalidInvoiceFile;
+  const uploadFile = receipts ? uploadReceiptImage : uploadBillFile;
 
   async function upload(picked: readonly File[]): Promise<void> {
     setError(null);
@@ -57,7 +65,7 @@ export function BillFilesInput({
       return;
     }
     const invalid = picked
-      .map((file) => invalidInvoiceFile(file))
+      .map((file) => invalidFile(file))
       .find((reason) => reason !== null);
     if (invalid) {
       setError(invalid);
@@ -68,7 +76,7 @@ export function BillFilesInput({
     const uploaded: UploadedBillFile[] = [];
     try {
       for (const file of picked) {
-        const id = await uploadBillFile(api, organizationId, file);
+        const id = await uploadFile(api, organizationId, file);
         uploaded.push({ id, name: file.name });
       }
     } catch (cause) {
@@ -94,7 +102,7 @@ export function BillFilesInput({
       <input
         id={inputId}
         type="file"
-        accept={BILL_FILE_ACCEPT}
+        accept={receipts ? RECEIPT_IMAGE_ACCEPT : BILL_FILE_ACCEPT}
         multiple
         disabled={blocked}
         onChange={(event) => {
@@ -118,7 +126,9 @@ export function BillFilesInput({
         {uploading ? "Uploading…" : "Choose files or drop them here"}
       </label>
       <FieldDescription>
-        A PDF, or a JPEG, PNG, WebP or HEIC image, up to 8 MB.
+        {receipts
+          ? "A JPEG, PNG, WebP or HEIC image, up to 8 MB."
+          : "A PDF, or a JPEG, PNG, WebP or HEIC image, up to 8 MB."}
       </FieldDescription>
       {files.length > 0 ? (
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">

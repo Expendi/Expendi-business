@@ -150,7 +150,7 @@ export function MarkPaidOutsideForm({
             value={note}
             onChange={(event) => setNote(event.target.value)}
             maxLength={BILL_NOTES_MAX_LENGTH}
-            placeholder="Paid with the company card"
+            placeholder="Paid with a bank card"
             disabled={busy}
           />
         </Field>

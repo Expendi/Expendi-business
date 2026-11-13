@@ -42,9 +42,24 @@ export const CARD_PROGRAM: CardProgram = {
 
 const base = {
   yours: false,
+  companyHeld: false,
   issuedAt: "2026-10-21T08:30:00.000Z",
   closedAt: null,
 } as const;
+
+/** The company-held card that pays Vercel and Notion (bills fixtures 315, 316). */
+export const SUBSCRIPTIONS_CARD = {
+  id: sampleId(9304),
+  nickname: "Software subscriptions",
+  lastFour: "0004",
+} as const;
+
+/** The recurring payments it pays, as the bills fixtures number them. */
+export const VERCEL_PAYMENT_ID = sampleId(315);
+export const NOTION_PAYMENT_ID = sampleId(316);
+/** Vercel's October bill, paid by the card's purchase `CARD_BILL_PURCHASE_ID`. */
+export const PAID_BY_CARD_BILL_ID = sampleId(30);
+export const CARD_BILL_PURCHASE_ID = sampleId(9406);
 
 export const SAMPLE_CARDS: readonly ExpendiCard[] = [
   {
@@ -58,6 +73,7 @@ export const SAMPLE_CARDS: readonly ExpendiCard[] = [
     holder: WANJIRU,
     yours: true,
     defaultCategory: SOFTWARE,
+    recurringPayments: [],
   },
   {
     ...base,
@@ -69,6 +85,7 @@ export const SAMPLE_CARDS: readonly ExpendiCard[] = [
     spentThisMonthUsdCents: "12750",
     holder: BRIAN,
     defaultCategory: TRAVEL,
+    recurringPayments: [],
   },
   {
     ...base,
@@ -80,9 +97,37 @@ export const SAMPLE_CARDS: readonly ExpendiCard[] = [
     spentThisMonthUsdCents: "0",
     holder: BRIAN,
     defaultCategory: SOFTWARE,
+    recurringPayments: [],
     closedAt: "2026-11-02T09:00:00.000Z",
   },
+  {
+    ...base,
+    ...SUBSCRIPTIONS_CARD,
+    state: "open",
+    monthlyLimitUsdCents: "5000",
+    spentThisMonthUsdCents: "1980",
+    companyHeld: true,
+    holder: null,
+    defaultCategory: SOFTWARE,
+    recurringPayments: [
+      { id: VERCEL_PAYMENT_ID, payeeName: "Vercel", state: "active" },
+      { id: NOTION_PAYMENT_ID, payeeName: "Notion", state: "active" },
+    ],
+    issuedAt: "2026-09-18T07:30:00.000Z",
+  },
 ];
+
+const onSubscriptionsCard = {
+  card: SUBSCRIPTIONS_CARD,
+  companyHeld: true,
+  holder: null,
+  yours: false,
+  expenseId: null,
+  amountKes: null,
+  usdKesRate: null,
+  receiptCount: 0,
+  needsReceipt: false,
+} as const;
 
 const purchase = (
   n: number,
@@ -96,8 +141,11 @@ const purchase = (
     nickname: "Marketing subscriptions",
     lastFour: "0001",
   },
+  companyHeld: false,
   holder: WANJIRU,
   yours: true,
+  merchantKey: null,
+  match: null,
   mcc: "5734",
   holdUsdCents: "0",
   settledUsdCents: "4500",
@@ -164,7 +212,54 @@ export const SAMPLE_PURCHASES: readonly CardPurchase[] = [
     declineReason: "Not enough in the Card balance.",
     authorizedAt: "2026-11-02T15:45:00.000Z",
   }),
+  purchase(6, {
+    ...onSubscriptionsCard,
+    merchant: "VERCEL INC.",
+    merchantKey: "lithic-merchant-vercel",
+    match: {
+      state: "matched",
+      recurringItemId: VERCEL_PAYMENT_ID,
+      billId: PAID_BY_CARD_BILL_ID,
+      payeeName: "Vercel",
+    },
+    settledUsdCents: "1980",
+    authorizedAt: "2026-10-20T06:00:00.000Z",
+  }),
+  purchase(7, {
+    ...onSubscriptionsCard,
+    merchant: "LINEAR.APP",
+    merchantKey: "lithic-merchant-linear",
+    match: {
+      state: "needs_review",
+      recurringItemId: null,
+      billId: null,
+      payeeName: null,
+    },
+    status: "pending",
+    holdUsdCents: "1600",
+    settledUsdCents: "0",
+    authorizedAt: "2026-11-05T22:14:00.000Z",
+  }),
+  purchase(8, {
+    ...onSubscriptionsCard,
+    merchant: "NOTION LABS",
+    merchantKey: "lithic-merchant-notion",
+    match: {
+      state: "matched",
+      recurringItemId: NOTION_PAYMENT_ID,
+      billId: null,
+      payeeName: "Notion",
+    },
+    status: "declined",
+    settledUsdCents: "0",
+    declineReason: "Over the card's monthly limit.",
+    authorizedAt: "2026-11-04T06:00:00.000Z",
+  }),
 ];
+
+/** `GET …/cards/purchases?needsReview=true`: what waits for an admin's answer. */
+export const PURCHASES_NEEDING_ANSWER: readonly CardPurchase[] =
+  SAMPLE_PURCHASES.filter((one) => one.match?.state === "needs_review");
 
 export const SAMPLE_LOADS: CardLoadList = {
   loads: [
@@ -196,15 +291,32 @@ export function seedCards(client: QueryClient): void {
     purchases: [...SAMPLE_PURCHASES],
     nextCursor: null,
   };
+  const waiting: CardPurchaseList = {
+    purchases: [...PURCHASES_NEEDING_ANSWER],
+    nextCursor: null,
+  };
+  const companyHeld: CardList = {
+    cards: SAMPLE_CARDS.filter((card) => card.companyHeld),
+  };
+  const noFilters = {
+    cardId: null,
+    status: null,
+    needsReceipt: null,
+    needsReview: null,
+  } as const;
   client.setQueryData(queryKeys.cardProgram(org), CARD_PROGRAM);
   client.setQueryData(queryKeys.cardList(org), list);
+  client.setQueryData(queryKeys.companyHeldCards(org), companyHeld);
   client.setQueryData(queryKeys.cardLoads(org), SAMPLE_LOADS);
+  client.setQueryData(queryKeys.cardPurchases(org, noFilters), {
+    pages: [page],
+    pageParams: [null],
+  });
   client.setQueryData(
-    queryKeys.cardPurchases(org, {
-      cardId: null,
-      status: null,
-      needsReceipt: null,
-    }),
-    { pages: [page], pageParams: [null] },
+    queryKeys.cardPurchases(org, { ...noFilters, needsReview: "true" }),
+    { pages: [waiting], pageParams: [null] },
   );
+  for (const one of SAMPLE_PURCHASES) {
+    client.setQueryData(queryKeys.cardPurchase(org, one.id), one);
+  }
 }

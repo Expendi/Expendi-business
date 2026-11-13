@@ -8,6 +8,7 @@ import { createZohoStaffRoutes } from "./accounting.js";
 import { createAlertRoutes } from "./alerts.js";
 import { createAuditRoutes } from "./audit.js";
 import { createStaffAuthRoutes } from "./auth.js";
+import { createCardSimulationRoutes } from "./card-simulations.js";
 import { createCompanyRoutes } from "./companies.js";
 import { createControlRoutes } from "./controls.js";
 import { createImportRoutes } from "./imports.js";
@@ -39,5 +40,6 @@ export function createInternalRoutes(
     .route("/", createPayoutRoutes(runtime))
     .route("/", createIntentQuoteRoutes(runtime))
     .route("/", createControlRoutes(runtime))
-    .route("/", createTreasuryActionRoutes(runtime));
+    .route("/", createTreasuryActionRoutes(runtime))
+    .route("/", createCardSimulationRoutes(runtime));
 }

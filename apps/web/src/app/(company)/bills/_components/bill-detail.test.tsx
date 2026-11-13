@@ -10,7 +10,8 @@ import {
   RECEIPT_SAMPLES,
   showsReceipt,
 } from "~/components/data/payment-receipts.samples";
-import { BillDetailBody } from "./bill-detail";
+import { BillDetailBody, BillSheetHeader } from "./bill-detail";
+import { BillStatusCell } from "./columns";
 
 function sample(find: (bill: BillDetail) => boolean): BillDetail {
   const bill = BILL_DETAILS.find(find);
@@ -144,5 +145,126 @@ describe("a bill's receipt download", () => {
 
     // #then
     expect(page).toContain("Your session ended. Sign in again.");
+  });
+});
+
+describe("a bill a company-held card was to pay", () => {
+  const VERCEL = sample(
+    (bill) => bill.payee.name === "Vercel" && bill.status === "upcoming",
+  );
+
+  it.each([
+    ["paused", "Paused: card purchases from Vercel are declined."],
+    ["ended", "Ended: card purchases from Vercel are declined."],
+  ] as const)(
+    "says why it won't be paid automatically once its payment is %s",
+    (state, why) => {
+      // #given
+      const recurring = VERCEL.recurring;
+      if (!recurring)
+        throw new Error("Vercel's bill has its recurring payment.");
+
+      // #when
+      const page = details({ ...VERCEL, recurring: { ...recurring, state } });
+
+      // #then
+      expect({
+        why: page.includes(
+          `Not paid automatically ${why} The bill stays owed.`,
+        ),
+        automatic: page.includes("Paid automatically"),
+      }).toEqual({ why: true, automatic: false });
+    },
+  );
+
+  it("says why it won't be paid automatically once its card is frozen", () => {
+    // #given
+    const card = VERCEL.card;
+    if (!card) throw new Error("Vercel's bill has its card.");
+
+    // #when
+    const page = details({ ...VERCEL, card: { ...card, state: "frozen" } });
+
+    // #then
+    expect({
+      why: page.includes(
+        "Not paid automatically Card •••• 0004 is frozen. The bill stays owed.",
+      ),
+      automatic: page.includes("Paid automatically"),
+    }).toEqual({ why: true, automatic: false });
+  });
+
+  it.each([
+    ["frozen", "Card frozen"],
+    ["closed", "Card closed"],
+  ] as const)(
+    "names a %s card in place of Automatic, in the list and the sheet",
+    (state, badge) => {
+      // #given
+      const card = VERCEL.card;
+      if (!card) throw new Error("Vercel's bill has its card.");
+      const bill = { ...VERCEL, card: { ...card, state } };
+
+      // #when
+      const row = pageText(
+        renderToStaticMarkup(<BillStatusCell bill={bill} />),
+      );
+      const header = pageText(
+        renderToStaticMarkup(<BillSheetHeader bill={bill} rate={null} />),
+      );
+
+      // #then
+      expect({ row, header: header.includes(`Upcoming ${badge}`) }).toEqual({
+        row: `Upcoming ${badge}`,
+        header: true,
+      });
+    },
+  );
+
+  it("says the card pays the last bill of a payment that ended, and nothing after it", () => {
+    // #given
+    const recurring = VERCEL.recurring;
+    const card = VERCEL.card;
+    if (!recurring || !card) {
+      throw new Error("Vercel's bill has its recurring payment and card.");
+    }
+    const ended = { ...recurring, state: "ended" as const };
+
+    // #when
+    const running = details({
+      ...VERCEL,
+      card: { ...card, state: "open" },
+      recurring: { ...ended, active: true },
+    });
+    const paused = details({
+      ...VERCEL,
+      card: { ...card, state: "open" },
+      recurring: { ...ended, active: false },
+    });
+
+    // #then
+    expect({
+      lastBill: running.includes(
+        "Paid automatically Card •••• 0004 pays this last bill, and nothing after it.",
+      ),
+      declined: running.includes("declined"),
+    }).toEqual({ lastBill: true, declined: false });
+    expect({
+      why: paused.includes(
+        "Not paid automatically Ended: card purchases from Vercel are declined. The bill stays owed.",
+      ),
+      lastBill: paused.includes("pays this last bill"),
+    }).toEqual({ why: true, lastBill: false });
+  });
+
+  it("says it's paid automatically while its payment is active", () => {
+    // #when
+    const page = details(VERCEL);
+
+    // #then
+    expect({
+      automatic: page.includes("Paid automatically"),
+      notAutomatic: page.includes("Not paid automatically"),
+    }).toEqual({ automatic: true, notAutomatic: false });
   });
 });

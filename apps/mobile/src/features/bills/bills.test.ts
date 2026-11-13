@@ -4,6 +4,7 @@ import type { Bill, BillStatus } from "@expendi-business/shared";
 
 import type { BillDraft } from "./bill-draft";
 import { formatBillAmount } from "./bill-amount";
+import { BILL_STATUS_BADGES } from "./bill-badges";
 import {
   amountChanged,
   centsToTyped,
@@ -13,7 +14,9 @@ import {
 } from "./bill-draft";
 import {
   groupOpenBills,
+  HISTORY_BILL_STATUSES,
   historyNewestFirst,
+  OPEN_BILL_STATUSES,
   shiftIsoDate,
 } from "./bill-groups";
 
@@ -97,6 +100,46 @@ describe("historyNewestFirst", () => {
       cancelled.id,
       paidEarly.id,
     ]);
+  });
+});
+
+describe("a bill paid by card", () => {
+  it("is labelled Paid by card and asked for with the history, not the open bills", () => {
+    // #then
+    expect({
+      badge: BILL_STATUS_BADGES.paid_by_card,
+      history: HISTORY_BILL_STATUSES.includes("paid_by_card"),
+      open: (OPEN_BILL_STATUSES as readonly BillStatus[]).includes(
+        "paid_by_card",
+      ),
+    }).toEqual({
+      badge: { label: "Paid by card", tone: "success" },
+      history: true,
+      open: false,
+    });
+  });
+
+  it("stays out of the open groups and sorts into the history by the day the card paid it", () => {
+    // #given
+    const byCard = bill({ status: "paid_by_card", paidOn: "2026-10-25" });
+    const outside = bill({ status: "paid_outside", paidOn: "2026-10-28" });
+    const cancelled = bill({
+      status: "cancelled",
+      cancelledAt: "2026-10-20T08:00:00.000Z",
+    });
+
+    // #when
+    const groups = groupOpenBills([byCard, bill({ status: "due" })]);
+    const history = historyNewestFirst([cancelled, byCard, outside]);
+
+    // #then
+    expect({
+      groups: groups.map((group) => group.status),
+      history: history.map((entry) => entry.id),
+    }).toEqual({
+      groups: ["due"],
+      history: [outside.id, byCard.id, cancelled.id],
+    });
   });
 });
 

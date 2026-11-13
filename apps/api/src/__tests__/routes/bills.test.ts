@@ -1322,6 +1322,7 @@ describe("GET /organizations/:organizationId/bills, for the Bills page", () => {
         schedule: "monthly",
         scheduleDay: 31,
         startsOn: "2026-01-31",
+        active: false,
       },
       [oneOff]: null,
     });

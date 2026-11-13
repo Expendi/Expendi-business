@@ -110,6 +110,7 @@ const KIND_LABELS: Readonly<Record<MoneyOutKind, string>> = {
 const STATUS_LABELS: Readonly<Record<string, string>> = {
   paid: "Paid",
   paid_outside: "Paid outside Expendi",
+  paid_by_card: "Paid by Expendi card",
   recorded: "Recorded",
   issue: "Float issued",
   top_up: "Float topped up",

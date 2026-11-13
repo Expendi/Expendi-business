@@ -6,12 +6,19 @@ import {
   updateRecurringItemRequestSchema,
 } from "@expendi-business/shared";
 
+import { billBadges } from "../bills/bill-badges";
 import {
   blankDraft,
   defaultScheduleDay,
   draftFromItem,
   isoWeekday,
+  nextBillBadgeFields,
+  nextBillCardDeclined,
   nextDueDate,
+  payingCardLabel,
+  payViaInWords,
+  recurringAmount,
+  reminderInWords,
   toCreateRequest,
   toUpdateRequest,
 } from "./recurring-draft";
@@ -201,6 +208,209 @@ describe("editing a recurring payment", () => {
     expect(
       toUpdateRequest(ending, { ...draftFromItem(ending), endsOn: "" }),
     ).toEqual({ endsOn: null });
+  });
+});
+
+describe("a recurring payment a company-held card pays", () => {
+  const card = {
+    id: "44444444-4444-4444-8444-444444444444",
+    nickname: "Software",
+    lastFour: "1234",
+    state: "open" as const,
+  };
+
+  /** Set up on the web: USD estimate, payee paid outside Expendi. */
+  function byCard(overrides: Partial<RecurringItem> = {}): RecurringItem {
+    return item({
+      payee: {
+        id: "11111111-1111-4111-8111-111111111111",
+        name: "Vercel",
+        kind: "vendor",
+        method: "outside",
+        archived: false,
+      },
+      overviewHeading: "subscriptions",
+      currency: "usd",
+      amountKes: null,
+      amountUsdc: "20000000",
+      payVia: "card",
+      card,
+      nextBill: null,
+      ...overrides,
+    });
+  }
+
+  it("shows the card as how it's paid, and its amount as a USD estimate", () => {
+    // #given
+    const existing = byCard();
+
+    // #then
+    expect({
+      card: payingCardLabel(existing),
+      amount: recurringAmount(existing, "Variable"),
+      noEstimate: recurringAmount(
+        byCard({ variable: true, amountUsdc: null }),
+        "Variable",
+      ),
+      paid: payViaInWords(existing),
+      reminder: reminderInWords(existing),
+    }).toEqual({
+      card: "Card •••• 1234",
+      amount: "About USD 20.00",
+      noEstimate: "No estimate",
+      paid: "By company-held card •••• 1234. Each bill is paid when Vercel charges the card.",
+      reminder: "Only if a bill goes overdue",
+    });
+  });
+
+  it("notes a frozen or closed card, which declines its Card purchases", () => {
+    // #given
+    const frozen = byCard({ card: { ...card, state: "frozen" } });
+    const closed = byCard({ card: { ...card, state: "closed" } });
+
+    // #then
+    expect({
+      frozen: [payingCardLabel(frozen), payViaInWords(frozen)],
+      closed: [payingCardLabel(closed), payViaInWords(closed)],
+    }).toEqual({
+      frozen: [
+        "Card •••• 1234 · Frozen",
+        "By company-held card •••• 1234. Each bill is paid when Vercel charges the card. The card is frozen, so Card purchases are declined until it’s unfrozen on the web dashboard.",
+      ],
+      closed: [
+        "Card •••• 1234 · Closed",
+        "By company-held card •••• 1234. Each bill is paid when Vercel charges the card. The card is closed. Move this payment to another card on the web dashboard.",
+      ],
+    });
+  });
+
+  it("leaves a payment through or outside Expendi worded as before", () => {
+    // #given
+    const expendi = item();
+    const outside = item({ payVia: "outside", reminderDays: 1 });
+
+    // #then
+    expect({
+      card: [payingCardLabel(expendi), payingCardLabel(outside)],
+      amount: recurringAmount(expendi, "Variable"),
+      paid: [payViaInWords(expendi), payViaInWords(outside)],
+      reminder: [reminderInWords(expendi), reminderInWords(outside)],
+    }).toEqual({
+      card: [null, null],
+      amount: "KES 45,000.00",
+      paid: [
+        "Through Expendi",
+        "Outside Expendi. Mark each bill paid once you’ve paid it.",
+      ],
+      reminder: ["3 days before it’s due", "1 day before it’s due"],
+    });
+  });
+
+  it("starts its edit form on the USD estimate, not the payee's KES", () => {
+    // #when
+    const draft = draftFromItem(byCard());
+
+    // #then
+    expect({
+      currency: draft.currency,
+      amount: draft.amount,
+      payVia: draft.payVia,
+    }).toEqual({ currency: "usd", amount: "20.00", payVia: "card" });
+  });
+
+  it("saves other changes without sending how it's paid or its card", () => {
+    // #given
+    const existing = byCard();
+
+    // #when
+    const request = toUpdateRequest(existing, {
+      ...draftFromItem(existing),
+      endsOn: "2027-06-30",
+      categoryId: "55555555-5555-4555-8555-555555555555",
+    });
+
+    // #then
+    expect(request).toEqual({
+      endsOn: "2027-06-30",
+      categoryId: "55555555-5555-4555-8555-555555555555",
+    });
+    expect(updateRecurringItemRequestSchema.safeParse(request).success).toBe(
+      true,
+    );
+  });
+
+  it("sends a new estimate as amountUsd, which the API takes for a card", () => {
+    // #given
+    const existing = byCard();
+
+    // #when
+    const request = toUpdateRequest(existing, {
+      ...draftFromItem(existing),
+      amount: "25",
+    });
+
+    // #then
+    expect(request).toEqual({ amountUsd: "25" });
+    expect(
+      updateRecurringItemRequestSchema.safeParse({
+        ...request,
+        payVia: "card",
+        cardId: card.id,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("badges its next bill Card declined once the card declined it, beside Automatic", () => {
+    // #given
+    const nextBill = {
+      id: "33333333-3333-4333-8333-333333333333",
+      status: "overdue" as const,
+      dueOn: "2026-11-20",
+      currency: "usd" as const,
+      amountKes: null,
+      amountUsdc: "20000000",
+    };
+    const declined = byCard({
+      nextBill: { ...nextBill, cardDeclinedAt: "2026-11-20T06:00:00.000Z" },
+    });
+    const notDeclined = byCard({
+      nextBill: { ...nextBill, cardDeclinedAt: null },
+    });
+    const olderApi = byCard({ nextBill });
+    const declinedFields = nextBillBadgeFields(declined);
+
+    // #then
+    expect({
+      declined: [
+        nextBillCardDeclined(declined),
+        declinedFields && billBadges(declinedFields),
+      ],
+      notDeclined: nextBillCardDeclined(notDeclined),
+      olderApi: nextBillCardDeclined(olderApi),
+      noBill: [nextBillCardDeclined(byCard()), nextBillBadgeFields(byCard())],
+    }).toEqual({
+      declined: [
+        true,
+        [
+          { label: "Overdue", tone: "warning" },
+          { label: "Automatic · card •••• 1234", tone: "neutral" },
+          { label: "Card declined", tone: "warning" },
+        ],
+      ],
+      notDeclined: false,
+      olderApi: false,
+      noBill: [false, null],
+    });
+  });
+
+  it("drops the estimate as amountUsd: null when it's made usage-based", () => {
+    // #given
+    const existing = byCard();
+
+    // #then
+    expect(
+      toUpdateRequest(existing, { ...draftFromItem(existing), variable: true }),
+    ).toEqual({ amountUsd: null });
   });
 });
 

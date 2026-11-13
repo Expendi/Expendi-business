@@ -6,6 +6,7 @@ import { makeRuntime } from "./runtime.js";
 import { alertChecksJob } from "./station/alert-checks.js";
 import { billStatusJob } from "./station/bill-status.js";
 import { cardReceiptRemindersJob } from "./station/card-receipt-reminders.js";
+import { cardSimulationsJob } from "./station/card-simulations.js";
 import { closeCardsJob } from "./station/close-cards.js";
 import { confirmOnchainJob } from "./station/confirm-onchain.js";
 import { feeCoversJob } from "./station/fee-covers.js";
@@ -62,6 +63,7 @@ const stopStation = startStation(
     closeCardsJob,
     reconcileLithicJob,
     cardReceiptRemindersJob,
+    cardSimulationsJob,
     nearDepositsJob,
     fundInsJob,
     fundInReturnsJob,

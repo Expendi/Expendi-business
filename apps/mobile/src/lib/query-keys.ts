@@ -21,6 +21,11 @@ export const queryKeys = {
     ["organizations", organizationId, "details"] as const,
   categories: (organizationId: string) =>
     ["organizations", organizationId, "categories"] as const,
+  /** Prefix of the admin's overview for every month. */
+  overview: (organizationId: string) =>
+    ["organizations", organizationId, "overview"] as const,
+  overviewMonth: (organizationId: string, month: string) =>
+    ["organizations", organizationId, "overview", month] as const,
   /** Prefix of every claim list and claim, so one invalidation refreshes both. */
   claims: (organizationId: string) =>
     ["organizations", organizationId, "claims"] as const,

@@ -1,6 +1,7 @@
-import type { BillFileType } from "@expendi-business/shared";
+import type { BillFileType, ReceiptImageType } from "@expendi-business/shared";
 import {
   BILL_FILE_TYPES,
+  RECEIPT_IMAGE_TYPES,
   RECEIPT_MAX_BYTES,
   receiptUploadResponseSchema,
 } from "@expendi-business/shared";
@@ -72,6 +73,53 @@ export async function uploadBillFile(
     },
     receiptUploadResponseSchema,
   );
+  return sendToStorage(upload, file);
+}
+
+/** A Card purchase's receipt is an image, as a claim's is; the API refuses a PDF there. */
+export const RECEIPT_IMAGE_ACCEPT = RECEIPT_IMAGE_TYPES.join(",");
+
+function isReceiptImageType(type: string): type is ReceiptImageType {
+  return RECEIPT_IMAGE_TYPES.some((allowed) => allowed === type);
+}
+
+/** Why a picked file can't be a receipt, or null if it can. */
+export function invalidReceiptImage(
+  file: Pick<File, "type" | "size">,
+): string | null {
+  if (!isReceiptImageType(file.type)) {
+    return "Upload a JPEG, PNG, WebP or HEIC image.";
+  }
+  return invalidInvoiceFile(file);
+}
+
+/** Uploads a receipt image the way the app does, and returns its id. */
+export async function uploadReceiptImage(
+  api: ApiClient,
+  organizationId: string,
+  file: File,
+): Promise<string> {
+  const invalid = invalidReceiptImage(file);
+  if (invalid !== null || !isReceiptImageType(file.type)) {
+    throw new InvoiceUploadError(invalid ?? notUploaded);
+  }
+  const upload = await api.post(
+    `/organizations/${organizationId}/receipts/upload-url`,
+    {
+      contentType: file.type,
+      byteSize: file.size,
+      sha256: await sha256Hex(file),
+      kind: "photo",
+    },
+    receiptUploadResponseSchema,
+  );
+  return sendToStorage(upload, file);
+}
+
+async function sendToStorage(
+  upload: { readonly receiptFileId: string; readonly uploadUrl: string },
+  file: File,
+): Promise<string> {
   let response: Response;
   try {
     response = await fetch(upload.uploadUrl, {
