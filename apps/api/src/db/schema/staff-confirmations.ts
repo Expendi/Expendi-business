@@ -18,6 +18,8 @@ export const STAFF_CONFIRMATION_PURPOSES = [
   "unpause_payouts",
   "resolve_intent_quote",
   "change_cash_out_provider",
+  "return_stranded_deposit",
+  "resume_treasury_return",
 ] as const;
 export type StaffConfirmationPurpose =
   (typeof STAFF_CONFIRMATION_PURPOSES)[number];
@@ -30,7 +32,8 @@ export const staffConfirmationPurpose = pgEnum(
 /**
  * The second confirmation a staff action needs (spec §6.15): resolving a
  * stuck payout or NEAR Intents quote, pausing or unpausing payouts, and
- * changing the active cash-out provider. Preparing the action writes a row
+ * changing the active cash-out provider, and sending a Treasury move's USDC
+ * back to the company wallet. Preparing the action writes a row
  * and hands the staff member a token; confirming with it applies exactly
  * what was prepared, once, before it expires.
  *

@@ -67,10 +67,12 @@ import {
   expectRouteIsolation,
   expectTableIsolation,
 } from "../helpers/isolation.js";
+import { saveTreasuryMove } from "../helpers/money-in.js";
 import {
   createPayingCompany,
   readPayout,
   updatePayout,
+  USDC,
 } from "../helpers/payouts.js";
 import { bearer, makeTestRuntime } from "../helpers/runtime.js";
 import { createStaff } from "../helpers/staff.js";
@@ -371,6 +373,21 @@ const balanceOf = (float: FloatDetail) => ({
 });
 
 describe("POST /organizations/:id/floats (issuing)", () => {
+  it("counts what an open move to Treasury still has to send as spent", async () => {
+    // #given 100 USDC in the wallet, 95 of it reserved for a move to Treasury
+    await saveTreasuryMove(
+      db,
+      { company: paying.company, walletId: paying.wallet.id },
+      { requestedUsdc: 95n * USDC },
+    );
+
+    // #when
+    const approval = await parseApproval(await issue());
+
+    // #then
+    expect(approval.wallet.availableUsdc).toBe((5n * USDC).toString());
+  });
+
   it("opens the float and previews the payment, sending nothing", async () => {
     // #when
     const approval = await parseApproval(await issue());

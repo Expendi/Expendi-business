@@ -41,6 +41,7 @@ import { createRecurringItemRoutes } from "./recurring-items.js";
 import { createReportRoutes } from "./reports.js";
 import { createSettingsRoutes } from "./settings.js";
 import { createCompanySpendingRoutes } from "./spending.js";
+import { createTreasuryRoutes } from "./treasury.js";
 import { createWalletRoutes } from "./wallet.js";
 import { createWithdrawalRoutes } from "./withdrawals.js";
 
@@ -124,6 +125,7 @@ export function createOrganizationRoutes(
     .route("/reports", createReportRoutes(runtime))
     .route("/salaries", createSalaryRoutes(runtime))
     .route("/settings", createSettingsRoutes(runtime))
+    .route("/treasury", createTreasuryRoutes(runtime))
     .route("/wallet", createWalletRoutes(runtime))
     .route("/withdrawal-addresses", createAllowlistRoutes(runtime))
     .route("/withdrawals", createWithdrawalRoutes(runtime));

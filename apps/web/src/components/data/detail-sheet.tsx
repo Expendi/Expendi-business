@@ -366,7 +366,7 @@ export function Callout({
       <div className="min-w-0">
         {title ? <p className="font-(--w-ui)">{title}</p> : null}
         {children}
-        {action ? <div className="mt-2">{action}</div> : null}
+        {action ? <div className="mt-2 empty:hidden">{action}</div> : null}
       </div>
     </div>
   );

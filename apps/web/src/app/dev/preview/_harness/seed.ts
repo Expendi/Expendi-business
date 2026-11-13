@@ -22,6 +22,7 @@ import { PAYROLL_RUNS, seedPayroll } from "./fixtures/payroll";
 import { seedReports } from "./fixtures/reports";
 import { seedSettings } from "./fixtures/settings";
 import { seedTeam } from "./fixtures/team";
+import { seedTreasury } from "./fixtures/treasury";
 import { seedWallet } from "./fixtures/wallet";
 
 /**
@@ -50,6 +51,7 @@ export function seedSampleData(client: QueryClient): void {
   seedPayees(client);
   seedReports(client);
   seedWallet(client);
+  seedTreasury(client, "on");
   seedSettings(client);
   seedActivity(client);
 }

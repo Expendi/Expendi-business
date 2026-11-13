@@ -80,6 +80,10 @@ export function makeFakeOneClick() {
     failNextQuotes(...failures: QuoteFailure[]) {
       quoteFailures.push(...failures);
     },
+    /** Forgets quote outcomes queued but not yet used. */
+    clearQuoteFailures() {
+      quoteFailures.length = 0;
+    },
     /** The next `times` status calls get no answer. */
     failNextStatus(times = 1) {
       statusFailures = times;

@@ -80,6 +80,35 @@ describe("money in and out", () => {
     });
   });
 
+  it("leaves moves to and from Treasury out of money in and out: the money stays the company's", () => {
+    // #given
+    const deposit = LEDGER.find((row) => row.type === "deposit");
+    if (!deposit) throw new Error("No sample deposit");
+    const moves: WalletHistoryItem[] = [
+      {
+        ...deposit,
+        type: "to_treasury",
+        usdcAmount: "-5000000000",
+        payout: null,
+      },
+      {
+        ...deposit,
+        type: "from_treasury",
+        usdcAmount: "1000000000",
+        payout: null,
+      },
+    ];
+
+    // #when
+    const flows = monthFlows([...LEDGER, ...moves], "2026-11");
+
+    // #then
+    expect({ in: signedUsdc(flows.in), out: signedUsdc(flows.out) }).toEqual({
+      in: "+6,031.78",
+      out: "−4,257.75",
+    });
+  });
+
   it("filters money in and money out by sign", () => {
     // #when
     const moneyIn = filterHistory(LEDGER, "in").map((row) => row.type);
@@ -132,23 +161,76 @@ describe("a ledger row", () => {
       ["Twiga Foods", "KES 186,000 · Bill"],
       ["Deposit", "From mwangaza-treasury.near"],
       ["Refund", "Zuku payment failed, money returned"],
-      ["Withdrawal", "To Treasury on Coinbase"],
+      ["Withdrawal", "To Reserve on Coinbase"],
       ["Wanjiru Kamau", "KES 260,000 · Payroll"],
     ]);
   });
 
-  it("badges payments still moving or failed, never paid ones or refunds", () => {
+  it("names a move to and from Treasury, with no payout behind it", () => {
+    // #given
+    const deposit = find("Deposit");
+    const moves: WalletHistoryItem[] = [
+      { ...deposit, type: "to_treasury", usdcAmount: "-5000000", payout: null },
+      {
+        ...deposit,
+        type: "from_treasury",
+        usdcAmount: "5000000",
+        payout: null,
+      },
+    ];
+
+    // #when
+    const lines = moves.map((row) => [
+      txTitle(row),
+      txDetail(row),
+      rowBadge(row),
+    ]);
+
+    // #then
+    expect(lines).toEqual([
+      ["Moved to Treasury", "To Treasury", { label: "Moved", tone: "quiet" }],
+      ["Moved to wallet", "From Treasury", { label: "Moved", tone: "quiet" }],
+    ]);
+  });
+
+  it("tints the badge of a payment still moving or failed", () => {
     // #when
     const badges = [
       find("Twiga Foods"),
       find("Kevin Mwangi"),
-      find("Zuku"),
-      find("Refund"),
-      find("Kenya Power"),
-    ].map((row) => rowBadge(row)?.label ?? null);
+      find("Zuku", "payout"),
+    ].map((row) => {
+      const badge = rowBadge(row);
+      return [badge?.label, badge?.tone];
+    });
 
     // #then
-    expect(badges).toEqual(["On its way", "Sending", "Failed", null, null]);
+    expect(badges).toEqual([
+      ["On its way", "moving"],
+      ["Sending", "moving"],
+      ["Failed", "failed"],
+    ]);
+  });
+
+  it("gives every settled row the green badge a paid bill has", () => {
+    // #when
+    const badges = [
+      find("Deposit"),
+      find("Refund"),
+      find("Kenya Power"),
+      find("Withdrawal"),
+    ].map((row) => {
+      const badge = rowBadge(row);
+      return [badge?.label, badge?.tone];
+    });
+
+    // #then
+    expect(badges).toEqual([
+      ["Received", "paid"],
+      ["Received", "paid"],
+      ["Paid", "paid"],
+      ["Sent", "paid"],
+    ]);
   });
 
   it("counts the other payments approved with the same passkey", () => {

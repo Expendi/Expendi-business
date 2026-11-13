@@ -42,9 +42,13 @@ const USDC = 1_000_000n;
  * chain with the real gas relayer on it, its transfers indexer, 1Click,
  * Base, Paycrest and Pretium. The fake 1Click never moves money, so a test that
  * needs a hop delivered sets the transit wallet's balance and 1Click's
- * status itself. `extra` adds fakes a test needs beyond these.
+ * status itself. `extra` adds fakes a test needs beyond these, and `env`
+ * settings such as the Earn vault ID.
  */
-export function makeNearPayoutWorld(extra: Partial<ExternalLayers> = {}) {
+export function makeNearPayoutWorld(
+  extra: Partial<ExternalLayers> = {},
+  env: Readonly<Record<string, string | undefined>> = {},
+) {
   const privy = makeFakePrivyWallets();
   const near = makeFakeNearRpc();
   const relayer = nearRelayerOnFakeChain(privy.state, near);
@@ -85,7 +89,7 @@ export function makeNearPayoutWorld(extra: Partial<ExternalLayers> = {}) {
       pretium: pretium.layer,
       ...extra,
     },
-    { NEAR_RELAYER_ACCOUNT_ID: relayer.accountId },
+    { NEAR_RELAYER_ACCOUNT_ID: relayer.accountId, ...env },
   );
 
   const balanceKey = (address: string) =>

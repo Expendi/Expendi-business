@@ -45,7 +45,7 @@ function Identity({ companyName }: { companyName: string }) {
 /**
  * The brand and company (a company switcher when there's more than one),
  * the grouped pages with their badges, and the person signed in. Its style
- * and how it collapses come from the layout controls.
+ * and how it collapses come from Settings > Appearance.
  */
 export function AppSidebar({
   path,

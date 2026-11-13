@@ -16,6 +16,10 @@ export const OPS_ALERT_KINDS = [
   "card_close_failed",
   "unexpected_transit_transfer",
   "deposits_held",
+  "treasury_move_stuck",
+  "treasury_usdc_idle",
+  "treasury_position_mismatch",
+  "treasury_partial_fill",
 ] as const;
 export const opsAlertKindSchema = z.enum(OPS_ALERT_KINDS);
 export type OpsAlertKind = z.infer<typeof opsAlertKindSchema>;

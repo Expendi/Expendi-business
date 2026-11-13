@@ -126,7 +126,7 @@ const saved = <A>(value: A | null, what: string): Effect.Effect<A> =>
  * Privy has no policy conditions for NEAR, and must instead be an implicit
  * account, which is the only kind the API can sign for.
  */
-function checkPrivyWallet(
+export function checkPrivyWallet(
   record: PrivyWalletRecord,
   expected: {
     readonly policyId: string | null;

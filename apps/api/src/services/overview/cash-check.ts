@@ -24,7 +24,11 @@ import { scheduledStatus } from "../bills/status.js";
 import { activeKesRateOrNull } from "../cash-out/active-rate.js";
 import { kesCentsFor } from "../paycrest/amounts.js";
 import { dueAfter, dueOnOrAfter } from "../recurring/schedule.js";
-import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
+import {
+  ledgerBalance,
+  reservedForPayouts,
+  reservedForTreasury,
+} from "../wallet/ledger.js";
 
 /**
  * The cash check (spec §6.24): the company's spendable USDC, valued in KES,
@@ -90,7 +94,10 @@ export interface CashCheck {
   readonly rate: string | null;
   /** The ledger balance, USDC base units. */
   readonly balanceUsdc: bigint;
-  /** USDC promised to approved payouts not yet debited. */
+  /**
+   * USDC promised to approved payouts, and to an open move to Treasury, not
+   * yet debited.
+   */
   readonly reservedUsdc: bigint;
   readonly balanceKes: bigint | null;
   /** The balance less reservations, in KES cents: what's compared. */
@@ -259,7 +266,9 @@ function readSpendableUsdc(tx: Transaction, organizationId: string) {
     if (!wallet) return { balanceUsdc: 0n, reservedUsdc: 0n };
     return {
       balanceUsdc: yield* ledgerBalance(tx, wallet.id),
-      reservedUsdc: yield* reservedForPayouts(tx, wallet.id),
+      reservedUsdc:
+        (yield* reservedForPayouts(tx, wallet.id)) +
+        (yield* reservedForTreasury(tx, wallet.id)),
     };
   });
 }

@@ -16,6 +16,7 @@ import {
   companyWalletSends,
   intentQuotes,
   payouts,
+  treasuryMoves,
   UNSETTLED_INTENT_QUOTE_STATUSES,
   wallets,
 } from "../../db/schema/index.js";
@@ -95,7 +96,12 @@ export type CompanyQuotePurpose = (typeof COMPANY_QUOTE_PURPOSES)[number];
  * its quote failed our checks, or the company has no wallet to pay it from.
  */
 export class QuoteNotOpened extends Data.TaggedError("QuoteNotOpened")<{
-  readonly reason: "no_wallet" | "one_click" | "untrusted" | "over_cap";
+  readonly reason:
+    | "no_wallet"
+    | "one_click"
+    | "one_click_unavailable"
+    | "untrusted"
+    | "over_cap";
   readonly message: string;
 }> {}
 
@@ -281,6 +287,12 @@ export function openCompanyQuote(input: {
 }
 
 /**
+ * How long after a move to or from Treasury settles its USDC may still be
+ * waiting for the deposit watcher to credit it.
+ */
+const TREASURY_CREDIT_WINDOW_MINUTES = 30;
+
+/**
  * Expendi's own USDC already sitting in the company wallet: what the gas
  * relayer sent for earlier quotes, less what those quotes turned out to
  * cost. An `EXACT_OUTPUT` quote refunds its unused buffer to the company
@@ -365,7 +377,23 @@ function expendiSurplus(
             )
             .limit(1),
         );
-        if (busyQuote || busyPayout || busySend) return null;
+        // A move to or from Treasury leaves the company's own USDC at the
+        // company wallet that the ledger doesn't count yet: a refunded part
+        // before the watcher credits it, or a delivery before it is credited.
+        // Read as "above the ledger", that would pass for Expendi's surplus.
+        const [busyMove] = yield* query(() =>
+          tx
+            .select({ id: treasuryMoves.id })
+            .from(treasuryMoves)
+            .where(
+              and(
+                eq(treasuryMoves.walletId, quote.walletId),
+                sql`(${treasuryMoves.status} IN ('open', 'needs_review') OR ${treasuryMoves.settledAt} > now() - make_interval(mins => ${TREASURY_CREDIT_WINDOW_MINUTES}))`,
+              ),
+            )
+            .limit(1),
+        );
+        if (busyQuote || busyPayout || busySend || busyMove) return null;
 
         const [wallet] = yield* query(() =>
           tx
@@ -666,7 +694,12 @@ export function advanceCompanyQuote<R>(input: {
       }
 
       quote = yield* quoteById(quote.organizationId, quote.id);
-      if ((yield* coverFee(quote)) === "waiting") {
+      // A move to Treasury is paid for by the company, not Expendi: its
+      // `EXACT_INPUT` quote delivers what is left after 1Click's charge.
+      if (
+        quote.purpose !== "to_treasury" &&
+        (yield* coverFee(quote)) === "waiting"
+      ) {
         return yield* quoteById(quote.organizationId, quote.id);
       }
 

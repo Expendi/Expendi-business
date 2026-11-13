@@ -11,7 +11,9 @@ import type {
 import type * as DetailSheetModule from "~/components/data/detail-sheet";
 import { DashboardProvider } from "~/contexts/dashboard-context";
 import { billKeys } from "~/features/payment-keys";
+import { PREFERENCE_DEFAULTS } from "~/lib/preferences/preferences-config";
 import { queryKeys } from "~/lib/query-keys";
+import { PreferencesStoreProvider } from "~/stores/preferences/preferences-provider";
 import { settingsKeys } from "./settings-api";
 import { SettingsView } from "./settings-view";
 import { describeSyncCounts } from "./zoho-settings";
@@ -138,11 +140,13 @@ function render({
   });
   return renderToStaticMarkup(
     <QueryClientProvider client={queryClient}>
-      <DashboardProvider
-        company={{ organizationId: ORG, name: "Acme Ltd", role }}
-      >
-        <SettingsView />
-      </DashboardProvider>
+      <PreferencesStoreProvider initialValues={PREFERENCE_DEFAULTS} sidebarOpen>
+        <DashboardProvider
+          company={{ organizationId: ORG, name: "Acme Ltd", role }}
+        >
+          <SettingsView />
+        </DashboardProvider>
+      </PreferencesStoreProvider>
     </QueryClientProvider>,
   );
 }
@@ -160,6 +164,7 @@ describe("settings", () => {
         "Categories",
         "Paid-from accounts",
         "Zoho Books",
+        "Appearance",
       ].every(
         (section) =>
           html.includes(`data-section`) && html.includes(`>${section}<`),
@@ -320,6 +325,28 @@ describe("settings", () => {
       sheet: false,
       forms: 0,
     });
+  });
+
+  it("lets an accountant set how the dashboard looks in their browser", () => {
+    // #when
+    const html = render({ role: "accountant" });
+    const panel = html.slice(html.indexOf('id="appearance"'));
+
+    // #then
+    expect({
+      rows: [
+        "Theme",
+        "Colours",
+        "Font",
+        "Page width",
+        "Header",
+        "Sidebar style",
+        "Collapsed sidebar",
+      ].every((row) => panel.includes(`>${row}<`)),
+      fullWidth: /aria-checked="true"[^>]*>Full width</.test(panel),
+      restore: panel.includes("Restore defaults"),
+      scope: panel.includes("Saved in this browser."),
+    }).toEqual({ rows: true, fullWidth: true, restore: true, scope: true });
   });
 
   it("offers to add the first category", () => {

@@ -10,6 +10,7 @@ import type { Tenant } from "../../middleware/tenant.js";
 import type { AuditActor, AuditLog } from "../audit/audit-log.js";
 import type { PayoutRecipient } from "../paycrest/recipient.js";
 import type { PayoutRejected } from "../payout/payout-errors.js";
+import type { PrivyWallets } from "../wallet/privy-wallets.js";
 import { payouts, wallets, webauthnChallenges } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { Conflict } from "../../errors.js";
@@ -20,7 +21,8 @@ import {
 } from "../paycrest/amounts.js";
 import { discardUnapprovedPayout } from "../payout/discard.js";
 import { livePayoutOf } from "../payout/prepare.js";
-import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
+import { withTreasuryOffer } from "../treasury/short-wallet.js";
+import { availableUsdc } from "../wallet/ledger.js";
 
 /**
  * The steps every Approve & pay shares, whatever it pays (claims, bills,
@@ -126,10 +128,7 @@ export function walletCover(
             ),
           ),
       );
-      const free = wallet
-        ? (yield* ledgerBalance(tx, wallet.id)) -
-          (yield* reservedForPayouts(tx, wallet.id))
-        : 0n;
+      const free = wallet ? yield* availableUsdc(tx, wallet.id) : 0n;
       const available = free > 0n ? free : 0n;
       const needed = batch.reduce(
         (sum, payout) => sum + payout.maxDebitUsdc,
@@ -146,25 +145,42 @@ export function walletCover(
   );
 }
 
-/** "Top up KES X" (spec §6.7 step 4), at the batch's quoted rate. */
+/**
+ * "Top up KES X" (spec §6.7 step 4), at the batch's quoted rate. A company
+ * with money in Treasury is also told how much and offered Move to wallet
+ * (`details.treasuryOffer`); nothing is moved.
+ */
 export function topUpConflict(
   error: PayoutRejected,
   batch: readonly Payout[],
-): Effect.Effect<never, PayoutRejected | Conflict> {
-  if (error.reason !== "insufficient_balance" || !error.shortfallUsdc) {
+): Effect.Effect<
+  never,
+  PayoutRejected | Conflict,
+  DatabaseService | PrivyWallets
+> {
+  const organizationId = batch[0]?.organizationId;
+  if (
+    error.reason !== "insufficient_balance" ||
+    !error.shortfallUsdc ||
+    organizationId === undefined
+  ) {
     return Effect.fail(error);
   }
   const topUpKes = topUpKesFor(error.shortfallUsdc, highestRate(batch));
   const shillings = (topUpKes / 100n).toLocaleString("en-KE");
-  return Effect.fail(
-    new Conflict({
-      message: `The wallet is too short to pay this. Top up KES ${shillings}, then approve again. Nothing was sent.`,
-      details: {
-        shortfallUsdc: error.shortfallUsdc.toString(),
-        topUpKes: topUpKes.toString(),
-      },
-    }),
-  );
+  const plain = new Conflict({
+    message: `The wallet is too short to pay this. Top up KES ${shillings}, then approve again. Nothing was sent.`,
+    details: {
+      shortfallUsdc: error.shortfallUsdc.toString(),
+      topUpKes: topUpKes.toString(),
+    },
+  });
+  return withTreasuryOffer(
+    organizationId,
+    error.shortfallUsdc,
+    plain,
+    "approve again",
+  ).pipe(Effect.flatMap((refusal) => Effect.fail(refusal)));
 }
 
 /**

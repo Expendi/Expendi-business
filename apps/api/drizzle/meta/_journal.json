@@ -645,6 +645,62 @@
       "when": 1794521754367,
       "tag": "0091_pretium_cash_outs_awaiting_funding",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1794532320604,
+      "tag": "0092_treasury",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1794532331819,
+      "tag": "0093_treasury_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1794532886713,
+      "tag": "0094_treasury_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1794532915081,
+      "tag": "0095_treasury_snapshots_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1794532923987,
+      "tag": "0096_treasury_snapshots_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1794537143351,
+      "tag": "0097_staff_treasury_return_purposes",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1794538872494,
+      "tag": "0098_treasury_return_approvals",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1794538874256,
+      "tag": "0099_treasury_return_approvals_access",
+      "breakpoints": true
     }
   ]
 }

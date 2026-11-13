@@ -49,7 +49,7 @@ const R = {
   memJoseph: record("membership", "Joseph Kariuki"),
   billKpl: record("bill", "Kenya Power, 54012339"),
   billZuku: record("bill", "Zuku, 118-2219"),
-  payWithdraw: record("payout", "Withdrawal to Treasury on Coinbase"),
+  payWithdraw: record("payout", "Withdrawal to Reserve on Coinbase"),
   expRubisFloat: record("expense", "Rubis Westlands, Kevin Mwangi"),
   expRubis: record("expense", "Rubis Westlands, Kevin Mwangi"),
   payeeCarmax: record("payee", "CarMax Mechanics"),

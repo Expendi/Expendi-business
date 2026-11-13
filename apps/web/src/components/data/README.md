@@ -172,12 +172,14 @@ pure scale helpers are in `~/lib/chart-scale` (`compact`, `niceScale`,
 
 `components/app-shell.tsx` is the template's frame (`(company)/layout.tsx`
 and the preview use it): `ui/sidebar` (`app-sidebar`, `nav-main`,
-`nav-user`), the 48px `site-header` with page search (⌘K / Ctrl+K), the
-layout controls, the theme switcher and the account menu
-(`components/shell/`). The layout controls save theme, colours, font, page
-width, header and sidebar style in cookies (`lib/preferences/`, store in
-`stores/preferences/`); the root layout reads them so the server renders the
-right look. A page can set `data-content-padding="false"` on its root to go
+`nav-user`), the 48px `site-header` with page search (⌘K / Ctrl+K) and the
+account menu (`components/shell/`). Settings > Appearance
+(`settings/_components/appearance-settings.tsx`) saves theme, colours, font,
+page width, header and sidebar style in cookies (`lib/preferences/`, store
+in `stores/preferences/`); the root layout reads them so the server renders
+the right look. A new browser starts light, in the Expendi colours and
+Outfit, full width, with a sticky header and an inset sidebar that
+collapses to icons. A page can set `data-content-padding="false"` on its root to go
 edge to edge. Sidebar badges come from `hooks/use-nav-counts.ts`:
 Approvals (`/claims/summary`), Expenses (petty cash missing a document),
 Bills (`/bills/summary`) and Payroll (runs to approve or retry).

@@ -107,6 +107,20 @@ describe("renderInvoicePdf", () => {
     expect(source).not.toContain("/Helvetica");
   });
 
+  it("heads the page with the Expendi Business mark and name", async () => {
+    // #given
+    const data = { invoice: invoiceOf(), payUrl: PAY_URL, payment: null };
+
+    // #when
+    const { bytes, texts } = await render(data);
+
+    // #then
+    expect({
+      first: texts[0],
+      markDrawn: /\/Width 377\b/.test(bytes.toString("latin1")),
+    }).toEqual({ first: "Expendi Business", markDrawn: true });
+  });
+
   it("stamps an open invoice past its due date OVERDUE", async () => {
     // #given
     const data = {

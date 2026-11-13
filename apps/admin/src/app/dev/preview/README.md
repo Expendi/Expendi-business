@@ -32,6 +32,7 @@ env check (`app/providers.tsx`), and the API is replaced by sample data
 | `controls-pretium-not-ready` | `/controls`, Pretium not ready, with its problems |
 | `audit-log`                  | `/audit-log`                                      |
 | `zoho-books`                 | `/zoho-books`                                     |
+| `settings`                   | `/settings`                                       |
 
 Add `?role=viewer` to see a page as an ops viewer, who can look but not
 change anything.

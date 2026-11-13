@@ -1,8 +1,12 @@
 import type {
   ApprovalChallenge,
   PasskeyRequestOptions,
+  TreasuryOffer,
 } from "@expendi-business/shared";
-import { topUpNeededSchema } from "@expendi-business/shared";
+import {
+  topUpNeededSchema,
+  treasuryOfferSchema,
+} from "@expendi-business/shared";
 
 import type { PasskeyAssertion } from "./passkeys";
 import { ApiError, describeApiError } from "./api";
@@ -72,8 +76,23 @@ export function topUpFrom(error: unknown): string | null {
     : null;
 }
 
-/** What to tell the admin when a passkey step fails, "Top up KES X" first. */
+/** The "Move to wallet" offer on a refusal for a short wallet, when the company has money in Treasury. */
+export function treasuryOfferFrom(error: unknown): TreasuryOffer | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null;
+  const details = error.details;
+  if (typeof details !== "object" || details === null) return null;
+  const parsed = treasuryOfferSchema.safeParse(
+    "treasuryOffer" in details ? details.treasuryOffer : undefined,
+  );
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * What to tell the admin when a passkey step fails: the "Top up KES X" line,
+ * unless the API offered Treasury, whose own message says what to do instead.
+ */
 export function describeApprovalError(error: unknown): string {
   if (error instanceof PasskeyUnavailableError) return error.message;
+  if (treasuryOfferFrom(error)) return describeApiError(error);
   return topUpFrom(error) ?? describeApiError(error);
 }

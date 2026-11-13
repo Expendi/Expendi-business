@@ -79,7 +79,7 @@ export function TxSheet({
         item ? (
           <div className="mt-1 flex flex-col items-start gap-1">
             <p className="text-2xl leading-8 font-(--w-heading) tracking-[-0.02em]">
-              <SignedUsdc amount={item.usdcAmount} />
+              <SignedUsdc amount={item.usdcAmount} tint />
             </p>
             {isPayment && status ? (
               <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
@@ -114,6 +114,10 @@ function eyebrowFor(item: WalletHistoryItem): string {
       return "Withdrawal";
     case "refund":
       return "Refund";
+    case "to_treasury":
+      return "Moved to Treasury";
+    case "from_treasury":
+      return "Moved to wallet";
     case "salary":
       return "Payroll payment";
     case "payment":
@@ -226,6 +230,15 @@ export function TxDetails({
               {payout.failureReason}
             </DetailItem>
           ) : null}
+          {transaction}
+        </DetailList>
+      );
+    case "to_treasury":
+    case "from_treasury":
+      return (
+        <DetailList>
+          <DetailItem label="Chain">{PAYEE_CHAIN_NAMES[item.chain]}</DetailItem>
+          <DetailItem label="When">{when}</DetailItem>
           {transaction}
         </DetailList>
       );

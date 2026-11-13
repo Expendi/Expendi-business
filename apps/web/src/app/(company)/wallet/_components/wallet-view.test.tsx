@@ -144,7 +144,7 @@ describe("Accounts", () => {
         "KES 186,000 · Bill",
         "From mwangaza-treasury.near",
         "Zuku payment failed, money returned",
-        "To Treasury on Coinbase",
+        "To Reserve on Coinbase",
       ].every((line) => page.includes(line)),
       moving: page.includes("On its way") && page.includes("Sending"),
       time: page.includes("09:20"),
@@ -156,6 +156,30 @@ describe("Accounts", () => {
       moving: true,
       time: true,
       more: true,
+    });
+  });
+
+  it("shows money in green and money out red in the history only", () => {
+    // #when
+    const html = render();
+    const tinted = (tone: string, figure: string) =>
+      new RegExp(`text-${tone}-700[^>]*>${figure}`).test(html);
+
+    // #then
+    expect({
+      deposit: tinted("success", "\\+6,000\\.00"),
+      refund: tinted("success", "\\+31\\.78"),
+      payment: tinted("error", "−1,441\\.86"),
+      withdrawal: tinted("error", "−2,000\\.00"),
+      monthIn: tinted("success", "\\+6,031\\.78"),
+      monthOut: tinted("error", "−4,257\\.75"),
+    }).toEqual({
+      deposit: true,
+      refund: true,
+      payment: true,
+      withdrawal: true,
+      monthIn: false,
+      monthOut: false,
     });
   });
 
@@ -202,7 +226,7 @@ describe("Accounts", () => {
       fundIn: page.includes(">Fund in<"),
       otherChain: page.includes("Fund in from another chain"),
       add: page.includes(">Add address<"),
-      remove: page.includes('aria-label="Remove Treasury on Coinbase"'),
+      remove: page.includes('aria-label="Remove Reserve on Coinbase"'),
       viewOnly: page.includes("View only"),
     }).toEqual({
       withdraw: true,

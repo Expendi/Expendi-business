@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { Database } from "../../db/client.js";
@@ -125,7 +125,10 @@ const ledgerRows = () =>
         usdcAmount: walletTransactions.usdcAmount,
         txHash: walletTransactions.txHash,
       })
-      .from(walletTransactions),
+      .from(walletTransactions)
+      // Without it Postgres returns rows in heap order, which flips when the
+      // debit and the refund were written by different connections.
+      .orderBy(asc(walletTransactions.createdAt)),
   );
 
 const companyUsdc = () => near.state.usdcBalanceOf(paying.accountId);

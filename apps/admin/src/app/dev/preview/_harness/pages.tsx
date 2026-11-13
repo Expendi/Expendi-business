@@ -13,6 +13,7 @@ import { IntentQuoteQueueView } from "~/app/(staff)/intent-quotes/_components/in
 import { IntentQuoteView } from "~/app/(staff)/intent-quotes/[id]/_components/intent-quote-view";
 import { PayoutQueueView } from "~/app/(staff)/payouts/_components/payout-queue-view";
 import { PayoutView } from "~/app/(staff)/payouts/[id]/_components/payout-view";
+import { SettingsView } from "~/app/(staff)/settings/_components/settings-view";
 import ZohoBooksPage from "~/app/(staff)/zoho-books/page";
 import { queryKeys } from "~/lib/query-keys";
 import { COMPANY_ID } from "./fixtures/companies";
@@ -104,5 +105,6 @@ export const PAGE_PREVIEWS: Readonly<Record<string, PagePreview>> = {
     View: PretiumPayoutPreview,
   },
   payouts: { path: "/payouts", View: PayoutQueueView },
+  settings: { path: "/settings", View: SettingsView },
   "zoho-books": { path: "/zoho-books", View: ZohoBooksPage },
 };

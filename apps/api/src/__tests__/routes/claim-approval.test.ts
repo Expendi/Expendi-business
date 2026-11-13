@@ -54,6 +54,7 @@ import {
   createIsolationFixture,
   expectRouteIsolation,
 } from "../helpers/isolation.js";
+import { saveTreasuryMove } from "../helpers/money-in.js";
 import {
   createPayingCompany,
   readPayout,
@@ -406,6 +407,37 @@ describe("POST /organizations/:id/claims/approval", () => {
       reserved: MAX_DEBIT.toString(),
       status: 200,
       claim: "paying",
+    });
+  });
+
+  it("counts what an open move to Treasury still has to send as spent: shows Top up KES X and refuses to pay", async () => {
+    // #given a wallet holding 5 USDC more than a claim needs, 7 of which an
+    // open move to Treasury has reserved: 2 USDC short
+    await setUpCompany(MAX_DEBIT + 5n * USDC);
+    await saveTreasuryMove(
+      db,
+      { company: paying.company, walletId: paying.wallet.id },
+      { requestedUsdc: 7n * USDC },
+    );
+    const claim = await submit();
+
+    // #when
+    const approval = await approvalFor([claim.id]);
+    const response = await confirm(approval);
+
+    // #then
+    expect({
+      wallet: approval.wallet,
+      status: response.status,
+      claim: (await claimRow(claim.id)).status,
+    }).toEqual({
+      wallet: {
+        availableUsdc: (MAX_DEBIT - 2n * USDC).toString(),
+        shortfallUsdc: (2n * USDC).toString(),
+        topUpKes: "25800",
+      },
+      status: 409,
+      claim: "submitted",
     });
   });
 

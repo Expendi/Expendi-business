@@ -28,6 +28,7 @@ import type { QueueTab } from "./claim-detail";
 import type { QueueState } from "./claim-queue";
 import type { PaymentRequest, PreparedPayment } from "./payment";
 import { firstName } from "~/app/(company)/expenses/_components/expense-labels";
+import { TreasuryOfferButton } from "~/app/(company)/wallet/_components/treasury-offer";
 import { Banner, Banners } from "~/components/data/banner";
 import { DetailSheet, SheetActions } from "~/components/data/detail-sheet";
 import { KindTabs } from "~/components/data/kind-tabs";
@@ -281,11 +282,14 @@ function CompanyApprovals({
   }
 
   const busy = prepare.isPending || pay.isPending || prepared !== null;
-  const actionError = prepare.isError
-    ? describePaymentError(prepare.error)
+  const actionFailure: unknown = prepare.isError
+    ? prepare.error
     : pay.isError
-      ? describePaymentError(pay.error)
+      ? pay.error
       : null;
+  const actionError = actionFailure
+    ? describePaymentError(actionFailure)
+    : null;
   const showPane = queue.isPending || (!queue.isError && claims.length > 0);
 
   function actionsFor(claim: Claim) {
@@ -417,16 +421,19 @@ function CompanyApprovals({
             tone="warn"
             title={actionError}
             actions={
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => {
-                  prepare.reset();
-                  pay.reset();
-                }}
-              >
-                Done
-              </Button>
+              <>
+                <TreasuryOfferButton error={actionFailure} />
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={() => {
+                    prepare.reset();
+                    pay.reset();
+                  }}
+                >
+                  Done
+                </Button>
+              </>
             }
           />
         ) : null}

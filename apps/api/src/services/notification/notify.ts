@@ -7,6 +7,7 @@ import type { ClaimNotificationEvent } from "./claim-notifications.js";
 import type { InvoiceNotificationEvent } from "./invoice-notifications.js";
 import type { NotificationChannel, OutgoingNotification } from "./outgoing.js";
 import type { SpendingNotificationEvent } from "./spending-notifications.js";
+import type { TreasuryNotificationEvent } from "./treasury-notifications.js";
 import { notificationOutbox } from "../../db/schema/index.js";
 import { query } from "../../db/scope.js";
 import { cardNotifications } from "./card-notifications.js";
@@ -19,6 +20,7 @@ import {
   salaryPaidNotifications,
   walletShortNotifications,
 } from "./spending-notifications.js";
+import { treasuryNotifications } from "./treasury-notifications.js";
 
 /**
  * Everything that notifies someone (spec §6.10). A new event adds itself to
@@ -29,7 +31,8 @@ export type NotificationEvent =
   | ClaimNotificationEvent
   | SpendingNotificationEvent
   | CardNotificationEvent
-  | InvoiceNotificationEvent;
+  | InvoiceNotificationEvent
+  | TreasuryNotificationEvent;
 
 function compose(
   tx: Transaction,
@@ -63,6 +66,9 @@ function compose(
       return cardNotifications(tx, event);
     case "invoice_paid":
       return invoiceNotifications(tx, event);
+    case "treasury_move_completed":
+    case "treasury_move_ended":
+      return treasuryNotifications(tx, event);
   }
 }
 

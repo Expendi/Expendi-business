@@ -1,4 +1,5 @@
 import type { PrivyClient, Wallet as PrivyWallet } from "@privy-io/node";
+import type { Wallets } from "@privy-io/node/resources";
 import type { ConfigError } from "effect";
 import type { PublicKey } from "near-api-js";
 import { APIError } from "@privy-io/node";
@@ -12,7 +13,10 @@ import {
 } from "../chain/base.js";
 import { implicitAccountPublicKey } from "../chain/near.js";
 import { PrivyClientLive, PrivyClientService } from "../privy/privy-client.js";
-import { companyWalletPolicyRules } from "./wallet-policy.js";
+import {
+  companyWalletPolicyRules,
+  treasuryWalletPolicyRules,
+} from "./wallet-policy.js";
 
 export class PrivyWalletError extends Data.TaggedError("PrivyWalletError")<{
   readonly message: string;
@@ -69,6 +73,11 @@ export interface CreatePolicyInput {
   readonly idempotencyKey: string;
 }
 
+export interface CreateTreasuryPolicyInput extends CreatePolicyInput {
+  /** Privy's ID for the Earn vault (not the contract address). */
+  readonly vaultId: string;
+}
+
 export interface CreateWalletInput {
   /** Write-once in Privy; lets a retry find a wallet whose ID was lost. */
   readonly externalId: string;
@@ -88,11 +97,62 @@ export interface NearSigningWallet {
   readonly accountId: string;
 }
 
+/** What Privy reports for an Earn action: only `pending` may still change. */
+export type EarnActionStatus = "pending" | "succeeded" | "rejected" | "failed";
+
+export interface EarnCallInput {
+  readonly privyWalletId: string;
+  /** Privy's ID for the vault (not the contract address). */
+  readonly vaultId: string;
+  /** USDC base units, always sent as `raw_amount`: a policy rule on `amount` wouldn't match. */
+  readonly rawAmount: bigint;
+  /**
+   * Sent as both Privy's `reference_id` and its idempotency key, so a repeat
+   * after a lost answer returns the same action and can't act twice.
+   */
+  readonly referenceId: string;
+}
+
+/** An Earn action as Privy reports it, with the hash of its transaction if it has one. */
+export interface EarnActionRecord {
+  readonly actionId: string;
+  readonly status: EarnActionStatus;
+  readonly rawAmount: bigint;
+  readonly shareAmount: bigint | null;
+  /** The step's `bundle_transaction_hash`: Privy sends Earn calls as user operations. */
+  readonly txHash: string | null;
+  /** Privy's reason when the action was rejected or failed. */
+  readonly failureReason: string | null;
+}
+
+export interface VaultPosition {
+  /** What the position is worth now. Right at once, unlike the totals. */
+  readonly assetsInVault: bigint;
+  readonly sharesInVault: bigint;
+  /** Count Earn calls only and lag a move by 10 to 20 seconds. */
+  readonly totalDeposited: bigint;
+  readonly totalWithdrawn: bigint;
+}
+
+export interface VaultDetails {
+  readonly name: string;
+  /** The rate to show, in basis points after Expendi's share; null if Privy has none. */
+  readonly userApyBps: number | null;
+  readonly availableLiquidityUsd: number | null;
+}
+
 export interface PrivyWalletsShape {
   readonly createPolicy: (
     input: CreatePolicyInput,
   ) => Effect.Effect<{ readonly policyId: string }, PrivyWalletError>;
-  /** An Ethereum wallet bound by a policy: a company's transit wallet. */
+  /** A Treasury wallet's policy: Earn into one vault, and the capped transfer. */
+  readonly createTreasuryPolicy: (
+    input: CreateTreasuryPolicyInput,
+  ) => Effect.Effect<{ readonly policyId: string }, PrivyWalletError>;
+  /**
+   * An Ethereum wallet bound by a policy: a company's transit wallet, or its
+   * Treasury wallet.
+   */
   readonly createWallet: (
     input: CreateWalletInput,
   ) => Effect.Effect<PrivyWalletRecord, PrivyWalletError>;
@@ -130,6 +190,31 @@ export interface PrivyWalletsShape {
     readonly privyWalletId: string;
     readonly privyTransactionId: string;
   }) => Effect.Effect<string | null, PrivyWalletError>;
+  /**
+   * Deposits from a Treasury wallet into the vault. A `SendRefused` (an
+   * unknown vault is a 404, an amount over the wallet's balance a 400)
+   * means nothing was signed; `SendOutcomeUnknown` means it may have been,
+   * so the same input is sent again, never a new reference.
+   */
+  readonly earnDeposit: (
+    input: EarnCallInput,
+  ) => Effect.Effect<EarnActionRecord, SendRefused | SendOutcomeUnknown>;
+  /** The same for a withdrawal from the vault; unused until a move to wallet. */
+  readonly earnWithdraw: (
+    input: EarnCallInput,
+  ) => Effect.Effect<EarnActionRecord, SendRefused | SendOutcomeUnknown>;
+  /** An Earn action's status, with the transaction hash if it has one. */
+  readonly getWalletAction: (input: {
+    readonly privyWalletId: string;
+    readonly actionId: string;
+  }) => Effect.Effect<EarnActionRecord, PrivyWalletError>;
+  readonly vaultPosition: (input: {
+    readonly privyWalletId: string;
+    readonly vaultId: string;
+  }) => Effect.Effect<VaultPosition, PrivyWalletError>;
+  readonly vaultDetails: (
+    vaultId: string,
+  ) => Effect.Effect<VaultDetails, PrivyWalletError>;
 }
 
 export class PrivyWallets extends Context.Tag("PrivyWallets")<
@@ -201,6 +286,38 @@ export function nearSigningFailure(
   );
 }
 
+const toAmount = (value: string | null | undefined): bigint | null =>
+  value === null || value === undefined || !/^\d+$/.test(value)
+    ? null
+    : BigInt(value);
+
+/**
+ * An Earn action in the shape the API keeps. Only a step of type
+ * `evm_user_operation` carries the hash, and only when asked for with
+ * `include=steps`.
+ */
+function toEarnAction(action: Wallets.WalletActionResponse): EarnActionRecord {
+  const earn =
+    action.type === "earn_deposit" || action.type === "earn_withdraw"
+      ? action
+      : null;
+  const hashes = (action.steps ?? []).flatMap((step) =>
+    step.type === "evm_user_operation" && step.bundle_transaction_hash !== null
+      ? [step.bundle_transaction_hash]
+      : [],
+  );
+  const hash = hashes.at(-1);
+  return {
+    actionId: action.id,
+    status: action.status,
+    rawAmount: toAmount(earn?.raw_amount) ?? 0n,
+    shareAmount: toAmount(earn?.share_amount),
+    txHash:
+      hash !== undefined && TX_HASH.test(hash) ? hash.toLowerCase() : null,
+    failureReason: action.failure_reason?.message ?? null,
+  };
+}
+
 const hexToBytes = (hex: string): Uint8Array =>
   Uint8Array.from(Buffer.from(hex.replace(/^0x/, ""), "hex"));
 
@@ -264,6 +381,31 @@ const findWallet = (
     return null;
   }).pipe(Effect.map((wallet) => (wallet ? toRecord(wallet) : null)));
 
+const earnCall = (
+  client: PrivyClient,
+  runtimeAuthorizationKey: Redacted.Redacted,
+  kind: "deposit" | "withdraw",
+  input: EarnCallInput,
+): Effect.Effect<EarnActionRecord, SendRefused | SendOutcomeUnknown> => {
+  const params = {
+    vault_id: input.vaultId,
+    raw_amount: input.rawAmount.toString(),
+    reference_id: input.referenceId,
+    idempotency_key: input.referenceId,
+    authorization_context: {
+      authorization_private_keys: [Redacted.value(runtimeAuthorizationKey)],
+    },
+  };
+  const earn = client.wallets().earn().ethereum();
+  return Effect.tryPromise({
+    try: (): Promise<Wallets.WalletActionResponse> =>
+      kind === "deposit"
+        ? earn.deposit(input.privyWalletId, params)
+        : earn.withdraw(input.privyWalletId, params),
+    catch: classifySendFailure,
+  }).pipe(Effect.map(toEarnAction));
+};
+
 export const makePrivyWallets = (
   client: PrivyClient,
   runtimeAuthorizationKey: Redacted.Redacted,
@@ -276,6 +418,21 @@ export const makePrivyWallets = (
         name: input.name,
         owner_id: input.ownerQuorumId,
         rules: companyWalletPolicyRules(input.perTransactionMaxUsdc),
+        idempotency_key: input.idempotencyKey,
+      }),
+    ).pipe(Effect.map((policy) => ({ policyId: policy.id }))),
+
+  createTreasuryPolicy: (input) =>
+    privyCall("Failed to create the Treasury policy", () =>
+      client.policies().create({
+        chain_type: "ethereum",
+        version: "1.0",
+        name: input.name,
+        owner_id: input.ownerQuorumId,
+        rules: treasuryWalletPolicyRules(
+          input.vaultId,
+          input.perTransactionMaxUsdc,
+        ),
         idempotency_key: input.idempotencyKey,
       }),
     ).pipe(Effect.map((policy) => ({ policyId: policy.id }))),
@@ -359,6 +516,47 @@ export const makePrivyWallets = (
           ? hash.toLowerCase()
           : null;
       }),
+    ),
+
+  earnDeposit: (input) =>
+    earnCall(client, runtimeAuthorizationKey, "deposit", input),
+
+  earnWithdraw: (input) =>
+    earnCall(client, runtimeAuthorizationKey, "withdraw", input),
+
+  getWalletAction: (input) =>
+    privyCall("Failed to read the Earn action", () =>
+      client.wallets().actions.get(input.actionId, {
+        wallet_id: input.privyWalletId,
+        include: "steps",
+      }),
+    ).pipe(Effect.map(toEarnAction)),
+
+  vaultPosition: (input) =>
+    privyCall("Failed to read the vault position", () =>
+      client
+        .wallets()
+        .earn()
+        .ethereum()
+        .vaultPosition(input.privyWalletId, { vault_id: input.vaultId }),
+    ).pipe(
+      Effect.map((position) => ({
+        assetsInVault: toAmount(position.assets_in_vault) ?? 0n,
+        sharesInVault: toAmount(position.shares_in_vault) ?? 0n,
+        totalDeposited: toAmount(position.total_deposited) ?? 0n,
+        totalWithdrawn: toAmount(position.total_withdrawn) ?? 0n,
+      })),
+    ),
+
+  vaultDetails: (vaultId) =>
+    privyCall("Failed to read the vault", () =>
+      client.wallets().earn().ethereum().vaultDetails(vaultId),
+    ).pipe(
+      Effect.map((vault) => ({
+        name: vault.name,
+        userApyBps: vault.user_apy ?? null,
+        availableLiquidityUsd: vault.available_liquidity_usd ?? null,
+      })),
     ),
 });
 

@@ -22,6 +22,8 @@ const TILES: Partial<Record<TxKind, LucideIcon>> = {
   topup: ArrowDownLeftIcon,
   withdrawal: LandmarkIcon,
   refund: Undo2Icon,
+  to_treasury: LandmarkIcon,
+  from_treasury: ArrowDownLeftIcon,
 };
 
 /** A tile for the wallet's own movements; initials for whoever was paid. */
@@ -101,7 +103,7 @@ export function historyColumns(
       header: "Amount",
       cell: ({ row }) => (
         <span className="text-base leading-6 font-(--w-amount)">
-          <SignedUsdc amount={row.original.usdcAmount} />
+          <SignedUsdc amount={row.original.usdcAmount} tint />
         </span>
       ),
       enableSorting: false,
@@ -131,7 +133,7 @@ export function TxPhoneCard({
       aside={
         <span className="flex flex-col items-end gap-0.5">
           <span className="text-base leading-6 font-(--w-amount)">
-            <SignedUsdc amount={item.usdcAmount} />
+            <SignedUsdc amount={item.usdcAmount} tint />
           </span>
           <span className="text-xs leading-4 text-muted-foreground tabular-nums">
             {nairobiTime(item.createdAt)}

@@ -1,6 +1,7 @@
 "use client";
 
 import type { JSX, ReactNode } from "react";
+import { cn } from "cn";
 import { InfoIcon, Table2Icon } from "lucide-react";
 import { useId, useState } from "react";
 
@@ -34,10 +35,26 @@ import {
 
 const TABLE_DAYS = [0, 7, 14, 21, 28, 30];
 
-/** "+6,000.00 USDC", the code small and muted. */
-export function SignedUsdc({ amount }: { amount: string }): JSX.Element {
+/**
+ * "+6,000.00 USDC", the code small and muted; `tint` shows money in green
+ * and money out red.
+ */
+export function SignedUsdc({
+  amount,
+  tint = false,
+}: {
+  amount: string;
+  tint?: boolean;
+}): JSX.Element {
+  const units = BigInt(amount);
   return (
-    <span className="whitespace-nowrap tabular-nums">
+    <span
+      className={cn(
+        "whitespace-nowrap tabular-nums",
+        tint && units > 0n && "text-success-700",
+        tint && units < 0n && "text-error-700",
+      )}
+    >
       {signedUsdc(amount)}{" "}
       <span className="text-[0.72em] font-(--w-ui) tracking-[0.04em] text-muted-foreground">
         USDC

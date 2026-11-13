@@ -19,6 +19,7 @@ import { timestamps } from "./columns.js";
 import { companyWalletSends } from "./company-wallet-sends.js";
 import { invoices } from "./invoices.js";
 import { organizations } from "./organizations.js";
+import { treasuryMoves } from "./treasury-moves.js";
 import { wallets } from "./wallets.js";
 
 /**
@@ -33,6 +34,10 @@ import { wallets } from "./wallets.js";
  *   company wallet.
  * - `invoice_payment`: a customer paying an invoice with USDC from another
  *   chain, delivered to the company wallet. Linked to its invoice.
+ * - `to_treasury`: company wallet to the Treasury wallet on Base. Linked to
+ *   its move; a refund of it comes back to the company wallet.
+ * - `from_treasury`: the Treasury wallet on Base to the company wallet.
+ *   Linked to its move.
  */
 export const INTENT_QUOTE_PURPOSES = [
   "base_hop",
@@ -41,6 +46,8 @@ export const INTENT_QUOTE_PURPOSES = [
   "usdc_payout",
   "fund_in_return",
   "invoice_payment",
+  "to_treasury",
+  "from_treasury",
 ] as const;
 export type IntentQuotePurpose = (typeof INTENT_QUOTE_PURPOSES)[number];
 
@@ -190,6 +197,8 @@ export const intentQuotes = pgTable(
     returnQuoteId: uuid("return_quote_id"),
     /** An `invoice_payment` quote's invoice, and only theirs. */
     invoiceId: uuid("invoice_id"),
+    /** A `to_treasury` or `from_treasury` quote's move, and only theirs. */
+    treasuryMoveId: uuid("treasury_move_id"),
     /** After this, 1Click refunds a deposit instead of delivering it. */
     deadline: timestamp("deadline", { withTimezone: true }).notNull(),
     /**
@@ -292,6 +301,11 @@ export const intentQuotes = pgTable(
       columns: [table.invoiceId, table.organizationId],
       foreignColumns: [invoices.id, invoices.organizationId],
     }),
+    foreignKey({
+      name: "intent_quotes_treasury_move_organization_fk",
+      columns: [table.treasuryMoveId, table.organizationId],
+      foreignColumns: [treasuryMoves.id, treasuryMoves.organizationId],
+    }),
     // Target of payouts' composite foreign keys.
     unique("intent_quotes_id_organization_id_unique").on(
       table.id,
@@ -314,6 +328,10 @@ export const intentQuotes = pgTable(
     index("intent_quotes_unsettled_idx")
       .on(table.organizationId)
       .where(sql`${table.status} IN ('quoted', 'depositing', 'needs_review')`),
+    // A move's quotes, one per part.
+    index("intent_quotes_treasury_move_id_idx")
+      .on(table.treasuryMoveId)
+      .where(sql`${table.treasuryMoveId} IS NOT NULL`),
     // An invoice's quotes, for reusing an open one.
     index("intent_quotes_invoice_id_idx")
       .on(table.invoiceId)
@@ -332,12 +350,16 @@ export const intentQuotes = pgTable(
       "intent_quotes_settled_has_time",
       sql`(${table.status} IN ('succeeded', 'refunded', 'failed', 'expired')) = (${table.settledAt} IS NOT NULL)`,
     ),
-    // Only a Base hop, a USDC payout and a fund-in return start from the
-    // company wallet. Compared as text: an enum value can't be used in the
-    // transaction that adds it.
+    // Only a Base hop, a USDC payout, a fund-in return and a move to Treasury
+    // start from the company wallet. Compared as text: an enum value can't be
+    // used in the transaction that adds it.
     check(
       "intent_quotes_send_is_from_company_wallet",
-      sql`${table.companyWalletSendId} IS NULL OR ${table.purpose}::text IN ('base_hop', 'usdc_payout', 'fund_in_return')`,
+      sql`${table.companyWalletSendId} IS NULL OR ${table.purpose}::text IN ('base_hop', 'usdc_payout', 'fund_in_return', 'to_treasury')`,
+    ),
+    check(
+      "intent_quotes_treasury_move_matches_purpose",
+      sql`(${table.treasuryMoveId} IS NOT NULL) = (${table.purpose}::text IN ('to_treasury', 'from_treasury'))`,
     ),
     // Only a fund-in return is paid from inside NEAR Intents, and only a
     // fund-in, its return or an invoice payment refunds into it.

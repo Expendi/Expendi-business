@@ -71,6 +71,7 @@ export const ACTIVITY_AREAS: readonly {
     icon: ShieldCheckIcon,
   },
   { prefix: "wallet.", label: "USDC wallet", icon: WalletIcon },
+  { prefix: "treasury", label: "Treasury", icon: LandmarkIcon },
   { prefix: "organization.", label: "Company settings", icon: SettingsIcon },
   { prefix: "accounting_", label: "Zoho Books", icon: BookOpenIcon },
   { prefix: "report_export.", label: "Exports", icon: DownloadIcon },
@@ -88,6 +89,13 @@ const capitalised = (text: string) =>
 const ACTION_LABELS: Readonly<Record<string, string>> = {
   "payout.paying": "Payment sent",
   "payee.restored": "Payee restored",
+  "treasury.turned_on": "Treasury turned on",
+  "treasury_move.started": "Treasury move started",
+  "treasury_move.completed": "Treasury move completed",
+  "treasury_move.returned": "Treasury move returned to the wallet",
+  "treasury_move.failed": "Treasury move failed",
+  "treasury_move.needs_review": "Treasury move needs review",
+  "treasury_move.return_started": "Treasury move return started",
 };
 
 /** `payroll_run.payment_left_out` → `Payroll run payment left out`. */
@@ -129,6 +137,7 @@ export const ENTITY_TYPES: Readonly<
   float: { label: "Petty cash float", icon: CoinsIcon },
   payout: { label: "Payment", icon: SendIcon },
   wallet: { label: "USDC wallet", icon: WalletIcon },
+  treasury_move: { label: "Treasury move", icon: LandmarkIcon },
   organization: { label: "Company", icon: SettingsIcon },
   accounting_connection: { label: "Zoho Books connection", icon: BookOpenIcon },
   accounting_sync: { label: "Zoho Books sync", icon: BookOpenIcon },
@@ -224,6 +233,7 @@ export function recordLink(
       return { href: "/settings", page: "Settings" };
     case "payout":
     case "wallet":
+    case "treasury_move":
     case "withdrawal_address":
       return { href: "/wallet", page: "Accounts" };
     case "report_export":
@@ -454,6 +464,22 @@ const FIELDS: Readonly<Record<string, FieldFormat>> = {
   kesEquivalent: kes("In KES"),
   amountUsdc: usdc("Amount"),
   maxDebitUsdc: usdc("From the wallet, at most"),
+  requestedUsdc: usdc("Amount"),
+  movedUsdc: usdc("Moved"),
+  costUsdc: usdc("Cost"),
+  direction: {
+    label: "Direction",
+    show: (value) =>
+      text(
+        value === "to_treasury"
+          ? "To Treasury"
+          : value === "to_wallet"
+            ? "To the wallet"
+            : null,
+      ),
+  },
+  partlyFilled: flag("Partly filled"),
+  undepositedUsdc: usdc("Not deposited"),
   currency: {
     label: "Currency",
     show: (value) =>
@@ -612,6 +638,11 @@ const HIDDEN_FIELDS = new Set([
   "userId",
   "membershipId",
   "batchSize",
+  "treasuryAddress",
+  "treasuryPrivyWalletId",
+  "treasuryPrivyPolicyId",
+  "vaultId",
+  "quoteId",
 ]);
 
 /** `etimsNotRequired` → `eTIMS not required`; unknown keys in plain words. */

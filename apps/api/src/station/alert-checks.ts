@@ -5,7 +5,7 @@ import { runAlerts } from "../services/alerts/run-alerts.js";
 import { IDLE } from "./scheduler.js";
 
 /**
- * Every minute, check the six alerts and email the alert list about each
+ * Every minute, check the alerts and email the alert list about each
  * new incident, once (spec §6.16).
  */
 export const alertChecksJob: StationJob = {

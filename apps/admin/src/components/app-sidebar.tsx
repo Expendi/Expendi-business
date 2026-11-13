@@ -23,7 +23,7 @@ import { usePreferencesStore } from "~/stores/preferences/preferences-provider";
 
 /**
  * The brand, the grouped pages and the staff member signed in. Its style
- * and how it collapses come from the layout controls.
+ * and how it collapses come from Settings > Appearance.
  */
 export function AppSidebar({
   path,

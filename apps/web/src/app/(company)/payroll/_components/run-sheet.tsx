@@ -26,6 +26,7 @@ import {
 import type { RunPayment } from "./run-payment";
 import type { FieldErrors } from "./sheet-parts";
 import type { PasskeyState } from "~/features/payment-ui";
+import { TreasuryOfferButton } from "~/app/(company)/wallet/_components/treasury-offer";
 import { TextLinkButton } from "~/components/data/actions";
 import { EntityMark, RowCheckbox } from "~/components/data/cells";
 import {
@@ -376,6 +377,7 @@ export function RunSheet({
         <PayrollReview
           prepared={prepared}
           error={payment.error}
+          errorAction={<TreasuryOfferButton error={payment.failure} />}
           cancelled={payment.cancelled}
         />
       </DetailSheet>
@@ -621,7 +623,10 @@ export function RunSheet({
       ) : null}
       {payment.error ? (
         <div role="alert">
-          <Callout tone="error">
+          <Callout
+            tone="error"
+            action={<TreasuryOfferButton error={payment.failure} />}
+          >
             <p>{payment.error}</p>
           </Callout>
         </div>

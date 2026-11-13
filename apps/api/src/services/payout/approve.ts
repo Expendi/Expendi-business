@@ -35,7 +35,7 @@ import { AuditLog } from "../audit/audit-log.js";
 import { cardLoadsTodayKes } from "../cards/balance.js";
 import { activeCashOutProvider } from "../cash-out/active-provider.js";
 import { fromMicro } from "../paycrest/amounts.js";
-import { ledgerBalance, reservedForPayouts } from "../wallet/ledger.js";
+import { availableUsdc } from "../wallet/ledger.js";
 import {
   cashOutRecipientProblem,
   withinCashOutLimits,
@@ -455,9 +455,7 @@ export function approvePayouts(input: {
           (sum, payout) => sum + payout.maxDebitUsdc,
           0n,
         );
-        const available =
-          (yield* ledgerBalance(tx, wallet.id)) -
-          (yield* reservedForPayouts(tx, wallet.id));
+        const available = yield* availableUsdc(tx, wallet.id);
         if (available < needed) {
           return yield* Effect.fail(
             new PayoutRejected({

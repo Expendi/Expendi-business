@@ -1,4 +1,4 @@
-/** The fonts the layout controls offer; Outfit is the brand font and the default. */
+/** The fonts Settings > Appearance offers; Outfit is the brand font and the default. */
 export const FONT_OPTIONS = [
   { label: "Outfit", value: "outfit" },
   { label: "Geist", value: "geist" },

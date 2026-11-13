@@ -33,9 +33,15 @@ const FONT_REGULAR = fileURLToPath(
 const FONT_SEMIBOLD = fileURLToPath(
   new URL("../../../assets/fonts/Outfit_600SemiBold.ttf", import.meta.url),
 );
+/** The dashboard's brand mark (`apps/web/public/expendi-mark.png`). */
+const BRAND_MARK = fileURLToPath(
+  new URL("../../../assets/brand/expendi-mark.png", import.meta.url),
+);
 
 /** `--color-brand-600` in apps/web's tokens. */
 const CORAL = "#f0613e";
+/** `--color-success-700`, the dashboard's paid colour. */
+const PAID_GREEN = "#067647";
 const INK = "#101828";
 const MUTED = "#667085";
 const RULE = "#e4e7ec";
@@ -153,7 +159,7 @@ export function invoicePdfFilename(number: string): string {
 function stampOf(
   invoice: PublicInvoice,
 ): { label: string; color: string } | null {
-  if (invoice.status === "paid") return { label: "PAID", color: CORAL };
+  if (invoice.status === "paid") return { label: "PAID", color: PAID_GREEN };
   if (invoice.status === "void") return { label: "VOID", color: MUTED };
   return invoice.overdue ? { label: "OVERDUE", color: CORAL } : null;
 }
@@ -223,7 +229,17 @@ export function renderInvoicePdf(
 
   doc.rect(0, 0, PAGE_WIDTH, 6).fill(CORAL);
 
-  let y = PAGE_MARGIN;
+  const markSize = 24;
+  doc.image(BRAND_MARK, PAGE_MARGIN, PAGE_MARGIN, {
+    width: markSize,
+    height: markSize,
+  });
+  put("Expendi Business", PAGE_MARGIN + markSize + 8, PAGE_MARGIN + 4, {
+    font: "SemiBold",
+    size: 13,
+  });
+
+  let y = PAGE_MARGIN + markSize + 28;
   put("Invoice", PAGE_MARGIN, y, { font: "SemiBold", size: 28 });
   put(invoice.number, PAGE_MARGIN, y + 36, { size: 12, color: MUTED });
 
@@ -433,7 +449,7 @@ export function renderInvoicePdf(
     put("PAYMENT RECEIVED", PAGE_MARGIN, y, {
       font: "SemiBold",
       size: 8,
-      color: CORAL,
+      color: PAID_GREEN,
     });
     y += 14;
     for (const detail of details) {
