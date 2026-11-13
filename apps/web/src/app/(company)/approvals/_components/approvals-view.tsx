@@ -40,6 +40,7 @@ import { useDashboard } from "~/contexts/dashboard-context";
 import { navCountKeys } from "~/hooks/use-nav-counts";
 import { describeApiError } from "~/lib/api";
 import { isChallengeFresh } from "~/lib/approval";
+import { useRefreshWhenSettled } from "~/lib/payment-poll";
 import { queryKeys } from "~/lib/query-keys";
 import {
   useApprovalPasskeyStatus,
@@ -51,6 +52,7 @@ import {
   CostChangedError,
   describePaymentError,
   describePaymentResult,
+  payingClaimsQuery,
   preparePayment,
   sameCost,
 } from "./payment";
@@ -192,6 +194,8 @@ function CompanyApprovals({
         queryKey: queryKeys.expenses(organizationId),
       }),
     ]);
+  const paying = useQuery(payingClaimsQuery(api, organizationId));
+  useRefreshWhenSettled(paying.data?.claims.length ?? 0, refresh);
 
   const pay = usePasskeyApproval<
     PreparedPayment,

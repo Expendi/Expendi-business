@@ -65,6 +65,7 @@ const run: PayrollRunDetail = {
     note: null,
     leftOut: null,
     paidOn: null,
+    paymentReceipts: [],
   })),
 };
 

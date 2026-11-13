@@ -1,7 +1,12 @@
 "use client";
 
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import type {
   CreateSalaryRequest,
@@ -15,6 +20,8 @@ import type {
   UpdateSalaryRequest,
 } from "@expendi-business/shared";
 import {
+  isPaymentInFlight,
+  paymentPollInterval,
   payrollMarginChallengeSchema,
   payrollMarginSchema,
   payrollRunDetailSchema,
@@ -30,6 +37,7 @@ import type { ApprovalOutcome, PasskeyApprovalSteps } from "~/lib/approval";
 import { CostChangedError } from "~/features/bills/bill-payment";
 import { billKeys, payrollKeys, walletPrefix } from "~/features/payment-keys";
 import { isChallengeFresh } from "~/lib/approval";
+import { useRefreshWhenSettled } from "~/lib/payment-poll";
 import { useApi } from "~/lib/use-api";
 import { usePasskeyApproval } from "~/lib/use-approval";
 import {
@@ -103,14 +111,73 @@ export function useSalaries(organizationId: string): UseQueryResult<Salary[]> {
   });
 }
 
-/** Payroll runs, latest pay date first. */
-export function usePayrollRuns(
+/**
+ * Payroll runs, latest pay date first. `followPayments` asks again every
+ * few seconds while one is being paid.
+ */
+export function payrollRunsQuery(
+  api: ApiClient,
   organizationId: string,
-): UseQueryResult<PayrollRun[]> {
-  const api = useApi();
-  return useQuery({
+  { followPayments }: { followPayments: boolean },
+) {
+  return queryOptions({
     queryKey: payrollKeys.runs(organizationId),
     queryFn: () => api.get(runsPath(organizationId), payrollRunsResponseSchema),
+    refetchInterval: followPayments
+      ? (query) =>
+          paymentPollInterval({
+            payrollRuns: query.state.data?.map((run) => run.status),
+          })
+      : false,
+  });
+}
+
+/**
+ * Payroll runs. With `followPayments`, payroll, bills and the wallet are
+ * fetched again once a run being paid settles; only the Payroll page
+ * follows them, not the sidebar's count.
+ */
+export function usePayrollRuns(
+  organizationId: string,
+  { followPayments = false }: { followPayments?: boolean } = {},
+): UseQueryResult<PayrollRun[]> {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidatePayroll(organizationId);
+  const runs = useQuery(
+    payrollRunsQuery(api, organizationId, { followPayments }),
+  );
+  const paying = followPayments
+    ? (runs.data?.filter((run) =>
+        isPaymentInFlight({ payrollRuns: [run.status] }),
+      ).length ?? 0)
+    : 0;
+  useRefreshWhenSettled(paying, () =>
+    Promise.all([
+      invalidate(),
+      queryClient.invalidateQueries({ queryKey: walletPrefix(organizationId) }),
+    ]),
+  );
+  return runs;
+}
+
+/** One run, asked about again while it or anyone in it is being paid. */
+export function payrollRunQuery(
+  api: ApiClient,
+  organizationId: string,
+  runId: string,
+) {
+  return queryOptions({
+    queryKey: payrollKeys.run(organizationId, runId),
+    queryFn: () =>
+      api.get(`${runsPath(organizationId)}/${runId}`, payrollRunDetailSchema),
+    refetchInterval: (query) => {
+      const run = query.state.data;
+      return paymentPollInterval({
+        payrollRuns: run ? [run.status] : [],
+        bills: run?.payments.map((payment) => payment.status),
+      });
+    },
   });
 }
 
@@ -119,11 +186,7 @@ export function usePayrollRun(
   runId: string,
 ): UseQueryResult<PayrollRunDetail> {
   const api = useApi();
-  return useQuery({
-    queryKey: payrollKeys.run(organizationId, runId),
-    queryFn: () =>
-      api.get(`${runsPath(organizationId)}/${runId}`, payrollRunDetailSchema),
-  });
+  return useQuery(payrollRunQuery(api, organizationId, runId));
 }
 
 export function usePayrollMargin(

@@ -280,6 +280,7 @@ function sampleRun(sample: SampleRun): PayrollRunDetail {
         ? { reason: leftOut, at: draftedOn(sample.payDate) }
         : null,
       paidOn: approved && !leftOut ? sample.payDate : null,
+      paymentReceipts: [],
     };
     return { payment, salaryKes: BigInt(kes(salary.shillings)) };
   });

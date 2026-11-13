@@ -3,6 +3,7 @@
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 import {
   keepPreviousData,
+  queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
@@ -16,6 +17,7 @@ import type {
   BillPaymentResult,
   BillsSummary,
   CancelBillRequest,
+  CashOutAmountLimits,
   CreateBillRequest,
   MarkBillPaidOutsideRequest,
   PaidFromAccount,
@@ -26,6 +28,8 @@ import {
   billsResponseSchema,
   billsSummarySchema,
   paidFromAccountsResponseSchema,
+  PAYMENT_POLL_MS,
+  paymentPollInterval,
   walletResponseSchema,
 } from "@expendi-business/shared";
 
@@ -40,6 +44,7 @@ import {
   walletPrefix,
 } from "~/features/payment-keys";
 import { isChallengeFresh } from "~/lib/approval";
+import { useRefreshWhenSettled } from "~/lib/payment-poll";
 import { queryKeys } from "~/lib/query-keys";
 import { useApi } from "~/lib/use-api";
 import { usePasskeyApproval } from "~/lib/use-approval";
@@ -51,6 +56,7 @@ import {
   prepareBillPayment,
   sameBillCost,
 } from "./bill-payment";
+import { limitsFromWallet } from "./cash-out-limits";
 
 /** The bill routes the app uses (T35, T37): admins act, accountants read. */
 
@@ -102,6 +108,24 @@ export const billListKey = (
     listParams(view, filters, today),
   ] as const;
 
+/** A tab's bills, asked about again every few seconds while one is being paid. */
+export function billListQuery(
+  api: ApiClient,
+  organizationId: string,
+  view: BillListView,
+  filters: BillFilters,
+  today: string,
+) {
+  return queryOptions({
+    queryKey: billListKey(organizationId, view, filters, today),
+    queryFn: () => listBills(api, organizationId, view, filters, today),
+    refetchInterval: (query) =>
+      paymentPollInterval({
+        bills: query.state.data?.map((bill) => bill.status),
+      }),
+  });
+}
+
 /**
  * A tab's bills. While new filters load, the last list stays up, dimmed
  * (`isPlaceholderData`).
@@ -114,8 +138,7 @@ export function useBills(
   const api = useApi();
   const today = nairobiIsoDate(new Date());
   return useQuery({
-    queryKey: billListKey(organizationId, view, filters, today),
-    queryFn: () => listBills(api, organizationId, view, filters, today),
+    ...billListQuery(api, organizationId, view, filters, today),
     placeholderData: keepPreviousData,
   });
 }
@@ -126,23 +149,59 @@ export const billsSummaryKey = (
   params: BillSummaryParams,
 ) => [...billKeys.all(organizationId), "summary", params] as const;
 
-/**
- * The tabs' counts under the filters, and the company-wide totals the stat
- * cards show; salaries are never counted.
- */
-export function useBillsSummary(
+/** The tabs' counts, asked about again while the Being paid tab isn't empty. */
+export function billsSummaryQuery(
+  api: ApiClient,
   organizationId: string,
   params: BillSummaryParams,
-): UseQueryResult<BillsSummary> {
-  const api = useApi();
-  return useQuery({
+) {
+  return queryOptions({
     queryKey: billsSummaryKey(organizationId, params),
     queryFn: () =>
       api.get(
         `${billsPath(organizationId)}/summary?${toSearchParams({ ...params })}`,
         billsSummarySchema,
       ),
+    refetchInterval: (query) =>
+      (query.state.data?.views.paying ?? 0) > 0 ? PAYMENT_POLL_MS : false,
+  });
+}
+
+/**
+ * The tabs' counts under the filters, and the company-wide totals the stat
+ * cards show; salaries are never counted. When a bill being paid settles,
+ * every bill query and the wallet are asked again.
+ */
+export function useBillsSummary(
+  organizationId: string,
+  params: BillSummaryParams,
+): UseQueryResult<BillsSummary> {
+  const api = useApi();
+  const summary = useQuery({
+    ...billsSummaryQuery(api, organizationId, params),
     placeholderData: keepPreviousData,
+  });
+  useRefreshWhenSettled(
+    summary.data?.views.paying ?? 0,
+    useInvalidateBills(organizationId),
+  );
+  return summary;
+}
+
+/** One bill, asked about again every few seconds while it's being paid. */
+export function billQuery(
+  api: ApiClient,
+  organizationId: string,
+  billId: string,
+) {
+  return queryOptions({
+    queryKey: billKeys.detail(organizationId, billId),
+    queryFn: () =>
+      api.get(`${billsPath(organizationId)}/${billId}`, billDetailSchema),
+    refetchInterval: (query) =>
+      paymentPollInterval({
+        bills: query.state.data ? [query.state.data.status] : [],
+      }),
   });
 }
 
@@ -152,11 +211,15 @@ export function useBill(
   { enabled = true }: { enabled?: boolean } = {},
 ): UseQueryResult<BillDetail> {
   const api = useApi();
-  return useQuery({
-    queryKey: billKeys.detail(organizationId, billId),
+  return useQuery({ ...billQuery(api, organizationId, billId), enabled });
+}
+
+/** The wallet as bills read it: the cash-out rate and amount limits, one fetch for both. */
+function billWalletQuery(api: ApiClient, organizationId: string) {
+  return queryOptions({
+    queryKey: billKeys.kesRate(organizationId),
     queryFn: () =>
-      api.get(`${billsPath(organizationId)}/${billId}`, billDetailSchema),
-    enabled,
+      api.get(`/organizations/${organizationId}/wallet`, walletResponseSchema),
   });
 }
 
@@ -170,14 +233,24 @@ export function useKesRate(
 ): string | null {
   const api = useApi();
   const wallet = useQuery({
-    queryKey: billKeys.kesRate(organizationId),
-    queryFn: () =>
-      api.get(`/organizations/${organizationId}/wallet`, walletResponseSchema),
+    ...billWalletQuery(api, organizationId),
     enabled,
   });
   return wallet.data?.status === "active"
     ? (wallet.data.kesEquivalent?.rate ?? null)
     : null;
+}
+
+/**
+ * The smallest and largest amount one cash-out can send now, for a KES
+ * bill's form to state and check; null until the wallet says.
+ */
+export function useCashOutLimits(
+  organizationId: string,
+): CashOutAmountLimits | null {
+  const api = useApi();
+  const wallet = useQuery(billWalletQuery(api, organizationId));
+  return limitsFromWallet(wallet.data);
 }
 
 /** The accounts a bill paid outside Expendi can be paid from (spec §6.23). */

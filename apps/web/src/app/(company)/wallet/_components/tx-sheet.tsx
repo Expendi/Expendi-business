@@ -16,6 +16,7 @@ import {
   SheetActions,
   SheetPosition,
 } from "~/components/data/detail-sheet";
+import { PaymentReceiptItems } from "~/components/data/payment-receipts";
 import { StatusBadge } from "~/components/data/status-badge";
 import { Button } from "~/components/ui/button";
 import { addressGroups, shortAddress } from "~/features/chain-display";
@@ -300,6 +301,9 @@ export function TxDetails({
               <DetailItem label="Paid">
                 {happenedAt(payout.paidAt, today)}
               </DetailItem>
+            ) : null}
+            {payout ? (
+              <PaymentReceiptItems receipts={payout.paymentReceipts} />
             ) : null}
             {transaction}
           </DetailList>

@@ -7,6 +7,7 @@ import type {
   BillListView,
   BillsSummary,
   BillStatus,
+  CashOutReceipt,
   PayeeKind,
   PayeeMethod,
   RecurringItem,
@@ -292,6 +293,8 @@ interface SampleBill {
   notes?: string;
   files?: readonly Paper[];
   paidOn?: string;
+  /** The cash-out's receipt once it's paid through Expendi. */
+  receipts?: readonly CashOutReceipt[];
   paidFrom?: string;
   adjustmentReason?: string;
   paidOutsideNote?: string;
@@ -337,6 +340,7 @@ function bill(sample: SampleBill): Bill {
     adjustmentReason: sample.adjustmentReason ?? null,
     paidOn: sample.paidOn ?? null,
     paidAt: sample.paidOn ? `${sample.paidOn}T09:00:00.000Z` : null,
+    paymentReceipts: [...(sample.receipts ?? [])],
     markedPaidBy: sample.status === "paid_outside" ? person : null,
     paidOutsideNote: sample.paidOutsideNote ?? null,
     cancelledReason: sample.cancelledReason ?? null,
@@ -588,6 +592,7 @@ const SETTLED_SAMPLES: readonly SampleBill[] = [
     dueOn: "2026-11-04",
     status: "paid",
     paidOn: "2026-11-04",
+    receipts: [{ kind: "mpesa", code: "UKDCW299LW" }],
     heading: "transactions",
     category: "rent",
     files: [
@@ -737,6 +742,7 @@ export const WALLET: WalletResponse = {
   chain: "near",
   usdcBalance: "16420800000",
   kesEquivalent: { kesCents: "211828320", rate: KES_RATE },
+  cashOutLimits: { minKesCents: "2000", maxKesCents: "25000000" },
 };
 
 const escapeXml = (text: string): string =>

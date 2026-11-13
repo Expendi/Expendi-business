@@ -12,6 +12,7 @@ import type {
 import { FUND_IN_CHAIN_NAMES, FUND_IN_CHAINS } from "@expendi-business/shared";
 
 import type { FundInFieldErrors } from "./fund-in-display";
+import { CopyButton } from "~/components/copy-button";
 import {
   Callout,
   DetailItem,
@@ -36,7 +37,6 @@ import {
 } from "~/components/ui/native-select";
 import { describeApiError } from "~/lib/api";
 import { formatUsdc } from "~/lib/money";
-import { CopyButton } from "./copy-button";
 import { FUND_IN_STATUS, fundInDraft } from "./fund-in-display";
 import { RailRow } from "./rail-cards";
 import { GroupedAddress } from "./tx-sheet";

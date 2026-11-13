@@ -6,6 +6,7 @@ import {
   keepPreviousData,
   useInfiniteQuery,
   useQuery,
+  useQueryClient,
 } from "@tanstack/react-query";
 import {
   CalendarIcon,
@@ -60,6 +61,7 @@ import { useDeepLinkParam } from "~/components/data/use-deep-link-param";
 import { Button } from "~/components/ui/button";
 import { useAuth } from "~/contexts/auth-context";
 import { useDashboard } from "~/contexts/dashboard-context";
+import { useRefreshWhenSettled } from "~/lib/payment-poll";
 import { queryKeys } from "~/lib/query-keys";
 import {
   DEFAULT_SORT,
@@ -78,6 +80,7 @@ import {
   personName,
   STATUS_ORDER,
 } from "./expense-labels";
+import { claimsBeingPaid, expenseListQuery } from "./expense-list";
 import { ExpenseSheet } from "./expense-sheet";
 import { ExpenseTable, ExpenseTableSkeleton } from "./expense-table";
 
@@ -111,6 +114,7 @@ function CompanyExpenses({
   canAct: boolean;
 }): JSX.Element {
   const { api } = useAuth();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -131,16 +135,14 @@ function CompanyExpenses({
     limit: EXPENSES_PAGE_SIZE,
   };
   const list = useInfiniteQuery({
-    queryKey: queryKeys.expenseList(organizationId, listQuery),
-    queryFn: ({ pageParam }) =>
-      api.listExpenses(organizationId, {
-        ...listQuery,
-        cursor: pageParam ?? undefined,
-      }),
-    initialPageParam: null as string | null,
-    getNextPageParam: (page) => page.nextCursor,
+    ...expenseListQuery(api, organizationId, listQuery),
     placeholderData: keepPreviousData,
   });
+  useRefreshWhenSettled(claimsBeingPaid(list.data), () =>
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.expenses(organizationId),
+    }),
+  );
 
   function setFilters(next: ExpenseFilters) {
     const query = filtersToParams(next).toString();

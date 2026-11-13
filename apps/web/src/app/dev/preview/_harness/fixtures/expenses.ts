@@ -633,6 +633,7 @@ function toRow(sample: SampleExpense): SampleRow {
       selfApproved: sample.selfApproved ?? false,
       approvedAt: sample.paidAt ? `${sample.paidAt}T08:00:00.000Z` : null,
       paidAt: sample.paidAt ? `${sample.paidAt}T09:00:00.000Z` : null,
+      paymentReceipts: [],
       floatId:
         sample.kind === "float" || sample.fromFloat ? sampleId(690) : null,
       overspendClaimId: null,
@@ -913,6 +914,7 @@ function toClaim(sample: SampleClaim, status: ExpenseStatus): ClaimDetail {
     approvedAt: status === "payout_failed" ? "2026-10-31T08:00:00.000Z" : null,
     selfApproved: false,
     paidAt: null,
+    paymentReceipts: [],
     canEdit: false,
     warnings: [...(sample.warnings ?? [])],
     receiptCount: receipts.length,

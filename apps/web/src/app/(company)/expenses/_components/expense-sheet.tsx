@@ -16,6 +16,7 @@ import {
   SectionLabel,
 } from "~/components/data/detail-sheet";
 import { Money } from "~/components/data/money";
+import { PaymentReceiptItems } from "~/components/data/payment-receipts";
 import { Skel } from "~/components/data/states";
 import { StatusBadge } from "~/components/data/status-badge";
 import { Button } from "~/components/ui/button";
@@ -124,6 +125,7 @@ export function ExpenseDetails({
             {formatNairobiDate(expense.paidAt)}
           </DetailItem>
         ) : null}
+        <PaymentReceiptItems receipts={expense.paymentReceipts} />
         {expense.selfApproved ? (
           <DetailItem label="Approval">
             Approved by the person who submitted it

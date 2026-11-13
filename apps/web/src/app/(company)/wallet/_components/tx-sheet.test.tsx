@@ -4,6 +4,11 @@ import { describe, expect, it } from "vitest";
 import type { WalletHistoryItem } from "@expendi-business/shared";
 
 import { LEDGER } from "~/app/dev/preview/_harness/fixtures/wallet";
+import {
+  pageText,
+  RECEIPT_SAMPLES,
+  showsReceipt,
+} from "~/components/data/payment-receipts.samples";
 import { TxDetails } from "./tx-sheet";
 
 const NEAR_HASH = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";
@@ -84,5 +89,47 @@ describe("a movement's details", () => {
       { base: true, solana: false, address: false, fee: true },
       { base: false, solana: true, address: true, fee: true },
     ]);
+  });
+});
+
+describe("a paid cash-out's receipt", () => {
+  function paidCashOut(): WalletHistoryItem {
+    const item = LEDGER.find(
+      (row) =>
+        row.type === "payout" &&
+        row.payout?.status === "paid" &&
+        row.payout.method !== "usdc",
+    );
+    if (!item) throw new Error("No sample paid cash-out");
+    return item;
+  }
+
+  function withReceipts(
+    receipts: (typeof RECEIPT_SAMPLES)[number]["receipts"],
+  ): WalletHistoryItem {
+    const item = paidCashOut();
+    return {
+      ...item,
+      payout: item.payout && {
+        ...item.payout,
+        paymentReceipts: [...receipts],
+      },
+    };
+  }
+
+  it.each(RECEIPT_SAMPLES)("shows $name right after Paid", (receipt) => {
+    // #when
+    const page = pageText(details(withReceipts(receipt.receipts)));
+
+    // #then
+    expect(page).toContain(`Paid Yesterday, 11:12 ${receipt.reads}`);
+  });
+
+  it("shows no receipt row before it's paid", () => {
+    // #when
+    const page = pageText(details(withReceipts([])));
+
+    // #then
+    expect(showsReceipt(page)).toBe(false);
   });
 });

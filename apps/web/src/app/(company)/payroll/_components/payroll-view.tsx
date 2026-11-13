@@ -143,7 +143,7 @@ function CompanyPayroll({
   organizationId: string;
   canAct: boolean;
 }): JSX.Element {
-  const runs = usePayrollRuns(organizationId);
+  const runs = usePayrollRuns(organizationId, { followPayments: true });
   const salaries = useSalaries(organizationId);
   const margin = usePayrollMargin(organizationId);
   const passkeyStatus = useApprovalPasskeyStatus(canAct);

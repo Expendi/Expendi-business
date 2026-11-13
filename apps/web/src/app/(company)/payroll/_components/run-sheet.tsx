@@ -39,6 +39,7 @@ import {
   SheetPosition,
 } from "~/components/data/detail-sheet";
 import { Money } from "~/components/data/money";
+import { ReceiptCodes } from "~/components/data/payment-receipts";
 import { Skel } from "~/components/data/states";
 import { StatusBadge } from "~/components/data/status-badge";
 import { Button } from "~/components/ui/button";
@@ -48,6 +49,7 @@ import {
   NativeSelectOption,
 } from "~/components/ui/native-select";
 import { holdWarning } from "~/features/bills/bill-payment";
+import { receiptRows } from "~/features/payment-receipts";
 import {
   FieldRow,
   FormField,
@@ -767,6 +769,7 @@ function PayList({
         const retrying =
           payment.preparing?.runId === run.id &&
           payment.preparing.retryBillId === row.billId;
+        const receipts = receiptRows(row.paymentReceipts);
         return (
           <li
             key={row.billId}
@@ -814,6 +817,18 @@ function PayList({
               />
               <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
             </div>
+            {receipts.length > 0 ? (
+              <div className="col-start-2 col-end-[-1] -mt-1 flex flex-col gap-2">
+                {receipts.map((receipt) => (
+                  <div key={receipt.kind}>
+                    <p className="text-xs leading-4 text-muted-foreground">
+                      {receipt.label}
+                    </p>
+                    <ReceiptCodes row={receipt} />
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {failed || (editable && !leftOut) ? (
               <div className="col-start-2 col-end-[-1] -mt-1 flex flex-wrap items-center gap-x-4 gap-y-2">
                 {failed && passkey === "ready" ? (

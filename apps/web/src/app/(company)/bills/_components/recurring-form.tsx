@@ -10,6 +10,7 @@ import type {
   CreateRecurringItemRequest,
   Payee,
   PayeeKind,
+  PayeeMethod,
   RecurringItem,
   RecurringPayVia,
   RecurringSchedule,
@@ -46,6 +47,13 @@ import {
 import { useAuth } from "~/contexts/auth-context";
 import { CURRENCY_LABELS, currencyOfPayee } from "~/features/bills/bill-amount";
 import { HEADING_LABELS, headingLabel } from "~/features/bills/bill-status";
+import { useCashOutLimits } from "~/features/bills/bills-api";
+import {
+  limitsForPayee,
+  serverFieldIssues,
+  smallestAmountHint,
+  typedAmountProblem,
+} from "~/features/bills/cash-out-limits";
 import { KIND_LABELS } from "~/features/payees/payee-display";
 import { ACTIVE_PAYEES, usePayees } from "~/features/payees/payees-api";
 import {
@@ -162,11 +170,23 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
     props.item?.payee.kind ?? null,
   );
   const [payeeOutside, setPayeeOutside] = useState(false);
+  const [payeeMethod, setPayeeMethod] = useState<PayeeMethod | null>(
+    props.item?.payee.method ?? null,
+  );
+  /** The save error last seen before an edit: its field message no longer applies. */
+  const [editedSince, setEditedSince] = useState<unknown>(null);
+  const cashOutLimits = useCashOutLimits(organizationId);
+  const amountLimits =
+    draft.payVia === "expendi" && !draft.variable
+      ? limitsForPayee(payeeMethod, cashOutLimits)
+      : null;
+  const amountHint = smallestAmountHint(amountLimits);
   const unchanged =
     props.item !== undefined &&
     Object.keys(toUpdateRequest(props.item, draft)).length === 0;
 
   function update(changes: Partial<RecurringDraft>, field: RecurringField) {
+    setEditedSince(submitError);
     setDraft((current) => ({ ...current, ...changes }));
     setFieldErrors((current) => {
       const next = { ...current };
@@ -180,6 +200,7 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
     const outside = payee.details?.method === "outside";
     setPayeeKind(payee.kind);
     setPayeeOutside(outside);
+    setPayeeMethod(payee.details?.method ?? null);
     update(
       {
         payeeId: payee.id,
@@ -201,6 +222,15 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
     );
   }
 
+  /** A cash-out amount out of range, judged as the API does: on any new amount. */
+  function amountProblem(amountChanged: boolean): boolean {
+    const problem = amountChanged
+      ? typedAmountProblem(draft.amount, amountLimits)
+      : null;
+    if (problem !== null) invalid([{ path: ["amountKes"], message: problem }]);
+    return problem !== null;
+  }
+
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (props.item === undefined) {
@@ -210,6 +240,7 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
         invalid(parsed.error.issues);
         return;
       }
+      if (amountProblem(true)) return;
       setFieldErrors({});
       props.onSubmit(request);
       return;
@@ -220,15 +251,22 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
       invalid(parsed.error.issues);
       return;
     }
+    if (amountProblem(request.amountKes !== undefined)) return;
     setFieldErrors({});
     props.onSubmit(request);
   }
 
   const amountShown = !draft.variable;
+  const serverIssues = serverFieldIssues(submitError, REQUEST_FIELDS);
+  const serverErrors: FieldErrors =
+    submitError === editedSince
+      ? {}
+      : fieldErrorsOf(serverIssues, REQUEST_FIELDS);
+  const shownErrors: FieldErrors = { ...serverErrors, ...fieldErrors };
   const invalidProps = (field: RecurringField) =>
-    fieldErrors[field] ? { "aria-invalid": true } : {};
+    shownErrors[field] ? { "aria-invalid": true } : {};
   const errorOf = (field: RecurringField) =>
-    fieldErrors[field] ? <FieldError>{fieldErrors[field]}</FieldError> : null;
+    shownErrors[field] ? <FieldError>{shownErrors[field]}</FieldError> : null;
 
   const endsField = (
     <Field>
@@ -272,7 +310,7 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
               id={idOf("payeeId")}
               organizationId={organizationId}
               value={draft.payeeId}
-              invalid={fieldErrors.payeeId !== undefined}
+              invalid={shownErrors.payeeId !== undefined}
               onChange={choosePayee}
             />
             {errorOf("payeeId")}
@@ -319,6 +357,9 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
                 This payee is paid in USDC: each bill pays exactly this many
                 USDC.
               </FieldDescription>
+            ) : null}
+            {amountHint ? (
+              <FieldDescription>{amountHint}</FieldDescription>
             ) : null}
             {props.item ? (
               <FieldDescription>
@@ -435,7 +476,7 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
             organizationId={organizationId}
             current={props.item?.category}
             value={draft.categoryId}
-            invalid={fieldErrors.categoryId !== undefined}
+            invalid={shownErrors.categoryId !== undefined}
             onChange={(categoryId) => update({ categoryId }, "categoryId")}
           />
           {errorOf("categoryId")}
@@ -446,7 +487,7 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
             <p role="alert">{fieldErrors.form}</p>
           </Callout>
         ) : null}
-        {submitError ? (
+        {submitError && serverIssues.length === 0 ? (
           <Callout tone="error">
             <p role="alert">{describeApiError(submitError)}</p>
           </Callout>
