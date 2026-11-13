@@ -11,7 +11,7 @@ The chain where every company's money sits at rest. It is NEAR.
 _Avoid_: Home chain, primary network, settlement chain
 
 **Company wallet**:
-The one account on the main chain that holds a single company's USDC. Never shared between companies. What it holds is what the company can spend now, unless the company has a confidential account: then that account holds it and the company wallet holds nothing at rest. Treasury is never part of it.
+The one account on the main chain that holds a single company's USDC. Never shared between companies. What it holds is what the company can spend now, unless the company has a confidential account: then that account holds it and the company wallet holds only what is waiting to be moved in, a few cents of dust and any of Expendi's own surplus. Treasury is never part of it.
 _Avoid_: Main wallet, NEAR wallet
 
 **Confidential account**:
@@ -23,13 +23,17 @@ A company's own account on Base that holds nothing at rest. Money passes through
 _Avoid_: Base wallet, bridge wallet, refund wallet
 
 **Gas relayer**:
-The Expendi-owned account that pays network fees, so a company wallet never holds anything but USDC.
+The Expendi-owned account that pays network fees, so a company wallet never holds anything but USDC. It also holds the USDC that refills each fee float.
 _Avoid_: Paymaster, sponsor, fee wallet
+
+**Fee float**:
+Expendi's own USDC kept inside a company's confidential account to pay what its Base hops and its USDC payouts to other chains cost beyond what they deliver. The gas relayer refills it to a target of 1 USDC whenever it falls below 0.25 USDC. It is never part of the company's balance.
+_Avoid_: Float (on its own: petty cash has floats), fee cover balance, gas float, buffer, reserve
 
 ### Moving money
 
 **Fund-in**:
-A company adding money to its company wallet by sending a supported asset from any supported chain.
+A company adding money to its company wallet, or to its confidential account if it has one, by sending a supported asset from any supported chain.
 _Avoid_: Deposit, on-ramp, bridge in
 
 **Move-in**:
@@ -37,7 +41,7 @@ Moving USDC that sits in a company wallet into the same company's confidential a
 _Avoid_: Shield, deposit, top-up
 
 **Fund-in return**:
-Sending a fund-in that couldn't be completed from the company's own NEAR Intents account, where it was refunded, back to its company wallet as USDC on NEAR.
+Sending a fund-in that couldn't be completed from the company's own NEAR Intents account, where it was refunded, back to its company wallet, or its confidential account, as USDC on NEAR.
 _Avoid_: Refund address, reverse fund-in
 
 **Cash-out**:
@@ -61,11 +65,11 @@ The chain a USDC payee or withdrawal address receives on.
 _Avoid_: Network, destination chain
 
 **Base hop**:
-Moving an exact amount of a company's USDC from its company wallet to its transit wallet so a cash-out can be funded.
+Moving an exact amount of a company's USDC from where its balance sits, its company wallet or its confidential account, to its transit wallet so a cash-out can be funded.
 _Avoid_: Bridge, bridging, swap
 
 **Sweep**:
-Returning whatever sits in a transit wallet to the company wallet.
+Returning whatever sits in a transit wallet to where the company's balance sits, its company wallet or its confidential account.
 _Avoid_: Reverse bridge, drain
 
 ### Treasury
@@ -79,11 +83,11 @@ A company's own account on Base that holds its Treasury as a position in the vau
 _Avoid_: Earn wallet, vault wallet, yield wallet, savings wallet
 
 **Move to Treasury**:
-Moving an amount of a company's USDC from its company wallet into its Treasury.
+Moving an amount of a company's USDC from where its balance sits, its company wallet or its confidential account, into its Treasury.
 _Avoid_: Deposit, invest, stake
 
 **Move to wallet**:
-Moving an amount of a company's Treasury back to its company wallet.
+Moving an amount of a company's Treasury back to where its balance sits, its company wallet or its confidential account.
 _Avoid_: Withdraw, redeem, unstake
 
 **Yield**:
@@ -131,7 +135,7 @@ Someone a company invoices. Not a payee: a payee is someone the company pays.
 _Avoid_: Client, buyer
 
 **Invoice**:
-What a company sends a customer to be paid in US dollars, settled as USDC in its company wallet. Draft, open, paid or void; overdue is an open invoice past its due date, not a status.
+What a company sends a customer to be paid in US dollars, settled as USDC in its company wallet, or its confidential account. Draft, open, paid or void; overdue is an open invoice past its due date, not a status.
 _Avoid_: Sales invoice, bill (a bill is what the company owes)
 
 **Pay link**:
