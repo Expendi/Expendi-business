@@ -40,28 +40,32 @@ const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`[server] Expendi Business API listening on port ${info.port}`);
 });
 
-const stopStation = startStation(runtime, [
-  reconcilePaycrestJob,
-  reconcilePretiumJob,
-  confirmOnchainJob,
-  billStatusJob,
-  recurringBillsJob,
-  payrollDraftsJob,
-  monthlyExportJob,
-  spendingRemindersJob,
-  pushNotificationsJob,
-  pushReceiptsJob,
-  zohoSyncJob,
-  alertChecksJob,
-  closeCardsJob,
-  reconcileLithicJob,
-  cardReceiptRemindersJob,
-  nearDepositsJob,
-  fundInsJob,
-  fundInReturnsJob,
-  outboundQuotesJob,
-  sweepTransitWalletsJob,
-]);
+const stopStation = startStation(
+  runtime,
+  [
+    reconcilePaycrestJob,
+    reconcilePretiumJob,
+    confirmOnchainJob,
+    billStatusJob,
+    recurringBillsJob,
+    payrollDraftsJob,
+    monthlyExportJob,
+    spendingRemindersJob,
+    pushNotificationsJob,
+    pushReceiptsJob,
+    zohoSyncJob,
+    alertChecksJob,
+    closeCardsJob,
+    reconcileLithicJob,
+    cardReceiptRemindersJob,
+    nearDepositsJob,
+    fundInsJob,
+    fundInReturnsJob,
+    outboundQuotesJob,
+    sweepTransitWalletsJob,
+  ],
+  config.databaseUrl,
+);
 
 function shutdown(signal: NodeJS.Signals): void {
   console.log(`[server] ${signal} received, shutting down`);
