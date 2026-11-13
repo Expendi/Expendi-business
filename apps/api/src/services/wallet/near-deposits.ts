@@ -1,11 +1,14 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { Cause, Effect, Exit } from "effect";
 
 import type { ConfigService } from "../../config.js";
 import type { DatabaseService } from "../../db/client.js";
 import type {
+  IntentQuote,
   IntentQuotePurpose,
   IntentQuoteStatus,
+  OneClickAccountType,
+  OneClickRecipientType,
 } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
 import type { AlertSignal, CheckResult } from "../alerts/ops-alerts.js";
@@ -14,6 +17,7 @@ import type { FastNearError, FastNearTransfer } from "../chain/fast-near.js";
 import type { NearRpcError } from "../chain/near-rpc.js";
 import type { NearUsdcReceiptTransfer } from "../chain/near.js";
 import type { EmailSender } from "../email/email-sender.js";
+import type { ConfidentialAccounts } from "../intents/confidential-account.js";
 import type { OneClick } from "../intents/one-click.js";
 import {
   intentQuotes,
@@ -29,7 +33,9 @@ import { FAST_NEAR_MAX_PAGE_SIZE, FastNear } from "../chain/fast-near.js";
 import { NearRelayer } from "../chain/near-relayer.js";
 import { NearRpc } from "../chain/near-rpc.js";
 import { NearChain, nearUsdcReceiptTransfersIn } from "../chain/near.js";
+import { sessionForQuote } from "../intents/company-session.js";
 import { refreshFundIn } from "../intents/fund-in.js";
+import { ONE_CLICK_USDC_ASSET_IDS } from "../intents/one-click.js";
 import {
   quotesToRecheck,
   refreshQuoteStatus,
@@ -123,6 +129,7 @@ type WatcherDeps =
   | NearChain
   | NearRelayer
   | OneClick
+  | ConfidentialAccounts
   | EmailSender
   | ConfigService;
 
@@ -134,6 +141,8 @@ interface ListedQuote {
   readonly purpose: IntentQuotePurpose;
   readonly status: IntentQuoteStatus;
   readonly treasuryMoveId: string | null;
+  readonly recipientType: OneClickRecipientType;
+  readonly refundType: OneClickAccountType;
 }
 
 /**
@@ -153,6 +162,8 @@ function quotesListing(
           purpose: intentQuotes.purpose,
           status: intentQuotes.status,
           treasuryMoveId: intentQuotes.treasuryMoveId,
+          recipientType: intentQuotes.recipientType,
+          refundType: intentQuotes.refundType,
         })
         .from(intentQuotes)
         .where(
@@ -166,8 +177,44 @@ function quotesListing(
 }
 
 /**
- * One of the company's unsettled quotes, or null if none is. A quote in
- * needs_review comes first: it is the one that waits for a person.
+ * Whether a quote could send USDC to the company wallet from NEAR Intents,
+ * so that an unexplained transfer from there may be its delivery or refund:
+ * it delivers to a public address and isn't paid out of a confidential
+ * account (whose payouts and hops go to a payee or the transit wallet, and
+ * whose buffer and refund return to the account), or it refunds to the
+ * origin chain where the origin is USDC on NEAR (a move-in, whose refund
+ * comes back). A fee cover refunds to the relayer. A delivery into a
+ * confidential account, and a refund into the company's NEAR Intents
+ * account, never reach the company wallet.
+ */
+const couldSendToCompanyWallet = (
+  quote: Pick<
+    IntentQuote,
+    "purpose" | "recipientType" | "depositType" | "refundType" | "originAsset"
+  >,
+): boolean =>
+  (quote.recipientType === "DESTINATION_CHAIN" &&
+    quote.depositType !== "CONFIDENTIAL_INTENTS") ||
+  (quote.refundType === "ORIGIN_CHAIN" &&
+    quote.originAsset === ONE_CLICK_USDC_ASSET_IDS.near &&
+    quote.purpose !== "fee_cover");
+
+const couldSendToCompanyWalletSql = or(
+  and(
+    eq(intentQuotes.recipientType, "DESTINATION_CHAIN"),
+    ne(intentQuotes.depositType, "CONFIDENTIAL_INTENTS"),
+  ),
+  and(
+    eq(intentQuotes.refundType, "ORIGIN_CHAIN"),
+    eq(intentQuotes.originAsset, ONE_CLICK_USDC_ASSET_IDS.near),
+    ne(intentQuotes.purpose, "fee_cover"),
+  ),
+);
+
+/**
+ * One of the company's unsettled quotes that could send USDC to the company
+ * wallet, or null if none is. A quote in needs_review comes first: it is the
+ * one that waits for a person.
  */
 function firstUnsettledQuote(
   organizationId: string,
@@ -185,6 +232,7 @@ function firstUnsettledQuote(
           and(
             eq(intentQuotes.organizationId, organizationId),
             inArray(intentQuotes.status, [...UNSETTLED_INTENT_QUOTE_STATUSES]),
+            couldSendToCompanyWalletSql,
           ),
         )
         .orderBy(
@@ -198,20 +246,30 @@ function firstUnsettledQuote(
 
 /**
  * Asks 1Click again about every quote of the company that could still list
- * a new transaction. False when any of them couldn't be asked: what it would
- * have said is then unknown.
+ * a new transaction to the company wallet. False when any of them couldn't
+ * be asked: what it would have said is then unknown. A quote that can never
+ * send there isn't asked about, so a failed sign-in for a confidential
+ * delivery holds nothing back.
  */
 function refreshQuotes(
   organizationId: string,
-): Effect.Effect<boolean, DatabaseError, DatabaseService | OneClick> {
+): Effect.Effect<
+  boolean,
+  DatabaseError,
+  DatabaseService | OneClick | ConfidentialAccounts
+> {
   return Effect.gen(function* () {
-    const quotes = yield* quotesToRecheck(organizationId);
+    const quotes = (yield* quotesToRecheck(organizationId)).filter(
+      couldSendToCompanyWallet,
+    );
     let allAnswered = true;
     for (const quote of quotes) {
       const exit = yield* Effect.exit(
         quote.purpose === "fund_in" || quote.purpose === "invoice_payment"
           ? refreshFundIn(quote)
-          : refreshQuoteStatus(quote),
+          : sessionForQuote(quote).pipe(
+              Effect.flatMap((session) => refreshQuoteStatus(quote, session)),
+            ),
       );
       if (Exit.isFailure(exit)) {
         allAnswered = false;
@@ -223,6 +281,32 @@ function refreshQuotes(
     }
     return allAnswered;
   });
+}
+
+/**
+ * Whether `account` is the deposit address of one of the company's
+ * move-ins. A move-in's refund can arrive from that address, and 1Click may
+ * not list its transaction.
+ */
+function isMoveInDepositAddress(
+  organizationId: string,
+  account: string,
+): Effect.Effect<boolean, DatabaseError, DatabaseService> {
+  return withScope({ organizationId }, (tx) =>
+    query(() =>
+      tx
+        .select({ id: intentQuotes.id })
+        .from(intentQuotes)
+        .where(
+          and(
+            eq(intentQuotes.organizationId, organizationId),
+            eq(intentQuotes.purpose, "move_in"),
+            eq(intentQuotes.depositAddress, account),
+          ),
+        )
+        .limit(1),
+    ),
+  ).pipe(Effect.map((rows) => rows.length > 0));
 }
 
 /**
@@ -255,13 +339,23 @@ type QuoteReading =
  * case a Treasury quote's transfer is credited. A `to_treasury` quote that
  * isn't settled may still turn out to have refunded, so what it lists can't
  * be judged yet; once it has succeeded or failed it lists nothing inbound.
- * Every other quote's transfer, other than a deposit's, is internal.
+ * Every other quote's transfer, other than a deposit's, is internal. So is
+ * a transfer in a transaction a confidential delivery lists: that quote is
+ * credited at settlement, never from a transfer. The same holds for a
+ * `from_treasury` quote that delivers into a confidential account and a
+ * `to_treasury` quote paid out of one, which refunds into it.
  */
 function readQuote(quote: ListedQuote): QuoteReading {
   switch (quote.purpose) {
     case "fund_in":
     case "fund_in_return":
     case "invoice_payment":
+      if (quote.recipientType === "CONFIDENTIAL_INTENTS") {
+        console.warn(
+          `[near-deposits] a transfer in a transaction that confidential delivery ${quote.id} lists; internal, since that quote is credited when 1Click reports it delivered`,
+        );
+        return { kind: "internal" };
+      }
       return {
         kind: "credit",
         quote: { id: quote.id, purpose: quote.purpose },
@@ -269,6 +363,12 @@ function readQuote(quote: ListedQuote): QuoteReading {
     case "from_treasury":
     case "to_treasury": {
       if (quote.treasuryMoveId === null) return { kind: "internal" };
+      if (
+        quote.recipientType === "CONFIDENTIAL_INTENTS" ||
+        quote.refundType === "CONFIDENTIAL_INTENTS"
+      ) {
+        return { kind: "internal" };
+      }
       if (quote.purpose === "to_treasury" && quote.status !== "refunded") {
         return UNSETTLED_INTENT_QUOTE_STATUSES.some(
           (status) => status === quote.status,
@@ -289,6 +389,7 @@ function readQuote(quote: ListedQuote): QuoteReading {
     case "sweep":
     case "usdc_payout":
     case "move_in":
+    case "fee_cover":
       return { kind: "internal" };
   }
 }
@@ -405,7 +506,8 @@ function creditDeposit(
  * Decides what one confirmed transfer into a company wallet is, in the
  * order the decision record gives:
  *
- * 1. from the gas relayer: its fee cover, internal;
+ * 1. from the gas relayer: its fee cover, internal; from the deposit
+ *    address of one of the company's move-ins: a move-in's refund, internal;
  * 2. in a transaction one of the company's quotes lists: a deposit if that
  *    quote is a fund-in, a fund-in return or an invoice payment (money that
  *    never reached the company wallet before); a `from_treasury` credit if
@@ -413,9 +515,12 @@ function creditDeposit(
  *    quote's return (the company's own money, credited because it left the
  *    ledger when it was sent to Treasury); held while a `to_treasury` quote
  *    that could still turn out refunded lists it; otherwise a hop refund, a
- *    sweep or a payout refund, internal;
- * 3. from NEAR Intents, unexplained, while a quote of the company's is
- *    still unsettled: held, because 1Click may not have listed it yet;
+ *    sweep or a payout refund, internal. A confidential delivery's own
+ *    transaction is internal too: it is credited when 1Click reports it
+ *    delivered;
+ * 3. from NEAR Intents, unexplained, while a quote of the company's that
+ *    could send USDC to the company wallet is still unsettled: held,
+ *    because 1Click may not have listed it yet;
  * 4. anything else: a deposit.
  */
 function settleTransfer(
@@ -426,6 +531,9 @@ function settleTransfer(
   return Effect.gen(function* () {
     const relayer = yield* NearRelayer;
     if (transfer.from === relayer.accountId) return "internal";
+    if (yield* isMoveInDepositAddress(organizationId, transfer.from)) {
+      return "internal";
+    }
 
     const explained = (listing: readonly ListedQuote[]) => {
       if (listing.length === 0) return null;
@@ -667,6 +775,7 @@ const QUOTE_PURPOSE_NAMES: Readonly<Record<IntentQuotePurpose, string>> = {
   to_treasury: "move to Treasury",
   from_treasury: "move to wallet",
   move_in: "move-in",
+  fee_cover: "fee cover",
 };
 
 function holdExplained(reason: HoldReason): string {

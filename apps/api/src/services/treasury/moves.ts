@@ -23,6 +23,7 @@ import type {
   ApprovalSettings,
   ConfirmationPurpose,
 } from "../approval/passkeys.js";
+import type { ConfidentialAccounts } from "../intents/confidential-account.js";
 import type { OneClick } from "../intents/one-click.js";
 import { violatedUniqueConstraint } from "../../db/error.js";
 import {
@@ -301,7 +302,7 @@ export function previewTreasuryMove(
 ): Effect.Effect<
   TreasuryMovePreview,
   TreasuryMoveError,
-  DatabaseService | OneClick | PrivyWallets
+  DatabaseService | OneClick | PrivyWallets | ConfidentialAccounts
 > {
   return Effect.gen(function* () {
     yield* requireAdmin(tenant);

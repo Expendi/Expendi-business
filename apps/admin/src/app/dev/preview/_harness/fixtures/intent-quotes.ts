@@ -108,6 +108,12 @@ export const INTENT_QUOTE_DETAIL: StaffIntentQuoteDetail = {
     "0x31ac7d90e4b25f86a1c03d7e92b48f5a60c1e3d79b2a45f8e0d61c3b97a24f50",
   companyWalletSendId: sampleId(801),
   depositPrivyTransactionId: "tx_cm3x9k7q2",
+  depositType: "ORIGIN_CHAIN",
+  recipientType: "DESTINATION_CHAIN",
+  refundType: "ORIGIN_CHAIN",
+  intentHash: null,
+  intentDeadline: null,
+  intentSubmittedAt: null,
   oneClickCheckedAt: minutesAgo(36),
   nearTxHashes: ["9Kx2mQ4vTb7WcN1eRf8sLz3YdHj6uPa5GoVi0XtB2nCw"],
   originChainTxHashes: [

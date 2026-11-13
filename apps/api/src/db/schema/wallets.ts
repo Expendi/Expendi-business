@@ -111,6 +111,15 @@ export const wallets = pgTable(
       () => users.id,
     ),
     /**
+     * What the company's confidential account held when the alert check last
+     * read it, in USDC base units. Staff code cannot sign in to read it, so
+     * the check saves each reading for them.
+     */
+    confidentialUsdc: bigint("confidential_usdc", { mode: "bigint" }),
+    confidentialUsdcReadAt: timestamp("confidential_usdc_read_at", {
+      withTimezone: true,
+    }),
+    /**
      * When the gas relayer had created the company wallet's account on chain
      * and registered it with the USDC contract.
      */
@@ -169,6 +178,10 @@ export const wallets = pgTable(
     check(
       "wallets_active_is_complete",
       sql`${table.status} <> 'active' OR (${table.privyPolicyId} IS NOT NULL AND ${table.privyWalletId} IS NOT NULL AND ${table.address} IS NOT NULL AND (${table.chain} = 'base' OR (${table.transitPrivyWalletId} IS NOT NULL AND ${table.transitAddress} IS NOT NULL AND ${table.onchainActivatedAt} IS NOT NULL)))`,
+    ),
+    check(
+      "wallets_confidential_reading_is_whole",
+      sql`(${table.confidentialUsdc} IS NULL) = (${table.confidentialUsdcReadAt} IS NULL)`,
     ),
     check(
       "wallets_per_transaction_max_positive",

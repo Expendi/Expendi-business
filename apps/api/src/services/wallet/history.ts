@@ -48,6 +48,9 @@ export interface WalletHistoryPayout {
   readonly paymentReceipts: readonly CashOutReceipt[];
   readonly rate: string | null;
   readonly failureReason: string | null;
+  /** Present only for a paid USDC payout delivered through NEAR Intents. */
+  readonly deliveryTxHash?: string;
+  readonly deliveryTxChain?: PayeeChain;
 }
 
 export interface WalletHistoryItem {
@@ -83,6 +86,37 @@ export function describeRecipient(recipient: PayoutRecipient): string {
     case "usdc":
       return recipient.address;
   }
+}
+
+/**
+ * The payee chain's own transaction that delivered a paid USDC payout
+ * through NEAR Intents: `providerReference`, which a delivered quote fills
+ * with `destinationChainTxHashes[0]`. A payout sent straight from the
+ * company wallet has none, and a cash-out's reference is a provider's
+ * receipt code, never a hash.
+ */
+export function deliveryTransactionOf(
+  payout: Pick<
+    Payout,
+    | "provider"
+    | "status"
+    | "recipient"
+    | "deliveryQuoteId"
+    | "providerReference"
+  >,
+): { readonly txHash: string; readonly chain: PayeeChain } | null {
+  const { recipient, providerReference } = payout;
+  if (
+    payout.provider !== "onchain" ||
+    payout.status !== "paid" ||
+    payout.deliveryQuoteId === null ||
+    recipient.method !== "usdc" ||
+    providerReference === null ||
+    providerReference === ""
+  ) {
+    return null;
+  }
+  return { txHash: providerReference, chain: recipient.chain };
 }
 
 export function walletHistory(input: {
@@ -143,37 +177,44 @@ export function walletHistory(input: {
       const page = rows.slice(0, limit);
       const last = page.at(-1);
       return {
-        items: page.map(({ entry, payout, categoryName }) => ({
-          id: entry.id,
-          type: entry.type,
-          usdcAmount: entry.usdcAmount,
-          chain: entry.chain,
-          txHash: entry.txHash,
-          counterpartyAddress: entry.counterpartyAddress,
-          createdAt: entry.createdAt,
-          payout: payout && {
-            id: payout.id,
-            subjectType: payout.subjectType,
-            method: payout.method,
-            recipientName: payout.recipient.accountName,
-            recipientDetail: describeRecipient(payout.recipient),
-            recipientChain:
-              payout.recipient.method === "usdc"
-                ? payout.recipient.chain
-                : null,
-            amountKesCents: payout.amountKes,
-            status: payout.status,
-            subjectId: payout.subjectId,
-            payrollRunId: payout.payrollRunId,
-            approvalId: payout.approvalId,
-            approvedAt: payout.approvedAt,
-            paidAt: payout.paidAt,
-            categoryName,
-            paymentReceipts: cashOutReceiptsOf([payout]),
-            rate: payout.rate,
-            failureReason: payout.failureReason,
-          },
-        })),
+        items: page.map(({ entry, payout, categoryName }) => {
+          const delivery = payout && deliveryTransactionOf(payout);
+          return {
+            id: entry.id,
+            type: entry.type,
+            usdcAmount: entry.usdcAmount,
+            chain: entry.chain,
+            txHash: entry.txHash,
+            counterpartyAddress: entry.counterpartyAddress,
+            createdAt: entry.createdAt,
+            payout: payout && {
+              id: payout.id,
+              subjectType: payout.subjectType,
+              method: payout.method,
+              recipientName: payout.recipient.accountName,
+              recipientDetail: describeRecipient(payout.recipient),
+              recipientChain:
+                payout.recipient.method === "usdc"
+                  ? payout.recipient.chain
+                  : null,
+              amountKesCents: payout.amountKes,
+              status: payout.status,
+              subjectId: payout.subjectId,
+              payrollRunId: payout.payrollRunId,
+              approvalId: payout.approvalId,
+              approvedAt: payout.approvedAt,
+              paidAt: payout.paidAt,
+              categoryName,
+              paymentReceipts: cashOutReceiptsOf([payout]),
+              rate: payout.rate,
+              failureReason: payout.failureReason,
+              ...(delivery && {
+                deliveryTxHash: delivery.txHash,
+                deliveryTxChain: delivery.chain,
+              }),
+            },
+          };
+        }),
         nextCursor: rows.length > limit && last ? last.entry.id : null,
       };
     }),

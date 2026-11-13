@@ -19,6 +19,11 @@ import {
  * create, approve, fund or retry a payout or withdrawal.
  */
 
+const walletBalanceHomeSchema = z.enum([
+  "company_wallet",
+  "confidential_account",
+]);
+
 const digits = z.string().regex(/^\d+$/);
 const integerString = z.string().regex(/^-?\d+$/);
 
@@ -141,6 +146,15 @@ export const companyDetailSchema = z.object({
       address: z.string().nullable(),
       /** The ledger balance, USDC base units. */
       usdcBalance: integerString,
+      /** Where the company's USDC sits at rest. */
+      balanceHome: walletBalanceHomeSchema,
+      /**
+       * What the alert check last read from the company's confidential
+       * account, USDC base units, and when. Staff can't read it themselves;
+       * null until the check has.
+       */
+      confidentialUsdc: integerString.nullable(),
+      confidentialUsdcReadAt: z.iso.datetime().nullable(),
       /** At Paycrest's current rate; null while Paycrest is unavailable. */
       kesEquivalent: z
         .object({ kesCents: digits, rate: z.string() })

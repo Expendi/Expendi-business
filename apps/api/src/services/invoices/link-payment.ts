@@ -48,8 +48,11 @@ export function recordLinkPayment(
     readonly organizationId: string;
     readonly intentQuoteId: string;
     readonly walletTransactionId: string;
-    /** The NEAR transaction that delivered it. */
-    readonly txHash: string;
+    /**
+     * The NEAR transaction that delivered it; null for a delivery into a
+     * confidential account, which no chain shows.
+     */
+    readonly txHash: string | null;
     /** USDC base units the company wallet received. */
     readonly receivedUsdc: bigint;
     readonly actor: AuditActor;
@@ -142,7 +145,8 @@ export function recordLinkPayment(
               paidOn,
               paymentId: recorded.paymentId,
               publicId: before.publicId,
-              transactionUrl: nearTransactionUrl(input.txHash),
+              transactionUrl:
+                input.txHash === null ? null : nearTransactionUrl(input.txHash),
             },
     };
   });

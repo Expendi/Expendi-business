@@ -551,7 +551,7 @@ describe("wallet_transactions", () => {
 
     // #then
     await expect(insert).rejects.toMatchObject({
-      cause: { constraint: "wallet_transactions_deposit_is_onchain" },
+      cause: { constraint: "wallet_transactions_deposit_has_source" },
     });
   });
 

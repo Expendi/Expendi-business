@@ -433,11 +433,21 @@ describe("checkCompanyIntent", () => {
     ],
     [
       "an amount above the quote's amount in",
-      "amount_above_quote",
+      "amount_not_the_quote",
       () =>
         check(
           intentOf((parts) => {
             firstIntent(parts).tokens = { [TOKEN_ID]: "100001" };
+          }),
+        ),
+    ],
+    [
+      "an amount below the quote's amount in",
+      "amount_not_the_quote",
+      () =>
+        check(
+          intentOf((parts) => {
+            firstIntent(parts).tokens = { [TOKEN_ID]: "99999" };
           }),
         ),
     ],

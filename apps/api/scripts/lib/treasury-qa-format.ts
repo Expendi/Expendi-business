@@ -127,10 +127,24 @@ export function formatReconciliation(result: Reconciliation): string[] {
     `Ledger balance:            ${usdc(result.ledgerUsdc)}`,
     `Company wallet (NEAR):     ${usdc(result.nearUsdc)}`,
     `Transit wallet (Base):     ${usdc(result.baseUsdc)}`,
+    ...(result.balanceHome === "confidential_account"
+      ? [`Confidential account:      ${usdc(result.confidentialUsdc)}`]
+      : []),
     `Difference (chain less ledger): ${usdc(result.differenceUsdc)}`,
+    `Expendi's recorded surplus:     ${usdc(result.expendiSurplusUsdc)}`,
+    ...(result.balanceHome === "confidential_account"
+      ? [
+          `  of which in the company wallet: ${usdc(result.companyWalletSurplusUsdc)}`,
+        ]
+      : []),
   ];
   if (result.differenceUsdc === 0n) lines.push("The ledger matches the chain.");
   for (const error of result.errors) lines.push(`Warning: ${error}`);
+  if (result.overdueCredits.length > 0) {
+    lines.push(
+      `Warning: 1Click reports these quotes delivered to the confidential account, but the ledger doesn't hold them: ${result.overdueCredits.join(", ")}`,
+    );
+  }
   if (result.inFlight.length > 0) {
     lines.push(
       "Warning: money is in flight, so the numbers can legitimately differ now:",

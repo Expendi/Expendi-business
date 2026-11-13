@@ -7,6 +7,7 @@ import type { IntentQuote } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
 import type { AuditLog } from "../audit/audit-log.js";
 import type { BaseRpc } from "../chain/base-rpc.js";
+import type { ConfidentialAccounts } from "../intents/confidential-account.js";
 import type { OneClick } from "../intents/one-click.js";
 import type { PrivyWallets } from "../wallet/privy-wallets.js";
 import type { Snapshot, Step } from "./move-state.js";
@@ -43,7 +44,12 @@ const QUOTE_RETRY_MS = 5 * 60_000;
 const CREDIT_WAIT_MS = 30 * 60_000;
 
 export type ReturnDeps =
-  DatabaseService | OneClick | BaseRpc | PrivyWallets | AuditLog;
+  | DatabaseService
+  | OneClick
+  | BaseRpc
+  | PrivyWallets
+  | AuditLog
+  | ConfidentialAccounts;
 
 const usdc = formatUsdAmount;
 

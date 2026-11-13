@@ -7,6 +7,7 @@ import type { IntentQuote } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { BaseRpc } from "../chain/base-rpc.js";
+import type { OneClickSession } from "./one-click.js";
 import {
   intentQuotes,
   payouts,
@@ -18,6 +19,8 @@ import { baseUsdcBalance } from "../chain/base-rpc.js";
 import { isImplicitNearAccount } from "../chain/near.js";
 import { isPaused } from "../payout/guards.js";
 import { PrivyWallets } from "../wallet/privy-wallets.js";
+import { sessionForQuote } from "./company-session.js";
+import { ConfidentialAccounts } from "./confidential-account.js";
 import { ONE_CLICK_USDC_ASSET_IDS, OneClick } from "./one-click.js";
 import {
   COMPANY_QUOTE_TTL_MS,
@@ -38,6 +41,12 @@ import { moveQuote, settleFromOneClick } from "./quote-settle.js";
  * A sweep moves a company's money between its own two wallets: it is never
  * a ledger entry, and its arrival on NEAR is one of the quote's own
  * transactions, which the deposit watcher skips.
+ *
+ * For a company whose balance is kept in a confidential account the sweep
+ * delivers into that account instead (`CONFIDENTIAL_INTENTS`), and 1Click
+ * talks about it only to the company's session. The refund still goes to
+ * the transit wallet on Base. The dust threshold is the same: the 0.15 USDC
+ * minimum of a delivery into the account is far below it.
  */
 
 /** Balances up to this stay put: sweeping them would cost more than it returns. */
@@ -45,7 +54,8 @@ export const SWEEP_DUST_USDC = 1_000_000n;
 
 const BASE_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
-export type SweepDeps = DatabaseService | OneClick | BaseRpc | PrivyWallets;
+export type SweepDeps =
+  DatabaseService | OneClick | BaseRpc | PrivyWallets | ConfidentialAccounts;
 
 /**
  * Whether anything of the company's could still need, or still change, the
@@ -125,7 +135,10 @@ const sweepById = (organizationId: string, quoteId: string) =>
  * - Privy refuses: `failed`, nothing moved;
  * - Privy's answer is lost, or a run stopped between recording the start
  *   and saving the answer: `needs_review`, never sent again. 1Click's own
- *   report of the deposit still settles it if the send did go out.
+ *   report of the deposit still settles it if the send did go out;
+ * - a sweep into a confidential account without the company's session
+ *   (sign-in failed): returned unchanged, nothing started or told to
+ *   1Click, and the next run tries again.
  */
 export function advanceSweep(
   input: Pick<IntentQuote, "id" | "organizationId">,
@@ -133,6 +146,25 @@ export function advanceSweep(
   const { organizationId } = input;
   return Effect.gen(function* () {
     let quote = yield* sweepById(organizationId, input.id);
+    const open =
+      quote.status === "quoted" ||
+      quote.status === "depositing" ||
+      quote.status === "needs_review";
+    let session: OneClickSession | undefined;
+    if (open) {
+      const signedIn = yield* sessionForQuote(quote).pipe(Effect.either);
+      if (signedIn._tag === "Left") {
+        if (signedIn.left._tag === "DatabaseError") {
+          return yield* Effect.fail(signedIn.left);
+        }
+        console.warn(
+          `[sweep] no session for quote ${quote.id}; left as it is`,
+          signedIn.left.message,
+        );
+        return quote;
+      }
+      session = signedIn.right;
+    }
     const reread = sweepById(organizationId, quote.id);
     const untouched = and(
       eq(intentQuotes.status, "quoted"),
@@ -246,7 +278,7 @@ export function advanceSweep(
     if (quote.depositTxHash !== null && quote.depositSubmittedAt === null) {
       const oneClick = yield* OneClick;
       const told = yield* oneClick
-        .submitDeposit(quote.depositAddress, quote.depositTxHash)
+        .submitDeposit(quote.depositAddress, quote.depositTxHash, session)
         .pipe(Effect.either);
       if (told._tag === "Right") {
         yield* moveQuote(quote, isNull(intentQuotes.depositSubmittedAt), {
@@ -255,7 +287,7 @@ export function advanceSweep(
         quote = yield* reread;
       }
     }
-    return yield* settleFromOneClick(quote);
+    return yield* settleFromOneClick(quote, session);
   });
 }
 
@@ -308,19 +340,44 @@ export function sweepTransitWallet(input: {
         ? wallet.perTransactionMaxUsdc
         : held.right;
 
+    const intoConfidentialAccount =
+      wallet.balanceHome === "confidential_account";
+    let session: OneClickSession | undefined;
+    if (intoConfidentialAccount) {
+      if (wallet.privyWalletId === null) return null;
+      const accounts = yield* ConfidentialAccounts;
+      const signedIn = yield* accounts
+        .session({ privyWalletId: wallet.privyWalletId, accountId: address })
+        .pipe(Effect.either);
+      if (signedIn._tag === "Left") {
+        console.warn(
+          `[sweep] no session to sweep ${organizationId}'s transit wallet`,
+          signedIn.left.message,
+        );
+        return null;
+      }
+      session = signedIn.right;
+    }
+
     const oneClick = yield* OneClick;
     const quoted = yield* oneClick
-      .quote({
-        dry: false,
-        swapType: "EXACT_INPUT",
-        originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
-        destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
-        amount,
-        recipient: address,
-        refundTo: transitAddress,
-        deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
-        slippageBps: STABLECOIN_SLIPPAGE_BPS,
-      })
+      .quote(
+        {
+          dry: false,
+          swapType: "EXACT_INPUT",
+          originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+          destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+          amount,
+          recipient: address,
+          ...(intoConfidentialAccount && {
+            recipientType: "CONFIDENTIAL_INTENTS" as const,
+          }),
+          refundTo: transitAddress,
+          deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
+          slippageBps: STABLECOIN_SLIPPAGE_BPS,
+        },
+        session,
+      )
       .pipe(Effect.either);
     if (quoted._tag === "Left") {
       console.warn(
@@ -371,6 +428,9 @@ export function sweepTransitWallet(input: {
               amountOut: quote.amountOut,
               minAmountOut: quote.minAmountOut,
               depositAddress: quote.depositAddress,
+              ...(intoConfidentialAccount && {
+                recipientType: "CONFIDENTIAL_INTENTS" as const,
+              }),
               recipient: address,
               refundTo: transitAddress,
               deadline: quote.deadline,

@@ -5,7 +5,7 @@ import type { DatabaseService } from "../../db/client.js";
 import type { IntentQuote } from "../../db/schema/index.js";
 import type { IntentQuotePurpose } from "../../db/schema/intent-quotes.js";
 import type { DatabaseError } from "../../errors.js";
-import type { OneClickError } from "./one-click.js";
+import type { OneClickError, OneClickSession } from "./one-click.js";
 import { intentQuotes } from "../../db/schema/index.js";
 import {
   INTENT_QUOTE_PURPOSES,
@@ -21,6 +21,20 @@ const textArray = (values: readonly string[]) =>
         values.map((value) => sql`${value}`),
         sql`, `,
       )}]::text[]`;
+
+/**
+ * Whether 1Click will only talk about this quote to the company's own
+ * session. Decided by the quote's columns, never by the company's current
+ * `balance_home`: a quote opened before a company was switched still
+ * behaves as it was opened. It lives here, not with the code that signs in,
+ * because staff code may ask it and must not import that.
+ */
+export const touchesConfidentialAccount = (
+  q: Pick<IntentQuote, "depositType" | "recipientType" | "refundType">,
+): boolean =>
+  q.recipientType === "CONFIDENTIAL_INTENTS" ||
+  q.depositType === "CONFIDENTIAL_INTENTS" ||
+  q.refundType === "CONFIDENTIAL_INTENTS";
 
 /** What 1Click reported, or what the row already holds when it reported nothing. */
 const reportedAmount = (
@@ -40,9 +54,14 @@ const reportedAmount = (
  * stays listed, so a transfer explained by it stays explained. Returns the
  * row as saved; a quote that isn't the company's dies, since callers pass
  * one they just read.
+ *
+ * 1Click reports a quote that touches a confidential account only to the
+ * company's `session`. It is an argument because this file is reachable from
+ * staff code, which must not reach the code that signs in.
  */
 export function refreshQuoteStatus(
   quote: Pick<IntentQuote, "id" | "organizationId" | "depositAddress">,
+  session?: OneClickSession,
 ): Effect.Effect<
   IntentQuote,
   OneClickError | DatabaseError,
@@ -50,7 +69,7 @@ export function refreshQuoteStatus(
 > {
   return Effect.gen(function* () {
     const oneClick = yield* OneClick;
-    const reported = yield* oneClick.status(quote.depositAddress);
+    const reported = yield* oneClick.status(quote.depositAddress, session);
     const merged = (
       column:
         | typeof intentQuotes.nearTxHashes

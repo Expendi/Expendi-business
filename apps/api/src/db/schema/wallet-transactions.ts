@@ -127,15 +127,26 @@ export const walletTransactions = pgTable(
     ),
     // Exactly the two Treasury types name their move. A debit to Treasury
     // names the quote it paid; a credit from Treasury may name the
-    // `from_treasury` quote it delivered, and no other type names a quote.
+    // `from_treasury` quote it delivered; a deposit may name the quote whose
+    // delivery into a confidential account it records; no other type names a
+    // quote.
     check(
       "wallet_transactions_treasury_has_move",
       sql`(${table.type}::text IN ('to_treasury', 'from_treasury')) = (${table.treasuryMoveId} IS NOT NULL)`,
     ),
     check(
       "wallet_transactions_quote_link_is_treasury",
-      sql`(${table.type}::text = 'to_treasury') <= (${table.intentQuoteId} IS NOT NULL) AND (${table.intentQuoteId} IS NULL OR ${table.type}::text IN ('to_treasury', 'from_treasury'))`,
+      sql`(${table.type}::text = 'to_treasury') <= (${table.intentQuoteId} IS NOT NULL) AND (${table.intentQuoteId} IS NULL OR ${table.type}::text IN ('to_treasury', 'from_treasury', 'deposit'))`,
     ),
+    // A delivery into a confidential account is credited once, when 1Click
+    // reports it, and has no chain transaction to name. Debits are negative
+    // and `from_treasury` credits carry a transaction, so both stay unbound.
+    // The predicate can't name the enum: it must be immutable.
+    uniqueIndex("wallet_transactions_quote_settled_credit_unique")
+      .on(table.intentQuoteId)
+      .where(
+        sql`${table.intentQuoteId} IS NOT NULL AND ${table.txHash} IS NULL AND ${table.usdcAmount} > 0`,
+      ),
     // A quote's send is debited once. Debits are the negative rows, so this
     // binds them only (the predicate can't name the enum: it must be
     // immutable). Credits that name a quote are kept once each by the
@@ -154,9 +165,11 @@ export const walletTransactions = pgTable(
     uniqueIndex("wallet_transactions_payout_debit_unique")
       .on(table.payoutId)
       .where(sql`${table.type} IN ('payout', 'withdrawal')`),
+    // A deposit is a transfer on chain, or the settlement of a quote that
+    // delivered into a confidential account, which has no chain transaction.
     check(
-      "wallet_transactions_deposit_is_onchain",
-      sql`${table.type} <> 'deposit' OR (${table.txHash} IS NOT NULL AND ${table.logIndex} IS NOT NULL AND ${table.blockNumber} IS NOT NULL)`,
+      "wallet_transactions_deposit_has_source",
+      sql`${table.type} <> 'deposit' OR (${table.intentQuoteId} IS NULL AND ${table.txHash} IS NOT NULL AND ${table.logIndex} IS NOT NULL AND ${table.blockNumber} IS NOT NULL) OR (${table.intentQuoteId} IS NOT NULL AND ${table.chain} <> 'base' AND ${table.txHash} IS NULL AND ${table.receiptId} IS NULL AND ${table.logIndex} IS NULL AND ${table.transferIndex} IS NULL AND ${table.blockNumber} IS NULL)`,
     ),
     // A receipt and a position in an event are how a NEAR transfer is named,
     // always together; a Base transfer has neither.
@@ -167,7 +180,7 @@ export const walletTransactions = pgTable(
     // Without its receipt a NEAR deposit could be credited twice.
     check(
       "wallet_transactions_near_deposit_has_receipt",
-      sql`${table.chain} = 'base' OR ${table.type} <> 'deposit' OR ${table.receiptId} IS NOT NULL`,
+      sql`${table.chain} = 'base' OR ${table.type} <> 'deposit' OR ${table.receiptId} IS NOT NULL OR ${table.intentQuoteId} IS NOT NULL`,
     ),
     check(
       "wallet_transactions_positions_not_negative",

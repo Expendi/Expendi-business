@@ -122,6 +122,9 @@ export interface CompanyDetailView {
     readonly status: "creating" | "active";
     readonly address: string | null;
     readonly usdcBalance: bigint;
+    readonly balanceHome: "company_wallet" | "confidential_account";
+    readonly confidentialUsdc: bigint | null;
+    readonly confidentialUsdcReadAt: string | null;
     readonly kesEquivalent: { kesCents: bigint; rate: string } | null;
   } | null;
   readonly unpaidClaims: {
@@ -195,6 +198,9 @@ export function companyDetail(
               chain: wallets.chain,
               status: wallets.status,
               address: wallets.address,
+              balanceHome: wallets.balanceHome,
+              confidentialUsdc: wallets.confidentialUsdc,
+              confidentialUsdcReadAt: wallets.confidentialUsdcReadAt,
             })
             .from(wallets)
             .where(eq(wallets.organizationId, organizationId)),
@@ -255,6 +261,10 @@ export function companyDetail(
             status: wallet.status,
             address: wallet.address,
             usdcBalance: wallet.balance,
+            balanceHome: wallet.balanceHome,
+            confidentialUsdc: wallet.confidentialUsdc,
+            confidentialUsdcReadAt:
+              wallet.confidentialUsdcReadAt?.toISOString() ?? null,
             kesEquivalent: kes,
           }
         : null,

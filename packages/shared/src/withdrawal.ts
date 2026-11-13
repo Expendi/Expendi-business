@@ -90,7 +90,17 @@ export const withdrawalSchema = z.object({
   /** Exactly what leaves the wallet; Expendi pays the gas. */
   amountUsdc: z.string().regex(/^\d+$/),
   status: payoutStatusSchema,
+  /**
+   * The transaction that paid it: the company's own send (on NEAR) or, when
+   * the company has none, the payee chain's delivery. Null until there is
+   * one. Case-sensitive: show it exactly as given.
+   */
   txHash: z.string().nullable(),
+  /**
+   * The chain `txHash` is on, so it can be labelled and linked correctly;
+   * absent while `txHash` is null.
+   */
+  txChain: payeeChainSchema.nullable().optional(),
   failureReason: z.string().nullable(),
 });
 

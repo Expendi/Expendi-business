@@ -3,6 +3,7 @@ import { Effect, Layer } from "effect";
 
 import type { Database } from "../../db/client.js";
 import type { IntentQuote } from "../../db/schema/index.js";
+import type { WalletBalanceHome } from "../../db/schema/wallets.js";
 import type { ExternalLayers } from "../../layers/main.js";
 import type { AppRuntime } from "../../runtime.js";
 import type { TestCompany, TestWallet } from "./db.js";
@@ -64,8 +65,8 @@ export function makeNearPayoutWorld(
   const plain = Effect.runSync(Effect.provide(OneClick, oneClick.layer));
   const oneClickLayer = Layer.succeed(OneClick, {
     ...plain,
-    quote: (request) =>
-      plain.quote(request).pipe(
+    quote: (request, session) =>
+      plain.quote(request, session).pipe(
         Effect.tap((quote) =>
           Effect.sync(() => {
             if (!quote.dry && isImplicitNearAccount(quote.depositAddress)) {
@@ -141,6 +142,7 @@ export async function createNearPayingCompany(
   options: {
     readonly balance?: bigint;
     readonly perTransactionMaxUsdc?: bigint;
+    readonly balanceHome?: WalletBalanceHome;
   } = {},
 ): Promise<NearPayingCompany> {
   const balance = options.balance ?? 100n * USDC;
@@ -151,6 +153,7 @@ export async function createNearPayingCompany(
     company,
     nearWallet,
     options.perTransactionMaxUsdc,
+    options.balanceHome,
   );
   world.near.state.fundWithUsdc(nearWallet.accountId, balance);
   const [row] = await runInScope(

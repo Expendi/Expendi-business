@@ -21,6 +21,7 @@ import {
   confirmAllowlistChange,
   requestAllowlistChange,
 } from "../../services/allowlist/allowlist.js";
+import { continueDelivery } from "../../services/payout/delivery.js";
 import {
   preparePayouts,
   requestPayoutApproval,
@@ -32,12 +33,14 @@ import {
   expectRouteIsolation,
 } from "../helpers/isolation.js";
 import { saveTreasuryMove } from "../helpers/money-in.js";
+import { readQuotes } from "../helpers/near-payouts.js";
 import {
   createNearUsdcPayingCompany,
   makeNearUsdcFakes,
   registeredNearAccount,
   savedSends,
 } from "../helpers/near-usdc-payouts.js";
+import { makeFakeOneClick } from "../helpers/one-click.js";
 import {
   allowlistAddress,
   claimRequest,
@@ -52,6 +55,7 @@ import { TEST_DATABASE_URL_MIGRATE } from "../setup/test-database.js";
 
 const fakes = makeNearUsdcFakes();
 const paycrest = makeFakePaycrest();
+const oneClick = makeFakeOneClick();
 let runtime: AppRuntime;
 let db: Database;
 let app: App;
@@ -82,6 +86,7 @@ beforeAll(async () => {
   runtime = makeTestRuntime({
     ...fakes.layers,
     paycrest: paycrest.layer,
+    oneClick: oneClick.layer,
   });
   ({ db } = await runtime.runPromise(DatabaseService));
   app = createApp({ runtime });
@@ -331,7 +336,13 @@ describe("withdrawing to an allowlisted address", () => {
 
     // #then
     const body = (await response.json()) as {
-      data: { id: string; status: string; amountUsdc: string; txHash: string };
+      data: {
+        id: string;
+        status: string;
+        amountUsdc: string;
+        txHash: string;
+        txChain?: string;
+      };
     };
     expect({
       ...body.data,
@@ -343,6 +354,7 @@ describe("withdrawing to an allowlisted address", () => {
       address: treasury,
       txHash: true,
     });
+    expect(body.data.txChain).toBeUndefined();
   });
 
   it("audits every step", async () => {
@@ -781,6 +793,75 @@ describe("withdrawing to an allowlisted address", () => {
         sends: 0,
       });
     });
+  });
+});
+
+describe("withdrawing out of a confidential account", () => {
+  it("pays through a quote out of the account, and debits it as a withdrawal only when 1Click delivers", async () => {
+    // #given a company whose USDC is in a confidential account
+    oneClick.state.costPerQuote = 0n;
+    paying = await createNearUsdcPayingCompany(
+      runtime,
+      db,
+      fakes,
+      100n * USDC,
+      undefined,
+      "confidential_account",
+    );
+    oneClick.state.fundConfidential(paying.wallet.address, 100n * USDC);
+    treasury = registeredNearAccount(fakes);
+    treasuryId = await allowlistNearAccount(paying, "Treasury", treasury);
+    broadcastsBefore = fakes.chain.state.broadcasts.length;
+    const challenge = await challengeFor(10n * USDC);
+
+    // #when the admin's passkey confirms it
+    const response = await confirm(challenge);
+
+    // #then the message is out and nothing was sent from the company wallet
+    // or debited
+    const body = (await response.json()) as {
+      data: { id: string; status: string };
+    };
+    expect({
+      status: response.status,
+      withdrawal: body.data.status,
+      sends: sends(),
+      ledger: await ledgerBalance(db, paying.company),
+      inAccount: oneClick.state.confidentialBalances.get(paying.wallet.address),
+    }).toEqual({
+      status: 200,
+      withdrawal: "funding",
+      sends: 0,
+      ledger: 100n * USDC,
+      inAccount: 90n * USDC,
+    });
+
+    // #when 1Click delivers
+    const [quote] = await readQuotes(db, paying.company);
+    if (!quote) throw new Error("no quote");
+    oneClick.state.deliverIntentPayout(quote.depositAddress);
+    await runtime.runPromise(continueDelivery(quote));
+
+    // #then the withdrawal is paid and debited once, as a withdrawal
+    const [payout] = await withdrawalPayouts();
+    const rows = await runInScope(
+      db,
+      { organizationId: paying.company.organizationId },
+      (tx) =>
+        tx
+          .select({
+            type: walletTransactions.type,
+            usdcAmount: walletTransactions.usdcAmount,
+            txHash: walletTransactions.txHash,
+          })
+          .from(walletTransactions)
+          .where(eq(walletTransactions.payoutId, challenge.withdrawal.id)),
+    );
+    expect({ status: payout?.status, rows }).toEqual({
+      status: "paid",
+      rows: [{ type: "withdrawal", usdcAmount: -10n * USDC, txHash: null }],
+    });
+    oneClick.state.costPerQuote = 4_465n;
   });
 });
 

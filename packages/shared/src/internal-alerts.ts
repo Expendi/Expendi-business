@@ -20,6 +20,7 @@ export const OPS_ALERT_KINDS = [
   "treasury_usdc_idle",
   "treasury_position_mismatch",
   "treasury_partial_fill",
+  "confidential_balance_mismatch",
 ] as const;
 export const opsAlertKindSchema = z.enum(OPS_ALERT_KINDS);
 export type OpsAlertKind = z.infer<typeof opsAlertKindSchema>;

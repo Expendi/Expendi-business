@@ -4,7 +4,6 @@ import { Cause, Effect, Exit } from "effect";
 import type { CompanyWalletSend, Payout } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
 import type { BaseRpcError } from "../chain/base-rpc.js";
-import type { NearRelayerError } from "../chain/near-relayer.js";
 import type { NearRpcError } from "../chain/near-rpc.js";
 import type { PrivyWallets } from "../wallet/privy-wallets.js";
 import type { DeliveryDeps } from "./delivery.js";
@@ -22,17 +21,14 @@ import { BaseRpc } from "../chain/base-rpc.js";
 import { usdcTransfersIn } from "../chain/base.js";
 import { NearRelayer } from "../chain/near-relayer.js";
 import { NearRpc } from "../chain/near-rpc.js";
-import {
-  isImplicitNearAccount,
-  NearChain,
-  nearUsdcTransfersIn,
-} from "../chain/near.js";
+import { NearChain, nearUsdcTransfersIn } from "../chain/near.js";
 import {
   sendUsdcFromCompanyWallet,
   settleCompanyWalletSend,
 } from "../wallet/company-wallet-send.js";
 import { deliverUsdcPayout } from "./delivery.js";
 import { isPaused, lockPayout, payoutSendKey } from "./guards.js";
+import { prepareRecipient } from "./near-recipient.js";
 import { applyPayoutOutcome } from "./subjects.js";
 import { FUNDING_STUCK_MS } from "./sync.js";
 
@@ -45,7 +41,9 @@ import { FUNDING_STUCK_MS } from "./sync.js";
  * wallet send (docs/decisions/near-main-chain.md, "Sending from a company
  * wallet"). A company wallet runs one send at a time, so a payout whose
  * turn hasn't come waits in `funding` and the minute job sends it: a
- * payroll of NEAR payees is paid one after another.
+ * payroll of NEAR payees is paid one after another. A company whose USDC is
+ * kept in a confidential account pays every payee, a NEAR one included,
+ * through a quote paid by a signed message (`delivery.ts`).
  */
 
 const ENGINE = { type: "system", id: "payout-engine" } as const;
@@ -156,13 +154,15 @@ const wait = (payout: Payout) =>
   ).pipe(Effect.as(payout));
 
 /**
- * Pays a USDC payee on Base or Solana through a NEAR Intents quote whose
- * recipient is the payee (`delivery.ts`). It is given the approved payout,
- * whose `recipient` holds the payee chain and address and whose
- * `quotedUsdc` is the amount; the pauses and the allowlist are checked
- * again, under its row lock, immediately before the company wallet pays.
+ * Pays a USDC payee through a NEAR Intents quote whose recipient is the
+ * payee (`delivery.ts`): any payee on Base or Solana, and every payee of a
+ * company whose USDC is kept in a confidential account, a payee on NEAR
+ * included. It is given the approved payout, whose `recipient` holds the
+ * payee chain and address and whose `quotedUsdc` is the amount; the pauses
+ * and the allowlist are checked again, under its row lock, immediately
+ * before the quote is paid.
  */
-export function deliverUsdcToOtherChain(
+export function payThroughQuote(
   payout: Payout,
   organizationId: string,
 ): Effect.Effect<Payout, DatabaseError, OnchainDeps> {
@@ -210,33 +210,6 @@ function asOnlyDriver<A, E, R>(
       );
     }),
   );
-}
-
-/**
- * Makes sure a NEAR account can hold USDC before any is sent to it: a
- * transfer to an account the USDC contract doesn't know fails. The gas
- * relayer creates and registers an implicit account. Returns why the payee
- * can't be paid, or null once it can.
- */
-function prepareRecipient(
-  accountId: string,
-): Effect.Effect<
-  string | null,
-  NearRpcError | NearRelayerError,
-  NearRpc | NearRelayer
-> {
-  return Effect.gen(function* () {
-    const rpc = yield* NearRpc;
-    const relayer = yield* NearRelayer;
-    if (yield* rpc.usdcStorageRegistered(accountId)) return null;
-    if (isImplicitNearAccount(accountId)) {
-      yield* relayer.activateAccount(accountId);
-      return null;
-    }
-    return (yield* rpc.accountExists(accountId))
-      ? `${accountId} can't receive USDC yet: it isn't registered with the USDC contract on NEAR. Ask the recipient to register it (receiving USDC from an exchange or a wallet does this), then pay again. Nothing was sent.`
-      : `The NEAR account ${accountId} doesn't exist, and a named account can't be created for someone else. Check the account with the recipient, correct it and pay again. Nothing was sent.`;
-  });
 }
 
 /** Every send saved for a payout, newest first. */
@@ -531,6 +504,11 @@ function driveNearPayout(
  * - The outcome is unclear, or the wallet is busy with another send: it
  *   stays `funding` and the minute job follows it. It is never re-sent
  *   while a signed send could still run.
+ *
+ * A payee on another chain, or any payee of a company whose USDC is kept in
+ * a confidential account, is paid through a quote instead (`payThroughQuote`).
+ * The route is chosen here, once: a payout already sent directly is
+ * followed by its saved send whatever the company's balance home is now.
  */
 export function fundOnchainPayout(input: {
   readonly organizationId: string;
@@ -567,15 +545,21 @@ export function fundOnchainPayout(input: {
               "The address was removed from the allowlist. Nothing was sent.",
           } as const;
         }
-        if (payout.recipient.chain !== "near") {
-          return { kind: "other_chain", payout } as const;
-        }
         const [wallet] = yield* query(() =>
           tx
-            .select({ privyWalletId: wallets.privyWalletId })
+            .select({
+              privyWalletId: wallets.privyWalletId,
+              balanceHome: wallets.balanceHome,
+            })
             .from(wallets)
             .where(eq(wallets.id, payout.walletId)),
         );
+        if (
+          payout.recipient.chain !== "near" ||
+          wallet?.balanceHome === "confidential_account"
+        ) {
+          return { kind: "quote", payout } as const;
+        }
         if (!wallet?.privyWalletId) {
           return {
             kind: "fail",
@@ -617,8 +601,8 @@ export function fundOnchainPayout(input: {
         );
       case "fail":
         return yield* fail(barrier.payout, barrier.reason);
-      case "other_chain":
-        return yield* deliverUsdcToOtherChain(barrier.payout, organizationId);
+      case "quote":
+        return yield* payThroughQuote(barrier.payout, organizationId);
       case "send": {
         const driven = yield* driveNearPayout(organizationId, payoutId);
         return driven?.payout ?? barrier.payout;

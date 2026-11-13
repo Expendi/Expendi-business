@@ -1,6 +1,14 @@
 import { randomBytes } from "node:crypto";
-import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { eq, inArray } from "drizzle-orm";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 
 import type { Database } from "../../db/client.js";
 import type { Payout } from "../../db/schema/index.js";
@@ -11,6 +19,7 @@ import { DatabaseService } from "../../db/client.js";
 import {
   companyWalletSends,
   organizations,
+  payouts,
   wallets,
   walletTransactions,
 } from "../../db/schema/index.js";
@@ -26,11 +35,14 @@ import {
   MAX_SEND_ATTEMPTS,
   SEND_UNCLEAR_AFTER_MS,
 } from "../../services/payout/onchain.js";
+import { advanceOutboundQuotes } from "../../services/payout/outbound-quotes.js";
 import {
   preparePayouts,
   requestPayoutApproval,
 } from "../../services/payout/payout-service.js";
+import { settleOpenQuotes } from "../helpers/confidential-delivery.js";
 import { makeFakePaycrest, TEST_ORIGIN } from "../helpers/fakes.js";
+import { readQuotes } from "../helpers/near-payouts.js";
 import {
   createNearUsdcPayingCompany,
   makeNearUsdcFakes,
@@ -39,6 +51,7 @@ import {
   savedSends,
 } from "../helpers/near-usdc-payouts.js";
 import { randomNearAccount } from "../helpers/near.js";
+import { makeFakeOneClick } from "../helpers/one-click.js";
 import {
   allowlistAddress,
   ledgerBalance,
@@ -59,6 +72,7 @@ const OPENING_BALANCE = 100n * USDC;
 const fakes = makeNearUsdcFakes();
 const { chain, privy } = fakes;
 const paycrest = makeFakePaycrest();
+const oneClick = makeFakeOneClick();
 let runtime: AppRuntime;
 let db: Database;
 let paying: NearUsdcPayingCompany;
@@ -66,7 +80,11 @@ let payee: string;
 let payeeListingId: string;
 
 beforeAll(async () => {
-  runtime = makeTestRuntime({ ...fakes.layers, paycrest: paycrest.layer });
+  runtime = makeTestRuntime({
+    ...fakes.layers,
+    paycrest: paycrest.layer,
+    oneClick: oneClick.layer,
+  });
   ({ db } = await runtime.runPromise(DatabaseService));
 });
 
@@ -948,6 +966,247 @@ describe("several NEAR payouts from one company wallet", () => {
       paid: AMOUNT,
       sends: ["executed"],
       debits: 1,
+    });
+  });
+});
+
+describe("a company whose USDC is in a confidential account", () => {
+  let quotesBefore = 0;
+
+  beforeEach(async () => {
+    oneClick.state.costPerQuote = 0n;
+    paying = await createNearUsdcPayingCompany(
+      runtime,
+      db,
+      fakes,
+      OPENING_BALANCE,
+      undefined,
+      "confidential_account",
+    );
+    oneClick.state.fundConfidential(paying.wallet.address, OPENING_BALANCE);
+    quotesBefore = oneClick.state.quoteRequests.length;
+  });
+
+  afterEach(async () => {
+    oneClick.state.costPerQuote = 4_465n;
+    const [wallet] = await inCompany((tx) =>
+      tx
+        .select({ transitAddress: wallets.transitAddress })
+        .from(wallets)
+        .where(eq(wallets.id, paying.wallet.id)),
+    );
+    await settleOpenQuotes(db, {
+      company: paying.company,
+      walletId: paying.wallet.id,
+      accountId: paying.wallet.address,
+      transitAddress: wallet?.transitAddress ?? "",
+    });
+    await inCompany((tx) =>
+      tx
+        .update(payouts)
+        .set({ status: "failed", failureReason: "The test is over." })
+        .where(
+          inArray(payouts.status, ["approved", "funding", "needs_review"]),
+        ),
+    );
+  });
+
+  it("pays a run of NEAR payees by one quote each, none from the company wallet, each debited once when the job hears 1Click", async () => {
+    // #given three registered NEAR payees on the allowlist, one bill each,
+    // and an account that covers all three messages beside one another
+    oneClick.state.fundConfidential(
+      paying.wallet.address,
+      2n * OPENING_BALANCE,
+    );
+    const payees = [1, 2, 3].map(() => registeredNearAccount(fakes));
+    for (const account of payees) {
+      await allowlistAddress(runtime, paying, account, "Supplier", "near");
+    }
+
+    // #when the admin approves and pays the run
+    const run = await payClaims(
+      runtime,
+      db,
+      paying,
+      payees.map((account) => nearUsdcBill(account)),
+    );
+
+    // #then every payout waits on its own quote out of the account: the
+    // company wallet sent nothing and nothing is debited yet
+    const quotes = await readQuotes(db, paying.company);
+    expect({
+      statuses: run.map((payout) => payout.status),
+      quotes: quotes.map((quote) => quote.depositType),
+      asked: oneClick.state.quoteRequests.length - quotesBefore,
+      sends: (await sends()).length,
+      ledger: await ledgerBalance(db, paying.company),
+      inAccount: oneClick.state.confidentialBalances.get(paying.wallet.address),
+    }).toEqual({
+      statuses: ["funding", "funding", "funding"],
+      quotes: Array<string>(3).fill("CONFIDENTIAL_INTENTS"),
+      asked: 3,
+      sends: 0,
+      ledger: OPENING_BALANCE,
+      inAccount: 3n * OPENING_BALANCE - 3n * AMOUNT,
+    });
+
+    // #when 1Click delivers all three and the job runs twice
+    for (const quote of quotes) {
+      oneClick.state.deliverIntentPayout(quote.depositAddress);
+    }
+    await runtime.runPromise(advanceOutboundQuotes(500));
+    await runtime.runPromise(advanceOutboundQuotes(500));
+
+    // #then all three are paid, each with exactly one debit
+    const after = await Promise.all(run.map(reload));
+    expect({
+      statuses: after.map((payout) => payout.status),
+      debits: await Promise.all(
+        after.map(async (payout) => (await debits(payout)).length),
+      ),
+      ledger: await ledgerBalance(db, paying.company),
+      sends: (await sends()).length,
+    }).toEqual({
+      statuses: ["paid", "paid", "paid"],
+      debits: [1, 1, 1],
+      ledger: OPENING_BALANCE - 3n * AMOUNT,
+      sends: 0,
+    });
+  });
+
+  it("holds a payout the account can't cover beside the messages already out, then pays it once they settle", async () => {
+    // #given three payouts of 25 USDC from an account holding 100: 1Click
+    // has already taken what two messages move, and those two are still
+    // unsettled, so a third would be counted twice
+    const payees = [1, 2, 3].map(() => registeredNearAccount(fakes));
+    for (const account of payees) {
+      await allowlistAddress(runtime, paying, account, "Supplier", "near");
+    }
+    const run = await payClaims(
+      runtime,
+      db,
+      paying,
+      payees.map((account) => nearUsdcBill(account)),
+    );
+    const afterRequest = await Promise.all(run.map(reload));
+    expect(afterRequest.map((payout) => payout.status).sort()).toEqual([
+      "approved",
+      "funding",
+      "funding",
+    ]);
+
+    // #when 1Click delivers the two that went out and the job runs
+    const quotes = await readQuotes(db, paying.company);
+    for (const quote of quotes.filter(
+      ({ status }) => status === "depositing",
+    )) {
+      oneClick.state.deliverIntentPayout(quote.depositAddress);
+    }
+    await runtime.runPromise(advanceOutboundQuotes(500));
+    await runtime.runPromise(advanceOutboundQuotes(500));
+
+    // #then the waiting payout went out and nothing was debited twice
+    const third = (await readQuotes(db, paying.company)).find(
+      ({ status }) => status === "depositing",
+    );
+    if (!third) throw new Error("the waiting quote never started");
+    oneClick.state.deliverIntentPayout(third.depositAddress);
+    await runtime.runPromise(advanceOutboundQuotes(500));
+    const after = await Promise.all(run.map(reload));
+    expect({
+      statuses: after.map((payout) => payout.status),
+      ledger: await ledgerBalance(db, paying.company),
+    }).toEqual({
+      statuses: ["paid", "paid", "paid"],
+      ledger: OPENING_BALANCE - 3n * AMOUNT,
+    });
+  });
+
+  it("fails every payout of a run whose quotes 1Click refunds, with no ledger row", async () => {
+    // #given two payouts waiting on their quotes
+    const payees = [1, 2].map(() => registeredNearAccount(fakes));
+    for (const account of payees) {
+      await allowlistAddress(runtime, paying, account, "Supplier", "near");
+    }
+    const run = await payClaims(
+      runtime,
+      db,
+      paying,
+      payees.map((account) => nearUsdcBill(account)),
+    );
+
+    // #when 1Click refunds both and the job runs
+    for (const quote of await readQuotes(db, paying.company)) {
+      oneClick.state.refundIntentPayout(quote.depositAddress);
+    }
+    await runtime.runPromise(advanceOutboundQuotes(500));
+
+    // #then both failed, nothing was written to the ledger and the money is
+    // back in the account
+    const after = await Promise.all(run.map(reload));
+    expect({
+      statuses: after.map((payout) => payout.status),
+      ledger: await ledgerBalance(db, paying.company),
+      rows: (await Promise.all(after.map((payout) => debits(payout)))).flat()
+        .length,
+      inAccount: oneClick.state.confidentialBalances.get(paying.wallet.address),
+    }).toEqual({
+      statuses: ["failed", "failed"],
+      ledger: OPENING_BALANCE,
+      rows: 0,
+      inAccount: OPENING_BALANCE,
+    });
+  });
+
+  it("is still paid through its quote when the company is switched back before the job runs", async () => {
+    // #given a payout waiting on its quote
+    await allowlistAddress(runtime, paying, payee, "Supplier", "near");
+    const [payout] = await payClaims(runtime, db, paying, [bill()]);
+    if (!payout) throw new Error("nothing was prepared");
+    const [quote] = await readQuotes(db, paying.company);
+    if (!quote) throw new Error("no quote");
+
+    // #when the company is switched to its company wallet and 1Click delivers
+    await inCompany((tx) =>
+      tx
+        .update(wallets)
+        .set({ balanceHome: "company_wallet" })
+        .where(eq(wallets.id, paying.wallet.id)),
+    );
+    oneClick.state.deliverIntentPayout(quote.depositAddress);
+    await runtime.runPromise(advanceOutboundQuotes(500));
+
+    // #then the quote's own columns decided: paid out of the account, once
+    expect({
+      status: (await reload(payout)).status,
+      debits: (await debits(payout)).length,
+      sends: (await sends()).length,
+    }).toEqual({ status: "paid", debits: 1, sends: 0 });
+  });
+});
+
+describe("a company whose USDC is in its company wallet", () => {
+  it("still sends a NEAR payee from the company wallet and asks 1Click nothing", async () => {
+    // #given the quote requests so far
+    const asked = oneClick.state.quoteRequests.length;
+    const intents = oneClick.state.submittedIntents.length;
+
+    // #when a NEAR payout is paid
+    const payout = await pay();
+
+    // #then it went out as one company wallet send
+    expect({
+      status: payout.status,
+      sends: (await sends()).length,
+      paid: paidToPayee(),
+      quotesAsked: oneClick.state.quoteRequests.length - asked,
+      intents: oneClick.state.submittedIntents.length - intents,
+    }).toEqual({
+      status: "paying",
+      sends: 1,
+      paid: AMOUNT,
+      quotesAsked: 0,
+      intents: 0,
     });
   });
 });

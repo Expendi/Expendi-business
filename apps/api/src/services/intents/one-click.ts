@@ -277,11 +277,13 @@ export interface OneClickShape {
   ) => Effect.Effect<{ readonly intentHash: string }, OneClickError>;
   /**
    * Tells 1Click which transaction paid a deposit address, so it doesn't
-   * have to find it. Safe to repeat.
+   * have to find it. Safe to repeat. A quote that touches a confidential
+   * account carries the company's `session`.
    */
   readonly submitDeposit: (
     depositAddress: string,
     txHash: string,
+    session?: OneClickSession,
   ) => Effect.Effect<void, OneClickError>;
 }
 
@@ -685,10 +687,11 @@ export function makeOneClick(
         };
       }),
 
-    submitDeposit: (depositAddress, txHash) =>
+    submitDeposit: (depositAddress, txHash, session) =>
       request("deposit submit", "/v0/deposit/submit", {
         method: "POST",
         body: { txHash, depositAddress },
+        session,
       }).pipe(Effect.asVoid),
 
     authenticate: (signed) =>

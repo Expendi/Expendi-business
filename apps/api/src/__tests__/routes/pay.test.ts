@@ -28,7 +28,9 @@ import {
   ONE_CLICK_USDC_ASSET_IDS,
 } from "../../services/intents/one-click.js";
 import { getInvoicePdfData } from "../../services/invoices/invoice-pdf.js";
+import { createDeliveryCompany } from "../helpers/confidential-delivery.js";
 import { createCompany } from "../helpers/db.js";
+import { makeFakePrivyWallets } from "../helpers/fakes.js";
 import {
   asAdmin,
   createCustomerAndInvoice,
@@ -42,6 +44,7 @@ import { TEST_DATABASE_URL_MIGRATE } from "../setup/test-database.js";
 
 const DASHBOARD_ORIGIN = "https://business.expendi.test";
 const oneClick = makeFakeOneClick();
+const privy = makeFakePrivyWallets();
 let runtime: AppRuntime;
 let db: Database;
 let owner: pg.Pool;
@@ -50,7 +53,7 @@ let funded: FundedCompany;
 
 beforeAll(async () => {
   runtime = makeTestRuntime(
-    { oneClick: oneClick.layer },
+    { oneClick: oneClick.layer, privyWallets: privy.layer },
     { DASHBOARD_ORIGINS: DASHBOARD_ORIGIN },
   );
   ({ db } = await runtime.runPromise(DatabaseService));
@@ -359,6 +362,54 @@ describe("GET /pay/:publicId/pdf", () => {
     expect(response.status).toBe(200);
   });
 
+  it("reads the payer's own transaction for a payment credited with no NEAR transaction", async () => {
+    // #given an invoice paid into a confidential account: the credit has no hash
+    const invoice = await open();
+    const quote = await insertInvoiceQuote(db, funded, invoice.invoiceId);
+    const payerTxHash = `0x${"e".repeat(64)}`;
+    await runInScope(db, asAdmin(funded.company), async (tx) => {
+      await tx
+        .update(intentQuotes)
+        .set({ originChainTxHashes: [payerTxHash] })
+        .where(eq(intentQuotes.id, quote.id));
+      const [credit] = await tx
+        .insert(walletTransactions)
+        .values({
+          organizationId: funded.company.organizationId,
+          walletId: funded.walletId,
+          type: "deposit",
+          chain: "near",
+          usdcAmount: 100_000_000n,
+          intentQuoteId: quote.id,
+        })
+        .returning({ id: walletTransactions.id });
+      await tx.insert(invoicePayments).values({
+        organizationId: funded.company.organizationId,
+        invoiceId: invoice.invoiceId,
+        kind: "link",
+        intentQuoteId: quote.id,
+        walletTransactionId: credit?.id,
+        amountUsdc: 100_000_000n,
+        paidOn: "2026-11-12",
+      });
+    });
+    await setInvoice(invoice.invoiceId, { status: "paid", paidAt: new Date() });
+
+    // #when
+    const data = await runtime.runPromise(
+      getInvoicePdfData(invoice.publicId ?? ""),
+    );
+
+    // #then
+    expect(data.payment).toEqual({
+      paidOn: "2026-11-12",
+      amountUsdc: 100_000_000n,
+      chain: "base",
+      txHash: null,
+      payerTxHash,
+    });
+  });
+
   it("gives an open invoice the pay link on the first dashboard origin", async () => {
     // #given
     const invoice = await open();
@@ -576,6 +627,96 @@ describe("POST /pay/:publicId/quotes", () => {
       status: response.status,
       oneClickCalls: oneClick.state.quoteRequests.length,
     }).toEqual({ status: 409, oneClickCalls: 0 });
+  });
+
+  it("quotes a company with a confidential account for delivery to it, with its session", async () => {
+    // #given
+    funded = await createDeliveryCompany(db, privy);
+    const invoice = await open();
+    const callsBefore = oneClick.state.calls.length;
+
+    // #when
+    const response = await requestQuote(invoice.publicId ?? "");
+
+    // #then
+    const quote = publicPayQuoteSchema.parse(
+      ((await response.json()) as { data: unknown }).data,
+    );
+    const [request] = oneClick.state.quoteRequests;
+    const [call] = oneClick.state.calls.slice(callsBefore);
+    const saved = await readQuote(db, funded, quote.id);
+    expect({
+      status: response.status,
+      request: {
+        recipient: request?.recipient,
+        recipientType: request?.recipientType,
+        refundTo: request?.refundTo,
+        refundType: request?.refundType,
+      },
+      sessionSent: call?.session !== undefined,
+      saved: {
+        recipientType: saved.recipientType,
+        refundType: saved.refundType,
+      },
+      shown: quote.status,
+    }).toEqual({
+      status: 201,
+      request: {
+        recipient: funded.accountId,
+        recipientType: "CONFIDENTIAL_INTENTS",
+        refundTo: funded.accountId,
+        refundType: "INTENTS",
+      },
+      sessionSent: true,
+      saved: { recipientType: "CONFIDENTIAL_INTENTS", refundType: "INTENTS" },
+      shown: "awaiting_deposit",
+    });
+  });
+
+  it("quotes a company wallet's invoice with no recipient type and no session, as before", async () => {
+    // #given
+    const invoice = await open();
+    const callsBefore = oneClick.state.calls.length;
+
+    // #when
+    const response = await requestQuote(invoice.publicId ?? "");
+
+    // #then
+    const quote = publicPayQuoteSchema.parse(
+      ((await response.json()) as { data: unknown }).data,
+    );
+    const [request] = oneClick.state.quoteRequests;
+    const [call] = oneClick.state.calls.slice(callsBefore);
+    expect({
+      hasRecipientType: request !== undefined && "recipientType" in request,
+      session: call?.session,
+      saved: (await readQuote(db, funded, quote.id)).recipientType,
+    }).toEqual({
+      hasRecipientType: false,
+      session: undefined,
+      saved: "DESTINATION_CHAIN",
+    });
+  });
+
+  it("answers 503, and saves nothing, when a confidential company can't be signed in", async () => {
+    // #given
+    funded = await createDeliveryCompany(db, privy);
+    const invoice = await open();
+    privy.state.nextNearSignings("refused");
+
+    // #when
+    const response = await requestQuote(invoice.publicId ?? "");
+
+    // #then
+    const saved = await runInScope(
+      db,
+      { organizationId: funded.company.organizationId },
+      (tx) => tx.select().from(intentQuotes),
+    );
+    expect({ status: response.status, saved: saved.length }).toEqual({
+      status: 503,
+      saved: 0,
+    });
   });
 
   it("answers 503 with a plain message when 1Click refuses, and saves nothing", async () => {

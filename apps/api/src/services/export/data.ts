@@ -115,9 +115,14 @@ interface OutstandingRecord extends Record<string, unknown> {
 const nameOf = (alias: string) =>
   sql.raw(`coalesce(nullif(btrim(${alias}.full_name), ''), ${alias}.email)`);
 
-/** Paycrest's order ID and the M-Pesa or bank reference, or the transaction hash for a USDC transfer. */
+/**
+ * Paycrest's order ID and the M-Pesa or bank reference, or the transaction
+ * hash for a USDC transfer: the company's own send, else the payee chain's
+ * transaction that a quote delivered it with (`provider_reference`, which an
+ * `onchain` payout only ever fills with a transaction hash).
+ */
 const payoutReference = sql.raw(
-  `CASE WHEN p.provider = 'onchain' THEN coalesce(p.tx_hash, '') ELSE concat_ws(' / ', p.provider_order_id, p.provider_reference) END`,
+  `CASE WHEN p.provider = 'onchain' THEN coalesce(p.tx_hash, p.provider_reference, '') ELSE concat_ws(' / ', p.provider_order_id, p.provider_reference) END`,
 );
 
 function readExpenses(

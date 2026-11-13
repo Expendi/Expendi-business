@@ -2,11 +2,13 @@ import { and, eq } from "drizzle-orm";
 import { Effect } from "effect";
 
 import type { DatabaseService } from "../../db/client.js";
-import type { IntentQuote } from "../../db/schema/index.js";
+import type { IntentQuote, Wallet } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
+import type { OneClickSession } from "./one-click.js";
 import { intentQuotes, wallets } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { isImplicitNearAccount } from "../chain/near.js";
+import { ConfidentialAccounts } from "./confidential-account.js";
 import { ONE_CLICK_USDC_ASSET_IDS, OneClick } from "./one-click.js";
 import {
   COMPANY_QUOTE_TTL_MS,
@@ -27,6 +29,14 @@ import {
  * The way back (`openTreasuryReturnQuote`) is the mirror image: USDC on Base
  * to USDC on NEAR, paid by the Treasury wallet, recipient the company wallet
  * and refund to the Treasury wallet.
+ *
+ * A company whose USDC is kept in a confidential account (`balance_home`)
+ * pays a part out of that account by a signed message, and its way back
+ * delivers into it (docs/work/confidential-accounts/phase-3-4-design.md, B6).
+ * Every quote of such a company is taken with its session. `balance_home`
+ * decides only how a quote is opened: the quote's own columns decide how it
+ * is paid and credited afterwards. For any other company each request and
+ * row is what it always was.
  */
 
 const BASE_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -76,6 +86,49 @@ function treasuryRoute(organizationId: string) {
 }
 
 /**
+ * The company's session, for a company that keeps its USDC in a confidential
+ * account, and `undefined` for any other, which signs in to nothing.
+ */
+function sessionOf(
+  wallet: Wallet,
+): Effect.Effect<
+  OneClickSession | undefined,
+  QuoteNotOpened,
+  ConfidentialAccounts
+> {
+  return Effect.gen(function* () {
+    if (wallet.balanceHome !== "confidential_account") return undefined;
+    if (wallet.privyWalletId === null || wallet.address === null) {
+      return yield* Effect.fail(
+        new QuoteNotOpened({
+          reason: "no_wallet",
+          message: "The company has no active company wallet on NEAR.",
+        }),
+      );
+    }
+    const accounts = yield* ConfidentialAccounts;
+    const signedIn = yield* accounts
+      .session({
+        privyWalletId: wallet.privyWalletId,
+        accountId: wallet.address,
+      })
+      .pipe(Effect.either);
+    if (signedIn._tag === "Left") {
+      return yield* Effect.fail(
+        new QuoteNotOpened({
+          reason: "one_click_unavailable",
+          message: `The company's confidential account couldn't be reached: ${signedIn.left.message}`,
+        }),
+      );
+    }
+    return signedIn.right;
+  });
+}
+
+const isConfidential = (wallet: Wallet): boolean =>
+  wallet.balanceHome === "confidential_account";
+
+/**
  * `one_click_unavailable` is 1Click not answering, which may pass; a refusal
  * is a definite no that asking again won't change.
  */
@@ -104,23 +157,31 @@ export function estimateTreasuryPart(input: {
 }): Effect.Effect<
   { readonly costUsdc: bigint; readonly seconds: number },
   QuoteNotOpened | DatabaseError,
-  OneClick | DatabaseService
+  OneClick | ConfidentialAccounts | DatabaseService
 > {
   return Effect.gen(function* () {
     const route = yield* treasuryRoute(input.organizationId);
+    const session = yield* sessionOf(route.wallet);
     const oneClick = yield* OneClick;
     const quoted = yield* oneClick
-      .quote({
-        dry: true,
-        swapType: "EXACT_INPUT",
-        originAsset: ONE_CLICK_USDC_ASSET_IDS.near,
-        destinationAsset: ONE_CLICK_USDC_ASSET_IDS.base,
-        amount: input.amountIn,
-        recipient: route.treasuryAddress,
-        refundTo: route.companyAddress,
-        deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
-        slippageBps: STABLECOIN_SLIPPAGE_BPS,
-      })
+      .quote(
+        {
+          dry: true,
+          swapType: "EXACT_INPUT",
+          originAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+          destinationAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+          amount: input.amountIn,
+          recipient: route.treasuryAddress,
+          refundTo: route.companyAddress,
+          ...(isConfidential(route.wallet) && {
+            depositType: "CONFIDENTIAL_INTENTS" as const,
+            refundType: "CONFIDENTIAL_INTENTS" as const,
+          }),
+          deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
+          slippageBps: STABLECOIN_SLIPPAGE_BPS,
+        },
+        session,
+      )
       .pipe(Effect.mapError(quoteFailure));
     const cost = quoted.amountIn - quoted.amountOut;
     if (cost < 0n || cost > maxQuoteCost(quoted.amountIn)) {
@@ -148,7 +209,7 @@ export function openTreasuryQuote(input: {
 }): Effect.Effect<
   IntentQuote,
   QuoteNotOpened | DatabaseError,
-  OneClick | DatabaseService
+  OneClick | ConfidentialAccounts | DatabaseService
 > {
   const { organizationId } = input;
   const byKey = withScope({ organizationId }, (tx) =>
@@ -172,19 +233,28 @@ export function openTreasuryQuote(input: {
 
     const { wallet, companyAddress, treasuryAddress } =
       yield* treasuryRoute(organizationId);
+    const session = yield* sessionOf(wallet);
+    const paidFromAccount = isConfidential(wallet);
     const oneClick = yield* OneClick;
     const quoted = yield* oneClick
-      .quote({
-        dry: false,
-        swapType: "EXACT_INPUT",
-        originAsset: ONE_CLICK_USDC_ASSET_IDS.near,
-        destinationAsset: ONE_CLICK_USDC_ASSET_IDS.base,
-        amount: input.amountIn,
-        recipient: treasuryAddress,
-        refundTo: companyAddress,
-        deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
-        slippageBps: STABLECOIN_SLIPPAGE_BPS,
-      })
+      .quote(
+        {
+          dry: false,
+          swapType: "EXACT_INPUT",
+          originAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+          destinationAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+          amount: input.amountIn,
+          recipient: treasuryAddress,
+          refundTo: companyAddress,
+          ...(paidFromAccount && {
+            depositType: "CONFIDENTIAL_INTENTS" as const,
+            refundType: "CONFIDENTIAL_INTENTS" as const,
+          }),
+          deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
+          slippageBps: STABLECOIN_SLIPPAGE_BPS,
+        },
+        session,
+      )
       .pipe(Effect.mapError(quoteFailure));
     const untrusted = (message: string) =>
       Effect.fail(new QuoteNotOpened({ reason: "untrusted", message }));
@@ -237,6 +307,10 @@ export function openTreasuryQuote(input: {
             depositAddress: quoted.depositAddress,
             recipient: treasuryAddress,
             refundTo: companyAddress,
+            ...(paidFromAccount && {
+              depositType: "CONFIDENTIAL_INTENTS" as const,
+              refundType: "CONFIDENTIAL_INTENTS" as const,
+            }),
             deadline: quoted.deadline,
             quoteResponse: quoted.signedResponse,
             treasuryMoveId: input.moveId,
@@ -264,23 +338,30 @@ export function estimateTreasuryReturnPart(input: {
 }): Effect.Effect<
   { readonly costUsdc: bigint; readonly seconds: number },
   QuoteNotOpened | DatabaseError,
-  OneClick | DatabaseService
+  OneClick | ConfidentialAccounts | DatabaseService
 > {
   return Effect.gen(function* () {
     const route = yield* treasuryRoute(input.organizationId);
+    const session = yield* sessionOf(route.wallet);
     const oneClick = yield* OneClick;
     const quoted = yield* oneClick
-      .quote({
-        dry: true,
-        swapType: "EXACT_INPUT",
-        originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
-        destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
-        amount: input.amountIn,
-        recipient: route.companyAddress,
-        refundTo: route.treasuryAddress,
-        deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
-        slippageBps: STABLECOIN_SLIPPAGE_BPS,
-      })
+      .quote(
+        {
+          dry: true,
+          swapType: "EXACT_INPUT",
+          originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+          destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+          amount: input.amountIn,
+          recipient: route.companyAddress,
+          ...(isConfidential(route.wallet) && {
+            recipientType: "CONFIDENTIAL_INTENTS" as const,
+          }),
+          refundTo: route.treasuryAddress,
+          deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
+          slippageBps: STABLECOIN_SLIPPAGE_BPS,
+        },
+        session,
+      )
       .pipe(Effect.mapError(quoteFailure));
     const cost = quoted.amountIn - quoted.amountOut;
     if (cost < 0n || cost > maxQuoteCost(quoted.amountIn)) {
@@ -310,7 +391,7 @@ export function openTreasuryReturnQuote(input: {
 }): Effect.Effect<
   IntentQuote,
   QuoteNotOpened | DatabaseError,
-  OneClick | DatabaseService
+  OneClick | ConfidentialAccounts | DatabaseService
 > {
   const { organizationId } = input;
   const byKey = withScope({ organizationId }, (tx) =>
@@ -334,6 +415,7 @@ export function openTreasuryReturnQuote(input: {
 
     const { wallet, companyAddress, treasuryAddress } =
       yield* treasuryRoute(organizationId);
+    const deliversToAccount = isConfidential(wallet);
     const untrusted = (message: string) =>
       Effect.fail(new QuoteNotOpened({ reason: "untrusted", message }));
     if (!BASE_ADDRESS.test(treasuryAddress)) {
@@ -347,19 +429,26 @@ export function openTreasuryReturnQuote(input: {
         }),
       );
     }
+    const session = yield* sessionOf(wallet);
     const oneClick = yield* OneClick;
     const quoted = yield* oneClick
-      .quote({
-        dry: false,
-        swapType: "EXACT_INPUT",
-        originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
-        destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
-        amount: input.amountIn,
-        recipient: companyAddress,
-        refundTo: treasuryAddress,
-        deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
-        slippageBps: STABLECOIN_SLIPPAGE_BPS,
-      })
+      .quote(
+        {
+          dry: false,
+          swapType: "EXACT_INPUT",
+          originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+          destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+          amount: input.amountIn,
+          recipient: companyAddress,
+          ...(deliversToAccount && {
+            recipientType: "CONFIDENTIAL_INTENTS" as const,
+          }),
+          refundTo: treasuryAddress,
+          deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
+          slippageBps: STABLECOIN_SLIPPAGE_BPS,
+        },
+        session,
+      )
       .pipe(Effect.mapError(quoteFailure));
     if (quoted.dry)
       return yield* untrusted("1Click answered with a dry quote.");
@@ -401,6 +490,9 @@ export function openTreasuryReturnQuote(input: {
             minAmountOut: quoted.minAmountOut,
             depositAddress: quoted.depositAddress,
             recipient: companyAddress,
+            ...(deliversToAccount && {
+              recipientType: "CONFIDENTIAL_INTENTS" as const,
+            }),
             refundTo: treasuryAddress,
             deadline: quoted.deadline,
             quoteResponse: quoted.signedResponse,

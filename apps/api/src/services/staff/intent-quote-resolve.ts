@@ -10,11 +10,7 @@ import { intentQuoteResolutionSchema } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
 import type { IntentQuote } from "../../db/schema/index.js";
-import type {
-  DatabaseError,
-  NotFound,
-  ServiceUnavailable,
-} from "../../errors.js";
+import type { DatabaseError, NotFound } from "../../errors.js";
 import type { OneClick } from "../intents/one-click.js";
 import type { ConfirmationRefused } from "./confirmations.js";
 import type { EvidenceDeps } from "./intent-quote-evidence.js";
@@ -26,9 +22,10 @@ import {
   payouts,
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
-import { BadRequest, Conflict } from "../../errors.js";
+import { BadRequest, Conflict, ServiceUnavailable } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { settleFromOneClick } from "../intents/quote-settle.js";
+import { touchesConfidentialAccount } from "../intents/quote-status.js";
 import { applyPayoutOutcome } from "../payout/subjects.js";
 import {
   issueConfirmation,
@@ -96,6 +93,40 @@ function askOneClick(
   );
 }
 
+/**
+ * How recent the job's own reading of a quote under review must be when
+ * staff can't ask 1Click themselves: the job asks about every quote under
+ * review every 15 seconds, so a reading older than this means it isn't
+ * running.
+ */
+const SAVED_READING_MAX_AGE_MS = 5 * 60_000;
+
+/**
+ * The quote as the job last saw it, for a quote that touches a confidential
+ * account: 1Click answers about one only to the company's session, which
+ * staff code can't open. A quote the job has settled is final (`SUCCESS`
+ * and `REFUNDED` are, and `failed` is written only once nothing can run),
+ * so it needs no fresh reading; one still under review does.
+ */
+function savedReading(
+  quote: IntentQuote,
+): Effect.Effect<IntentQuote, ServiceUnavailable> {
+  const settled = quote.status !== "needs_review";
+  const heard = quote.oneClickCheckedAt?.getTime() ?? null;
+  return settled ||
+    (heard !== null && Date.now() - heard <= SAVED_READING_MAX_AGE_MS)
+    ? Effect.succeed(quote)
+    : Effect.fail(
+        new ServiceUnavailable({
+          message:
+            "The job hasn't heard from 1Click about this quote in the last 5 minutes, and staff can't ask for a quote in a confidential account. Nothing was changed; try again shortly.",
+        }),
+      );
+}
+
+const reading = (quote: IntentQuote) =>
+  touchesConfidentialAccount(quote) ? savedReading(quote) : askOneClick(quote);
+
 export interface PreparedQuoteResolution {
   readonly token: string;
   readonly expiresAt: string;
@@ -126,7 +157,7 @@ export function prepareQuoteResolution(
   return Effect.gen(function* () {
     const organizationId = yield* quoteOrganization(quoteId);
     const scoped = yield* readScopedQuote(organizationId, quoteId);
-    const quote = yield* askOneClick(scoped.quote);
+    const quote = yield* reading(scoped.quote);
     const evidence = yield* gatherQuoteEvidence(quote);
     const plan = yield* planQuoteResolution({
       quote,
@@ -204,7 +235,7 @@ export function confirmQuoteResolution(
       );
     }
     const scoped = yield* readScopedQuote(organizationId, quoteId);
-    const asked = yield* askOneClick(scoped.quote);
+    const asked = yield* reading(scoped.quote);
     const evidence = yield* gatherQuoteEvidence(asked);
 
     return yield* withScope({ organizationId }, (tx) =>

@@ -287,10 +287,16 @@ export function gatherQuoteEvidence(
         .filter((transfer) => transfer.to === to.toLowerCase())
         .map(baseTransfer);
 
+    // A quote paid out of a confidential account is paid by a signed
+    // message, so no chain shows its deposit, and its refund goes back into
+    // the account, which nothing here can read.
+    const paidFromAccount = quote.depositType === "CONFIDENTIAL_INTENTS";
     let near: NearEvidence | null = null;
     let deposits: QuoteTransfer[] = [];
     let savedDeposit: SavedBaseDeposit = "none";
-    if (originChain === "near") {
+    if (paidFromAccount) {
+      deposits = [];
+    } else if (originChain === "near") {
       near = yield* gatherNearSendsByKey(
         quote.organizationId,
         quoteSendKey(quote.id),
@@ -369,8 +375,9 @@ export function gatherQuoteEvidence(
         : destinationChain === "near"
           ? yield* nearTransfersTo(quote.recipient, nearHashes)
           : [];
-    const refunds =
-      originChain === "base"
+    const refunds = paidFromAccount
+      ? []
+      : originChain === "base"
         ? listedOnBase(quote.refundTo)
         : yield* nearTransfersTo(quote.refundTo, nearHashes);
     return {
@@ -476,6 +483,108 @@ const RESOLVED_AS: Readonly<
 > = { delivered: "succeeded", refunded: "refunded", never_deposited: "failed" };
 
 /**
+ * What the job settles a quote paid out of a confidential account as, and the
+ * outcome that matches it. `failed` is only ever written once the signed
+ * message's own deadline has passed with 1Click still waiting for its
+ * deposit (or before anything was signed), so nothing moved.
+ */
+const SETTLED_BY_THE_JOB: Partial<
+  Record<IntentQuote["status"], IntentQuoteResolution>
+> = { succeeded: "delivered", refunded: "refunded", failed: "never_deposited" };
+
+/** The 1Click status the job saved with each settlement; `failed` has none to match. */
+const SAVED_ONE_CLICK_STATUS = {
+  succeeded: "SUCCESS",
+  refunded: "REFUNDED",
+} as const;
+
+/**
+ * Resolving a quote paid out of a confidential account. Staff can't sign in,
+ * so 1Click can't be asked and no chain shows a deposit or a refund: the
+ * outbound quotes job settles the quote from 1Click, and staff only hand
+ * back the payouts it held. A quote still under review is refused (it
+ * settles when the job hears `SUCCESS` or `REFUNDED`, or fails after the
+ * message's deadline), and once settled only the outcome it settled as is
+ * allowed, so money 1Click delivered can never be handed back as refunded or
+ * never sent. The payouts go back to the delivery code, which debits and pays
+ * or fails them by its own rules.
+ */
+function planPaidFromAccount(input: {
+  readonly quote: IntentQuote;
+  readonly outcome: IntentQuoteResolution;
+  readonly payouts: readonly QuotePayout[];
+}): Effect.Effect<QuoteResolutionPlan, Conflict> {
+  const { quote, outcome } = input;
+  if (quote.status === "needs_review") {
+    return refuse(
+      `This quote is paid out of the company's confidential account, so no chain shows whether it ran. It settles when the outbound quotes job hears SUCCESS or REFUNDED from 1Click, or fails once the signed message's own deadline${quote.intentDeadline ? ` (${quote.intentDeadline.toISOString()})` : ""} has passed. Resolve it after that.`,
+    );
+  }
+  const settledBy = SETTLED_BY_THE_JOB[quote.status];
+  if (settledBy === undefined) {
+    return refuse(
+      `Only a quote the job has settled can be resolved here; this one is ${quote.status}.`,
+    );
+  }
+  const savedStatus =
+    quote.status === "succeeded" || quote.status === "refunded"
+      ? SAVED_ONE_CLICK_STATUS[quote.status]
+      : null;
+  if (savedStatus !== null && quote.oneClickStatus !== savedStatus) {
+    return refuse(
+      `The quote is ${quote.status}, but the last 1Click reading saved with it is ${quote.oneClickStatus ?? "none"}, not ${savedStatus}. Check it by hand.`,
+    );
+  }
+  if (outcome !== settledBy) {
+    return refuse(
+      `The quote settled as ${settledBy.replace("_", " ")}, not ${outcome.replace("_", " ")}.`,
+    );
+  }
+  const held = input.payouts.filter(({ payout }) => isHeldBy(quote, payout));
+  if (held.length === 0) {
+    return refuse(
+      `The job settled this quote as ${quote.status}, and nothing it holds is left under review.`,
+    );
+  }
+  const debited = held.find(
+    ({ debits, refunds }) => debits.length > 0 || refunds.length > 0,
+  );
+  if (debited) {
+    return refuse(
+      `Payout ${debited.payout.id} has ledger rows, but a payout paid out of a confidential account is debited only when its quote succeeds. That needs a ledger correction by hand.`,
+    );
+  }
+  const cashOuts = quote.purpose === "base_hop";
+  const count = held.length;
+  const what = cashOuts
+    ? `${count} cash-out${count === 1 ? "" : "s"}`
+    : "The payout";
+  const consequence = cashOuts
+    ? outcome === "delivered"
+      ? `${what} go back to approved. The outbound quotes job orders and funds them from the transit wallet as after any delivered hop.`
+      : `${what} go back to approved, and the outbound quotes job fails them with nothing sent, as for any hop that ${outcome === "refunded" ? "was refunded" : "never happened"}. The company's admin can retry them.`
+    : outcome === "delivered"
+      ? "The payout goes back to the delivery code, which marks it paid with 1Click's delivery transaction as its reference and debits the ledger once."
+      : outcome === "refunded"
+        ? "The payout goes back to the delivery code, which fails it. The refund went back into the company's account, so no ledger entry is written. The company's admin can retry it."
+        : "The payout goes back to the delivery code, which fails it with nothing sent and no ledger entry. The company's admin can retry it.";
+  return Effect.succeed({
+    settleAs: null,
+    failure: null,
+    deposit: null,
+    sendsToClose: [],
+    payoutsToReturn: held.map(({ payout }) => ({
+      payoutId: payout.id,
+      status: cashOuts ? ("approved" as const) : ("funding" as const),
+    })),
+    consequences: [
+      consequence,
+      "Nothing is signed or sent, and the quote's own record isn't changed.",
+    ],
+  });
+}
+
+/**
  * Whether `outcome` may resolve `quote` given `evidence`, and what resolving
  * it records. Refuses whatever the evidence doesn't show, and anything that
  * would leave the ledger out of step with the chain.
@@ -502,6 +611,9 @@ export function planQuoteResolution(input: {
 
   if (quote.purpose === "fund_in") {
     return refuse("A fund-in isn't resolved here: it moves no payout's money.");
+  }
+  if (quote.depositType === "CONFIDENTIAL_INTENTS") {
+    return planPaidFromAccount({ quote, outcome, payouts: input.payouts });
   }
   const settledBy = SETTLED_BY_ONE_CLICK[quote.status];
   if (quote.status !== "needs_review") {

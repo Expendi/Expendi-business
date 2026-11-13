@@ -62,6 +62,14 @@ export function confidentialUsdcTokenId(usdcContractId: string): string {
  */
 export const MAX_INTENT_LIFETIME_MS = 4 * 24 * 60 * 60 * 1000;
 
+/**
+ * The least USDC worth moving from a company wallet into its confidential
+ * account, in base units (0.05 USDC). 1Click moved 0.01 for nothing on
+ * 2026-11-13, but every move-in costs Expendi a storage registration for its
+ * deposit address, so smaller amounts stay in the company wallet.
+ */
+export const MOVE_IN_MIN_USDC = 50_000n;
+
 const SIGN_IN_LIFETIME_MS = 5 * 60 * 1000;
 const SESSION_REUSE_MARGIN_MS = 60 * 1000;
 const SALT_LENGTH = 4;
@@ -124,7 +132,7 @@ export type CompanyIntentRefusalReason =
   | "token_id"
   | "amount_format"
   | "amount_not_positive"
-  | "amount_above_quote"
+  | "amount_not_the_quote"
   | "amount_above_cap"
   | "deadline_format"
   | "deadline_passed"
@@ -197,9 +205,10 @@ const hasVersionedPrefix = (nonce: Buffer): boolean =>
  * Whether a message 1Click generated may be signed for the company. Strict
  * on purpose: the signer must know exactly what it signs, so anything
  * unexpected is refused. The only message it accepts is one `transfer` of
- * the confidential USDC token to the quote's deposit address, for more than
- * nothing and no more than the quote's amount in or the spend cap, expiring
- * within `MAX_INTENT_LIFETIME_MS`, with that expiry also in its nonce.
+ * the confidential USDC token to the quote's deposit address, for exactly
+ * the quote's amount in (both messages 1Click generated on 2026-11-13 move
+ * exactly that) and no more than the spend cap, expiring within
+ * `MAX_INTENT_LIFETIME_MS`, with that expiry also in its nonce.
  */
 export function checkCompanyIntent(
   input: CompanyIntentCheckInput,
@@ -285,8 +294,11 @@ export function checkCompanyIntent(
   if (amount <= 0n) {
     return refuse("amount_not_positive", "The amount is not above zero");
   }
-  if (amount > input.amountIn) {
-    return refuse("amount_above_quote", "The amount is above the quote's");
+  if (amount !== input.amountIn) {
+    return refuse(
+      "amount_not_the_quote",
+      "The amount is not exactly the quote's amount in",
+    );
   }
   if (amount > input.spendCap) {
     return refuse("amount_above_cap", "The amount is above the spend cap");

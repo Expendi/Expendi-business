@@ -955,6 +955,34 @@ describe("OneClick.submitDeposit", () => {
     });
   });
 
+  it("sends no authorization without a session", async () => {
+    // #given
+    const { oneClick, calls } = oneClickAnswering({
+      json: { status: "KNOWN_DEPOSIT_TX" },
+    });
+
+    // #when
+    await Effect.runPromise(oneClick.submitDeposit(DEPOSIT_ADDRESS, TX_HASH));
+
+    // #then
+    expect(calls[0]?.headers).not.toHaveProperty("authorization");
+  });
+
+  it("tells 1Click as the company when given its session", async () => {
+    // #given
+    const { oneClick, calls } = oneClickAnswering({
+      json: { status: "KNOWN_DEPOSIT_TX" },
+    });
+
+    // #when
+    await Effect.runPromise(
+      oneClick.submitDeposit(DEPOSIT_ADDRESS, TX_HASH, SESSION),
+    );
+
+    // #then
+    expect(calls[0]?.headers.authorization).toBe(`Bearer ${SESSION_TOKEN}`);
+  });
+
   it("reports a refusal", async () => {
     // #given
     const { oneClick } = oneClickAnswering({

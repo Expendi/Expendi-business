@@ -15,8 +15,10 @@ import { runInScope } from "../../db/scope.js";
 import { USDC_BASE_ADDRESS } from "../../services/chain/base.js";
 import { creditUsdcDeposits } from "../../services/wallet/deposits.js";
 import { randomTxHash, transferReceipt } from "../helpers/chain.js";
+import { createDeliveryCompany } from "../helpers/confidential-delivery.js";
 import {
   makeFakeBaseRpc,
+  makeFakePrivyWallets,
   randomAddress,
   signAlchemyBody,
 } from "../helpers/fakes.js";
@@ -152,6 +154,7 @@ describe("USDC arriving at a transit wallet", () => {
           blockNumber: 436n,
           counterpartyAddress: depositAddress.toLowerCase(),
           payoutId,
+          intentQuoteId: null,
         },
       ],
     });
@@ -409,6 +412,136 @@ describe("USDC arriving at a transit wallet", () => {
       summary: { credited: 0, alreadyCredited: 0 },
       ledger: [],
       alerts: 1,
+    });
+  });
+});
+
+describe("USDC arriving at the transit wallet of a company whose USDC is in a confidential account", () => {
+  const privy = makeFakePrivyWallets();
+  let confidential: AppRuntime;
+  let company: FundedCompany;
+
+  beforeAll(() => {
+    confidential = makeTestRuntime({
+      baseRpc: rpc.layer,
+      oneClick: oneClick.layer,
+      privyWallets: privy.layer,
+    });
+  });
+
+  afterAll(async () => {
+    await confidential.dispose();
+  });
+
+  beforeEach(async () => {
+    company = await createDeliveryCompany(db, privy);
+  });
+
+  const hop = (status: "depositing" | "succeeded") =>
+    saveQuote(confidential, db, company, "base_hop", {
+      intentPaid: true,
+      row: {
+        status,
+        depositStartedAt: new Date(),
+        ...(status === "succeeded" && { settledAt: new Date() }),
+      },
+    });
+
+  const creditConfidential = (hash: string) =>
+    confidential.runPromise(Effect.either(creditUsdcDeposits([hash], ALCHEMY)));
+
+  it("recognises a hop's arrival as internal, asking 1Click with the company's session, and flags nothing", async () => {
+    // #given a hop out of the account that 1Click reports delivered to the
+    // transit wallet
+    const paid = await hop("depositing");
+    const hash = mined([
+      { to: company.transitAddress, amount: paid.amountOut },
+    ]);
+    oneClick.state.setStatus(paid.depositAddress, {
+      status: "SUCCESS",
+      destinationChainTxHashes: [hash],
+    });
+    const before = oneClick.state.calls.length;
+
+    // #when Alchemy reports the transfer
+    const outcome = await creditConfidential(hash);
+
+    // #then it is the company's own money: nothing credited, nothing
+    // flagged, and 1Click was asked about the hop with a session
+    expect({
+      outcome: outcome._tag,
+      credited: outcome._tag === "Right" ? outcome.right.credited : null,
+      ledger: await ledgerOf(db, company),
+      alerts: await alerts(hash),
+      statusCalls: oneClick.state.calls
+        .slice(before)
+        .filter(
+          (entry) =>
+            entry.call === "status" &&
+            entry.depositAddress === paid.depositAddress,
+        )
+        .map((entry) => entry.session !== undefined),
+    }).toEqual({
+      outcome: "Right",
+      credited: 0,
+      ledger: [],
+      alerts: [],
+      statusCalls: [true],
+    });
+  });
+
+  it("waits, without flagging, when the company can't be signed in, and recognises the arrival once it can", async () => {
+    // #given a hop that settled a moment ago whose transaction 1Click has
+    // not listed on our row yet, and a sign-in that Privy refuses
+    const paid = await hop("succeeded");
+    const hash = mined([
+      { to: company.transitAddress, amount: paid.amountOut },
+    ]);
+    oneClick.state.setStatus(paid.depositAddress, {
+      status: "SUCCESS",
+      destinationChainTxHashes: [hash],
+    });
+    privy.state.nextNearSignings("refused");
+
+    // #when Alchemy reports the transfer
+    const waiting = await creditConfidential(hash);
+
+    // #then it is to be retried and nothing was flagged or credited
+    expect({
+      outcome: waiting._tag === "Left" ? waiting.left._tag : "succeeded",
+      ledger: await ledgerOf(db, company),
+      alerts: await alerts(hash),
+    }).toEqual({ outcome: "HopArrivalUnconfirmed", ledger: [], alerts: [] });
+
+    // #when the retry finds sign-in working
+    const retried = await creditConfidential(hash);
+
+    // #then the arrival is internal
+    expect({
+      outcome: retried._tag,
+      alerts: await alerts(hash),
+    }).toEqual({ outcome: "Right", alerts: [] });
+  });
+
+  it("still flags USDC that no hop of the company explains", async () => {
+    // #given a settled hop for a different amount than what arrived
+    const paid = await hop("succeeded");
+    const hash = mined([
+      { to: company.transitAddress, amount: paid.amountOut + 1n, logIndex: 3 },
+    ]);
+
+    // #when Alchemy reports the transfer
+    const outcome = await creditConfidential(hash);
+
+    // #then it is raised for review, not credited
+    expect({
+      outcome: outcome._tag,
+      ledger: await ledgerOf(db, company),
+      alerts: (await alerts(hash)).map((alert) => alert.kind),
+    }).toEqual({
+      outcome: "Right",
+      ledger: [],
+      alerts: ["unexpected_transit_transfer"],
     });
   });
 });

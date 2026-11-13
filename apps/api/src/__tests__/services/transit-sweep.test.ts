@@ -5,6 +5,7 @@ import type { Database } from "../../db/client.js";
 import type { IntentQuote, Payout } from "../../db/schema/index.js";
 import type { NearPayingCompany } from "../helpers/near-payouts.js";
 import { DatabaseService } from "../../db/client.js";
+import { creditSettledQuote } from "../../services/intents/quote-credit.js";
 import {
   advanceSweep,
   SWEEP_DUST_USDC,
@@ -13,6 +14,7 @@ import {
 import { preparePayouts } from "../../services/payout/payout-service.js";
 import { PRETIUM_BASE_SETTLEMENT_ADDRESS } from "../../services/pretium/settlement.js";
 import { randomTxHash } from "../helpers/chain.js";
+import { saveQuote } from "../helpers/money-in.js";
 import {
   createNearPayingCompany,
   makeNearPayoutWorld,
@@ -338,5 +340,224 @@ describe("sweeping a transit wallet", () => {
       status: resumed.status,
       sends: transitSends().length,
     }).toEqual({ status: "expired", sends: 1 });
+  });
+});
+
+describe("sweeping the transit wallet of a company whose USDC is in a confidential account", () => {
+  const callsBefore = () => oneClick.state.calls.length;
+
+  beforeEach(async () => {
+    paying = await createNearPayingCompany(world, db, {
+      balanceHome: "confidential_account",
+    });
+  });
+
+  it("delivers into the account, with the company's session, and refunds to the transit wallet on Base", async () => {
+    // #given 5 USDC in the transit wallet
+    world.setBaseUsdc(paying.transitAddress, 5n * USDC);
+    const before = callsBefore();
+
+    // #when the sweep runs
+    const started = await sweep();
+    if (!started) throw new Error("no sweep");
+
+    // #then 1Click was asked for a delivery into the confidential account,
+    // refunding on Base, with a session, and the row says the same
+    const request = oneClick.state.quotes.get(started.depositAddress)?.request;
+    expect({
+      request: {
+        swapType: request?.swapType,
+        amount: request?.amount,
+        recipient: request?.recipient,
+        recipientType: request?.recipientType,
+        refundTo: request?.refundTo,
+        refundType: request?.refundType,
+        depositType: request?.depositType,
+      },
+      row: {
+        recipientType: started.recipientType,
+        recipient: started.recipient,
+        refundTo: started.refundTo,
+        depositType: started.depositType,
+        refundType: started.refundType,
+      },
+      sessions: oneClick.state.calls
+        .slice(before)
+        .filter((entry) => entry.call === "quote")
+        .map((entry) => entry.session !== undefined),
+      sends: transitSends().length,
+    }).toEqual({
+      request: {
+        swapType: "EXACT_INPUT",
+        amount: 5n * USDC,
+        recipient: paying.accountId,
+        recipientType: "CONFIDENTIAL_INTENTS",
+        refundTo: paying.transitAddress,
+        refundType: undefined,
+        depositType: undefined,
+      },
+      row: {
+        recipientType: "CONFIDENTIAL_INTENTS",
+        recipient: paying.accountId,
+        refundTo: paying.transitAddress,
+        depositType: "ORIGIN_CHAIN",
+        refundType: "ORIGIN_CHAIN",
+      },
+      sessions: [true],
+      sends: 1,
+    });
+  });
+
+  it("asks 1Click about the sweep with the session, and is never a ledger entry", async () => {
+    // #given a sweep 1Click delivered into the account
+    world.setBaseUsdc(paying.transitAddress, 5n * USDC);
+    const started = await sweep();
+    if (!started) throw new Error("no sweep");
+    delivered(started);
+    world.setBaseUsdc(paying.transitAddress, 0n);
+
+    // #when it is resumed, and the credit job considers it
+    const settled = await advance(started);
+    const credit = await runtime.runPromise(
+      creditSettledQuote({
+        quoteId: started.id,
+        organizationId: paying.company.organizationId,
+      }),
+    );
+
+    // #then it succeeded, the status and the deposit notice carried the
+    // session, and the ledger holds only the opening deposit
+    const sessionless = oneClick.state.calls.filter(
+      (entry) =>
+        entry.depositAddress === started.depositAddress &&
+        entry.session === undefined,
+    );
+    expect({
+      status: settled.status,
+      credit,
+      ledger: await ledgerBalance(db, paying.company),
+      sessionless: sessionless.length,
+    }).toEqual({
+      status: "succeeded",
+      credit: "not_creditable",
+      ledger: 100n * USDC,
+      sessionless: 0,
+    });
+  });
+
+  it("leaves dust in the transit wallet: nothing is quoted at the threshold", async () => {
+    // #given a balance at the dust threshold
+    world.setBaseUsdc(paying.transitAddress, SWEEP_DUST_USDC);
+    const before = callsBefore();
+
+    // #when the sweep runs
+    const started = await sweep();
+
+    // #then nothing is quoted or sent
+    expect({
+      started,
+      quotes: oneClick.state.calls
+        .slice(before)
+        .filter((entry) => entry.call === "quote").length,
+      sends: transitSends().length,
+    }).toEqual({ started: null, quotes: 0, sends: 0 });
+  });
+
+  it("starts nothing when the company can't be signed in, and sweeps once it can", async () => {
+    // #given a balance to sweep and a sign-in Privy refuses
+    world.setBaseUsdc(paying.transitAddress, 5n * USDC);
+    privy.state.nextNearSignings("refused");
+
+    // #when the sweep runs
+    const refused = await sweep();
+
+    // #then no quote was saved and nothing was sent
+    expect({
+      refused,
+      sweeps: (await sweeps()).length,
+      sends: transitSends().length,
+    }).toEqual({ refused: null, sweeps: 0, sends: 0 });
+
+    // #when it runs again with sign-in working
+    const retried = await sweep();
+
+    // #then it sweeps
+    expect(retried?.status).toBe("depositing");
+  });
+
+  it("leaves a saved sweep untouched, sending nothing and telling 1Click nothing, while the company can't be signed in", async () => {
+    // #given a saved sweep into the account whose transfer hasn't started,
+    // and a company that has not signed in yet
+    world.setBaseUsdc(paying.transitAddress, 5n * USDC);
+    const saved = await saveQuote(
+      runtime,
+      db,
+      {
+        company: paying.company,
+        walletId: paying.wallet.id,
+        accountId: paying.accountId,
+        transitAddress: paying.transitAddress,
+      },
+      "sweep",
+      { amount: 5n * USDC, row: { recipientType: "CONFIDENTIAL_INTENTS" } },
+    );
+    const told = oneClick.state.submitted.length;
+    privy.state.nextNearSignings("refused");
+
+    // #when it is advanced with no session to be had
+    const resumed = await advance(saved);
+
+    // #then it is as it was: nothing sent, 1Click told nothing
+    expect({
+      status: resumed.status,
+      depositStartedAt: resumed.depositStartedAt,
+      sends: transitSends().length,
+      told: oneClick.state.submitted.length - told,
+    }).toEqual({
+      status: "quoted",
+      depositStartedAt: null,
+      sends: 0,
+      told: 0,
+    });
+
+    // #when the sign-in works again
+    const later = await advance(saved);
+
+    // #then it goes ahead
+    expect(later.status).toBe("depositing");
+  });
+});
+
+describe("sweeping the transit wallet of a company whose USDC is in its company wallet", () => {
+  it("asks 1Click exactly as before: no confidential field, no session", async () => {
+    // #given 5 USDC in the transit wallet
+    world.setBaseUsdc(paying.transitAddress, 5n * USDC);
+    const before = oneClick.state.calls.length;
+
+    // #when the sweep runs
+    const started = await sweep();
+    if (!started) throw new Error("no sweep");
+
+    // #then
+    const request = oneClick.state.quotes.get(started.depositAddress)?.request;
+    expect({
+      recipientType: request?.recipientType,
+      depositType: request?.depositType,
+      refundType: request?.refundType,
+      sessions: oneClick.state.calls
+        .slice(before)
+        .map((entry) => [entry.call, entry.session]),
+      row: [started.recipientType, started.depositType, started.refundType],
+    }).toEqual({
+      recipientType: undefined,
+      depositType: undefined,
+      refundType: undefined,
+      sessions: [
+        ["quote", undefined],
+        ["submitDeposit", undefined],
+        ["status", undefined],
+      ],
+      row: ["DESTINATION_CHAIN", "ORIGIN_CHAIN", "ORIGIN_CHAIN"],
+    });
   });
 });

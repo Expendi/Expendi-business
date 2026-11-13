@@ -40,6 +40,9 @@ import { wallets } from "./wallets.js";
  *   Linked to its move.
  * - `move_in`: moving a company's USDC from its company wallet into its
  *   confidential account. Internal, not a ledger entry.
+ * - `fee_cover`: Expendi's own USDC delivered into a company's confidential
+ *   account, so a payout out of it costs the company nothing beyond what it
+ *   approved. Internal, not a ledger entry.
  */
 export const INTENT_QUOTE_PURPOSES = [
   "base_hop",
@@ -51,6 +54,7 @@ export const INTENT_QUOTE_PURPOSES = [
   "to_treasury",
   "from_treasury",
   "move_in",
+  "fee_cover",
 ] as const;
 export type IntentQuotePurpose = (typeof INTENT_QUOTE_PURPOSES)[number];
 
@@ -279,6 +283,8 @@ export const intentQuotes = pgTable(
     intentSubmittedAt: timestamp("intent_submitted_at", {
       withTimezone: true,
     }),
+    /** When a delivery into a confidential account was written to the ledger. */
+    ledgerCreditedAt: timestamp("ledger_credited_at", { withTimezone: true }),
     /** 1Click's last reported status, and when we last asked. */
     oneClickStatus: oneClickStatus("one_click_status"),
     oneClickCheckedAt: timestamp("one_click_checked_at", {
@@ -389,22 +395,46 @@ export const intentQuotes = pgTable(
       "intent_quotes_settled_has_time",
       sql`(${table.status} IN ('succeeded', 'refunded', 'failed', 'expired')) = (${table.settledAt} IS NOT NULL)`,
     ),
-    // Only a Base hop, a USDC payout, a fund-in return and a move to Treasury
-    // start from the company wallet. Compared as text: an enum value can't be
-    // used in the transaction that adds it.
+    // Only a Base hop, a USDC payout, a fund-in return, a move to Treasury
+    // and a move into the confidential account start from the company
+    // wallet. Compared as text: an enum value can't be used in the
+    // transaction that adds it.
     check(
       "intent_quotes_send_is_from_company_wallet",
-      sql`${table.companyWalletSendId} IS NULL OR ${table.purpose}::text IN ('base_hop', 'usdc_payout', 'fund_in_return', 'to_treasury')`,
+      sql`${table.companyWalletSendId} IS NULL OR ${table.purpose}::text IN ('base_hop', 'usdc_payout', 'fund_in_return', 'to_treasury', 'move_in')`,
     ),
+    // Only the quotes that deliver into the company's own account may name
+    // a confidential account as their recipient, and a move-in and a fee
+    // cover always do.
+    check(
+      "intent_quotes_recipient_type_matches_purpose",
+      sql`(${table.recipientType} = 'DESTINATION_CHAIN' OR ${table.purpose}::text IN ('move_in', 'fund_in', 'invoice_payment', 'fund_in_return', 'sweep', 'from_treasury', 'fee_cover')) AND (${table.purpose}::text NOT IN ('move_in', 'fee_cover') OR ${table.recipientType} = 'CONFIDENTIAL_INTENTS')`,
+    ),
+    // A delivery is written to the ledger only once it has succeeded, and
+    // only into a confidential account: any other is credited by the deposit
+    // watcher from the chain. A sweep, a move-in and a fee cover are never
+    // credited: they move or add the company's own USDC.
+    check(
+      "intent_quotes_ledger_credit_is_confidential_delivery",
+      sql`${table.ledgerCreditedAt} IS NULL OR (${table.status} = 'succeeded' AND ${table.recipientType} = 'CONFIDENTIAL_INTENTS' AND ${table.purpose}::text IN ('fund_in', 'invoice_payment', 'fund_in_return', 'from_treasury'))`,
+    ),
+    // Deliveries to a confidential account waiting to be credited.
+    index("intent_quotes_ledger_credit_due_idx")
+      .on(table.settledAt)
+      .where(
+        sql`${table.recipientType} = 'CONFIDENTIAL_INTENTS' AND ${table.status} = 'succeeded' AND ${table.ledgerCreditedAt} IS NULL`,
+      ),
     check(
       "intent_quotes_treasury_move_matches_purpose",
       sql`(${table.treasuryMoveId} IS NOT NULL) = (${table.purpose}::text IN ('to_treasury', 'from_treasury'))`,
     ),
     // Only a fund-in return is paid from inside NEAR Intents, and only a
-    // fund-in, its return or an invoice payment refunds into it.
+    // fund-in, its return or an invoice payment refunds into it. Only a Base
+    // hop, a USDC payout or a move to Treasury is paid out of a confidential
+    // account, and then it refunds into it too.
     check(
       "intent_quotes_intents_side_matches_purpose",
-      sql`(${table.depositType} = 'INTENTS') = (${table.purpose}::text = 'fund_in_return') AND (${table.refundType} = 'ORIGIN_CHAIN' OR ${table.purpose}::text IN ('fund_in', 'fund_in_return', 'invoice_payment'))`,
+      sql`(${table.depositType} = 'INTENTS') = (${table.purpose}::text = 'fund_in_return') AND (${table.depositType}::text <> 'CONFIDENTIAL_INTENTS' OR ${table.purpose}::text IN ('base_hop', 'usdc_payout', 'to_treasury')) AND (${table.refundType} <> 'INTENTS' OR ${table.purpose}::text IN ('fund_in', 'fund_in_return', 'invoice_payment')) AND ((${table.refundType}::text = 'CONFIDENTIAL_INTENTS') = (${table.depositType}::text = 'CONFIDENTIAL_INTENTS'))`,
     ),
     check(
       "intent_quotes_invoice_matches_purpose",
@@ -428,10 +458,28 @@ export const intentQuotes = pgTable(
       "intent_quotes_intent_submitted_is_signed",
       sql`${table.signedIntent} IS NOT NULL OR (${table.intentHash} IS NULL AND ${table.intentSubmittedAt} IS NULL)`,
     ),
-    // Nothing was deposited for a quote that expired unused.
+    // Only a quote paid out of a confidential account carries a signed
+    // message, and only once its deposit has started.
+    check(
+      "intent_quotes_signed_intent_is_confidential",
+      sql`${table.signedIntent} IS NULL OR (${table.depositType}::text = 'CONFIDENTIAL_INTENTS' AND ${table.depositStartedAt} IS NOT NULL)`,
+    ),
+    // Such a quote is never paid by a transfer on chain.
+    check(
+      "intent_quotes_confidential_deposit_has_no_send",
+      sql`${table.depositType}::text <> 'CONFIDENTIAL_INTENTS' OR (${table.companyWalletSendId} IS NULL AND ${table.depositTxHash} IS NULL AND ${table.depositRegistrationTxHash} IS NULL AND ${table.feeCoverUsdc} IS NULL)`,
+    ),
+    // A signed message stays spendable until its own deadline (decision
+    // record, Signing 4), so its quote fails only after that.
+    check(
+      "intent_quotes_signed_fails_after_its_deadline",
+      sql`${table.status} <> 'failed' OR ${table.signedIntent} IS NULL OR ${table.settledAt} > ${table.intentDeadline}`,
+    ),
+    // Nothing was deposited for a quote that expired unused, and nothing
+    // was signed for it.
     check(
       "intent_quotes_expired_never_deposited",
-      sql`${table.status} <> 'expired' OR (${table.depositStartedAt} IS NULL AND ${table.companyWalletSendId} IS NULL AND ${table.depositTxHash} IS NULL)`,
+      sql`${table.status} <> 'expired' OR (${table.depositStartedAt} IS NULL AND ${table.companyWalletSendId} IS NULL AND ${table.depositTxHash} IS NULL AND ${table.signedIntent} IS NULL)`,
     ),
   ],
 );

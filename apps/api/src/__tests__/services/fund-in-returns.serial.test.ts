@@ -6,7 +6,11 @@ import type { IntentQuote } from "../../db/schema/index.js";
 import type { AppRuntime } from "../../runtime.js";
 import type { NearUsdcPayingCompany } from "../helpers/near-usdc-payouts.js";
 import { DatabaseService } from "../../db/client.js";
-import { companyWalletSends, intentQuotes } from "../../db/schema/index.js";
+import {
+  companyWalletSends,
+  intentQuotes,
+  wallets,
+} from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 import {
   returnFundIns,
@@ -18,6 +22,8 @@ import {
   refreshOpenFundIns,
 } from "../../services/intents/fund-in.js";
 import { ONE_CLICK_FUND_IN_USDC_ASSET_IDS } from "../../services/intents/one-click.js";
+import { creditSettledQuotes } from "../../services/intents/quote-credit.js";
+import { ledgerOf } from "../helpers/money-in.js";
 import {
   createNearUsdcPayingCompany,
   makeNearUsdcFakes,
@@ -265,5 +271,176 @@ describe("returnFundIns", () => {
       returns: await returns(),
       held: chain.state.intentsBalanceOf(account(), ARBITRUM_USDC),
     }).toEqual({ returns: [], held: 5n * USDC });
+  });
+});
+
+describe("returnFundIns, for a company that keeps its USDC in a confidential account", () => {
+  beforeEach(async () => {
+    paying = await createNearUsdcPayingCompany(
+      runtime,
+      db,
+      fakes,
+      undefined,
+      undefined,
+      "confidential_account",
+    );
+  });
+
+  const ledger = () =>
+    ledgerOf(db, {
+      company: paying.company,
+      walletId: paying.wallet.id,
+      accountId: account(),
+      transitAddress: "",
+    }).then((rows) => rows.filter((row) => row.intentQuoteId !== null));
+
+  it("is quoted paid from inside NEAR Intents and delivered to the confidential account, with the company's session", async () => {
+    // #given
+    chain.state.fundIntents(account(), ARBITRUM_USDC, 40n * USDC);
+
+    // #when
+    await run();
+
+    // #then
+    const [back] = await returns();
+    if (!back) throw new Error("no return was started");
+    const asked = oneClick.state.quotes.get(back.depositAddress)?.request;
+    const call = oneClick.state.calls.filter((entry) => entry.call === "quote")[
+      oneClick.state.quoteRequests.findIndex(
+        (request) => request.recipient === account(),
+      )
+    ];
+    expect({
+      asked: {
+        depositType: asked?.depositType,
+        recipientType: asked?.recipientType,
+        recipient: asked?.recipient,
+        refundType: asked?.refundType,
+        refundTo: asked?.refundTo,
+      },
+      sessionSent: call?.session !== undefined,
+      saved: {
+        depositType: back.depositType,
+        recipientType: back.recipientType,
+        refundType: back.refundType,
+        status: back.status,
+      },
+    }).toEqual({
+      asked: {
+        depositType: "INTENTS",
+        recipientType: "CONFIDENTIAL_INTENTS",
+        recipient: account(),
+        refundType: "INTENTS",
+        refundTo: account(),
+      },
+      sessionSent: true,
+      saved: {
+        depositType: "INTENTS",
+        recipientType: "CONFIDENTIAL_INTENTS",
+        refundType: "INTENTS",
+        status: "depositing",
+      },
+    });
+  });
+
+  it("is credited when 1Click reports it delivered, for what it delivered, and not before", async () => {
+    // #given
+    const fundIn = await refundedFundIn();
+    await run();
+    const [back] = await returns();
+    if (!back) throw new Error("no return was started");
+    oneClick.state.deliverConfidential(back.depositAddress, 39_900_000n);
+
+    // #when
+    await run();
+    const beforeCredit = await ledger();
+    await runtime.runPromise(creditSettledQuotes());
+
+    // #then
+    const [settled] = await returns();
+    expect({
+      status: settled?.status,
+      statusCalls: oneClick.state.calls
+        .filter(
+          (entry) =>
+            entry.call === "status" &&
+            entry.depositAddress === back.depositAddress,
+        )
+        .every((entry) => entry.session !== undefined),
+      beforeCredit,
+      credited: (await ledger()).map((row) => ({
+        usdcAmount: row.usdcAmount,
+        intentQuoteId: row.intentQuoteId,
+        txHash: row.txHash,
+      })),
+      shown: await shown(fundIn.id),
+    }).toEqual({
+      status: "succeeded",
+      statusCalls: true,
+      beforeCredit: [],
+      credited: [
+        { usdcAmount: 39_900_000n, intentQuoteId: back.id, txHash: null },
+      ],
+      shown: "returned",
+    });
+  });
+
+  it("starts nothing, and sends nothing, when the company can't be signed in", async () => {
+    // #given
+    chain.state.fundIntents(account(), ARBITRUM_USDC, 40n * USDC);
+    fakes.privy.state.nextNearSignings("refused");
+
+    // #when
+    await runtime.runPromise(
+      startFundInReturn({ organizationId: organizationId() }),
+    );
+
+    // #then
+    expect({
+      returns: await returns(),
+      held: chain.state.intentsBalanceOf(account(), ARBITRUM_USDC),
+    }).toEqual({ returns: [], held: 40n * USDC });
+  });
+
+  it("returns a refunded fund-in to the company wallet as before when the quote was made before the switch", async () => {
+    // #given
+    paying = await createNearUsdcPayingCompany(runtime, db, fakes);
+    chain.state.fundIntents(account(), ARBITRUM_USDC, 40n * USDC);
+    await run();
+    await runInScope(db, { organizationId: organizationId() }, (tx) =>
+      tx
+        .update(wallets)
+        .set({ balanceHome: "confidential_account" })
+        .where(eq(wallets.id, paying.wallet.id)),
+    );
+    const [back] = await returns();
+    if (!back) throw new Error("no return was started");
+    oneClick.state.setStatus(back.depositAddress, { status: "SUCCESS" });
+
+    // #when
+    await run();
+    await runtime.runPromise(creditSettledQuotes());
+
+    // #then
+    const asked = oneClick.state.quotes.get(back.depositAddress)?.request;
+    expect({
+      recipientType: back.recipientType,
+      askedRecipientType: asked?.recipientType,
+      status: (await returns())[0]?.status,
+      credited: await ledger(),
+      askedWithoutSession: oneClick.state.calls
+        .filter(
+          (entry) =>
+            entry.call === "status" &&
+            entry.depositAddress === back.depositAddress,
+        )
+        .every((entry) => entry.session === undefined),
+    }).toEqual({
+      recipientType: "DESTINATION_CHAIN",
+      askedRecipientType: undefined,
+      status: "succeeded",
+      credited: [],
+      askedWithoutSession: true,
+    });
   });
 });
