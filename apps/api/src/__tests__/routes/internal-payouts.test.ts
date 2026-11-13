@@ -468,7 +468,7 @@ describe("POST /internal/payouts/:id/refetch", () => {
     expect(payoutRefetchResponseSchema.parse(await dataOf(response))).toEqual({
       previousStatus: "needs_review",
       status: "needs_review",
-      paycrestStatus: "settled",
+      providerStatus: "settled",
     });
     expect(await readPayout(db, paying.company, payout.id)).toMatchObject({
       status: "needs_review",
@@ -506,7 +506,7 @@ describe("POST /internal/payouts/:id/refetch", () => {
     expect(payoutRefetchResponseSchema.parse(await dataOf(response))).toEqual({
       previousStatus: "paying",
       status: "paid",
-      paycrestStatus: "settled",
+      providerStatus: "settled",
     });
     const paid = await auditEntries(payout.id, "payout.paid");
     expect(paid).toHaveLength(1);

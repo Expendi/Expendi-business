@@ -88,7 +88,7 @@ function nextFor(
           status: "failed",
           action: "payout.failed",
           reason:
-            "Paycrest refunded the order. The USDC returns to the company wallet.",
+            "The cash-out didn't go through. The USDC returns to the company wallet.",
         };
       }
       if (NEVER_FUNDED.has(status)) {
@@ -449,6 +449,20 @@ function settleApprovalAfterHop(
 }
 
 /**
+ * Settles an approved cash-out of either provider that has nothing at its
+ * provider yet: the approval lapses once it could have been funded long
+ * enough ago, after its Base hop settled if it has one. Never sends.
+ */
+export function settleUnfundedApproval(
+  payout: Payout,
+  now: number,
+): Effect.Effect<boolean, DatabaseError, DatabaseService | AuditLog> {
+  return payout.baseHopQuoteId !== null && !payout.orderRequestedAt
+    ? settleApprovalAfterHop(payout, payout.baseHopQuoteId, now)
+    : settleOrderlessApproval(payout, now);
+}
+
+/**
  * Settles a funded payout whose order Paycrest won't return: never sends,
  * never orders. Any fetch error, a 404 included (Paycrest 404s an order
  * while it refunds), is for a person only once the payout is past its
@@ -552,13 +566,7 @@ export function reconcilePaycrestPayouts(
           if (!payout) return false;
           if (!payout.providerOrderId) {
             if (payout.status !== "approved") return false;
-            return payout.baseHopQuoteId !== null && !payout.orderRequestedAt
-              ? yield* settleApprovalAfterHop(
-                  payout,
-                  payout.baseHopQuoteId,
-                  Date.now(),
-                )
-              : yield* settleOrderlessApproval(payout, Date.now());
+            return yield* settleUnfundedApproval(payout, Date.now());
           }
           const fetched = yield* Effect.either(
             paycrest.getOrder(payout.providerOrderId),

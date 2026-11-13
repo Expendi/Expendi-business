@@ -7,6 +7,9 @@ import { COMPANY_ID, companySummary } from "./companies";
 import { minutesAgo, sampleId } from "./ids";
 
 export const PAYOUT_ID = sampleId(201);
+export const PRETIUM_PAYOUT_ID = sampleId(207);
+
+const PRETIUM_SETTLEMENT_ADDRESS = "0x8005ee53e57ab11e11eaa4efe07ee3835dc02f98";
 
 interface PayoutInput {
   n: number;
@@ -39,11 +42,18 @@ function payout(input: PayoutInput): StaffPayoutSummary {
     status: input.status,
     amountKesCents: input.amountKesCents,
     amountToTransferUsdc: input.amountToTransferUsdc ?? null,
-    providerOrderId: provider === "paycrest" ? `pc_${1000 + input.n}` : null,
+    providerOrderId:
+      provider === "paycrest"
+        ? `pc_${1000 + input.n}`
+        : provider === "pretium"
+          ? `TXK7${1000 + input.n}`
+          : null,
     depositAddress:
       provider === "paycrest"
         ? "0x9be1c07a4d2f58a3e6c1b0794d8a25f3e1c06b72"
-        : null,
+        : provider === "pretium"
+          ? PRETIUM_SETTLEMENT_ADDRESS
+          : null,
     txHash:
       input.status === "needs_review" || input.status === "paid"
         ? `0x${String(input.n).padStart(2, "0")}c4a1e9d07b3f528a6e0d41c97b5f3a82d6e10c49b7a35f82e1d06c3b49a7f5e`
@@ -70,8 +80,27 @@ const REVIEW_PAYOUT: StaffPayoutSummary = {
   id: PAYOUT_ID,
 };
 
+const PRETIUM_PAYOUT: StaffPayoutSummary = {
+  ...payout({
+    n: 7,
+    companyId: sampleId(2),
+    subjectType: "claim",
+    method: "mpesa_phone",
+    provider: "pretium",
+    status: "needs_review",
+    amountKesCents: "1500000",
+    amountToTransferUsdc: "115830000",
+    providerStatus: "FAILED",
+    failureReason:
+      "Pretium didn't pay the shillings and its refund hasn't arrived. Check it by hand.",
+    updatedMinutesAgo: 25,
+  }),
+  id: PRETIUM_PAYOUT_ID,
+};
+
 export const PAYOUTS: StaffPayoutSummary[] = [
   REVIEW_PAYOUT,
+  PRETIUM_PAYOUT,
   payout({
     n: 2,
     companyId: sampleId(2),
@@ -131,6 +160,8 @@ export const PAYOUT_DETAIL: StaffPayoutDetail = {
   ...REVIEW_PAYOUT,
   recipient: { name: "Rift Valley Fuel Depot", detail: "Paybill 247247" },
   heldByIntentQuoteId: null,
+  refundRequestedAt: null,
+  refundTxHash: null,
   quotedUsdc: "1430233000",
   maxDebitUsdc: "1444535000",
   rate: "128.9",
@@ -184,7 +215,34 @@ export const PAYOUT_DETAIL: StaffPayoutDetail = {
   ],
 };
 
+/** A Pretium cash-out Pretium was asked to refund, with the refund not yet back. */
+export const PRETIUM_PAYOUT_DETAIL: StaffPayoutDetail = {
+  ...PAYOUT_DETAIL,
+  ...PRETIUM_PAYOUT,
+  recipient: { name: "Jane Wanjiku", detail: "•••• 5678" },
+  quotedUsdc: "115830000",
+  maxDebitUsdc: "116990000",
+  rate: "129.5",
+  depositValidUntil: null,
+  gatewayOrderId: null,
+  refundRequestedAt: minutesAgo(20),
+  refundTxHash:
+    "0x5be0a2c19d47f3e86b10c25d94a7e3f18c06b2d59a4e71c38f02d6b95e1a7c40",
+  ledger: [
+    {
+      id: sampleId(507),
+      type: "payout",
+      usdcAmount: "-115830000",
+      chain: "base",
+      txHash: PRETIUM_PAYOUT.txHash,
+      createdAt: minutesAgo(30),
+    },
+  ],
+  auditTrail: [],
+};
+
 export function payoutDetail(id: string): StaffPayoutDetail {
+  if (id === PRETIUM_PAYOUT_ID) return PRETIUM_PAYOUT_DETAIL;
   const summary = PAYOUTS.find((payout) => payout.id === id);
   if (!summary || summary.id === PAYOUT_ID) return PAYOUT_DETAIL;
   return {

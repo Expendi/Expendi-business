@@ -80,7 +80,7 @@ export function billPreviewRows(preview: BillPaymentPreview): PreviewRow[] {
         ]
       : [{ label: "USDC", value: `${formatUsdc(preview.usdc)} USDC` }]),
     {
-      label: "Paycrest fee, at most",
+      label: "Cash-out fee, at most",
       value: `${formatUsdc(preview.feeAllowanceUsdc)} USDC`,
     },
     {
@@ -111,7 +111,7 @@ export function billTotalRows(payment: BillPayment): PreviewRow[] {
         ]
       : []),
     {
-      label: "Paycrest fees, at most",
+      label: "Cash-out fees, at most",
       value: `${formatUsdc(totals.feeAllowanceUsdc)} USDC`,
     },
     {

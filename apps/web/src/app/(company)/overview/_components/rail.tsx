@@ -167,8 +167,8 @@ export function WalletCard({
         USDC wallet
         <InfoTip label="Exchange rate">
           {cash.rate === null
-            ? "Paycrest's KES rate is unavailable right now."
-            : `Paycrest rate today: KES ${cash.rate} per USDC.`}{" "}
+            ? "The KES rate is unavailable right now."
+            : `Rate today: KES ${cash.rate} per USDC.`}{" "}
           {cashFootnote(cash)}
         </InfoTip>
         <RailLink href="/wallet">View account</RailLink>

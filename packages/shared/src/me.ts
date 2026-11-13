@@ -36,8 +36,8 @@ const INVISIBLE_CHARACTERS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
 const NAME_PATTERN = /^\p{L}[\p{L}\p{M} '.-]*$/u;
 
 /**
- * The person's name as their M-Pesa account shows it: Paycrest pays in the
- * recipient's name (spec §6.2). Trimmed, with runs of spaces and typographic
+ * The person's name as their M-Pesa account shows it: a cash-out pays in
+ * the recipient's name (spec §6.2). Trimmed, with runs of spaces and typographic
  * apostrophes (iOS types ’) made plain.
  */
 export const fullNameSchema = z

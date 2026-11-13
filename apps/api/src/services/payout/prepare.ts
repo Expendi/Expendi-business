@@ -2,28 +2,26 @@ import { and, eq, ne } from "drizzle-orm";
 import { Effect } from "effect";
 
 import type { PayeeChain } from "@expendi-business/shared";
+import { formatKesAmount } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
 import type { Payout } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
 import type { AuditActor } from "../audit/audit-log.js";
-import type { PaycrestError } from "../paycrest/paycrest-client.js";
+import type { Paycrest, PaycrestError } from "../paycrest/paycrest-client.js";
 import type { AmountTooSmall } from "../paycrest/quote.js";
 import type { KesRecipient, UsdcRecipient } from "../paycrest/recipient.js";
+import type { Pretium, PretiumError } from "../pretium/pretium-client.js";
 import { payouts, wallets } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { isAllowlisted } from "../allowlist/allowlist.js";
 import { canonicalJson } from "../approval/passkeys.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { activeCashOutProvider } from "../cash-out/active-provider.js";
+import { cashOutRate, quoteKesCashOut } from "../cash-out/quote.js";
 import { normalisePayeeAddress } from "../chain/address.js";
 import { ceilDiv, fromMicro, kesCentsFor } from "../paycrest/amounts.js";
-import { Paycrest } from "../paycrest/paycrest-client.js";
-import { quoteKesPayout } from "../paycrest/quote.js";
-import {
-  InvalidRecipient,
-  PAYOUT_MEMO,
-  toPaycrestRecipient,
-} from "../paycrest/recipient.js";
+import { cashOutRecipientProblem } from "./cash-out-check.js";
 import { PayoutRejected } from "./payout-errors.js";
 
 export { PAYOUT_MEMO } from "../paycrest/recipient.js";
@@ -33,9 +31,6 @@ const USDC_ADDRESS_KINDS: Readonly<Record<PayeeChain, string>> = {
   base: "a Base address",
   solana: "a Solana address",
 };
-
-/** Paycrest's marginal rate, used to value a USDC payout in KES. */
-const RATE_PROBE_USDC = "1";
 
 /**
  * Room above the quote for Paycrest's fee and a small rate move before
@@ -56,7 +51,7 @@ interface PayoutRequestBase {
   readonly idempotencyKey: string;
 }
 
-/** KES through Paycrest: the amount is what the recipient receives. */
+/** A cash-out in KES: the amount is what the recipient receives. */
 export interface KesPayoutRequest extends PayoutRequestBase {
   readonly recipient: KesRecipient;
   readonly amountKesCents: bigint;
@@ -75,7 +70,11 @@ export const isUsdcRequest = (
 ): request is UsdcPayoutRequest => request.recipient.method === "usdc";
 
 export type PrepareError =
-  PayoutRejected | PaycrestError | AmountTooSmall | DatabaseError;
+  | PayoutRejected
+  | PaycrestError
+  | PretiumError
+  | AmountTooSmall
+  | DatabaseError;
 
 const reject = (reason: PayoutRejected["reason"], message: string) =>
   Effect.fail(new PayoutRejected({ reason, message }));
@@ -128,7 +127,7 @@ export function preparePayouts(input: {
 }): Effect.Effect<
   Payout[],
   PrepareError,
-  DatabaseService | AuditLog | Paycrest
+  DatabaseService | AuditLog | Paycrest | Pretium
 > {
   const { organizationId, actor } = input;
   const requests = input.requests.map(normalise);
@@ -155,57 +154,52 @@ export function preparePayouts(input: {
       );
     }
 
-    const [wallet] = yield* withScope(scope, (tx) =>
-      query(() =>
-        tx
-          .select({
-            id: wallets.id,
-            perTransactionMaxUsdc: wallets.perTransactionMaxUsdc,
-          })
-          .from(wallets)
-          .where(
-            and(
-              eq(wallets.organizationId, organizationId),
-              eq(wallets.status, "active"),
-            ),
-          )
-          .limit(1),
-      ),
+    // One read for the whole batch, so its cash-outs can't straddle a change.
+    const { wallet, provider } = yield* withScope(scope, (tx) =>
+      Effect.gen(function* () {
+        const [wallet] = yield* query(() =>
+          tx
+            .select({
+              id: wallets.id,
+              perTransactionMaxUsdc: wallets.perTransactionMaxUsdc,
+            })
+            .from(wallets)
+            .where(
+              and(
+                eq(wallets.organizationId, organizationId),
+                eq(wallets.status, "active"),
+              ),
+            )
+            .limit(1),
+        );
+        return { wallet, provider: yield* activeCashOutProvider(tx) };
+      }),
     );
     if (!wallet) {
       return yield* reject("no_wallet", "This company has no wallet yet.");
     }
 
-    const paycrest = yield* Paycrest;
     const audit = yield* AuditLog;
-    let bankCodes: Set<string> | null = null;
 
     const priceKes = (request: KesPayoutRequest) =>
       Effect.gen(function* () {
-        try {
-          toPaycrestRecipient(request.recipient, PAYOUT_MEMO);
-        } catch (error) {
-          if (error instanceof InvalidRecipient) {
-            return yield* reject("invalid_recipient", error.message);
-          }
-          throw error;
+        const problem = cashOutRecipientProblem(provider, request.recipient);
+        if (problem !== null) {
+          return yield* reject("invalid_recipient", problem);
         }
-        if (request.recipient.method === "bank") {
-          bankCodes ??= new Set(
-            (yield* paycrest.institutions())
-              .filter((institution) => institution.type === "bank")
-              .map((institution) => institution.code),
-          );
-          if (!bankCodes.has(request.recipient.bankCode)) {
-            return yield* reject(
-              "invalid_recipient",
-              "Paycrest can't pay that bank.",
-            );
-          }
-        }
-        const quote = yield* quoteKesPayout(request.amountKesCents);
+        const quote = yield* quoteKesCashOut(
+          provider,
+          request.amountKesCents,
+        ).pipe(
+          Effect.catchTag("AmountTooLarge", ({ maxKesCents }) =>
+            reject(
+              "invalid_amount",
+              `A single payment can send at most ${formatKesAmount(maxKesCents)}. Split it into smaller payments.`,
+            ),
+          ),
+        );
         return {
-          provider: "paycrest",
+          provider,
           requestedKesCents: request.amountKesCents,
           amountKes: quote.payoutKesCents,
           quotedRate: quote.rate,
@@ -238,7 +232,7 @@ export function preparePayouts(input: {
             "That address isn't on the company's allowlist.",
           );
         }
-        const { rate } = yield* paycrest.rate(RATE_PROBE_USDC);
+        const rate = yield* cashOutRate(provider);
         const kesEquivalent = kesCentsFor(request.amountUsdc, rate);
         if (kesEquivalent <= 0n) {
           return yield* reject("invalid_amount", "That amount is too small.");

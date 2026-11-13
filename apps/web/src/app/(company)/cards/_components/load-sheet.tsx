@@ -169,9 +169,9 @@ export function LoadSheet({
             />
           </FormField>
           <SheetNote>
-            It counts against the company&apos;s daily limit at today&apos;s
-            Paycrest rate, together with today&apos;s payouts. Money can&apos;t
-            be moved back out of the Card balance.
+            It counts against the company&apos;s daily limit at today&apos;s KES
+            rate, together with today&apos;s payouts. Money can&apos;t be moved
+            back out of the Card balance.
           </SheetNote>
           {action.data?.status === "cancelled" ? (
             <SheetNote>Cancelled. Nothing was loaded.</SheetNote>

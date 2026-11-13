@@ -17,7 +17,7 @@ export const MIN_ORDER_USDC = 500_000n;
  * rate, then re-quote at the real size, then (spec §6.7) once more if that
  * moved the order into a different rate band.
  */
-const PROBE_USDC = "1";
+export const PROBE_USDC = "1";
 const MAX_REQUOTES = 2;
 
 export class AmountTooSmall extends Data.TaggedError("AmountTooSmall")<{

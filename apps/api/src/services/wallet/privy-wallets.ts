@@ -181,6 +181,16 @@ export interface PrivyWalletsShape {
     input: SendUsdcInput,
   ) => Effect.Effect<SentTransaction, SendRefused | SendOutcomeUnknown>;
   /**
+   * The Base hash of a send Privy accepted without one, once the send is
+   * confirmed on chain. Null while it isn't, or when the transaction isn't
+   * that wallet's: a hash is only ever taken from Privy's own record of the
+   * send, never guessed from the chain.
+   */
+  readonly transactionHash: (input: {
+    readonly privyWalletId: string;
+    readonly privyTransactionId: string;
+  }) => Effect.Effect<string | null, PrivyWalletError>;
+  /**
    * Deposits from a Treasury wallet into the vault. A `SendRefused` (an
    * unknown vault is a 404, an amount over the wallet's balance a 400)
    * means nothing was signed; `SendOutcomeUnknown` means it may have been,
@@ -227,6 +237,9 @@ const privyCall = <A>(message: string, run: () => Promise<A>) =>
   });
 
 const TX_HASH = /^0x[0-9a-fA-F]{64}$/;
+
+/** A hash Privy may later replace or that reverted is no proof of a transfer. */
+const SETTLED_ON_CHAIN = new Set(["confirmed", "finalized"]);
 
 /** The refusal in `cause`, if Privy answered with a definite no. */
 function refusalIn(cause: unknown): SendRefused | null {
@@ -487,6 +500,22 @@ export const makePrivyWallets = (
         txHash: TX_HASH.test(sent.hash) ? sent.hash.toLowerCase() : null,
         privyTransactionId: sent.transaction_id ?? null,
       })),
+    ),
+
+  transactionHash: ({ privyWalletId, privyTransactionId }) =>
+    privyCall("Privy didn't return the transaction", () =>
+      client.transactions().get(privyTransactionId),
+    ).pipe(
+      Effect.map((transaction) => {
+        const hash = transaction.transaction_hash;
+        return transaction.wallet_id === privyWalletId &&
+          transaction.caip2 === `eip155:${BASE_CHAIN_ID}` &&
+          SETTLED_ON_CHAIN.has(transaction.status) &&
+          hash !== null &&
+          TX_HASH.test(hash)
+          ? hash.toLowerCase()
+          : null;
+      }),
     ),
 
   earnDeposit: (input) =>

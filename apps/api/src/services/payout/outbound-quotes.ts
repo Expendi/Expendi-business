@@ -125,14 +125,21 @@ export function advanceOutboundQuotes(
         ),
       ).pipe(Effect.map(([payout]) => payout ?? null));
 
-    const { rows: cashOuts } = yield* withScope({}, (tx) =>
+    const { rows: paycrestCashOuts } = yield* withScope({}, (tx) =>
       query(() =>
         tx.execute<PayoutRef>(
           sql`SELECT payout_id, organization_id FROM paycrest_payouts_to_reconcile(${maxRows * 4})`,
         ),
       ),
     );
-    for (const ref of cashOuts) {
+    const { rows: pretiumCashOuts } = yield* withScope({}, (tx) =>
+      query(() =>
+        tx.execute<PayoutRef>(
+          sql`SELECT payout_id, organization_id FROM pretium_cash_outs_awaiting_funding(${maxRows * 4})`,
+        ),
+      ),
+    );
+    for (const ref of [...paycrestCashOuts, ...pretiumCashOuts]) {
       yield* isolated(
         `cash-out ${ref.payout_id}`,
         Effect.gen(function* () {

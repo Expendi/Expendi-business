@@ -4,6 +4,7 @@ import type { DatabaseService } from "../../db/client.js";
 import type { DatabaseError } from "../../errors.js";
 import type { EmailSender } from "../email/email-sender.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import type { CheckResult } from "./ops-alerts.js";
 import {
   lowBalanceCheck,
@@ -27,7 +28,7 @@ export interface AlertsRun {
 type Check = Effect.Effect<
   readonly CheckResult[],
   DatabaseError,
-  DatabaseService | Paycrest
+  DatabaseService | Paycrest | Pretium
 >;
 
 const CHECKS: Readonly<Record<string, Check>> = {
@@ -48,7 +49,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
 export function runAlerts(): Effect.Effect<
   AlertsRun,
   DatabaseError,
-  DatabaseService | Paycrest | EmailSender
+  DatabaseService | Paycrest | Pretium | EmailSender
 > {
   return Effect.gen(function* () {
     let opened = 0;

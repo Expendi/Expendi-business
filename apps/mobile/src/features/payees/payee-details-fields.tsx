@@ -217,7 +217,7 @@ interface PickerFieldProps {
   disabled: boolean;
 }
 
-/** Paycrest's Kenyan banks, searchable, collapsed once one is chosen. */
+/** The Kenyan banks we can pay, searchable, collapsed once one is chosen. */
 function BankPicker({
   organizationId,
   value,

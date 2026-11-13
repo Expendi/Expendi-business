@@ -23,6 +23,7 @@ import {
 } from "./station/push-notifications.js";
 import { reconcileLithicJob } from "./station/reconcile-lithic.js";
 import { reconcilePaycrestJob } from "./station/reconcile-paycrest.js";
+import { reconcilePretiumJob } from "./station/reconcile-pretium.js";
 import { recurringBillsJob } from "./station/recurring-bills.js";
 import { spendingRemindersJob } from "./station/reminders.js";
 import { startStation } from "./station/scheduler.js";
@@ -42,6 +43,7 @@ const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
 
 const stopStation = startStation(runtime, [
   reconcilePaycrestJob,
+  reconcilePretiumJob,
   confirmOnchainJob,
   billStatusJob,
   recurringBillsJob,

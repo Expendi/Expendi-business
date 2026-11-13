@@ -1,5 +1,5 @@
 {
-  "id": "4fe739f1-f4ef-40e3-aa59-3c3845f2ff14",
+  "id": "3c6ff86d-fa11-42b2-a6bb-045b7701bc50",
   "prevId": "4a33181d-0803-40e1-b424-72160f4139f1",
   "version": "7",
   "dialect": "postgresql",
@@ -4930,6 +4930,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "refund_requested_at": {
+          "name": "refund_requested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refund_tx_hash": {
+          "name": "refund_tx_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "failure_reason": {
           "name": "failure_reason",
           "type": "text",
@@ -5047,6 +5059,12 @@
           "name": "payouts_provider_order_id_unique",
           "columns": [
             {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
               "expression": "provider_order_id",
               "isExpression": false,
               "asc": true,
@@ -5054,6 +5072,22 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payouts_refund_tx_hash_unique": {
+          "name": "payouts_refund_tx_hash_unique",
+          "columns": [
+            {
+              "expression": "refund_tx_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"payouts\".\"refund_tx_hash\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -5157,7 +5191,7 @@
       "checkConstraints": {
         "payouts_base_hop_is_for_a_cash_out": {
           "name": "payouts_base_hop_is_for_a_cash_out",
-          "value": "\"payouts\".\"base_hop_quote_id\" IS NULL OR \"payouts\".\"provider\" = 'paycrest'"
+          "value": "\"payouts\".\"base_hop_quote_id\" IS NULL OR \"payouts\".\"provider\" <> 'onchain'"
         },
         "payouts_delivery_quote_is_for_usdc": {
           "name": "payouts_delivery_quote_is_for_usdc",
@@ -5167,13 +5201,21 @@
           "name": "payouts_subject_part",
           "value": "\"payouts\".\"subject_part\" >= 1 AND (\"payouts\".\"subject_part\" = 1 OR (\"payouts\".\"subject_type\" = 'bill' AND \"payouts\".\"payroll_run_id\" IS NOT NULL))"
         },
+        "payouts_refund_tx_hash_is_bytes32": {
+          "name": "payouts_refund_tx_hash_is_bytes32",
+          "value": "\"payouts\".\"refund_tx_hash\" ~ '^0x[0-9a-f]{64}$'"
+        },
+        "payouts_refund_is_pretium": {
+          "name": "payouts_refund_is_pretium",
+          "value": "\"payouts\".\"provider\"::text = 'pretium' OR (\"payouts\".\"refund_requested_at\" IS NULL AND \"payouts\".\"refund_tx_hash\" IS NULL)"
+        },
         "payouts_gateway_order_id_is_bytes32": {
           "name": "payouts_gateway_order_id_is_bytes32",
           "value": "\"payouts\".\"gateway_order_id\" ~ '^0x[0-9a-f]{64}$'"
         },
         "payouts_whole_shillings": {
           "name": "payouts_whole_shillings",
-          "value": "\"payouts\".\"provider\" <> 'paycrest' OR \"payouts\".\"amount_kes\" % 100 = 0"
+          "value": "\"payouts\".\"provider\" = 'onchain' OR \"payouts\".\"amount_kes\" % 100 = 0"
         },
         "payouts_amounts_positive": {
           "name": "payouts_amounts_positive",
@@ -6436,6 +6478,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "active_cash_out_provider": {
+          "name": "active_cash_out_provider",
+          "type": "cash_out_provider",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'paycrest'"
         },
         "updated_by": {
           "name": "updated_by",
@@ -7861,36 +7911,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "treasury_privy_wallet_id": {
-          "name": "treasury_privy_wallet_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "treasury_address": {
-          "name": "treasury_address",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "treasury_privy_policy_id": {
-          "name": "treasury_privy_policy_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "treasury_turned_on_at": {
-          "name": "treasury_turned_on_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "treasury_turned_on_by": {
-          "name": "treasury_turned_on_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "onchain_activated_at": {
           "name": "onchain_activated_at",
           "type": "timestamp with time zone",
@@ -7999,36 +8019,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "wallets_treasury_privy_wallet_id_unique": {
-          "name": "wallets_treasury_privy_wallet_id_unique",
-          "columns": [
-            {
-              "expression": "treasury_privy_wallet_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "wallets_treasury_address_unique": {
-          "name": "wallets_treasury_address_unique",
-          "columns": [
-            {
-              "expression": "lower(\"treasury_address\")",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -8037,15 +8027,6 @@
           "tableFrom": "wallets",
           "tableTo": "organizations",
           "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "wallets_treasury_turned_on_by_users_id_fk": {
-          "name": "wallets_treasury_turned_on_by_users_id_fk",
-          "tableFrom": "wallets",
-          "tableTo": "users",
-          "columnsFrom": ["treasury_turned_on_by"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -8061,10 +8042,6 @@
       },
       "policies": {},
       "checkConstraints": {
-        "wallets_treasury_on_is_complete": {
-          "name": "wallets_treasury_on_is_complete",
-          "value": "\"wallets\".\"treasury_turned_on_at\" IS NULL OR (\"wallets\".\"treasury_privy_wallet_id\" IS NOT NULL AND \"wallets\".\"treasury_address\" IS NOT NULL AND \"wallets\".\"treasury_privy_policy_id\" IS NOT NULL)"
-        },
         "wallets_active_is_complete": {
           "name": "wallets_active_is_complete",
           "value": "\"wallets\".\"status\" <> 'active' OR (\"wallets\".\"privy_policy_id\" IS NOT NULL AND \"wallets\".\"privy_wallet_id\" IS NOT NULL AND \"wallets\".\"address\" IS NOT NULL AND (\"wallets\".\"chain\" = 'base' OR (\"wallets\".\"transit_privy_wallet_id\" IS NOT NULL AND \"wallets\".\"transit_address\" IS NOT NULL AND \"wallets\".\"onchain_activated_at\" IS NOT NULL)))"
@@ -8686,7 +8663,7 @@
     "public.payout_provider": {
       "name": "payout_provider",
       "schema": "public",
-      "values": ["paycrest", "onchain"]
+      "values": ["paycrest", "onchain", "pretium"]
     },
     "public.payout_status": {
       "name": "payout_status",
@@ -8732,6 +8709,11 @@
       "schema": "public",
       "values": ["pending", "approved", "verified", "expired"]
     },
+    "public.cash_out_provider": {
+      "name": "cash_out_provider",
+      "schema": "public",
+      "values": ["paycrest", "pretium"]
+    },
     "public.bill_file_role": {
       "name": "bill_file_role",
       "schema": "public",
@@ -8759,7 +8741,8 @@
         "resolve_payout",
         "pause_payouts",
         "unpause_payouts",
-        "resolve_intent_quote"
+        "resolve_intent_quote",
+        "change_cash_out_provider"
       ]
     },
     "public.staff_role": {

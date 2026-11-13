@@ -60,7 +60,7 @@ export function previewRows(preview: ClaimPaymentPreview): PreviewRow[] {
     },
     { label: "USDC", value: `${formatUsdc(preview.usdc)} USDC` },
     {
-      label: "Paycrest fee, at most",
+      label: "Cash-out fee, at most",
       value: `${formatUsdc(preview.feeAllowanceUsdc)} USDC`,
     },
     {

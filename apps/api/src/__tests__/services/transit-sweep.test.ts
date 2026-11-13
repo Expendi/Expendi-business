@@ -1,7 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { Database } from "../../db/client.js";
-import type { IntentQuote } from "../../db/schema/index.js";
+import type { IntentQuote, Payout } from "../../db/schema/index.js";
 import type { NearPayingCompany } from "../helpers/near-payouts.js";
 import { DatabaseService } from "../../db/client.js";
 import {
@@ -9,6 +10,8 @@ import {
   SWEEP_DUST_USDC,
   sweepTransitWallet,
 } from "../../services/intents/sweep.js";
+import { preparePayouts } from "../../services/payout/payout-service.js";
+import { PRETIUM_BASE_SETTLEMENT_ADDRESS } from "../../services/pretium/settlement.js";
 import { randomTxHash } from "../helpers/chain.js";
 import {
   createNearPayingCompany,
@@ -20,6 +23,7 @@ import {
   claimRequest,
   ledgerBalance,
   payClaims,
+  updatePayout,
   USDC,
 } from "../helpers/payouts.js";
 
@@ -181,6 +185,49 @@ describe("sweeping a transit wallet", () => {
       sends: 0,
     });
   });
+
+  it.each<[Payout["status"], boolean]>([
+    ["approved", false],
+    ["funding", false],
+    ["paying", true],
+    ["paid", true],
+  ])(
+    "with a Pretium cash-out %s, sweeps only once its USDC has left (%s)",
+    async (status, sweeps) => {
+      // #given a Pretium cash-out with no hop in flight, and USDC in the
+      // transit wallet
+      const [prepared] = await runtime.runPromise(
+        preparePayouts({
+          organizationId: paying.company.organizationId,
+          actor: { type: "user", id: paying.company.admin.id },
+          requests: [claimRequest()],
+        }),
+      );
+      if (!prepared) throw new Error("nothing prepared");
+      await updatePayout(db, paying.company, prepared.id, {
+        provider: "pretium",
+        status,
+        approvalId: randomUUID(),
+        approvedBy: paying.company.admin.id,
+        approvedAt: new Date(),
+        ...(status !== "approved" && {
+          fundingStartedAt: new Date(),
+          amountToTransferUsdc: 11n * USDC,
+          depositAddress: PRETIUM_BASE_SETTLEMENT_ADDRESS.toLowerCase(),
+        }),
+      });
+      world.setBaseUsdc(paying.transitAddress, 5n * USDC);
+
+      // #when the sweep runs
+      const started = await sweep();
+
+      // #then
+      expect({
+        started: started !== null,
+        sends: transitSends().length,
+      }).toEqual({ started: sweeps, sends: sweeps ? 1 : 0 });
+    },
+  );
 
   it("sweeps at most the transit wallet's per-transaction cap at a time", async () => {
     // #given a transit wallet holding more than its cap

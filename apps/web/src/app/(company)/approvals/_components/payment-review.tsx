@@ -174,8 +174,8 @@ export function PaymentReview({
         </div>
       </dl>
       <Note icon={InfoIcon}>
-        Paycrest states its exact fee when each payment is made. What isn’t used
-        stays in the wallet. Each one is paid on its own.
+        The exact fee is known when each cash-out is sent. What isn’t used stays
+        in the wallet. Each one is paid on its own.
       </Note>
       {topUpKes ? (
         <Callout

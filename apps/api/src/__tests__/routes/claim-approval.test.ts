@@ -1609,7 +1609,9 @@ describe("the admin's queue: GET /organizations/:id/claims?status=submitted", ()
       status: "payout_failed",
       payout: { status: "failed" },
     });
-    expect(forAdmin.payout?.failureReason).toContain("Paycrest refused");
+    expect(forAdmin.payout?.failureReason).toContain(
+      "The cash-out was refused",
+    );
     expect(forEmployee).toMatchObject({
       status: "payout_failed",
       payout: null,

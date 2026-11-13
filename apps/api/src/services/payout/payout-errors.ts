@@ -17,7 +17,8 @@ export type PayoutRejectionReason =
   | "not_allowlisted"
   | "over_transaction_cap"
   | "invalid_amount"
-  | "subject_not_payable";
+  | "subject_not_payable"
+  | "cash_out_unavailable";
 
 /**
  * A payment the engine refused before any order was created or any money

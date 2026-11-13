@@ -776,15 +776,31 @@ describe("payout engine", () => {
       // #when
       await pay([payout]);
 
-      // #then
+      // #then the problem is recorded for staff; the company's reason
+      // names no provider
       const row = await payoutRow(payout.id);
+      const { rows: failures } = await owner.query<{
+        after: { problems?: string[] };
+      }>(
+        "SELECT after FROM audit_log WHERE entity_type = 'payout' AND entity_id = $1 AND action = 'payout.failed'",
+        [payout.id],
+      );
       expect({
         status: row?.status,
-        flagged: row?.failureReason?.includes(
-          "deposit address is the company's own wallet",
+        reason: row?.failureReason,
+        flagged: failures.some((failure) =>
+          failure.after.problems?.includes(
+            "deposit address is the company's own wallet",
+          ),
         ),
         sends: privy.state.sends.length,
-      }).toEqual({ status: "failed", flagged: true, sends: 0 });
+      }).toEqual({
+        status: "failed",
+        reason:
+          "The cash-out failed our safety checks (unsafe). Nothing was sent.",
+        flagged: true,
+        sends: 0,
+      });
     });
 
     it("refuses an order that would underpay after the rate dropped", async () => {

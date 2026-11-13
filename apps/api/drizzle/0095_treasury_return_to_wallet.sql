@@ -1,7 +1,0 @@
-ALTER TABLE "wallet_transactions" DROP CONSTRAINT "wallet_transactions_to_treasury_has_quote";--> statement-breakpoint
-DROP INDEX "wallet_transactions_to_treasury_quote_unique";--> statement-breakpoint
-ALTER TABLE "treasury_earn_actions" ADD COLUMN "delivered_usdc" bigint;--> statement-breakpoint
-CREATE UNIQUE INDEX "treasury_earn_actions_one_withdrawal_per_move" ON "treasury_earn_actions" USING btree ("treasury_move_id") WHERE "treasury_earn_actions"."kind" = 'withdraw';--> statement-breakpoint
-CREATE UNIQUE INDEX "wallet_transactions_to_treasury_quote_unique" ON "wallet_transactions" USING btree ("intent_quote_id") WHERE "wallet_transactions"."intent_quote_id" IS NOT NULL AND "wallet_transactions"."usdc_amount" < 0;--> statement-breakpoint
-ALTER TABLE "treasury_earn_actions" ADD CONSTRAINT "treasury_earn_actions_delivered_is_a_withdrawal" CHECK ("treasury_earn_actions"."delivered_usdc" IS NULL OR ("treasury_earn_actions"."kind"::text = 'withdraw' AND "treasury_earn_actions"."status"::text = 'succeeded' AND "treasury_earn_actions"."delivered_usdc" > 0));--> statement-breakpoint
-ALTER TABLE "wallet_transactions" ADD CONSTRAINT "wallet_transactions_quote_link_is_treasury" CHECK (("wallet_transactions"."type"::text = 'to_treasury') <= ("wallet_transactions"."intent_quote_id" IS NOT NULL) AND ("wallet_transactions"."intent_quote_id" IS NULL OR "wallet_transactions"."type"::text IN ('to_treasury', 'from_treasury')));

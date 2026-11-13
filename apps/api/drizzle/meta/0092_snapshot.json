@@ -1,6 +1,6 @@
 {
-  "id": "1c7ea368-94aa-4d17-a386-267ee51a0bb5",
-  "prevId": "4e1482d5-7696-45d9-be2a-c787c458c202",
+  "id": "2d46a4bb-090f-4d14-a46b-3b78b19904fc",
+  "prevId": "4fae9214-c8da-4367-be4d-51d47c1fa579",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4965,6 +4965,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "refund_requested_at": {
+          "name": "refund_requested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refund_tx_hash": {
+          "name": "refund_tx_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "failure_reason": {
           "name": "failure_reason",
           "type": "text",
@@ -5082,6 +5094,12 @@
           "name": "payouts_provider_order_id_unique",
           "columns": [
             {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
               "expression": "provider_order_id",
               "isExpression": false,
               "asc": true,
@@ -5089,6 +5107,22 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payouts_refund_tx_hash_unique": {
+          "name": "payouts_refund_tx_hash_unique",
+          "columns": [
+            {
+              "expression": "refund_tx_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"payouts\".\"refund_tx_hash\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -5192,7 +5226,7 @@
       "checkConstraints": {
         "payouts_base_hop_is_for_a_cash_out": {
           "name": "payouts_base_hop_is_for_a_cash_out",
-          "value": "\"payouts\".\"base_hop_quote_id\" IS NULL OR \"payouts\".\"provider\" = 'paycrest'"
+          "value": "\"payouts\".\"base_hop_quote_id\" IS NULL OR \"payouts\".\"provider\" <> 'onchain'"
         },
         "payouts_delivery_quote_is_for_usdc": {
           "name": "payouts_delivery_quote_is_for_usdc",
@@ -5202,13 +5236,21 @@
           "name": "payouts_subject_part",
           "value": "\"payouts\".\"subject_part\" >= 1 AND (\"payouts\".\"subject_part\" = 1 OR (\"payouts\".\"subject_type\" = 'bill' AND \"payouts\".\"payroll_run_id\" IS NOT NULL))"
         },
+        "payouts_refund_tx_hash_is_bytes32": {
+          "name": "payouts_refund_tx_hash_is_bytes32",
+          "value": "\"payouts\".\"refund_tx_hash\" ~ '^0x[0-9a-f]{64}$'"
+        },
+        "payouts_refund_is_pretium": {
+          "name": "payouts_refund_is_pretium",
+          "value": "\"payouts\".\"provider\"::text = 'pretium' OR (\"payouts\".\"refund_requested_at\" IS NULL AND \"payouts\".\"refund_tx_hash\" IS NULL)"
+        },
         "payouts_gateway_order_id_is_bytes32": {
           "name": "payouts_gateway_order_id_is_bytes32",
           "value": "\"payouts\".\"gateway_order_id\" ~ '^0x[0-9a-f]{64}$'"
         },
         "payouts_whole_shillings": {
           "name": "payouts_whole_shillings",
-          "value": "\"payouts\".\"provider\" <> 'paycrest' OR \"payouts\".\"amount_kes\" % 100 = 0"
+          "value": "\"payouts\".\"provider\" = 'onchain' OR \"payouts\".\"amount_kes\" % 100 = 0"
         },
         "payouts_amounts_positive": {
           "name": "payouts_amounts_positive",
@@ -6472,6 +6514,14 @@
           "notNull": true,
           "default": false
         },
+        "active_cash_out_provider": {
+          "name": "active_cash_out_provider",
+          "type": "cash_out_provider",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'paycrest'"
+        },
         "updated_by": {
           "name": "updated_by",
           "type": "text",
@@ -7492,6 +7542,277 @@
       },
       "isRLSEnabled": false
     },
+    "public.treasury_earn_actions": {
+      "name": "treasury_earn_actions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "treasury_move_id": {
+          "name": "treasury_move_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "intent_quote_id": {
+          "name": "intent_quote_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "treasury_earn_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attempt": {
+          "name": "attempt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "reference_id": {
+          "name": "reference_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "raw_amount": {
+          "name": "raw_amount",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "share_amount": {
+          "name": "share_amount",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "privy_action_id": {
+          "name": "privy_action_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "treasury_earn_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'saved'"
+        },
+        "tx_hash": {
+          "name": "tx_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delivered_usdc": {
+          "name": "delivered_usdc",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_started_at": {
+          "name": "call_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failure": {
+          "name": "failure",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "settled_at": {
+          "name": "settled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "treasury_earn_actions_reference_id_unique": {
+          "name": "treasury_earn_actions_reference_id_unique",
+          "columns": [
+            {
+              "expression": "reference_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "treasury_earn_actions_privy_action_id_unique": {
+          "name": "treasury_earn_actions_privy_action_id_unique",
+          "columns": [
+            {
+              "expression": "privy_action_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"treasury_earn_actions\".\"privy_action_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "treasury_earn_actions_one_live_per_move": {
+          "name": "treasury_earn_actions_one_live_per_move",
+          "columns": [
+            {
+              "expression": "treasury_move_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"treasury_earn_actions\".\"status\" IN ('saved', 'pending')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "treasury_earn_actions_one_deposit_per_quote": {
+          "name": "treasury_earn_actions_one_deposit_per_quote",
+          "columns": [
+            {
+              "expression": "intent_quote_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"treasury_earn_actions\".\"kind\" = 'deposit' AND \"treasury_earn_actions\".\"status\" IN ('saved', 'pending', 'succeeded')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "treasury_earn_actions_one_withdrawal_per_move": {
+          "name": "treasury_earn_actions_one_withdrawal_per_move",
+          "columns": [
+            {
+              "expression": "treasury_move_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"treasury_earn_actions\".\"kind\" = 'withdraw'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "treasury_earn_actions_organization_id_organizations_id_fk": {
+          "name": "treasury_earn_actions_organization_id_organizations_id_fk",
+          "tableFrom": "treasury_earn_actions",
+          "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "treasury_earn_actions_move_organization_fk": {
+          "name": "treasury_earn_actions_move_organization_fk",
+          "tableFrom": "treasury_earn_actions",
+          "tableTo": "treasury_moves",
+          "columnsFrom": ["treasury_move_id", "organization_id"],
+          "columnsTo": ["id", "organization_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "treasury_earn_actions_quote_organization_fk": {
+          "name": "treasury_earn_actions_quote_organization_fk",
+          "tableFrom": "treasury_earn_actions",
+          "tableTo": "intent_quotes",
+          "columnsFrom": ["intent_quote_id", "organization_id"],
+          "columnsTo": ["id", "organization_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "treasury_earn_actions_attempt_unique": {
+          "name": "treasury_earn_actions_attempt_unique",
+          "nullsNotDistinct": false,
+          "columns": ["treasury_move_id", "intent_quote_id", "kind", "attempt"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "treasury_earn_actions_delivered_is_a_withdrawal": {
+          "name": "treasury_earn_actions_delivered_is_a_withdrawal",
+          "value": "\"treasury_earn_actions\".\"delivered_usdc\" IS NULL OR (\"treasury_earn_actions\".\"kind\"::text = 'withdraw' AND \"treasury_earn_actions\".\"status\"::text = 'succeeded' AND \"treasury_earn_actions\".\"delivered_usdc\" > 0)"
+        },
+        "treasury_earn_actions_raw_amount_positive": {
+          "name": "treasury_earn_actions_raw_amount_positive",
+          "value": "\"treasury_earn_actions\".\"raw_amount\" > 0"
+        },
+        "treasury_earn_actions_attempt_positive": {
+          "name": "treasury_earn_actions_attempt_positive",
+          "value": "\"treasury_earn_actions\".\"attempt\" > 0"
+        },
+        "treasury_earn_actions_reference_id_length": {
+          "name": "treasury_earn_actions_reference_id_length",
+          "value": "char_length(\"treasury_earn_actions\".\"reference_id\") <= 64"
+        },
+        "treasury_earn_actions_deposit_has_quote": {
+          "name": "treasury_earn_actions_deposit_has_quote",
+          "value": "(\"treasury_earn_actions\".\"kind\"::text = 'deposit') <= (\"treasury_earn_actions\".\"intent_quote_id\" IS NOT NULL)"
+        },
+        "treasury_earn_actions_acted_has_action_id": {
+          "name": "treasury_earn_actions_acted_has_action_id",
+          "value": "\"treasury_earn_actions\".\"status\"::text NOT IN ('pending', 'succeeded', 'failed') OR \"treasury_earn_actions\".\"privy_action_id\" IS NOT NULL"
+        },
+        "treasury_earn_actions_settled_has_time": {
+          "name": "treasury_earn_actions_settled_has_time",
+          "value": "(\"treasury_earn_actions\".\"status\"::text IN ('succeeded', 'rejected', 'failed')) = (\"treasury_earn_actions\".\"settled_at\" IS NOT NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.treasury_moves": {
       "name": "treasury_moves",
       "schema": "",
@@ -7942,7 +8263,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"wallet_transactions\".\"intent_quote_id\" IS NOT NULL",
+          "where": "\"wallet_transactions\".\"intent_quote_id\" IS NOT NULL AND \"wallet_transactions\".\"usdc_amount\" < 0",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -8029,9 +8350,9 @@
           "name": "wallet_transactions_treasury_has_move",
           "value": "(\"wallet_transactions\".\"type\"::text IN ('to_treasury', 'from_treasury')) = (\"wallet_transactions\".\"treasury_move_id\" IS NOT NULL)"
         },
-        "wallet_transactions_to_treasury_has_quote": {
-          "name": "wallet_transactions_to_treasury_has_quote",
-          "value": "(\"wallet_transactions\".\"type\"::text = 'to_treasury') = (\"wallet_transactions\".\"intent_quote_id\" IS NOT NULL)"
+        "wallet_transactions_quote_link_is_treasury": {
+          "name": "wallet_transactions_quote_link_is_treasury",
+          "value": "(\"wallet_transactions\".\"type\"::text = 'to_treasury') <= (\"wallet_transactions\".\"intent_quote_id\" IS NOT NULL) AND (\"wallet_transactions\".\"intent_quote_id\" IS NULL OR \"wallet_transactions\".\"type\"::text IN ('to_treasury', 'from_treasury'))"
         },
         "wallet_transactions_payout_has_payout": {
           "name": "wallet_transactions_payout_has_payout",
@@ -8958,7 +9279,7 @@
     "public.payout_provider": {
       "name": "payout_provider",
       "schema": "public",
-      "values": ["paycrest", "onchain"]
+      "values": ["paycrest", "onchain", "pretium"]
     },
     "public.payout_status": {
       "name": "payout_status",
@@ -9004,6 +9325,11 @@
       "schema": "public",
       "values": ["pending", "approved", "verified", "expired"]
     },
+    "public.cash_out_provider": {
+      "name": "cash_out_provider",
+      "schema": "public",
+      "values": ["paycrest", "pretium"]
+    },
     "public.bill_file_role": {
       "name": "bill_file_role",
       "schema": "public",
@@ -9031,7 +9357,8 @@
         "resolve_payout",
         "pause_payouts",
         "unpause_payouts",
-        "resolve_intent_quote"
+        "resolve_intent_quote",
+        "change_cash_out_provider"
       ]
     },
     "public.staff_role": {
@@ -9043,6 +9370,16 @@
       "name": "staff_status",
       "schema": "public",
       "values": ["active", "disabled"]
+    },
+    "public.treasury_earn_kind": {
+      "name": "treasury_earn_kind",
+      "schema": "public",
+      "values": ["deposit", "withdraw"]
+    },
+    "public.treasury_earn_status": {
+      "name": "treasury_earn_status",
+      "schema": "public",
+      "values": ["saved", "pending", "succeeded", "rejected", "failed"]
     },
     "public.treasury_move_direction": {
       "name": "treasury_move_direction",

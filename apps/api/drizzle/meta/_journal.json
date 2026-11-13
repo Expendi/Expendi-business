@@ -621,64 +621,43 @@
     {
       "idx": 88,
       "version": "7",
-      "when": 1794520570544,
-      "tag": "0088_treasury_wallet",
+      "when": 1794517986115,
+      "tag": "0088_pretium_cash_out",
       "breakpoints": true
     },
     {
       "idx": 89,
       "version": "7",
-      "when": 1794520659569,
-      "tag": "0089_treasury_ledger",
+      "when": 1794518013474,
+      "tag": "0089_pretium_cash_out_access",
       "breakpoints": true
     },
     {
       "idx": 90,
       "version": "7",
-      "when": 1794520677334,
-      "tag": "0090_treasury_moves_rls",
+      "when": 1794519589337,
+      "tag": "0090_pretium_ops_alerts",
       "breakpoints": true
     },
     {
       "idx": 91,
       "version": "7",
-      "when": 1794520709073,
-      "tag": "0091_treasury_turn_on_purpose",
+      "when": 1794521754367,
+      "tag": "0091_pretium_cash_outs_awaiting_funding",
       "breakpoints": true
     },
     {
       "idx": 92,
       "version": "7",
-      "when": 1794524092502,
-      "tag": "0092_treasury_move_purposes",
+      "when": 1794532320604,
+      "tag": "0092_treasury",
       "breakpoints": true
     },
     {
       "idx": 93,
       "version": "7",
-      "when": 1794524121760,
-      "tag": "0093_treasury_earn_actions",
-      "breakpoints": true
-    },
-    {
-      "idx": 94,
-      "version": "7",
-      "when": 1794524145857,
-      "tag": "0094_treasury_earn_actions_rls",
-      "breakpoints": true
-    },
-    {
-      "idx": 95,
-      "version": "7",
-      "when": 1794529170286,
-      "tag": "0095_treasury_return_to_wallet",
-      "breakpoints": true
-    },
-    {
-      "idx": 96,
-      "version": "7",
-      "when": 1794529174433,
-      "tag": "0096_treasury_return_to_wallet_job",
+      "when": 1794532331819,
+      "tag": "0093_treasury_access",
       "breakpoints": true
     }
   ]

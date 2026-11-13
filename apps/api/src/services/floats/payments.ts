@@ -74,7 +74,7 @@ const movementNotFound = new NotFound({
 });
 const floatClosed = new Conflict({ message: "This float is closed." });
 
-/** Who a float pays, as their confirmed M-Pesa number and the name Paycrest pays. */
+/** Who a float pays, as their confirmed M-Pesa number and the name the cash-out pays. */
 interface Holder {
   readonly membershipId: string;
   readonly userId: string;
@@ -145,7 +145,7 @@ function readHolder(
     if (!accountName) {
       return yield* Effect.fail(
         new Conflict({
-          message: `Add ${who}'s full name before paying them: Paycrest pays M-Pesa in the recipient's name.`,
+          message: `Add ${who}'s full name before paying them: we pay M-Pesa in the recipient's name.`,
         }),
       );
     }

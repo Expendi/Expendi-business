@@ -8,11 +8,11 @@
 - **T2:** the ledger entries, the `treasury_moves` table, holding back money on its way to Treasury, and crediting money that comes back.
 - **T3:** moving money from the company wallet into the vault.
 
-**Doesn't cover** (not built yet): moving money back to the wallet (T4), Treasury's value, yield and rate (T5), any screen (T6), the export and the staff app (T7).
+**Doesn't cover yet:** moving money back to the wallet (T4, built after this plan was written; its checks are still to be added), Treasury's value, yield and rate (T5), any screen (T6), the export and the staff app (T7).
 
 **Read first:** `docs/work/treasury/spec.md` (sections 4, 5, 6 and 11) and `docs/decisions/treasury-on-base.md`. Terms are in `CONTEXT.md`.
 
-> **Money put in during QA stays in Treasury until T4 ships.** Nothing can move it back to the company wallet before then, except a person using the management key. Keep every live amount small: this plan uses about 30 USDC in total.
+> **Money put in during QA stays in Treasury until a move to the wallet (T4) brings it back.** T4 is built on the same branch, but its live checks aren't in this plan yet. Keep every live amount small: this plan uses about 30 USDC in total.
 
 ---
 
@@ -22,7 +22,7 @@
 
 | #   | What                                                                                                                      | Who             |
 | --- | ------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| P1  | Merge `feat/treasury` into `staging` (or deploy the branch to the Railway `staging` API) so migrations 0088 to 0094 run   | Dennis          |
+| P1  | Merge `feat/treasury` into `staging` (or deploy the branch to the Railway `staging` API) so migrations 0092 and 0093 run  | Dennis          |
 | P2  | Leave `PRIVY_EARN_VAULT_ID` **unset** in Doppler `stg` until check L1 is done, then set it to `ry2qt6co7rkpwkr5mqudloo4`  | Dennis          |
 | P3  | A test company on staging with an active NEAR company wallet, two admins (A and B), an accountant and an employee         | Dennis + Claude |
 | P4  | About 30 USDC on NEAR in that company wallet, sent as a fund-in                                                           | Dennis          |

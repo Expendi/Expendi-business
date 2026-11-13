@@ -38,7 +38,7 @@ export type ApproveClaimsRequest = z.infer<typeof approveClaimsRequestSchema>;
 export const claimPaymentPreviewSchema = z.object({
   claimId: z.uuid(),
   payoutId: z.uuid(),
-  /** The name Paycrest pays. */
+  /** The name the cash-out pays. */
   claimantName: z.string(),
   /** The last four digits of the claimant's confirmed M-Pesa number. */
   phoneLast4: z.string(),
@@ -46,14 +46,14 @@ export const claimPaymentPreviewSchema = z.object({
   claimedKes: units,
   /** What reaches their M-Pesa: the claim rounded up to a whole shilling. */
   receivesKes: units,
-  /** Paycrest's quoted KES per USDC. */
+  /** The cash-out's quoted KES per USDC. */
   rate: z.string(),
-  /** The USDC Paycrest converts into `receivesKes`. */
+  /** The USDC converted into `receivesKes`. */
   usdc: units,
   /**
-   * The most Paycrest's fee and a rate move can add. Paycrest states its
-   * exact fee only once the order exists; whatever isn't used stays in the
-   * wallet.
+   * The most a cash-out fee and a rate move can add. The exact fee is
+   * known only once the cash-out is under way; whatever isn't used stays in
+   * the wallet.
    */
   feeAllowanceUsdc: units,
   /** The most USDC that can leave the wallet for it: `usdc` + `feeAllowanceUsdc`. */

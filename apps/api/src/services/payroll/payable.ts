@@ -37,8 +37,8 @@ import { salaryParts } from "./split.js";
  *
  * The payout engine's subject hooks then move each bill to `paying` with
  * its payout, and the run with them (`bills/bill-payout-hooks.ts`,
- * `run-status.ts`). A salary above Paycrest's largest order becomes
- * several payouts, its parts (`split.ts`).
+ * `run-status.ts`). A salary above the active cash-out provider's largest
+ * cash-out becomes several payouts, its parts (`split.ts`).
  */
 
 export interface PayablePayrollPayment {
@@ -296,19 +296,21 @@ export interface PayrollRequestOptions {
  * The payout engine's requests for a run's payments: one per person, each
  * tagged with the run (the engine checks the run's cap) and keyed to the
  * bill, `payroll:<billId>:<n>`, so preparing twice returns the same
- * payouts. A salary above Paycrest's largest order is several requests,
- * parts 1, 2, …, keyed `payroll:<billId>:<n>:part<k>`.
+ * payouts. A salary above `maxKesPerPart`, the largest cash-out of the
+ * provider that will pay it, is several requests, parts 1, 2, …, keyed
+ * `payroll:<billId>:<n>:part<k>`.
  */
 export function payrollPayoutRequests(
   runId: string,
   payments: readonly PayablePayrollPayment[],
+  maxKesPerPart: bigint,
   {
     attemptOf = () => 1,
     paidParts = () => new Set(),
   }: PayrollRequestOptions = {},
 ): KesPayoutRequest[] {
   return payments.flatMap((payment) => {
-    const parts = salaryParts(payment.amountKesCents);
+    const parts = salaryParts(payment.amountKesCents, maxKesPerPart);
     const paid = paidParts(payment.billId);
     return parts.flatMap((amountKesCents, index) => {
       const part = index + 1;

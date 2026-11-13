@@ -25,7 +25,7 @@ export const payrollPersonPreviewSchema = z.object({
   amountKes: units,
   /** What reaches them: each order rounded up to a whole shilling. */
   receivesKes: units,
-  /** More than one when the salary is above Paycrest's largest order. */
+  /** More than one when the salary is above the largest single cash-out. */
   orders: z.int().positive(),
   payoutIds: z.array(z.uuid()),
   rate: z.string(),

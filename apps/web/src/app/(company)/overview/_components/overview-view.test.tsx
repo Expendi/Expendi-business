@@ -154,7 +154,7 @@ describe("OverviewView", () => {
     expect(html).toContain("Left over");
     expect(html).toContain("33,523.20");
     expect(html).toContain("Covered for the next 30 days");
-    expect(html).toContain("Paycrest rate today: KES 129 per USDC.");
+    expect(html).toContain("Rate today: KES 129 per USDC.");
     expect(html).toContain('href="/wallet"');
     expect(html).toContain("Pay someone");
   });

@@ -13,19 +13,21 @@ import type { DatabaseService } from "../db/client.js";
 import type { DatabaseError } from "../errors.js";
 import type { Tenant, TenantVariables } from "../middleware/tenant.js";
 import type { AppRuntime } from "../runtime.js";
+import type { Paycrest } from "../services/paycrest/paycrest-client.js";
+import type { Pretium } from "../services/pretium/pretium-client.js";
 import { wallets, walletTransactions } from "../db/schema/index.js";
 import { query, withScope } from "../db/scope.js";
 import { BadRequest, NotFound } from "../errors.js";
 import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
 import { requireAdminOrReader } from "../middleware/tenant.js";
+import { activeKesRateOrNull } from "../services/cash-out/active-rate.js";
 import {
   createFundIn,
   getFundIn,
   listFundIns,
 } from "../services/intents/fund-in.js";
 import { kesCentsFor } from "../services/paycrest/amounts.js";
-import { Paycrest } from "../services/paycrest/paycrest-client.js";
 import { walletHistory } from "../services/wallet/history.js";
 import {
   readyAddress,
@@ -35,26 +37,20 @@ import {
 /** Only before sign-up's first wallet step has run, e.g. if it hit a database error. */
 const noWallet = new NotFound({ message: "This company has no wallet yet" });
 
-/** Paycrest's marginal sell rate, which is what a small payout gets. */
-const RATE_PROBE_USDC = "1";
-
 /**
- * Display only, so a Paycrest outage shows the balance without its KES
- * equivalent rather than failing the whole wallet screen.
+ * At the active cash-out provider's rate. Display only, so a provider
+ * outage shows the balance without its KES equivalent rather than failing
+ * the whole wallet screen.
  */
 function kesEquivalent(usdcBalance: bigint) {
-  return Effect.flatMap(Paycrest, (paycrest) =>
-    paycrest.rate(RATE_PROBE_USDC),
-  ).pipe(
-    Effect.map(({ rate }) => ({
-      kesCents: kesCentsFor(usdcBalance > 0n ? usdcBalance : 0n, rate),
-      rate,
-    })),
-    Effect.catchTag("PaycrestError", (error) =>
-      Effect.sync(() => {
-        console.warn("[wallet] KES equivalent unavailable", error.message);
-        return null;
-      }),
+  return activeKesRateOrNull("wallet").pipe(
+    Effect.map((rate) =>
+      rate === null
+        ? null
+        : {
+            kesCents: kesCentsFor(usdcBalance > 0n ? usdcBalance : 0n, rate),
+            rate,
+          },
     ),
   );
 }
@@ -82,7 +78,7 @@ function getCompanyWallet(
 ): Effect.Effect<
   CompanyWallet,
   NotFound | DatabaseError,
-  DatabaseService | Paycrest
+  DatabaseService | Paycrest | Pretium
 > {
   return withScope(tenant, (tx) =>
     Effect.gen(function* () {
@@ -118,14 +114,21 @@ function getCompanyWallet(
       };
     }),
   ).pipe(
-    Effect.flatMap((wallet): Effect.Effect<CompanyWallet, never, Paycrest> =>
-      wallet === null
-        ? Effect.succeed({ status: "creating" })
-        : Effect.map(kesEquivalent(wallet.usdcBalance), (kes) => ({
-            status: "active",
-            ...wallet,
-            kesEquivalent: kes,
-          })),
+    Effect.flatMap(
+      (
+        wallet,
+      ): Effect.Effect<
+        CompanyWallet,
+        DatabaseError,
+        DatabaseService | Paycrest | Pretium
+      > =>
+        wallet === null
+          ? Effect.succeed({ status: "creating" })
+          : Effect.map(kesEquivalent(wallet.usdcBalance), (kes) => ({
+              status: "active",
+              ...wallet,
+              kesEquivalent: kes,
+            })),
     ),
   );
 }

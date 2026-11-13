@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { Cause, Effect, Exit } from "effect";
 
 import type { DatabaseService } from "../../db/client.js";
@@ -80,8 +80,22 @@ function somethingInFlight(
         .where(
           and(
             eq(payouts.organizationId, organizationId),
-            eq(payouts.provider, "paycrest"),
-            inArray(payouts.status, ["approved", "order_created", "funding"]),
+            or(
+              and(
+                eq(payouts.provider, "paycrest"),
+                inArray(payouts.status, [
+                  "approved",
+                  "order_created",
+                  "funding",
+                ]),
+              ),
+              // A Pretium cash-out has no order: once `paying`, its USDC has
+              // left, and only a refund comes back, for the sweep to return.
+              and(
+                eq(payouts.provider, "pretium"),
+                inArray(payouts.status, ["approved", "funding"]),
+              ),
+            ),
           ),
         )
         .limit(1),

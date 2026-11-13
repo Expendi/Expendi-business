@@ -11,7 +11,8 @@ import type { CardPurchase } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { LithicTransaction } from "../lithic/lithic-client.js";
-import type { PaycrestError } from "../paycrest/paycrest-client.js";
+import type { Paycrest, PaycrestError } from "../paycrest/paycrest-client.js";
+import type { Pretium, PretiumError } from "../pretium/pretium-client.js";
 import {
   cardPrograms,
   cardPurchases,
@@ -23,10 +24,10 @@ import {
 import { query, withScope } from "../../db/scope.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { nairobiDate } from "../bills/status.js";
+import { activeKesRate } from "../cash-out/active-rate.js";
 import { etimsStatusFor } from "../expenses/etims.js";
 import { notify } from "../notification/notify.js";
 import { kesCentsFromUsdCents } from "../paycrest/amounts.js";
-import { Paycrest } from "../paycrest/paycrest-client.js";
 import { enqueueRecordedSpending } from "../zoho/enqueue.js";
 import {
   isCardBalanceLow,
@@ -43,9 +44,6 @@ import {
  */
 
 const ACTOR = { type: "system", id: "lithic-sync" } as const;
-
-/** Paycrest's marginal rate, as every other USD valuation asks for it. */
-const RATE_PROBE_USDC = "1";
 
 export interface CardRef extends Record<string, unknown> {
   readonly card_id: string;
@@ -484,8 +482,8 @@ export function applyCardTransaction(
   transaction: LithicTransaction,
 ): Effect.Effect<
   CardTransactionOutcome,
-  DatabaseError | PaycrestError,
-  DatabaseService | Paycrest | AuditLog
+  DatabaseError | PaycrestError | PretiumError,
+  DatabaseService | Paycrest | Pretium | AuditLog
 > {
   return Effect.gen(function* () {
     if (isPendingCredit(transaction)) {
@@ -507,8 +505,7 @@ export function applyCardTransaction(
       } as const;
     }
 
-    const paycrest = yield* Paycrest;
-    const { rate } = yield* paycrest.rate(RATE_PROBE_USDC);
+    const rate = yield* activeKesRate();
     const expenseRecorded = yield* withScope(scope, (tx) =>
       recordCardExpense(
         tx,

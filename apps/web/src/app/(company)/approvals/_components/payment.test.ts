@@ -253,7 +253,7 @@ describe("previewRows", () => {
       },
       { label: "USDC", value: { kind: "usdc", units: "11664595" } },
       {
-        label: "Paycrest fee, at most",
+        label: "Cash-out fee, at most",
         value: { kind: "usdc", units: "116646" },
       },
       {

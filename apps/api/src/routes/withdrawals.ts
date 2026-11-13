@@ -20,6 +20,12 @@ import {
   requestWithdrawal,
 } from "../services/withdrawal/withdrawals.js";
 
+/** The active cash-out provider's rate values a withdrawal in KES. */
+const rateUnavailable = new ServiceUnavailable({
+  message:
+    "Couldn't get today's KES rate to record this withdrawal. Try again in a minute.",
+});
+
 const confirmSchema = z.object({
   response: z.custom<AuthenticationResponseJSON>(
     (value) => passkeyAssertionSchema.safeParse(value).success,
@@ -54,13 +60,8 @@ export function createWithdrawalRoutes(
           Effect.catchTags({
             PayoutRejected: (error) =>
               Effect.fail(payoutRejectionAsClientError(error)),
-            PaycrestError: () =>
-              Effect.fail(
-                new ServiceUnavailable({
-                  message:
-                    "Couldn't get today's KES rate to record this withdrawal. Try again in a minute.",
-                }),
-              ),
+            PaycrestError: () => Effect.fail(rateUnavailable),
+            PretiumError: () => Effect.fail(rateUnavailable),
             AmountTooSmall: () =>
               Effect.fail(
                 new BadRequest({ message: "That amount is too small." }),

@@ -5,6 +5,8 @@ import type { WalletChain } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
 import type { BadRequest, DatabaseError } from "../../errors.js";
+import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import type { StaffPayoutSummaryView } from "./payouts.js";
 import {
   expenses,
@@ -17,8 +19,8 @@ import {
 } from "../../db/schema/index.js";
 import { query } from "../../db/scope.js";
 import { NotFound } from "../../errors.js";
+import { activeKesRateOrNull } from "../cash-out/active-rate.js";
 import { kesCentsFor } from "../paycrest/amounts.js";
-import { Paycrest } from "../paycrest/paycrest-client.js";
 import { ledgerBalance } from "../wallet/ledger.js";
 import { decodeCursor, encodeCursor, isoUtc, UUID } from "./paging.js";
 import { payoutSummary } from "./payouts.js";
@@ -34,9 +36,6 @@ import { withStaffReadScope } from "./staff-scope.js";
 const UNPAID_CLAIM_STATUSES = ["submitted", "paying", "payout_failed"] as const;
 
 const RECENT_PAYOUTS = 10;
-
-/** Paycrest's marginal sell rate, as the company's own wallet screen uses. */
-const RATE_PROBE_USDC = "1";
 
 export interface CompanySummaryView {
   readonly id: string;
@@ -134,23 +133,19 @@ export interface CompanyDetailView {
 
 const noSuchCompany = new NotFound({ message: "No company with this ID" });
 
-/** Display only: a Paycrest outage leaves the KES equivalent out. */
+/**
+ * At the active cash-out provider's rate, as the company's own wallet
+ * screen shows it. Display only: a provider outage leaves it out.
+ */
 function kesEquivalent(usdcBalance: bigint) {
-  return Effect.flatMap(Paycrest, (paycrest) =>
-    paycrest.rate(RATE_PROBE_USDC),
-  ).pipe(
-    Effect.map(({ rate }) => ({
-      kesCents: kesCentsFor(usdcBalance > 0n ? usdcBalance : 0n, rate),
-      rate,
-    })),
-    Effect.catchTag("PaycrestError", (error) =>
-      Effect.sync(() => {
-        console.warn(
-          "[staff-companies] KES equivalent unavailable",
-          error.message,
-        );
-        return null;
-      }),
+  return activeKesRateOrNull("staff-companies").pipe(
+    Effect.map((rate) =>
+      rate === null
+        ? null
+        : {
+            kesCents: kesCentsFor(usdcBalance > 0n ? usdcBalance : 0n, rate),
+            rate,
+          },
     ),
   );
 }
@@ -160,7 +155,7 @@ export function companyDetail(
 ): Effect.Effect<
   CompanyDetailView,
   NotFound | DatabaseError,
-  DatabaseService | Paycrest
+  DatabaseService | Paycrest | Pretium
 > {
   if (!UUID.test(organizationId)) return Effect.fail(noSuchCompany);
   return Effect.gen(function* () {

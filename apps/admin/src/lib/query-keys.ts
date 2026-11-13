@@ -25,6 +25,7 @@ export const queryKeys = {
   intentQuoteEvidence: (quoteId: string) =>
     ["internal", "intent-quote", quoteId, "evidence"] as const,
   controls: () => ["internal", "controls"] as const,
+  cashOutProvider: () => ["internal", "controls", "cash-out-provider"] as const,
   zoho: (companyId: string) => ["internal", "zoho", companyId] as const,
   zohoOrganizations: (companyId: string) =>
     ["internal", "zoho", companyId, "organizations"] as const,

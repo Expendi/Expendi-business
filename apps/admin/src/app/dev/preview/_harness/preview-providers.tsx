@@ -21,10 +21,13 @@ import { seedSampleData } from "./seed";
 export function PreviewProviders({
   staff,
   currentPath,
+  seed,
   children,
 }: {
   staff: StaffMeResponse;
   currentPath: string;
+  /** The page's own sample data, on top of `seedSampleData`'s. */
+  seed?: (client: QueryClient) => void;
   children: ReactNode;
 }): JSX.Element {
   const [queryClient] = useState(() => {
@@ -39,6 +42,7 @@ export function PreviewProviders({
       },
     });
     seedSampleData(client);
+    seed?.(client);
     return client;
   });
   const [api] = useState(() => createInternalApi(createPreviewApi()));

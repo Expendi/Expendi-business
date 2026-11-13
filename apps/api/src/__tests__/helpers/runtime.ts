@@ -8,6 +8,7 @@ import {
   InvalidAccessToken,
   PrivyAuth,
 } from "../../services/auth/privy-auth.js";
+import { PretiumReceiptPolling } from "../../services/payout/pretium-fund.js";
 import {
   makeFakeAlchemyWebhook,
   makeFakeBaseRpc,
@@ -16,6 +17,7 @@ import {
   makeFakeLithic,
   makeFakeOtpProvider,
   makeFakePaycrest,
+  makeFakePretium,
   makeFakePrivyWallets,
   makeFakeReceiptExtractor,
   makeFakeZoho,
@@ -117,6 +119,7 @@ export function makeTestRuntime(
     fastNear: makeFakeFastNear().layer,
     oneClick: makeFakeOneClick().layer,
     paycrest: makeFakePaycrest().layer,
+    pretium: makeFakePretium().layer,
     lithic: makeFakeLithic().layer,
     approvalSettings: TestApprovalSettings,
     emailSender: makeFakeEmailSender().layer,
@@ -126,7 +129,12 @@ export function makeTestRuntime(
     receiptExtractor: makeFakeReceiptExtractor().layer,
     zoho: makeFakeZoho().layer,
     ...overrides,
-  });
+  }).pipe(
+    // Fake chains answer at once; a test that waits for a receipt asks.
+    Layer.merge(
+      Layer.succeed(PretiumReceiptPolling, { retries: 0, interval: 0 }),
+    ),
+  );
   return makeRuntime(
     Object.keys(env).length === 0
       ? layer

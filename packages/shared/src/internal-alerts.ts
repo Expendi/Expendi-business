@@ -73,34 +73,45 @@ export const opsAlertsResponseSchema = z.object({
 
 export type OpsAlertsResponse = z.infer<typeof opsAlertsResponseSchema>;
 
-/** `GET /internal/health`: the station jobs and the Paycrest webhook. */
+/** A cash-out provider's reconciliation job, judged by its heartbeat. */
+const reconciliationHealthSchema = z.object({
+  job: z.string(),
+  /** Null if the job has never finished a run. */
+  lastFinishedAt: z.iso.datetime().nullable(),
+  /** No finished run in this long fires "Reconciliation stopped". */
+  staleAfterMinutes: z.number().int().positive(),
+  stale: z.boolean(),
+});
+
+/** A provider webhook's latest signature-failure incident. */
+const webhookHealthSchema = z.object({
+  /** An open incident resolves once this long passes with no new failure. */
+  resolvesAfterQuietMinutes: z.number().int().positive(),
+  /** The open incident, or else the last one; null if none ever opened. */
+  signatureFailures: z
+    .object({
+      alertId: z.uuid(),
+      open: z.boolean(),
+      /** Failed signatures counted while the incident was open. */
+      count: z.number().int().positive(),
+      firstSeenAt: z.iso.datetime(),
+      lastSeenAt: z.iso.datetime(),
+      resolvedAt: z.iso.datetime().nullable(),
+    })
+    .nullable(),
+});
+
+/**
+ * `GET /internal/health`: the station jobs, and each cash-out provider's
+ * reconciliation and webhook. `reconciliation` is Paycrest's.
+ */
 export const systemHealthSchema = z.object({
   /** The database's clock when this was read. */
   checkedAt: z.iso.datetime(),
-  reconciliation: z.object({
-    job: z.string(),
-    /** Null if the job has never finished a run. */
-    lastFinishedAt: z.iso.datetime().nullable(),
-    /** No finished run in this long fires "Reconciliation stopped". */
-    staleAfterMinutes: z.number().int().positive(),
-    stale: z.boolean(),
-  }),
-  paycrestWebhook: z.object({
-    /** An open incident resolves once this long passes with no new failure. */
-    resolvesAfterQuietMinutes: z.number().int().positive(),
-    /** The open incident, or else the last one; null if none ever opened. */
-    signatureFailures: z
-      .object({
-        alertId: z.uuid(),
-        open: z.boolean(),
-        /** Failed signatures counted while the incident was open. */
-        count: z.number().int().positive(),
-        firstSeenAt: z.iso.datetime(),
-        lastSeenAt: z.iso.datetime(),
-        resolvedAt: z.iso.datetime().nullable(),
-      })
-      .nullable(),
-  }),
+  reconciliation: reconciliationHealthSchema,
+  pretiumReconciliation: reconciliationHealthSchema,
+  paycrestWebhook: webhookHealthSchema,
+  pretiumWebhook: webhookHealthSchema,
   /** Every station job that records a heartbeat, by name. */
   jobs: z.array(
     z.object({ job: z.string(), lastFinishedAt: z.iso.datetime() }),

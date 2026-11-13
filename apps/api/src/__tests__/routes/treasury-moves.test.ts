@@ -23,7 +23,7 @@ import {
   VAULT_ID,
 } from "../helpers/treasury-moves.js";
 
-const world = makeNearPayoutWorld({ PRIVY_EARN_VAULT_ID: VAULT_ID });
+const world = makeNearPayoutWorld({}, { PRIVY_EARN_VAULT_ID: VAULT_ID });
 const { runtime, privy } = world;
 let app: App;
 let db: Database;

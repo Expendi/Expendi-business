@@ -10,6 +10,8 @@ import { UNPAID_BILL_STATUSES } from "@expendi-business/shared";
 import type { DatabaseService } from "../../db/client.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
+import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import {
   bills,
   payees,
@@ -19,8 +21,8 @@ import {
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { scheduledStatus } from "../bills/status.js";
+import { activeKesRateOrNull } from "../cash-out/active-rate.js";
 import { kesCentsFor } from "../paycrest/amounts.js";
-import { Paycrest } from "../paycrest/paycrest-client.js";
 import { dueAfter, dueOnOrAfter } from "../recurring/schedule.js";
 import {
   ledgerBalance,
@@ -41,11 +43,12 @@ import {
  * - Due dates no bill exists for yet, from each active recurring payment's
  *   `next_due_on`: a weekly bill's later weeks, and salaries before the
  *   payroll run is drafted 5 days ahead.
- * - USD bills at Paycrest's rate now: they haven't been paid yet.
+ * - USD bills at the active cash-out provider's rate now: they haven't
+ *   been paid yet.
  *
  * Bills being paid are left out: their USDC is already reserved, and the
  * balance compared is the ledger less those reservations. Bills paid outside
- * Expendi are listed but don't count against the wallet. Paycrest's fees and
+ * Expendi are listed but don't count against the wallet. Cash-out fees and
  * the round-up to whole shillings aren't predicted.
  */
 
@@ -74,7 +77,7 @@ export interface CashObligationView {
   readonly status: CashObligationStatus;
   /**
    * KES cents still to pay. Null when the amount isn't entered yet (a
-   * variable bill) or is in USD and Paycrest's rate is unavailable.
+   * variable bill) or is in USD and the cash-out rate is unavailable.
    */
   readonly amountKes: bigint | null;
   readonly payVia: CashPayVia;
@@ -87,7 +90,7 @@ export interface CashCheck {
   readonly today: string;
   /** The window's last day, included. */
   readonly through: string;
-  /** Paycrest's KES per USDC now; null when Paycrest couldn't be reached. */
+  /** The active cash-out provider's KES per USDC now; null when it couldn't be reached. */
   readonly rate: string | null;
   /** The ledger balance, USDC base units. */
   readonly balanceUsdc: bigint;
@@ -125,9 +128,6 @@ export interface CashCheckWindow {
   readonly days: number;
 }
 
-/** Paycrest's marginal sell rate, which is what a small payout gets. */
-const RATE_PROBE_USDC = "1";
-
 const DAY_MS = 86_400_000;
 
 export function addDays(day: string, days: number): string {
@@ -135,21 +135,6 @@ export function addDays(day: string, days: number): string {
     .toISOString()
     .slice(0, 10);
 }
-
-/**
- * Paycrest's KES rate now, or null when Paycrest can't be reached, so an
- * outage shows the cash check as unknown instead of failing the screen.
- */
-export const liveKesRate: Effect.Effect<string | null, never, Paycrest> =
-  Effect.flatMap(Paycrest, (paycrest) => paycrest.rate(RATE_PROBE_USDC)).pipe(
-    Effect.map(({ rate }) => rate),
-    Effect.catchTag("PaycrestError", (error) =>
-      Effect.sync(() => {
-        console.warn("[cash-check] KES rate unavailable", error.message);
-        return null;
-      }),
-    ),
-  );
 
 function valueInKes(
   amount: {
@@ -308,8 +293,9 @@ function sumAmounts(amounts: readonly (bigint | null)[]): bigint | null {
 /**
  * The cash check inside the caller's transaction, which must be able to
  * read the company's bills and salaries (an admin or accountant scope).
- * `rate` is Paycrest's KES rate (`liveKesRate`), asked for before the
- * transaction so no connection waits on Paycrest.
+ * `rate` is the active cash-out provider's KES rate
+ * (`activeKesRateOrNull`), asked for before the transaction so no
+ * connection waits on the provider.
  */
 export function readCashCheck(
   tx: Transaction,
@@ -486,9 +472,13 @@ export function readCashCheck(
  */
 export function checkCash(
   window: CashCheckWindow,
-): Effect.Effect<CashCheck, DatabaseError, DatabaseService | Paycrest> {
+): Effect.Effect<
+  CashCheck,
+  DatabaseError,
+  DatabaseService | Paycrest | Pretium
+> {
   return Effect.gen(function* () {
-    const rate = yield* liveKesRate;
+    const rate = yield* activeKesRateOrNull("cash-check");
     return yield* withScope(
       { organizationId: window.organizationId, role: "accountant" },
       (tx) => readCashCheck(tx, window, rate),

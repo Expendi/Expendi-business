@@ -16,7 +16,7 @@ export const inviteMemberRequestSchema = z.object({
     .trim()
     .toLowerCase()
     .pipe(z.email("That isn't a valid email address.")),
-  /** Paycrest needs the recipient's name to pay them (spec §6.2). */
+  /** A cash-out needs the recipient's name to pay them (spec §6.2). */
   fullName: z
     .string({ error: enterName })
     .trim()

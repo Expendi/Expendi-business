@@ -120,6 +120,12 @@ export const SYSTEM_HEALTH: SystemHealth = {
     staleAfterMinutes: 15,
     stale: false,
   },
+  pretiumReconciliation: {
+    job: "reconcile-pretium",
+    lastFinishedAt: minutesAgo(1),
+    staleAfterMinutes: 5,
+    stale: false,
+  },
   paycrestWebhook: {
     resolvesAfterQuietMinutes: 30,
     signatureFailures: {
@@ -131,8 +137,13 @@ export const SYSTEM_HEALTH: SystemHealth = {
       resolvedAt: null,
     },
   },
+  pretiumWebhook: {
+    resolvesAfterQuietMinutes: 60,
+    signatureFailures: null,
+  },
   jobs: [
     { job: "payout-reconciliation", lastFinishedAt: minutesAgo(3) },
+    { job: "reconcile-pretium", lastFinishedAt: minutesAgo(1) },
     { job: "ops-alerts", lastFinishedAt: minutesAgo(1) },
     { job: "zoho-sync", lastFinishedAt: minutesAgo(6) },
     { job: "deposit-watcher", lastFinishedAt: minutesAgo(2) },

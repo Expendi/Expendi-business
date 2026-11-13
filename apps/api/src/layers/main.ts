@@ -20,6 +20,7 @@ import type { Lithic } from "../services/lithic/lithic-client.js";
 import type { PushSender } from "../services/notification/push-sender.js";
 import type { Paycrest } from "../services/paycrest/paycrest-client.js";
 import type { OtpProvider } from "../services/phone-verification/otp-provider.js";
+import type { Pretium } from "../services/pretium/pretium-client.js";
 import type { FileStorage } from "../services/storage/file-storage.js";
 import type { WalletSettings } from "../services/wallet/company-wallet.js";
 import type { PrivyWallets } from "../services/wallet/privy-wallets.js";
@@ -44,6 +45,7 @@ import { LithicLive } from "../services/lithic/lithic-client.js";
 import { PushSenderLive } from "../services/notification/push-sender.js";
 import { PaycrestLive } from "../services/paycrest/paycrest-client.js";
 import { OtpProviderLive } from "../services/phone-verification/telnyx-verify.js";
+import { PretiumLive } from "../services/pretium/pretium-client.js";
 import { FileStorageLive } from "../services/storage/r2.js";
 import { WalletSettingsLive } from "../services/wallet/company-wallet.js";
 import { PrivyWalletsLive } from "../services/wallet/privy-wallets.js";
@@ -66,6 +68,7 @@ export type AppDeps =
   | FastNear
   | OneClick
   | Paycrest
+  | Pretium
   | Lithic
   | ApprovalSettings
   | EmailSender
@@ -97,6 +100,7 @@ export interface ExternalLayers {
   readonly fastNear: Layer.Layer<FastNear, AppLayerError, NearChain>;
   readonly oneClick: Layer.Layer<OneClick, AppLayerError>;
   readonly paycrest: Layer.Layer<Paycrest, AppLayerError>;
+  readonly pretium: Layer.Layer<Pretium, AppLayerError>;
   readonly lithic: Layer.Layer<Lithic, AppLayerError>;
   readonly approvalSettings: Layer.Layer<ApprovalSettings, AppLayerError>;
   readonly emailSender: Layer.Layer<EmailSender, AppLayerError>;
@@ -119,6 +123,7 @@ export const LiveExternalLayers: ExternalLayers = {
   fastNear: FastNearLive,
   oneClick: OneClickLive,
   paycrest: PaycrestLive,
+  pretium: PretiumLive,
   lithic: LithicLive,
   approvalSettings: ApprovalSettingsLive,
   emailSender: EmailSenderLive,
@@ -154,6 +159,7 @@ export function makeAppLayer(
     external.fastNear.pipe(Layer.provide(external.nearChain)),
     external.oneClick,
     external.paycrest,
+    external.pretium,
     external.lithic,
     external.approvalSettings,
     external.emailSender,

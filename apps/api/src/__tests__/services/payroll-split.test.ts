@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { PayablePayrollPayment } from "../../services/payroll/payable.js";
+import { cashOutLimits } from "../../services/cash-out/quote.js";
 import { payrollPayoutRequests } from "../../services/payroll/payable.js";
 import {
   MAX_KES_PER_ORDER_CENTS,
   salaryParts,
 } from "../../services/payroll/split.js";
+
+const PRETIUM_MAX = cashOutLimits("pretium").maxKesCents;
 
 const sum = (parts: readonly bigint[]) =>
   parts.reduce((total, part) => total + part, 0n);
@@ -19,17 +22,32 @@ describe("salaryParts", () => {
     ["KES 900,000", 90_000_000n, [30_000_000n, 30_000_000n, 30_000_000n]],
   ])("splits %s into as few orders as fit", (_, amount, expected) => {
     // #when
-    const parts = salaryParts(amount);
+    const parts = salaryParts(amount, MAX_KES_PER_ORDER_CENTS);
 
     // #then
     expect(parts).toEqual(expected);
   });
 
+  it.each([
+    ["exactly KES 250,000", 25_000_000n, [25_000_000n]],
+    ["KES 280,000", 28_000_000n, [14_000_000n, 14_000_000n]],
+    ["KES 500,000.50", 50_000_050n, [16_666_700n, 16_666_700n, 16_666_650n]],
+  ])(
+    "splits %s by Pretium's KES 250,000 when Pretium pays",
+    (_, amount, expected) => {
+      // #when
+      const parts = salaryParts(amount, PRETIUM_MAX);
+
+      // #then
+      expect(parts).toEqual(expected);
+    },
+  );
+
   it.each([30_000_099n, 59_999_999n, 123_456_789n, 1_000_000_000n])(
     "keeps every order of %s KES cents under the maximum, adding up exactly",
     (amount) => {
       // #when
-      const parts = salaryParts(amount);
+      const parts = salaryParts(amount, MAX_KES_PER_ORDER_CENTS);
 
       // #then
       expect({
@@ -65,7 +83,11 @@ describe("payrollPayoutRequests for a salary above the largest order", () => {
 
   it("asks for one payout per part, each keyed to its part", () => {
     // #when
-    const requests = payrollPayoutRequests(runId, [payment]);
+    const requests = payrollPayoutRequests(
+      runId,
+      [payment],
+      MAX_KES_PER_ORDER_CENTS,
+    );
 
     // #then
     expect(
@@ -80,12 +102,31 @@ describe("payrollPayoutRequests for a salary above the largest order", () => {
     ]);
   });
 
+  it("splits by the largest cash-out it is given", () => {
+    // #when
+    const requests = payrollPayoutRequests(runId, [payment], PRETIUM_MAX);
+
+    // #then
+    expect(
+      requests.map((request) => [request.subjectPart, request.amountKesCents]),
+    ).toEqual([
+      [1, 16_666_700n],
+      [2, 16_666_700n],
+      [3, 16_666_650n],
+    ]);
+  });
+
   it("leaves out the parts already paid, and keys a retry's attempt", () => {
     // #when
-    const requests = payrollPayoutRequests(runId, [payment], {
-      paidParts: () => new Set([1]),
-      attemptOf: (_, part) => (part === 2 ? 2 : 1),
-    });
+    const requests = payrollPayoutRequests(
+      runId,
+      [payment],
+      MAX_KES_PER_ORDER_CENTS,
+      {
+        paidParts: () => new Set([1]),
+        attemptOf: (_, part) => (part === 2 ? 2 : 1),
+      },
+    );
 
     // #then
     expect(

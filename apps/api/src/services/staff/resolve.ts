@@ -3,6 +3,7 @@ import { Effect } from "effect";
 
 import type {
   PayoutStatus,
+  PretiumTransactionEvidence,
   ResolveOutcome,
   WalletChain,
 } from "@expendi-business/shared";
@@ -19,9 +20,14 @@ import type { BaseRpc } from "../chain/base-rpc.js";
 import type { NearRpc } from "../chain/near-rpc.js";
 import type { NearChain } from "../chain/near.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import type { ConfirmationRefused } from "./confirmations.js";
 import type { CompanyWalletSendView } from "./near-send-evidence.js";
-import type { LedgerRow, PayoutEvidence } from "./payout-evidence.js";
+import type {
+  LedgerRow,
+  PayoutEvidence,
+  PretiumLookup,
+} from "./payout-evidence.js";
 import type { LedgerEntryView } from "./payouts.js";
 import type { StaffMember } from "./staff-auth.js";
 import {
@@ -34,6 +40,7 @@ import { BadRequest, Conflict } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { lockPayout } from "../payout/guards.js";
 import { applyPayoutOutcome } from "../payout/subjects.js";
+import { PRETIUM_BASE_SETTLEMENT_ADDRESS } from "../pretium/settlement.js";
 import {
   issueConfirmation,
   peekConfirmation,
@@ -42,8 +49,10 @@ import {
 import { companyWalletSendView } from "./near-send-evidence.js";
 import {
   gatherChainAndPaycrest,
+  isPayoutsPretiumTransaction,
   payoutLedger,
   planResolution,
+  refundedUsdc,
 } from "./payout-evidence.js";
 import { ledgerView, payoutOrganization, readScopedPayout } from "./payouts.js";
 import { withStaffReadScope } from "./staff-scope.js";
@@ -62,7 +71,8 @@ import { withStaffReadScope } from "./staff-scope.js";
  * anything, once it can no longer run.
  */
 
-type EvidenceDeps = DatabaseService | Paycrest | BaseRpc | NearRpc | NearChain;
+type EvidenceDeps =
+  DatabaseService | Paycrest | Pretium | BaseRpc | NearRpc | NearChain;
 type ResolveDeps = EvidenceDeps | AuditLog;
 type ResolveError =
   | NotFound
@@ -75,8 +85,19 @@ type ResolveError =
 const RESOLVED_FAILED_REASON =
   "Expendi reviewed this payout and closed it as failed. Nothing more will be sent.";
 
+export interface PretiumEvidenceView {
+  readonly settlementAddress: string;
+  readonly depositAddressIsSettlement: boolean;
+  readonly transferHash: string | null;
+  readonly transaction: PretiumTransactionEvidence;
+  readonly refundRequestedAt: string | null;
+  readonly refundTxHash: string | null;
+  readonly refundCreditedUsdc: bigint | null;
+}
+
 export interface EvidenceView {
   readonly paycrestStatus: string | null;
+  readonly pretium: PretiumEvidenceView | null;
   readonly fundingStarted: boolean;
   readonly depositTransfers: readonly {
     readonly chain: WalletChain;
@@ -95,9 +116,58 @@ export interface EvidenceView {
   readonly companyWalletSends: readonly CompanyWalletSendView[];
 }
 
-export function evidenceView(evidence: PayoutEvidence): EvidenceView {
+function pretiumTransactionView(
+  payout: Payout,
+  transferHash: string | null,
+  lookup: PretiumLookup,
+): PretiumTransactionEvidence {
+  if (lookup.state !== "found") return lookup;
+  const { transaction } = lookup;
+  return {
+    state: "found",
+    lookedUpBy: lookup.lookedUpBy,
+    transactionCode: transaction.transactionCode,
+    status: transaction.status,
+    transactionHash: transaction.transactionHash,
+    receiptNumber: transaction.receiptNumber,
+    message: transaction.message,
+    isThisPayouts: isPayoutsPretiumTransaction(
+      payout,
+      transferHash,
+      transaction,
+    ),
+  };
+}
+
+function pretiumView(
+  payout: Payout,
+  evidence: PayoutEvidence,
+): PretiumEvidenceView | null {
+  const { pretium } = evidence;
+  if (!pretium) return null;
+  return {
+    settlementAddress: PRETIUM_BASE_SETTLEMENT_ADDRESS.toLowerCase(),
+    depositAddressIsSettlement: pretium.depositAddressIsSettlement,
+    transferHash: pretium.transferHash,
+    transaction: pretiumTransactionView(
+      payout,
+      pretium.transferHash,
+      pretium.lookup,
+    ),
+    refundRequestedAt: payout.refundRequestedAt?.toISOString() ?? null,
+    refundTxHash: payout.refundTxHash,
+    refundCreditedUsdc:
+      evidence.refunds.length === 0 ? null : refundedUsdc(evidence.refunds),
+  };
+}
+
+export function evidenceView(
+  payout: Payout,
+  evidence: PayoutEvidence,
+): EvidenceView {
   return {
     paycrestStatus: evidence.paycrestStatus,
+    pretium: pretiumView(payout, evidence),
     fundingStarted: evidence.fundingStarted,
     depositTransfers: evidence.depositTransfers.map((transfer) => ({
       chain: evidence.chain,
@@ -117,7 +187,10 @@ const notUnderReview = (payout: Payout) =>
     message: `Only a payout under review can be resolved; this one is ${payout.status}.`,
   });
 
-/** A payout with what Paycrest, the chain and the ledger say of it right now. */
+/**
+ * A payout with what its cash-out provider (Paycrest or Pretium), the
+ * chain and the ledger say of it right now.
+ */
 function gatherEvidence(
   organizationId: string,
   payoutId: string,
@@ -180,7 +253,7 @@ export function payoutEvidence(
     Effect.flatMap((organizationId) =>
       gatherEvidence(organizationId, payoutId),
     ),
-    Effect.map(({ evidence }) => evidenceView(evidence)),
+    Effect.map(({ payout, evidence }) => evidenceView(payout, evidence)),
   );
 }
 
@@ -227,7 +300,7 @@ export function prepareResolution(
       expiresAt: issued.expiresAt.toISOString(),
       outcome: request.outcome,
       reason: request.reason,
-      evidence: evidenceView(evidence),
+      evidence: evidenceView(payout, evidence),
       consequences: [
         ...plan.consequences,
         "The resolution is audited under your name, with your reason.",
@@ -387,7 +460,7 @@ export function confirmResolution(
           ...evidence,
           ledgerDebits: recorded ? [...ledger.debits, recorded] : ledger.debits,
         };
-        const view = evidenceView(after);
+        const view = evidenceView(payout, after);
         yield* audit.record(tx, {
           actor: { type: "staff", id: staff.staffUserId },
           organizationId,
@@ -401,6 +474,7 @@ export function confirmResolution(
             status: updated.status,
             resolution: outcome.data,
             paycrestStatus: view.paycrestStatus,
+            ...(view.pretium && { pretium: view.pretium }),
             depositTransfers: view.depositTransfers,
             ledgerDebits: view.ledgerDebits,
             refunds: view.refunds,

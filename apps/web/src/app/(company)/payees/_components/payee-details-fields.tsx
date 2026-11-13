@@ -62,7 +62,7 @@ export const detailFieldId = (field: DetailField | "method"): string =>
 
 /**
  * The payment method and its details (spec §6.19). Banks come from
- * Paycrest's list; a USDC payee has a payee chain and can only be an
+ * Expendi's list; a USDC payee has a payee chain and can only be an
  * address already on the company's allowlist for that chain.
  */
 export function PayeeDetailsFields({
@@ -204,7 +204,7 @@ function payeeChain(value: string): PayeeChain {
   return PAYEE_CHAINS.find((candidate) => candidate === value) ?? "near";
 }
 
-/** Paycrest's Kenyan banks, A to Z. */
+/** The Kenyan banks we can pay, A to Z. */
 function BankPicker({
   organizationId,
   value,

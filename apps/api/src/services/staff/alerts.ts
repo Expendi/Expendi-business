@@ -15,6 +15,7 @@ import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import { query } from "../../db/scope.js";
 import {
+  PRETIUM_RECONCILE_JOB,
   RECONCILE_JOB,
   RECONCILIATION_STALE_MINUTES,
   WEBHOOK_QUIET_MINUTES,
@@ -140,8 +141,12 @@ export function listOpsAlerts(
 
 interface ClockRow extends Record<string, unknown> {
   readonly checked_at: string;
-  readonly reconciled_at: string | null;
-  readonly reconciliation_stale: boolean;
+}
+
+interface ReconciliationRow extends Record<string, unknown> {
+  readonly job: string;
+  readonly last_finished_at: string;
+  readonly stale: boolean;
 }
 
 interface HeartbeatRow extends Record<string, unknown> {
@@ -149,10 +154,49 @@ interface HeartbeatRow extends Record<string, unknown> {
   readonly last_finished_at: string;
 }
 
+type ReconciliationHealth = SystemHealth["reconciliation"];
+type WebhookHealth = SystemHealth["paycrestWebhook"];
+
+/** A job that has never finished a run counts as stopped. */
+function reconciliationHealth(
+  job: string,
+  rows: readonly ReconciliationRow[],
+): ReconciliationHealth {
+  const row = rows.find((candidate) => candidate.job === job);
+  return {
+    job,
+    lastFinishedAt: row?.last_finished_at ?? null,
+    staleAfterMinutes: RECONCILIATION_STALE_MINUTES,
+    stale: row?.stale ?? true,
+  };
+}
+
+/** The source's open incident, or else its latest; `incidents` come open first, newest first. */
+function webhookHealth(
+  source: "paycrest" | "pretium",
+  incidents: readonly AlertRow[],
+): WebhookHealth {
+  const incident = incidents.find((row) => row.subject_key === source);
+  return {
+    resolvesAfterQuietMinutes: WEBHOOK_QUIET_MINUTES,
+    signatureFailures: incident
+      ? {
+          alertId: incident.alert_id,
+          open: incident.resolved_at === null,
+          count: incident.occurrences,
+          firstSeenAt: incident.opened_at,
+          lastSeenAt: incident.last_seen_at,
+          resolvedAt: incident.resolved_at,
+        }
+      : null,
+  };
+}
+
 /**
- * The last finished reconciliation run, judged on the database's clock as
- * the "reconciliation stopped" alert judges it; the Paycrest webhook's
- * latest signature-failure incident; and every station job's heartbeat.
+ * Each cash-out provider's last finished reconciliation run, judged on the
+ * database's clock as the "reconciliation stopped" alert judges it; each
+ * provider webhook's latest signature-failure incident; and every station
+ * job's heartbeat.
  */
 export function systemHealth(): Effect.Effect<
   SystemHealth,
@@ -164,20 +208,22 @@ export function systemHealth(): Effect.Effect<
       const {
         rows: [clock],
       } = yield* query(() =>
-        tx.execute<ClockRow>(sql`
-          SELECT ${isoUtc(sql`now()`)} AS checked_at,
-                 ${isoUtc(sql`h.last_finished_at`)} AS reconciled_at,
-                 coalesce(
-                   h.last_finished_at < now() - make_interval(mins => ${RECONCILIATION_STALE_MINUTES}),
-                   true
-                 ) AS reconciliation_stale
-          FROM (SELECT 1) AS one
-          LEFT JOIN station_heartbeats h ON h.job = ${RECONCILE_JOB}`),
+        tx.execute<ClockRow>(sql`SELECT ${isoUtc(sql`now()`)} AS checked_at`),
       );
-      const [webhook] = yield* readAlerts(tx, {
+      const { rows: reconciliations } = yield* query(() =>
+        tx.execute<ReconciliationRow>(sql`
+          SELECT job,
+                 ${isoUtc(sql`last_finished_at`)} AS last_finished_at,
+                 last_finished_at < now() - make_interval(mins => ${RECONCILIATION_STALE_MINUTES}) AS stale
+          FROM station_heartbeats
+          WHERE job IN (${RECONCILE_JOB}, ${PRETIUM_RECONCILE_JOB})`),
+      );
+      // Every source shares the alert kind; the most a read returns is
+      // enough to find each source's latest incident.
+      const webhookIncidents = yield* readAlerts(tx, {
         kind: "webhook_signature_failure",
         resolvedSince: null,
-        maxRows: 1,
+        maxRows: ALERTS_SHOWN + 1,
       });
       const { rows: jobs } = yield* query(() =>
         tx.execute<HeartbeatRow>(sql`
@@ -187,25 +233,13 @@ export function systemHealth(): Effect.Effect<
       );
       return {
         checkedAt: clock?.checked_at ?? new Date().toISOString(),
-        reconciliation: {
-          job: RECONCILE_JOB,
-          lastFinishedAt: clock?.reconciled_at ?? null,
-          staleAfterMinutes: RECONCILIATION_STALE_MINUTES,
-          stale: clock?.reconciliation_stale ?? true,
-        },
-        paycrestWebhook: {
-          resolvesAfterQuietMinutes: WEBHOOK_QUIET_MINUTES,
-          signatureFailures: webhook
-            ? {
-                alertId: webhook.alert_id,
-                open: webhook.resolved_at === null,
-                count: webhook.occurrences,
-                firstSeenAt: webhook.opened_at,
-                lastSeenAt: webhook.last_seen_at,
-                resolvedAt: webhook.resolved_at,
-              }
-            : null,
-        },
+        reconciliation: reconciliationHealth(RECONCILE_JOB, reconciliations),
+        pretiumReconciliation: reconciliationHealth(
+          PRETIUM_RECONCILE_JOB,
+          reconciliations,
+        ),
+        paycrestWebhook: webhookHealth("paycrest", webhookIncidents),
+        pretiumWebhook: webhookHealth("pretium", webhookIncidents),
         jobs: jobs.map((row) => ({
           job: row.job,
           lastFinishedAt: row.last_finished_at,

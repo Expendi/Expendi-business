@@ -9,6 +9,7 @@ import {
   companyDetail,
   CONTROLS,
 } from "./fixtures/companies";
+import { CASH_OUT_PROVIDER } from "./fixtures/controls";
 import {
   INTENT_QUOTE_DETAIL,
   INTENT_QUOTE_EVIDENCE,
@@ -74,6 +75,7 @@ export function seedSampleData(client: QueryClient): void {
   client.setQueryData(queryKeys.opsAlerts(), OPS_ALERTS);
   client.setQueryData(queryKeys.systemHealth(), SYSTEM_HEALTH);
   client.setQueryData(queryKeys.controls(), CONTROLS);
+  client.setQueryData(queryKeys.cashOutProvider(), CASH_OUT_PROVIDER);
   client.setQueryData(
     queryKeys.auditSearch({ cursor: undefined, limit: PAGE_SIZE }),
     { entries: AUDIT_ENTRIES, nextCursor: null },

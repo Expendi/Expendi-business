@@ -24,6 +24,7 @@ export function payoutRejectionAsClientError(
     case "paused":
     case "no_wallet":
     case "subject_not_payable":
+    case "cash_out_unavailable":
       return new Conflict({ message });
     case "empty_batch":
     case "mixed_batch":

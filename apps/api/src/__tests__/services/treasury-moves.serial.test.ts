@@ -31,7 +31,7 @@ import {
  * here, one file at a time, where no other file's moves are in the database.
  */
 
-const world = makeNearPayoutWorld({ PRIVY_EARN_VAULT_ID: VAULT_ID });
+const world = makeNearPayoutWorld({}, { PRIVY_EARN_VAULT_ID: VAULT_ID });
 const { runtime, near, oneClick, privy, fastNear } = world;
 let db: Database;
 let delivered: Set<string>;

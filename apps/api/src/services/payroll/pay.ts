@@ -22,12 +22,15 @@ import type {
   KesPayoutRequest,
   PayoutEngineDeps,
 } from "../payout/payout-service.js";
+import type { PretiumError } from "../pretium/pretium-client.js";
 import type { PayablePayrollPayment, PayrollNotPayable } from "./payable.js";
 import type { PayrollRunDetailView } from "./runs.js";
 import { payouts } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { Conflict, NotFound } from "../../errors.js";
 import { canonicalJson } from "../approval/passkeys.js";
+import { currentCashOutProvider } from "../cash-out/active-rate.js";
+import { cashOutLimits } from "../cash-out/quote.js";
 import {
   challengePayouts,
   costOf,
@@ -53,7 +56,8 @@ import { getPayrollRun } from "./runs.js";
  * approves the run's payouts through the payout engine, which checks the
  * run's cap (its salaries plus the margin, spec §7.4) along with every
  * other guard. Each person is their own payout, or several for a salary
- * above Paycrest's largest order (`split.ts`), so a failure touches no one
+ * above the active cash-out provider's largest cash-out (`split.ts`), so a
+ * failure touches no one
  * else, and a retry pays only that person's parts not yet paid.
  *
  * The bills and the run move with their payouts in the engine's own
@@ -63,6 +67,7 @@ import { getPayrollRun } from "./runs.js";
 export type PayrollPaymentError =
   | PayoutRejected
   | PaycrestError
+  | PretiumError
   | AmountTooSmall
   | Conflict
   | NotFound
@@ -140,7 +145,8 @@ const pays = (payout: Payout, request: KesPayoutRequest): boolean =>
  * Each part's payout awaiting approval: the same one again while it still
  * pays exactly what's needed, otherwise a new one under the next key. A
  * stale payout, or one for a part or person no longer in the payment, is
- * discarded first (nothing was sent).
+ * discarded first (nothing was sent). Salaries are split for the cash-out
+ * provider active now, so a change of provider re-splits them.
  */
 function awaitingPayouts(
   organizationId: string,
@@ -151,13 +157,14 @@ function awaitingPayouts(
 ): Effect.Effect<Payout[], PayrollPaymentError, PayoutEngineDeps> {
   return Effect.gen(function* () {
     const paidOf = (billId: string) => paidParts.get(billId) ?? new Set();
+    const { maxKesCents } = cashOutLimits(yield* currentCashOutProvider);
     const needed = new Map(
-      payrollPayoutRequests(run.id, payments, { paidParts: paidOf }).map(
-        (request) => [
-          partKey(request.subjectId, request.subjectPart ?? 1),
-          request,
-        ],
-      ),
+      payrollPayoutRequests(run.id, payments, maxKesCents, {
+        paidParts: paidOf,
+      }).map((request) => [
+        partKey(request.subjectId, request.subjectPart ?? 1),
+        request,
+      ]),
     );
     const existing = yield* payoutsOfBills(
       organizationId,
@@ -216,7 +223,7 @@ function awaitingPayouts(
       const key = partKey(payout.subjectId, payout.subjectPart);
       failed.set(key, (failed.get(key) ?? 0) + 1);
     }
-    const requests = payrollPayoutRequests(run.id, payments, {
+    const requests = payrollPayoutRequests(run.id, payments, maxKesCents, {
       paidParts: paidOf,
       attemptOf: (billId, part) => (failed.get(partKey(billId, part)) ?? 0) + 1,
     });
@@ -232,7 +239,7 @@ export interface PayrollPersonPreviewView extends PaymentCost {
   readonly amountKes: bigint;
   /** What reaches them: each order rounded up to a whole shilling. */
   readonly receivesKes: bigint;
-  /** More than one when the salary is above Paycrest's largest order. */
+  /** More than one when the salary is above the largest cash-out. */
   readonly orders: number;
   readonly payoutIds: readonly string[];
 }

@@ -4,6 +4,10 @@ import type {
   AccountingSyncsResponse,
   AuditSearchQuery,
   AuditSearchResponse,
+  CashOutProviderConfirmed,
+  CashOutProviderControl,
+  CashOutProviderPrepared,
+  CashOutProviderPrepareRequest,
   ChooseZohoOrganization,
   CompanyDetail,
   CompanySearchQuery,
@@ -41,6 +45,9 @@ import {
   accountingSyncSchema,
   accountingSyncsResponseSchema,
   auditSearchResponseSchema,
+  cashOutProviderConfirmedSchema,
+  cashOutProviderControlSchema,
+  cashOutProviderPreparedSchema,
   companyDetailSchema,
   companySearchResponseSchema,
   controlsResponseSchema,
@@ -115,6 +122,14 @@ export interface InternalApi {
       action: PauseAction,
       token: string,
     ) => Promise<PauseConfirmed>;
+    /** Checks both providers live, so it is slower than `controls`. */
+    cashOutProvider: () => Promise<CashOutProviderControl>;
+    prepareCashOutProviderChange: (
+      body: CashOutProviderPrepareRequest,
+    ) => Promise<CashOutProviderPrepared>;
+    confirmCashOutProviderChange: (
+      token: string,
+    ) => Promise<CashOutProviderConfirmed>;
   };
   /**
    * NEAR Intents quotes that need a person: every staff role can look;
@@ -260,6 +275,23 @@ export function createInternalApi(client: ApiClient): InternalApi {
           `/internal/controls/${action}/confirm`,
           { token },
           pauseConfirmedSchema,
+        ),
+      cashOutProvider: () =>
+        client.get(
+          "/internal/controls/cash-out-provider",
+          cashOutProviderControlSchema,
+        ),
+      prepareCashOutProviderChange: (body) =>
+        client.post(
+          "/internal/controls/cash-out-provider/prepare",
+          body,
+          cashOutProviderPreparedSchema,
+        ),
+      confirmCashOutProviderChange: (token) =>
+        client.post(
+          "/internal/controls/cash-out-provider/confirm",
+          { token },
+          cashOutProviderConfirmedSchema,
         ),
     },
     intentQuotes: {

@@ -34,6 +34,11 @@ import type {
   OtpProviderErrorCode,
   VerificationCheckResult,
 } from "../../services/phone-verification/otp-provider.js";
+import type {
+  PretiumBank,
+  PretiumPayRequest,
+  PretiumTransaction,
+} from "../../services/pretium/pretium-client.js";
 import type { StoredObject } from "../../services/storage/file-storage.js";
 import type {
   CreateNearWalletInput,
@@ -80,6 +85,12 @@ import {
   OtpProviderError,
 } from "../../services/phone-verification/otp-provider.js";
 import {
+  Pretium,
+  PretiumError,
+  verifyPretiumSignature,
+} from "../../services/pretium/pretium-client.js";
+import { PRETIUM_BASE_SETTLEMENT_ADDRESS } from "../../services/pretium/settlement.js";
+import {
   FileStorage,
   StorageError,
 } from "../../services/storage/file-storage.js";
@@ -91,6 +102,7 @@ import {
   SendRefused,
 } from "../../services/wallet/privy-wallets.js";
 import { Zoho, ZohoError } from "../../services/zoho/zoho-client.js";
+import { transferReceipt } from "./chain.js";
 
 export const TEST_WALLET_SETTINGS = {
   managementQuorumId: "kq-management",
@@ -233,6 +245,40 @@ export function makeFakePrivyWallets() {
         readonly txHash: string;
       }) => void)
     | null = null;
+  /** What Privy reports for each send it accepted, by its transaction ID. */
+  const privyTransactions = new Map<
+    string,
+    {
+      readonly privyWalletId: string;
+      readonly input: SendUsdcInput;
+      txHash: string | null;
+    }
+  >();
+  const transactionHashLookups: string[] = [];
+  /** Base addresses of wallets the API holds but this fake didn't create. */
+  const baseAddresses = new Map<string, string>();
+  /** Where a send with a hash is mined, once a test wires a Base chain. */
+  let minedInto: Map<string, TransactionReceipt> | null = null;
+
+  /** A send lands on Base as one USDC transfer from its wallet. */
+  const mine = (input: SendUsdcInput, txHash: string) => {
+    if (!minedInto) return;
+    const from =
+      baseAddresses.get(input.privyWalletId) ??
+      [...wallets.values()].find((wallet) => wallet.id === input.privyWalletId)
+        ?.address;
+    if (!from) {
+      throw new Error(
+        `fake Privy can't mine a send from unknown wallet ${input.privyWalletId}`,
+      );
+    }
+    minedInto.set(
+      txHash.toLowerCase(),
+      transferReceipt([{ from, to: input.to, amount: input.amount }], {
+        txHash,
+      }),
+    );
+  };
 
   const maybeFail = (
     call: FailingCall,
@@ -385,6 +431,28 @@ export function makeFakePrivyWallets() {
     nextSends(...outcomes: SendOutcome[]) {
       sendOutcomes.push(...outcomes);
     },
+    /** Every `transactionHash` call, by Privy transaction ID. */
+    transactionHashLookups,
+    /** Privy learns the hash of a send it accepted without one. */
+    confirmTransaction(privyTransactionId: string, txHash: string) {
+      const transaction = privyTransactions.get(privyTransactionId);
+      if (!transaction) {
+        throw new Error(`fake Privy has no transaction ${privyTransactionId}`);
+      }
+      transaction.txHash = txHash.toLowerCase();
+      mine(transaction.input, transaction.txHash);
+    },
+    /**
+     * Mines every send that has a hash into `receipts` (a fake Base RPC's),
+     * as Base would within seconds; null stops mining.
+     */
+    mineOn(receipts: Map<string, TransactionReceipt> | null) {
+      minedInto = receipts;
+    },
+    /** The Base address of a wallet the API holds, for mining its sends. */
+    walletAt(privyWalletId: string, address: string) {
+      baseAddresses.set(privyWalletId, address.toLowerCase());
+    },
     /** A wallet created outside this fake's idempotency (e.g. >24h ago). */
     seedWallet(record: PrivyWalletRecord, input: CreateWalletInput) {
       wallets.set(`seeded-${record.id}`, { ...record, input });
@@ -407,6 +475,8 @@ export function makeFakePrivyWallets() {
       withdrawalFills.length = 0;
       onEarnDeposit = null;
       onWithdrawn = null;
+      privyTransactions.clear();
+      transactionHashLookups.length = 0;
       for (const call of Object.keys(calls) as FailingCall[]) calls[call] = 0;
     },
   };
@@ -573,6 +643,12 @@ export function makeFakePrivyWallets() {
         privyTransactionId: `ptx-${randomBytes(6).toString("hex")}`,
       };
       sent.set(input.idempotencyKey, result);
+      privyTransactions.set(result.privyTransactionId, {
+        privyWalletId: input.privyWalletId,
+        input,
+        txHash: result.txHash,
+      });
+      if (result.txHash !== null) mine(input, result.txHash);
       return Effect.succeed(result);
     },
     earnDeposit: earnCall("deposit"),
@@ -608,6 +684,14 @@ export function makeFakePrivyWallets() {
           availableLiquidityUsd: 15_500_000,
         })),
       ),
+    transactionHash: ({ privyWalletId, privyTransactionId }) =>
+      Effect.sync(() => {
+        transactionHashLookups.push(privyTransactionId);
+        const transaction = privyTransactions.get(privyTransactionId);
+        return transaction?.privyWalletId === privyWalletId
+          ? transaction.txHash
+          : null;
+      }),
   });
 
   return { layer, state };
@@ -673,6 +757,7 @@ export function makeFakeBaseRpc() {
   let failures = 0;
   let callFailures = 0;
   let searchFailures = 0;
+  let unminedReads = 0;
   const state = {
     receipts,
     callResults,
@@ -680,6 +765,10 @@ export function makeFakeBaseRpc() {
     latestBlock: 40_000_000n,
     failNext(times = 1) {
       failures = times;
+    },
+    /** The next `times` receipt reads find nothing, as before a block is mined. */
+    unminedForNext(times = 1) {
+      unminedReads = times;
     },
     /** The next `times` eth_calls fail; receipts are unaffected. */
     failNextCalls(times = 1) {
@@ -702,6 +791,10 @@ export function makeFakeBaseRpc() {
       if (failures > 0) {
         failures -= 1;
         return Effect.fail(new BaseRpcError({ message: "fake RPC failure" }));
+      }
+      if (unminedReads > 0) {
+        unminedReads -= 1;
+        return Effect.succeed(null);
       }
       return Effect.succeed(receipts.get(txHash.toLowerCase()) ?? null);
     },
@@ -736,6 +829,16 @@ export const TEST_PAYCREST_SECRET = "pc_test_webhook_secret";
 
 export function signPaycrestBody(rawBody: string): string {
   return createHmac("sha256", TEST_PAYCREST_SECRET)
+    .update(rawBody, "utf8")
+    .digest("hex");
+}
+
+export const TEST_PRETIUM_SIGNING_KEY = "pretium_test_signing_key";
+export const TEST_PRETIUM_CALLBACK_URL =
+  "https://api.business.expendi.test/webhooks/pretium";
+
+export function signPretiumBody(rawBody: string): string {
+  return createHmac("sha512", TEST_PRETIUM_SIGNING_KEY)
     .update(rawBody, "utf8")
     .digest("hex");
 }
@@ -1068,6 +1171,225 @@ export function makeFakePaycrest() {
             }),
           );
     },
+  });
+  return { layer, state };
+}
+
+/**
+ * `ambiguous` loses the reply after Pretium accepted the payment, as a
+ * timeout can; `ambiguous_lost` loses it before Pretium saw the request.
+ */
+export type FakePretiumPayOutcome =
+  "accepted" | "refused" | "ambiguous" | "ambiguous_lost" | "already_processed";
+
+export type FakePretiumRefundOutcome =
+  | { readonly kind: "success"; readonly hash: string | null }
+  | { readonly kind: "refused" | "ambiguous" | "already_processed" };
+
+const FAKE_PRETIUM_BANKS: readonly PretiumBank[] = [
+  { code: "522522", name: "Kenya Commercial Bank" },
+  { code: "247247", name: "Equity Bank" },
+];
+
+/**
+ * In-memory Pretium. Accepted payments become transactions a test can move
+ * to any status with `settle`; a hash Pretium already took is refused as
+ * already processed, as the real one does.
+ */
+export function makeFakePretium() {
+  const payRequests: PretiumPayRequest[] = [];
+  const refundCalls: string[] = [];
+  const statusCalls: string[] = [];
+  const findCalls: { txHash: string; since: Date }[] = [];
+  const transactions = new Map<string, PretiumTransaction>();
+  const codeByHash = new Map<string, string>();
+  const state = {
+    payRequests,
+    refundCalls,
+    statusCalls,
+    findCalls,
+    /** By transaction code. */
+    transactions,
+    /** Lowercased transaction hash to transaction code. */
+    codeByHash,
+    rateCalls: 0,
+    configured: true,
+    signingKeyConfigured: true,
+    callbackUrl: TEST_PRETIUM_CALLBACK_URL as string | null,
+    rate: "129.5",
+    failRate: false,
+    /** Null makes `baseSettlementAddress` fail. */
+    settlementAddress: PRETIUM_BASE_SETTLEMENT_ADDRESS.toLowerCase() as
+      string | null,
+    banks: FAKE_PRETIUM_BANKS,
+    nextPayOutcome: "accepted" as FakePretiumPayOutcome,
+    nextRefundOutcome: {
+      kind: "success",
+      hash: null,
+    } as FakePretiumRefundOutcome,
+    failStatus: false,
+    byHash(txHash: string): PretiumTransaction | null {
+      const code = codeByHash.get(txHash.toLowerCase());
+      return code === undefined ? null : (transactions.get(code) ?? null);
+    },
+    /** Moves a transaction on, as Pretium's callback would report. */
+    settle(
+      transactionCode: string,
+      status: string,
+      receiptNumber: string | null = null,
+    ) {
+      const transaction = transactions.get(transactionCode);
+      if (!transaction) {
+        throw new Error(`fake Pretium has no ${transactionCode}`);
+      }
+      transactions.set(transactionCode, {
+        ...transaction,
+        status,
+        receiptNumber,
+      });
+    },
+    reset() {
+      payRequests.length = 0;
+      refundCalls.length = 0;
+      statusCalls.length = 0;
+      findCalls.length = 0;
+      transactions.clear();
+      codeByHash.clear();
+      state.rateCalls = 0;
+      state.configured = true;
+      state.signingKeyConfigured = true;
+      state.callbackUrl = TEST_PRETIUM_CALLBACK_URL;
+      state.rate = "129.5";
+      state.failRate = false;
+      state.settlementAddress = PRETIUM_BASE_SETTLEMENT_ADDRESS.toLowerCase();
+      state.banks = FAKE_PRETIUM_BANKS;
+      state.nextPayOutcome = "accepted";
+      state.nextRefundOutcome = { kind: "success", hash: null };
+      state.failStatus = false;
+    },
+  };
+
+  const error = (status: number, code: string, ambiguous: boolean) =>
+    new PretiumError({
+      message: `fake Pretium ${code}`,
+      status,
+      code,
+      ambiguous,
+    });
+  const whenConfigured = <A>(
+    effect: () => Effect.Effect<A, PretiumError>,
+  ): Effect.Effect<A, PretiumError> =>
+    Effect.suspend(() =>
+      state.configured
+        ? effect()
+        : Effect.fail(error(503, "NOT_CONFIGURED", false)),
+    );
+
+  const record = (request: PretiumPayRequest): PretiumTransaction => {
+    const transaction: PretiumTransaction = {
+      transactionCode: `TX${randomBytes(4).toString("hex").toUpperCase()}`,
+      status: "PENDING",
+      amount: request.amountShillings.toString(),
+      receiptNumber: null,
+      publicName: null,
+      transactionHash: request.transactionHash.toLowerCase(),
+      message: null,
+    };
+    transactions.set(transaction.transactionCode, transaction);
+    codeByHash.set(
+      request.transactionHash.toLowerCase(),
+      transaction.transactionCode,
+    );
+    return transaction;
+  };
+
+  const layer = Layer.succeed(Pretium, {
+    get configured() {
+      return state.configured;
+    },
+    get signingKeyConfigured() {
+      return state.signingKeyConfigured;
+    },
+    get callbackUrl() {
+      return state.callbackUrl;
+    },
+    rate: () =>
+      whenConfigured(() => {
+        state.rateCalls += 1;
+        return state.failRate
+          ? Effect.fail(error(503, "TRANSPORT_ERROR", false))
+          : Effect.succeed(state.rate);
+      }),
+    baseSettlementAddress: () =>
+      whenConfigured(() =>
+        state.settlementAddress === null
+          ? Effect.fail(error(502, "NO_BASE_SETTLEMENT_ADDRESS", false))
+          : Effect.succeed(state.settlementAddress),
+      ),
+    banks: () => whenConfigured(() => Effect.succeed(state.banks)),
+    pay: (request) =>
+      whenConfigured(() => {
+        payRequests.push(request);
+        const outcome = state.byHash(request.transactionHash)
+          ? "already_processed"
+          : state.nextPayOutcome;
+        state.nextPayOutcome = "accepted";
+        switch (outcome) {
+          case "accepted": {
+            const { transactionCode, status } = record(request);
+            return Effect.succeed({ transactionCode, status });
+          }
+          case "ambiguous":
+            record(request);
+            return Effect.fail(error(503, "TRANSPORT_ERROR", true));
+          case "ambiguous_lost":
+            return Effect.fail(error(503, "TRANSPORT_ERROR", true));
+          case "refused":
+            return Effect.fail(error(400, "HTTP_400", false));
+          case "already_processed":
+            return Effect.fail(error(400, "HASH_ALREADY_PROCESSED", false));
+        }
+      }),
+    status: (transactionCode) =>
+      whenConfigured(() => {
+        statusCalls.push(transactionCode);
+        if (state.failStatus) {
+          return Effect.fail(error(503, "TRANSPORT_ERROR", false));
+        }
+        const transaction = transactions.get(transactionCode);
+        return transaction
+          ? Effect.succeed(transaction)
+          : Effect.fail(error(404, "HTTP_404", false));
+      }),
+    findByHash: (query) =>
+      whenConfigured(() => {
+        findCalls.push(query);
+        return Effect.succeed(state.byHash(query.txHash));
+      }),
+    refund: (txHash) =>
+      whenConfigured(() => {
+        refundCalls.push(txHash);
+        const outcome = state.nextRefundOutcome;
+        state.nextRefundOutcome = { kind: "success", hash: null };
+        switch (outcome.kind) {
+          case "success":
+            return Effect.succeed({
+              refundTxHash: outcome.hash?.toLowerCase() ?? null,
+              amount: null,
+              token: "USDC",
+              address: null,
+            });
+          case "refused":
+            return Effect.fail(error(400, "HTTP_400", false));
+          case "ambiguous":
+            return Effect.fail(error(503, "TRANSPORT_ERROR", true));
+          case "already_processed":
+            return Effect.fail(error(400, "HASH_ALREADY_PROCESSED", false));
+        }
+      }),
+    verifyWebhookSignature: (rawBody, signature) =>
+      state.signingKeyConfigured &&
+      verifyPretiumSignature(rawBody, signature, TEST_PRETIUM_SIGNING_KEY),
   });
   return { layer, state };
 }

@@ -9,8 +9,12 @@ import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 import { DataTable, useDataTable } from "~/components/data/data-table";
 import { PageHeader } from "~/components/data/page-header";
 import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
+import {
+  providerName,
+  providerOrderLabel,
+  subjectLabel,
+} from "~/components/payout-columns";
 import { PayoutStatusBadge } from "~/components/payout-status";
-import { subjectLabel } from "~/components/payouts-table";
 import { linkClass, secondaryButton } from "~/components/styles";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
@@ -33,7 +37,41 @@ function transactionHash(payout: StaffPayoutDetail): string {
     : "—";
 }
 
-/** One payout, with what's needed to check it against Paycrest and the chain. */
+/**
+ * The rows that say where the payout is at its cash-out provider. A Pretium
+ * cash-out has no order or deposit window: its USDC goes to Pretium's one
+ * settlement address, and it may be refunded once Pretium is asked.
+ */
+function providerRows(payout: StaffPayoutDetail): [string, string][] {
+  const name = providerName(payout.provider) ?? "Provider";
+  const rows: [string, string][] = [
+    [providerOrderLabel(payout.provider), payout.providerOrderId ?? "—"],
+    [
+      `${name} status`,
+      payout.providerStatus
+        ? `${payout.providerStatus} (checked ${time(payout.providerCheckedAt)})`
+        : "—",
+    ],
+  ];
+  if (payout.provider === "pretium") {
+    rows.push(["Pretium settlement address", payout.depositAddress ?? "—"]);
+    if (payout.refundRequestedAt) {
+      rows.push(["Refund asked for", time(payout.refundRequestedAt)]);
+    }
+    if (payout.refundTxHash) {
+      rows.push(["Refund hash (Base)", payout.refundTxHash]);
+    }
+    return rows;
+  }
+  rows.push(
+    ["Gateway order", payout.gatewayOrderId ?? "—"],
+    ["Deposit address", payout.depositAddress ?? "—"],
+    ["Deposit valid until", time(payout.depositValidUntil)],
+  );
+  return rows;
+}
+
+/** One payout, with what's needed to check it against its provider and the chain. */
 export function PayoutView({ payoutId }: { payoutId: string }) {
   const { api, staff } = useStaffAuth();
   const canAct = staff?.role === "ops_admin";
@@ -114,16 +152,7 @@ export function PayoutView({ payoutId }: { payoutId: string }) {
                   "Recipient",
                   `${payout.recipient.name}, ${payout.recipient.detail}`,
                 ],
-                ["Paycrest order", payout.providerOrderId ?? "—"],
-                [
-                  "Paycrest status",
-                  payout.providerStatus
-                    ? `${payout.providerStatus} (checked ${time(payout.providerCheckedAt)})`
-                    : "—",
-                ],
-                ["Gateway order", payout.gatewayOrderId ?? "—"],
-                ["Deposit address", payout.depositAddress ?? "—"],
-                ["Deposit valid until", time(payout.depositValidUntil)],
+                ...providerRows(payout),
                 ["Company wallet", payout.walletAddress ?? "—"],
                 ["Amount to send", usdc(payout.amountToTransferUsdc)],
                 ["Most it may debit", usdc(payout.maxDebitUsdc)],
@@ -207,6 +236,12 @@ function PayoutActions({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["internal"] }),
   });
 
+  const name = providerName(payout.provider);
+  const canRefetch =
+    (payout.provider === "paycrest" && payout.providerOrderId !== null) ||
+    (payout.provider === "pretium" &&
+      (payout.providerOrderId !== null || payout.txHash !== null));
+
   if (!canAct) {
     return (
       <p className="mt-4 text-sm text-muted-foreground">
@@ -217,7 +252,7 @@ function PayoutActions({
 
   return (
     <div className="mt-4 space-y-3">
-      {payout.provider === "paycrest" && payout.providerOrderId ? (
+      {canRefetch && name ? (
         <div>
           <button
             type="button"
@@ -225,11 +260,11 @@ function PayoutActions({
             disabled={refetch.isPending}
             className={secondaryButton}
           >
-            {refetch.isPending ? "Asking Paycrest…" : "Re-fetch from Paycrest"}
+            {refetch.isPending ? `Asking ${name}…` : `Re-fetch from ${name}`}
           </button>
           {refetch.isSuccess ? (
             <p className="mt-2 text-sm text-muted-foreground">
-              Paycrest says {refetch.data.paycrestStatus}.{" "}
+              {name} says {refetch.data.providerStatus}.{" "}
               {refetch.data.status === refetch.data.previousStatus
                 ? "The payout is unchanged."
                 : `The payout moved from ${refetch.data.previousStatus} to ${refetch.data.status}.`}
@@ -254,7 +289,7 @@ function PayoutActions({
           </Link>
         </p>
       ) : (
-        <ResolveFlow payoutId={payout.id} />
+        <ResolveFlow payoutId={payout.id} provider={payout.provider} />
       )}
     </div>
   );

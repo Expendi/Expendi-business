@@ -20,6 +20,7 @@ import type {
 } from "../approval/passkeys.js";
 import type { Lithic } from "../lithic/lithic-client.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import type { CardLoadView, CardView } from "./views.js";
 import { withScope } from "../../db/scope.js";
 import { Forbidden } from "../../errors.js";
@@ -60,7 +61,7 @@ type ConfirmError =
   | DatabaseError;
 
 type ConfirmDeps =
-  DatabaseService | AuditLog | ApprovalSettings | Lithic | Paycrest;
+  DatabaseService | AuditLog | ApprovalSettings | Lithic | Paycrest | Pretium;
 
 export type CardActionResultView =
   | {
@@ -134,7 +135,11 @@ function checkReveal(
 function check(
   tenant: Tenant,
   action: CardAction,
-): Effect.Effect<void, ConfirmError, DatabaseService | Lithic | Paycrest> {
+): Effect.Effect<
+  void,
+  ConfirmError,
+  DatabaseService | Lithic | Paycrest | Pretium
+> {
   switch (action.type) {
     case "issue_card":
       return Effect.asVoid(checkIssue(tenant, action));
@@ -214,7 +219,7 @@ function perform(
 ): Effect.Effect<
   CardActionResultView,
   ConfirmError,
-  DatabaseService | AuditLog | Lithic | Paycrest
+  DatabaseService | AuditLog | Lithic | Paycrest | Pretium
 > {
   switch (action.type) {
     case "issue_card":
