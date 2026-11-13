@@ -591,7 +591,7 @@ const walletNotReady = new Conflict({
 });
 
 /** The pay link is on the first dashboard origin. */
-function payUrlFor(
+export function payUrlFor(
   publicId: string,
 ): Effect.Effect<string, ServiceUnavailable, ConfigService> {
   return Effect.flatMap(ConfigService, ({ dashboardOrigins }) => {

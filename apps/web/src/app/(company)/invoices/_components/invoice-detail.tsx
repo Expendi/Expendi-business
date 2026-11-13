@@ -5,6 +5,7 @@ import {
   BanIcon,
   CheckIcon,
   CopyIcon,
+  DownloadIcon,
   PencilIcon,
   RotateCcwIcon,
   SendIcon,
@@ -18,7 +19,7 @@ import type {
   InvoiceSummary,
 } from "@expendi-business/shared";
 
-import { TextLinkButton } from "~/components/data/actions";
+import { TextLinkButton, textLinkClass } from "~/components/data/actions";
 import {
   Callout,
   DetailItem,
@@ -144,6 +145,16 @@ export function InvoiceDetailBody({
           </DetailItem>
         ) : null}
       </DetailList>
+
+      {invoice.publicId === null ? null : (
+        <a
+          href={`/pay/${invoice.publicId}/pdf`}
+          className={`${textLinkClass} inline-flex w-fit items-center gap-1.5`}
+        >
+          <DownloadIcon aria-hidden="true" className="size-4" />
+          Download PDF
+        </a>
+      )}
 
       <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
         <Party

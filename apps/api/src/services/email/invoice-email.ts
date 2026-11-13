@@ -60,6 +60,7 @@ export function invoiceEmail(input: InvoiceEmailInput): EmailMessage {
     : `${companyName} sent you invoice ${input.number} for ${amount}, due ${due}.`;
   const note = input.note?.trim() ? input.note.trim() : null;
   const ask = "You can see the invoice and pay it in USDC with no account.";
+  const pdfUrl = `${input.payUrl}/pdf`;
   return {
     to: input.to,
     subject: `Invoice ${input.number} from ${companyName} — ${amount} due ${due}`,
@@ -68,7 +69,7 @@ export function invoiceEmail(input: InvoiceEmailInput): EmailMessage {
       `Hi ${customerName},`,
       intro,
       ...(note ? [`Note from ${companyName}: ${note}`] : []),
-      `${ask}\nView and pay: ${input.payUrl}`,
+      `${ask}\nView and pay: ${input.payUrl}\nDownload PDF: ${pdfUrl}`,
     ].join("\n\n"),
     html: [
       `<p>Hi ${escapeHtml(customerName)},</p>`,
@@ -79,7 +80,7 @@ export function invoiceEmail(input: InvoiceEmailInput): EmailMessage {
           ]
         : []),
       `<p>${escapeHtml(ask)}</p>`,
-      `<p><a href="${escapeHtml(input.payUrl)}">View and pay</a></p>`,
+      `<p><a href="${escapeHtml(input.payUrl)}">View and pay</a> · <a href="${escapeHtml(pdfUrl)}">Download PDF</a></p>`,
     ].join("\n"),
   };
 }

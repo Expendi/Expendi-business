@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Cause, Effect, Exit } from "effect";
 
+import type { ConfigService } from "../../config.js";
 import type { DatabaseService } from "../../db/client.js";
 import type {
   IntentQuotePurpose,
@@ -122,7 +123,8 @@ type WatcherDeps =
   | NearChain
   | NearRelayer
   | OneClick
-  | EmailSender;
+  | EmailSender
+  | ConfigService;
 
 type WatcherError = DatabaseError | FastNearError | NearRpcError;
 
@@ -238,7 +240,7 @@ function creditDeposit(
 ): Effect.Effect<
   Verdict,
   DatabaseError,
-  DatabaseService | AuditLog | EmailSender
+  DatabaseService | AuditLog | EmailSender | ConfigService
 > {
   return Effect.gen(function* () {
     const credited = yield* withScope(

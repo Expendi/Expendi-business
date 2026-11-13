@@ -204,7 +204,7 @@ Still to build from the [guide](docs/implementation-guide.md#part-2-crypto-invoi
 - [ ] **Other assets and rails:** USDT and other tokens, card checkout, bank (ACH/SEPA) and mobile-money collection.
 - [ ] **Other invoice currencies:** KES and others, with a stored exchange rate.
 - [ ] **Automation:** recurring invoices and scheduled overdue reminders.
-- [ ] **Documents and reconciliation:** PDF invoices, Zoho Books invoices and customer payments, receivables reports.
+- [ ] **Documents and reconciliation:** Zoho Books invoices and customer payments, receivables reports.
 - [ ] **Fees:** an Expendi fee on invoice payments, if wanted (1Click supports one per quote).
 
 ### Kenya eTIMS invoice issuance — not implemented
