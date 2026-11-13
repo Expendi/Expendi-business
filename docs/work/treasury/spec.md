@@ -502,6 +502,22 @@ The withdrawal, reading what arrived, the return quotes paid by the Treasury wal
 
 **Depends on:** T3. **Files:** as T3. **Scope:** L.
 
+**What T3 left for T4** (2026-11-13):
+
+- `earnWithdraw` is on `PrivyWalletsShape` and faked, but has never run against the real SDK. Prove it on the spike wallet first.
+- `treasury_earn_actions.intent_quote_id` may be null, for a withdrawal that comes before its return quote.
+- `from_treasury` quotes need their own opener, paid by the Treasury wallet through Privy as a sweep is paid by the transit wallet.
+- `treasury_moves_to_advance()` and the step function cover `to_treasury` only. Preview and start refuse `to_wallet` with 503.
+- A move to Treasury whose vault deposit Privy rejected three times goes to `needs_review` with its USDC in the Treasury wallet. T4's return path should give staff a way to send it back.
+- Moves in `needs_review` aren't stepped, and the staff resolve path settles only the quote, not the move.
+
+**How T3 differs from this spec:**
+
+- A move whose parts landed only in part completes for the smaller amount and tells every admin, by push and email, that it was partly filled.
+- `cost_usdc` is what was debited, less what came back, less what reached the vault.
+- A 1Click outage is retried for 5 minutes; a quote 1Click refuses outright fails the move at once; an expired quote is taken again up to 3 times.
+- If 1Click reports a delivery without its amount, the move goes to review instead of depositing anything.
+
 ### T5: Figures, snapshots and alerts
 
 Position and rate on `GET /treasury`, the snapshot job, the four alert checks, the "wallet is short" message.
