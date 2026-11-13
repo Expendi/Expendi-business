@@ -137,18 +137,44 @@ describe("a ledger row", () => {
     ]);
   });
 
-  it("badges payments still moving or failed, never paid ones or refunds", () => {
+  it("tints the badge of a payment still moving or failed", () => {
     // #when
     const badges = [
       find("Twiga Foods"),
       find("Kevin Mwangi"),
-      find("Zuku"),
-      find("Refund"),
-      find("Kenya Power"),
-    ].map((row) => rowBadge(row)?.label ?? null);
+      find("Zuku", "payout"),
+    ].map((row) => {
+      const badge = rowBadge(row);
+      return [badge?.label, badge?.tone];
+    });
 
     // #then
-    expect(badges).toEqual(["On its way", "Sending", "Failed", null, null]);
+    expect(badges).toEqual([
+      ["On its way", "moving"],
+      ["Sending", "moving"],
+      ["Failed", "failed"],
+    ]);
+  });
+
+  it("gives every settled row a quiet badge", () => {
+    // #when
+    const badges = [
+      find("Deposit"),
+      find("Refund"),
+      find("Kenya Power"),
+      find("Withdrawal"),
+    ].map((row) => {
+      const badge = rowBadge(row);
+      return [badge?.label, badge?.tone];
+    });
+
+    // #then
+    expect(badges).toEqual([
+      ["Received", "quiet"],
+      ["Received", "quiet"],
+      ["Paid", "quiet"],
+      ["Sent", "quiet"],
+    ]);
   });
 
   it("counts the other payments approved with the same passkey", () => {
