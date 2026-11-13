@@ -13,12 +13,40 @@ import {
 import { TxDetails } from "./tx-sheet";
 
 const NEAR_HASH = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";
+const BASE_HASH = `0xabcd${"0".repeat(56)}ef12`;
+const SOLANA_SIGNATURE =
+  "5VERv8NMvzbJMEkV8xnrLkEaWRtSz9CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSZzUWv";
 const SOLANA_ADDRESS = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU";
 
 function sample(type: WalletHistoryItem["type"], chain: "near" | "base") {
   const item = LEDGER.find((row) => row.type === type && row.chain === chain);
   if (!item) throw new Error(`No sample ${type} on ${chain}`);
   return item;
+}
+
+function usdcPayment(
+  delivery: Pick<
+    NonNullable<WalletHistoryItem["payout"]>,
+    "deliveryTxHash" | "deliveryTxChain"
+  >,
+): WalletHistoryItem {
+  const base = LEDGER.find(
+    (row) => row.type === "payout" && row.payout?.method !== "usdc",
+  );
+  if (!base?.payout) throw new Error("No sample payment");
+  return {
+    ...base,
+    txHash: null,
+    counterpartyAddress: null,
+    payout: {
+      ...base.payout,
+      method: "usdc",
+      recipientDetail: SOLANA_ADDRESS,
+      recipientChain: "solana",
+      status: "paid",
+      ...delivery,
+    },
+  };
 }
 
 function details(item: WalletHistoryItem): string {
@@ -49,6 +77,84 @@ describe("a movement's details", () => {
       lowercased: false,
       sender: true,
     });
+  });
+
+  it("shows nothing for a transaction or a sender when a row has neither", () => {
+    // #given
+    const delivered: WalletHistoryItem = {
+      ...sample("deposit", "near"),
+      txHash: null,
+      counterpartyAddress: null,
+    };
+
+    // #when
+    const page = details(delivered);
+
+    // #then
+    expect({
+      transaction: page.includes("transaction"),
+      sender: page.includes("From"),
+      chain: /Chain\s+NEAR/.test(page),
+    }).toEqual({ transaction: false, sender: false, chain: true });
+  });
+
+  it.each([
+    ["near", NEAR_HASH, "9xQeWv…VFin", "NEAR transaction"],
+    ["base", BASE_HASH, "0xabcd…ef12", "Base transaction"],
+    ["solana", SOLANA_SIGNATURE, "5VERv8…zUWv", "Solana transaction"],
+  ] as const)(
+    "shows a paid USDC payment's delivery on %s, labelled with that chain",
+    (chain, hash, shown, label) => {
+      // #given a payment with no transaction of the company's own
+      const payment = usdcPayment({
+        deliveryTxHash: hash,
+        deliveryTxChain: chain,
+      });
+
+      // #when
+      const page = details(payment);
+
+      // #then
+      expect({
+        label: page.includes(label),
+        hash: page.includes(shown),
+        lowercased:
+          page.includes(hash.toLowerCase()) && hash !== hash.toLowerCase(),
+      }).toEqual({ label: true, hash: true, lowercased: false });
+    },
+  );
+
+  it("shows no transaction for a payment whose delivery has no chain or hash", () => {
+    // #given
+    const pages = [
+      usdcPayment({}),
+      usdcPayment({ deliveryTxHash: null, deliveryTxChain: null }),
+      usdcPayment({ deliveryTxHash: NEAR_HASH, deliveryTxChain: null }),
+    ].map(details);
+
+    // #then
+    expect(pages.map((page) => page.includes("transaction"))).toEqual([
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it("keeps a row's own transaction ahead of a delivery", () => {
+    // #given
+    const payment = {
+      ...usdcPayment({ deliveryTxHash: BASE_HASH, deliveryTxChain: "base" }),
+      txHash: NEAR_HASH,
+    };
+
+    // #when
+    const page = details(payment);
+
+    // #then
+    expect({
+      near: page.includes("NEAR transaction"),
+      base: page.includes("Base transaction"),
+    }).toEqual({ near: true, base: false });
   });
 
   it("still shows a deposit from before the move as a Base one", () => {

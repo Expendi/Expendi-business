@@ -159,7 +159,12 @@ export function PayoutView({ payoutId }: { payoutId: string }) {
                 ["Rate", payout.rate ?? "—"],
                 ["Transaction hash", transactionHash(payout)],
                 ["Privy transaction", payout.privyTransactionId ?? "—"],
-                ["M-Pesa or bank reference", payout.providerReference ?? "—"],
+                [
+                  payout.method === "usdc"
+                    ? "Payee chain transaction"
+                    : "M-Pesa or bank reference",
+                  payout.providerReference ?? "—",
+                ],
                 ["Created", time(payout.createdAt)],
                 ["Approved", time(payout.approvedAt)],
                 ["Funding started", time(payout.fundingStartedAt)],

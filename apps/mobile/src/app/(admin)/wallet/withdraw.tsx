@@ -329,7 +329,11 @@ function WithdrawalResult({
       </View>
       {withdrawal.txHash ? (
         <View className="gap-2">
-          <Text className="text-sm text-gray-600">Transaction</Text>
+          <Text className="text-sm text-gray-600">
+            {withdrawal.txChain
+              ? `${PAYEE_CHAIN_NAMES[withdrawal.txChain]} transaction`
+              : "Transaction"}
+          </Text>
           <Text selectable className="font-mono text-sm text-gray-700">
             {withdrawal.txHash}
           </Text>
