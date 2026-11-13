@@ -9,16 +9,17 @@ import { BadRequest, Conflict, Forbidden } from "../errors.js";
 export function payoutRejectionAsClientError(
   error: PayoutRejected,
 ): ClientError {
-  const { message } = error;
+  const { message, details } = error;
   switch (error.reason) {
     case "not_an_admin":
     case "approval_mismatch":
     case "not_allowlisted":
       return new Forbidden({ message });
+    case "insufficient_balance":
+      return new Conflict({ message, ...(details && { details }) });
     case "subject_already_paying":
     case "idempotency_key_reused":
     case "not_awaiting_approval":
-    case "insufficient_balance":
     case "daily_cap":
     case "payroll_cap":
     case "paused":

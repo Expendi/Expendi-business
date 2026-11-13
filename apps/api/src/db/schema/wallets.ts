@@ -19,6 +19,7 @@ import {
 
 import { timestamps } from "./columns.js";
 import { organizations } from "./organizations.js";
+import { users } from "./users.js";
 
 export const walletChain = pgEnum("wallet_chain", WALLET_CHAINS);
 
@@ -74,6 +75,23 @@ export const wallets = pgTable(
     /** The transit wallet on Base, EIP-55 checksummed as Privy returns it. */
     transitAddress: text("transit_address"),
     /**
+     * The Treasury wallet on Base (docs/decisions/treasury-on-base.md): where
+     * the company's USDC earns in a Privy Earn vault. Null until an admin
+     * turns Treasury on; the three columns fill in as setup resumes, and
+     * `treasuryTurnedOnAt` is set last.
+     */
+    treasuryPrivyWalletId: text("treasury_privy_wallet_id"),
+    /** EIP-55 checksummed, as Privy returns it. */
+    treasuryAddress: text("treasury_address"),
+    /** The Treasury wallet's policy: Earn into one vault, capped USDC transfer. */
+    treasuryPrivyPolicyId: text("treasury_privy_policy_id"),
+    treasuryTurnedOnAt: timestamp("treasury_turned_on_at", {
+      withTimezone: true,
+    }),
+    treasuryTurnedOnBy: uuid("treasury_turned_on_by").references(
+      () => users.id,
+    ),
+    /**
      * When the gas relayer had created the company wallet's account on chain
      * and registered it with the USDC contract.
      */
@@ -107,6 +125,16 @@ export const wallets = pgTable(
     ),
     uniqueIndex("wallets_transit_address_unique").on(
       sql`lower(${table.transitAddress})`,
+    ),
+    uniqueIndex("wallets_treasury_privy_wallet_id_unique").on(
+      table.treasuryPrivyWalletId,
+    ),
+    uniqueIndex("wallets_treasury_address_unique").on(
+      sql`lower(${table.treasuryAddress})`,
+    ),
+    check(
+      "wallets_treasury_on_is_complete",
+      sql`${table.treasuryTurnedOnAt} IS NULL OR (${table.treasuryPrivyWalletId} IS NOT NULL AND ${table.treasuryAddress} IS NOT NULL AND ${table.treasuryPrivyPolicyId} IS NOT NULL)`,
     ),
     // Rule 4 of the decision record. Rows made before the move keep the
     // rule they were created under.

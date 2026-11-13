@@ -17,6 +17,10 @@ export const KIND_LABELS: Record<OpsAlertKind, string> = {
   card_close_failed: "Card close failed",
   unexpected_transit_transfer: "Unexplained transfer to a transit wallet",
   deposits_held: "Deposits held",
+  treasury_move_stuck: "Treasury move not settled",
+  treasury_usdc_idle: "USDC idle in a Treasury wallet",
+  treasury_position_mismatch: "Treasury position doesn't match its moves",
+  treasury_partial_fill: "Treasury withdrawal filled in part",
 };
 
 /** Where staff look into an alert's cause. */
@@ -31,6 +35,10 @@ export function causeLink(
     case "card_close_failed":
     case "unexpected_transit_transfer":
     case "deposits_held":
+    case "treasury_move_stuck":
+    case "treasury_usdc_idle":
+    case "treasury_position_mismatch":
+    case "treasury_partial_fill":
       return alert.organization
         ? {
             href: `/companies/${alert.organization.id}`,

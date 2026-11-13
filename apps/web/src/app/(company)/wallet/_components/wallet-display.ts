@@ -122,7 +122,14 @@ export function maxWithdrawal(baseUnits: string): string {
 }
 
 export type TxKind =
-  "deposit" | "topup" | "withdrawal" | "refund" | "payment" | "salary";
+  | "deposit"
+  | "topup"
+  | "withdrawal"
+  | "refund"
+  | "payment"
+  | "salary"
+  | "to_treasury"
+  | "from_treasury";
 
 export function txKind(item: WalletHistoryItem): TxKind {
   if (item.type === "payout") {
@@ -141,6 +148,10 @@ export function txTitle(item: WalletHistoryItem): string {
       return "Withdrawal";
     case "refund":
       return "Refund";
+    case "to_treasury":
+      return "Moved to Treasury";
+    case "from_treasury":
+      return "Moved to wallet";
     case "payment":
     case "salary":
       return item.payout?.recipientName ?? "Payment";
@@ -179,6 +190,10 @@ export function txDetail(item: WalletHistoryItem): string {
       return payout
         ? `${payout.recipientName} payment failed, money returned`
         : "A payment failed, money returned";
+    case "to_treasury":
+      return "To Treasury";
+    case "from_treasury":
+      return "From Treasury";
     case "payment":
     case "salary": {
       if (!payout) return "Payment";
@@ -211,6 +226,11 @@ export const PAYOUT_STATUS: Record<PayoutStatus, PayoutBadge> = {
  * has failed, quiet once the money has settled.
  */
 export function rowBadge(item: WalletHistoryItem): PayoutBadge | null {
+  // The company's own money moving between its wallet and Treasury: neither
+  // received from outside nor paid to anyone.
+  if (item.type === "to_treasury" || item.type === "from_treasury") {
+    return { label: "Moved", tone: "quiet" };
+  }
   if (item.type !== "payout" && item.type !== "withdrawal") {
     return { label: "Received", tone: "quiet" };
   }
@@ -254,7 +274,10 @@ export function groupByDay(items: readonly WalletHistoryItem[]): HistoryDay[] {
   return days;
 }
 
-/** Money in and out this Nairobi month, USDC base units: out is negative. */
+/**
+ * Money in and out this Nairobi month, USDC base units: out is negative.
+ * A move to or from Treasury is neither: the money stays the company's own.
+ */
 export function monthFlows(
   items: readonly WalletHistoryItem[],
   month: string,
@@ -263,6 +286,7 @@ export function monthFlows(
   let moneyOut = 0n;
   for (const item of items) {
     if (!nairobiDay(item.createdAt).startsWith(month)) continue;
+    if (item.type === "to_treasury" || item.type === "from_treasury") continue;
     const amount = BigInt(item.usdcAmount);
     if (amount > 0n) moneyIn += amount;
     else moneyOut += amount;

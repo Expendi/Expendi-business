@@ -302,7 +302,7 @@ export function AddAddressSheet({
             id={nameId}
             name="label"
             maxLength={WITHDRAWAL_ADDRESS_LABEL_MAX_LENGTH}
-            placeholder="e.g. Treasury on Coinbase"
+            placeholder="e.g. Our Coinbase account"
             autoComplete="off"
             aria-invalid={errors.label ? true : undefined}
           />

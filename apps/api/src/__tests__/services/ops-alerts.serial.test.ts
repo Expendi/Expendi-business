@@ -54,6 +54,11 @@ beforeAll(async () => {
   ({ db } = await runtime.runPromise(DatabaseService));
   app = createApp({ runtime });
   owner = new pg.Pool({ connectionString: TEST_DATABASE_URL_MIGRATE, max: 2 });
+  // Each run emails at most 20 alerts, oldest first, so a backlog left by
+  // earlier files in the shared database can starve the alerts raised here.
+  await owner.query(
+    "UPDATE ops_alerts SET resolved_at = now() WHERE resolved_at IS NULL",
+  );
 });
 
 afterAll(async () => {

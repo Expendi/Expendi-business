@@ -4,6 +4,7 @@ import type { JSX, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { TreasuryOfferProvider } from "~/app/(company)/wallet/_components/treasury-offer";
 import { AppShell } from "~/components/app-shell";
 import { CompanyPicker } from "~/components/company-picker";
 import { FullNameStep } from "~/components/full-name-step";
@@ -106,14 +107,16 @@ export default function CompanyLayout({
 
   return (
     <DashboardProvider company={{ ...company, role: company.role }}>
-      <AppShell
-        name={me.user.fullName}
-        email={me.user.email}
-        onSwitchCompany={onSwitchCompany}
-        onSignOut={onSignOut}
-      >
-        {children}
-      </AppShell>
+      <TreasuryOfferProvider>
+        <AppShell
+          name={me.user.fullName}
+          email={me.user.email}
+          onSwitchCompany={onSwitchCompany}
+          onSignOut={onSignOut}
+        >
+          {children}
+        </AppShell>
+      </TreasuryOfferProvider>
     </DashboardProvider>
   );
 }

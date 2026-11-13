@@ -62,3 +62,40 @@ export function companyWalletPolicyRules(
     },
   ];
 }
+
+const earnRule = (
+  method: "earn_deposit" | "earn_withdraw",
+  vaultId: string,
+): PolicyCreateParams.Rule => ({
+  name: `${method.replace("_", "-")}-one-vault`,
+  method,
+  action: "ALLOW",
+  conditions: [
+    {
+      field_source: "action_request_body",
+      field: "vault_id",
+      operator: "eq",
+      value: vaultId,
+    },
+  ],
+});
+
+/**
+ * A company's Treasury wallet: Earn deposits into and withdrawals from the
+ * one configured vault, plus the transit wallet's capped USDC transfer.
+ * Everything else is refused, and so is Earn on the transit wallet, whose
+ * policy has no Earn rule. Proven on Base mainnet in
+ * docs/decisions/treasury-on-base.md. The Earn rules carry no amount
+ * condition: they only move the wallet's own money to and from its own
+ * position.
+ */
+export function treasuryWalletPolicyRules(
+  vaultId: string,
+  perTransactionMaxUsdc: bigint,
+): PolicyCreateParams.Rule[] {
+  return [
+    earnRule("earn_deposit", vaultId),
+    earnRule("earn_withdraw", vaultId),
+    ...companyWalletPolicyRules(perTransactionMaxUsdc),
+  ];
+}

@@ -43,7 +43,11 @@ import type { StoredObject } from "../../services/storage/file-storage.js";
 import type {
   CreateNearWalletInput,
   CreatePolicyInput,
+  CreateTreasuryPolicyInput,
   CreateWalletInput,
+  EarnActionRecord,
+  EarnActionStatus,
+  EarnCallInput,
   NearSigningWallet,
   PrivyWalletRecord,
   SendUsdcInput,
@@ -124,10 +128,24 @@ export const randomAddress = (): string =>
 
 type FailingCall =
   | "createPolicy"
+  | "createTreasuryPolicy"
   | "createWallet"
   | "findWalletByExternalId"
   | "createNearWallet"
-  | "findNearWalletByExternalId";
+  | "findNearWalletByExternalId"
+  | "getWalletAction"
+  | "vaultPosition"
+  | "vaultDetails";
+
+/**
+ * What Privy does with the next Earn call:
+ * - `succeeded`, `pending`, `rejected`, `failed`: it answers with an action in
+ *   that status;
+ * - `refused`: a 400 or 404 before anything is signed, and no action exists;
+ * - `unknown`: the action is created but the reply is lost.
+ */
+export type EarnOutcome =
+  "succeeded" | "pending" | "rejected" | "failed" | "refused" | "unknown";
 
 /** `refused` is a definite no from Privy; `unavailable` is a lost reply. */
 type NearSigningOutcome = "signed" | "refused" | "unavailable";
@@ -173,7 +191,10 @@ interface FakeNearWallet extends PrivyWalletRecord {
  * chain (helpers/near.ts).
  */
 export function makeFakePrivyWallets() {
-  const policies = new Map<string, { id: string; input: CreatePolicyInput }>();
+  const policies = new Map<
+    string,
+    { id: string; input: CreatePolicyInput | CreateTreasuryPolicyInput }
+  >();
   const wallets = new Map<
     string,
     PrivyWalletRecord & { readonly input: CreateWalletInput }
@@ -183,10 +204,14 @@ export function makeFakePrivyWallets() {
   const nearSigningRequests = new Map<string, number>();
   const calls: Record<FailingCall, number> = {
     createPolicy: 0,
+    createTreasuryPolicy: 0,
     createWallet: 0,
     findWalletByExternalId: 0,
     createNearWallet: 0,
     findNearWalletByExternalId: 0,
+    getWalletAction: 0,
+    vaultPosition: 0,
+    vaultDetails: 0,
   };
   const failures = new Map<FailingCall, number>();
   /** Every send that reached "Privy", in order; replays aren't repeated. */
@@ -195,6 +220,45 @@ export function makeFakePrivyWallets() {
   type SendOutcome =
     "sent" | "sent_without_hash" | "refused" | "policy_violation" | "unknown";
   const sendOutcomes: SendOutcome[] = [];
+  /** Every Earn call that reached "Privy", in order; replays aren't repeated. */
+  const earnCalls: (EarnCallInput & {
+    readonly kind: "deposit" | "withdraw";
+  })[] = [];
+  const earnActions = new Map<
+    string,
+    EarnActionRecord & {
+      readonly privyWalletId: string;
+      readonly kind: "deposit" | "withdraw";
+    }
+  >();
+  const earnByKey = new Map<string, string>();
+  const earnOutcomes: EarnOutcome[] = [];
+  const vaultAssets = new Map<string, bigint>();
+  /** What Privy's `total_deposited` and `total_withdrawn` say, from Earn calls that succeeded. */
+  const vaultTotals = new Map<
+    string,
+    { deposited: bigint; withdrawn: bigint }
+  >();
+  const totalsOf = (privyWalletId: string) => {
+    const totals = vaultTotals.get(privyWalletId) ?? {
+      deposited: 0n,
+      withdrawn: 0n,
+    };
+    vaultTotals.set(privyWalletId, totals);
+    return totals;
+  };
+  let vaultApyBps: number | null = 519;
+  let onEarnDeposit: ((input: EarnCallInput) => void) | null = null;
+  /** What the vault pays out for the next withdrawals that succeed; each without one pays in full. */
+  const withdrawalFills: bigint[] = [];
+  let onWithdrawn:
+    | ((withdrawal: {
+        readonly privyWalletId: string;
+        readonly rawAmount: bigint;
+        readonly delivered: bigint;
+        readonly txHash: string;
+      }) => void)
+    | null = null;
   /** What Privy reports for each send it accepted, by its transaction ID. */
   const privyTransactions = new Map<
     string,
@@ -308,6 +372,88 @@ export function makeFakePrivyWallets() {
       failures.set(call, times);
     },
     sends,
+    earnCalls,
+    /** Queue outcomes for the next Earn calls; each without one succeeds. */
+    nextEarnCalls(...outcomes: EarnOutcome[]) {
+      earnOutcomes.push(...outcomes);
+    },
+    /** Moves an action on, as Privy does once its transaction settles. */
+    settleEarnAction(
+      actionId: string,
+      status: EarnActionStatus,
+      details: { readonly failureReason?: string } = {},
+    ) {
+      const action = earnActions.get(actionId);
+      if (!action) throw new Error(`no Earn action ${actionId}`);
+      const txHash =
+        status === "pending" || status === "rejected"
+          ? null
+          : `0x${randomBytes(32).toString("hex")}`;
+      earnActions.set(actionId, {
+        ...action,
+        status,
+        txHash,
+        failureReason: details.failureReason ?? null,
+      });
+      if (status === "succeeded" && action.kind === "deposit") {
+        vaultAssets.set(
+          action.privyWalletId,
+          (vaultAssets.get(action.privyWalletId) ?? 0n) + action.rawAmount,
+        );
+        totalsOf(action.privyWalletId).deposited += action.rawAmount;
+      }
+      if (status === "succeeded" && action.kind === "withdraw" && txHash) {
+        const held = vaultAssets.get(action.privyWalletId) ?? 0n;
+        const delivered = withdrawalFills.shift() ?? action.rawAmount;
+        vaultAssets.set(action.privyWalletId, held - delivered);
+        totalsOf(action.privyWalletId).withdrawn += delivered;
+        onWithdrawn?.({
+          privyWalletId: action.privyWalletId,
+          rawAmount: action.rawAmount,
+          delivered,
+          txHash,
+        });
+      }
+    },
+    /** Queue what the vault pays out for the next withdrawals that succeed (a partial fill). */
+    nextWithdrawalFills(...amounts: bigint[]) {
+      withdrawalFills.push(...amounts);
+    },
+    /** Runs when a withdrawal succeeds, to put its USDC in the test's chain. */
+    onWithdrawn(run: NonNullable<typeof onWithdrawn>) {
+      onWithdrawn = run;
+    },
+    /** Sets what a wallet's vault position is worth, as yield or a deposit made elsewhere would. */
+    setVaultAssets(privyWalletId: string, amount: bigint) {
+      vaultAssets.set(privyWalletId, amount);
+    },
+    /** The yearly rate the vault reports after Expendi's share, in basis points. */
+    setVaultApy(bps: number | null) {
+      vaultApyBps = bps;
+    },
+    /** Sets what Privy reports as ever deposited and withdrawn, as a call made outside Expendi would. */
+    setVaultTotals(
+      privyWalletId: string,
+      totals: { readonly deposited: bigint; readonly withdrawn: bigint },
+    ) {
+      vaultTotals.set(privyWalletId, { ...totals });
+    },
+    /** Forgets queued Earn outcomes and the calls made so far. */
+    resetEarn() {
+      earnOutcomes.length = 0;
+      earnCalls.length = 0;
+      withdrawalFills.length = 0;
+    },
+    /** The ID of the action created under a reference, as Privy would answer it. */
+    actionIdFor: (referenceId: string): string | null =>
+      earnByKey.get(referenceId) ?? null,
+    /** Runs when a deposit is first accepted, to move the USDC in the test's chain. */
+    onEarnDeposit(run: (input: EarnCallInput) => void) {
+      onEarnDeposit = run;
+    },
+    /** What a wallet's vault position is worth, from the deposits that succeeded. */
+    vaultAssetsOf: (privyWalletId: string): bigint =>
+      vaultAssets.get(privyWalletId) ?? 0n,
     /** Queue outcomes for the next sends; each send without one succeeds. */
     nextSends(...outcomes: SendOutcome[]) {
       sendOutcomes.push(...outcomes);
@@ -348,15 +494,105 @@ export function makeFakePrivyWallets() {
       sends.length = 0;
       sent.clear();
       sendOutcomes.length = 0;
+      earnCalls.length = 0;
+      earnActions.clear();
+      earnByKey.clear();
+      earnOutcomes.length = 0;
+      vaultAssets.clear();
+      vaultTotals.clear();
+      vaultApyBps = 519;
+      withdrawalFills.length = 0;
+      onEarnDeposit = null;
+      onWithdrawn = null;
       privyTransactions.clear();
       transactionHashLookups.length = 0;
       for (const call of Object.keys(calls) as FailingCall[]) calls[call] = 0;
     },
   };
 
+  const earnCall =
+    (kind: "deposit" | "withdraw") =>
+    (
+      input: EarnCallInput,
+    ): Effect.Effect<EarnActionRecord, SendRefused | SendOutcomeUnknown> => {
+      const replay = earnByKey.get(input.referenceId);
+      const existing = replay ? earnActions.get(replay) : undefined;
+      if (existing) return Effect.succeed(existing);
+      // Privy refuses a withdrawal of more than the position holds before
+      // anything is signed.
+      if (
+        kind === "withdraw" &&
+        input.rawAmount > (vaultAssets.get(input.privyWalletId) ?? 0n)
+      ) {
+        return Effect.fail(
+          new SendRefused({
+            message: "fake: amount over the position",
+            status: 400,
+            policyViolation: false,
+          }),
+        );
+      }
+      const outcome = earnOutcomes.shift() ?? "succeeded";
+      if (outcome === "refused") {
+        return Effect.fail(
+          new SendRefused({
+            message: "fake Earn refusal",
+            status: 400,
+            policyViolation: false,
+          }),
+        );
+      }
+      earnCalls.push({ ...input, kind });
+      const status: EarnActionStatus =
+        outcome === "unknown" ? "pending" : outcome;
+      const action = {
+        actionId: `action-${randomBytes(6).toString("hex")}`,
+        status: "pending" as EarnActionStatus,
+        rawAmount: input.rawAmount,
+        shareAmount: null,
+        txHash: null,
+        failureReason: null,
+        privyWalletId: input.privyWalletId,
+        kind,
+      };
+      earnActions.set(action.actionId, action);
+      earnByKey.set(input.referenceId, action.actionId);
+      // Nothing is signed for a rejected or reverted deposit, so no USDC leaves.
+      if (
+        kind === "deposit" &&
+        outcome !== "rejected" &&
+        outcome !== "failed"
+      ) {
+        onEarnDeposit?.(input);
+      }
+      if (status !== "pending") {
+        state.settleEarnAction(
+          action.actionId,
+          status,
+          status === "succeeded" ? {} : { failureReason: `fake ${status}` },
+        );
+      }
+      if (outcome === "unknown") {
+        return Effect.fail(
+          new SendOutcomeUnknown({ message: "fake timeout", cause: null }),
+        );
+      }
+      return Effect.succeed(earnActions.get(action.actionId) ?? action);
+    };
+
   const layer = Layer.succeed(PrivyWallets, {
     createPolicy: (input) =>
       maybeFail("createPolicy").pipe(
+        Effect.map(() => {
+          const existing = policies.get(input.idempotencyKey);
+          if (existing) return { policyId: existing.id };
+          const id = `policy-${policies.size + 1}-${randomBytes(4).toString("hex")}`;
+          policies.set(input.idempotencyKey, { id, input });
+          return { policyId: id };
+        }),
+      ),
+    createTreasuryPolicy: (input) =>
+      maybeFail("createTreasuryPolicy").pipe(
         Effect.map(() => {
           const existing = policies.get(input.idempotencyKey);
           if (existing) return { policyId: existing.id };
@@ -444,6 +680,39 @@ export function makeFakePrivyWallets() {
       if (result.txHash !== null) mine(input, result.txHash);
       return Effect.succeed(result);
     },
+    earnDeposit: earnCall("deposit"),
+    earnWithdraw: earnCall("withdraw"),
+    getWalletAction: (input) =>
+      maybeFail("getWalletAction").pipe(
+        Effect.flatMap(() => {
+          const action = earnActions.get(input.actionId);
+          return action
+            ? Effect.succeed(action)
+            : Effect.fail(
+                new PrivyWalletError({ message: "fake: no such action" }),
+              );
+        }),
+      ),
+    vaultPosition: (input) =>
+      maybeFail("vaultPosition").pipe(
+        Effect.map(() => {
+          const assets = vaultAssets.get(input.privyWalletId) ?? 0n;
+          return {
+            assetsInVault: assets,
+            sharesInVault: assets,
+            totalDeposited: totalsOf(input.privyWalletId).deposited,
+            totalWithdrawn: totalsOf(input.privyWalletId).withdrawn,
+          };
+        }),
+      ),
+    vaultDetails: () =>
+      maybeFail("vaultDetails").pipe(
+        Effect.map(() => ({
+          name: "Fake Aave USDC",
+          userApyBps: vaultApyBps,
+          availableLiquidityUsd: 15_500_000,
+        })),
+      ),
     transactionHash: ({ privyWalletId, privyTransactionId }) =>
       Effect.sync(() => {
         transactionHashLookups.push(privyTransactionId);

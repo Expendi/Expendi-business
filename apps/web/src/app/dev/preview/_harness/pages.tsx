@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 
+import type { TreasuryScenario } from "./fixtures/treasury";
 import { ActivityView } from "~/app/(company)/activity/_components/activity-view";
 import { ApprovalsView } from "~/app/(company)/approvals/_components/approvals-view";
 import { BillsView } from "~/app/(company)/bills/_components/bills-view";
@@ -13,11 +14,14 @@ import { ReportsView } from "~/app/(company)/reports/_components/reports-view";
 import { SettingsView } from "~/app/(company)/settings/_components/settings-view";
 import { TeamView } from "~/app/(company)/team/_components/team-view";
 import { WalletView } from "~/app/(company)/wallet/_components/wallet-view";
+import { TreasuryShortPreview } from "./treasury-short";
 
 export interface PagePreview {
   /** The real route, so the sidebar marks it current. */
   readonly path: string;
   readonly View: ComponentType;
+  /** Which Treasury state to seed; the default is Treasury on, with figures. */
+  readonly treasury?: TreasuryScenario;
 }
 
 /**
@@ -38,4 +42,18 @@ export const PAGE_PREVIEWS: Readonly<Record<string, PagePreview>> = {
   settings: { path: "/settings", View: SettingsView },
   team: { path: "/team", View: TeamView },
   wallet: { path: "/wallet", View: WalletView },
+  "treasury-unavailable": {
+    path: "/wallet",
+    View: WalletView,
+    treasury: "unavailable",
+  },
+  "treasury-off": { path: "/wallet", View: WalletView, treasury: "off" },
+  "treasury-on": { path: "/wallet", View: WalletView, treasury: "on" },
+  "treasury-move": { path: "/wallet", View: WalletView, treasury: "move" },
+  "treasury-saved": { path: "/wallet", View: WalletView, treasury: "saved" },
+  "treasury-short": {
+    path: "/bills",
+    View: TreasuryShortPreview,
+    treasury: "short",
+  },
 };

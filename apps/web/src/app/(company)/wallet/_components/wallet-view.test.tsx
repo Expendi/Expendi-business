@@ -144,7 +144,7 @@ describe("Accounts", () => {
         "KES 186,000 · Bill",
         "From mwangaza-treasury.near",
         "Zuku payment failed, money returned",
-        "To Treasury on Coinbase",
+        "To Reserve on Coinbase",
       ].every((line) => page.includes(line)),
       moving: page.includes("On its way") && page.includes("Sending"),
       time: page.includes("09:20"),
@@ -222,7 +222,7 @@ describe("Accounts", () => {
       fundIn: page.includes(">Fund in<"),
       otherChain: page.includes("Fund in from another chain"),
       add: page.includes(">Add address<"),
-      remove: page.includes('aria-label="Remove Treasury on Coinbase"'),
+      remove: page.includes('aria-label="Remove Reserve on Coinbase"'),
       viewOnly: page.includes("View only"),
     }).toEqual({
       withdraw: true,

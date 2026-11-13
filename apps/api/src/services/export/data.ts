@@ -6,8 +6,10 @@ import type { OverviewHeading } from "@expendi-business/shared";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { MonthBounds } from "./month.js";
+import type { TreasuryMonth } from "./treasury.js";
 import { receiptFiles } from "../../db/schema/index.js";
 import { query } from "../../db/scope.js";
+import { readTreasuryMonth } from "./treasury.js";
 
 /**
  * What a month's export lists (spec §6.11), read inside one company's
@@ -75,6 +77,8 @@ export interface ExportData {
   readonly floatTransfers: readonly MoneyOutRow[];
   readonly outstanding: readonly OutstandingBill[];
   readonly receipts: readonly ExportReceipt[];
+  /** Null for a company without Treasury by the month's end. */
+  readonly treasury: TreasuryMonth | null;
 }
 
 interface MoneyOutRecord extends Record<string, unknown> {
@@ -391,6 +395,7 @@ export function readExportData(
         reference: record.reference,
       })),
       receipts,
+      treasury: yield* readTreasuryMonth(tx, organizationId, month),
     };
   });
 }

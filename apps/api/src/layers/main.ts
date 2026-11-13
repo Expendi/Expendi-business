@@ -1,5 +1,5 @@
 import type { ConfigError } from "effect";
-import { Layer } from "effect";
+import { Effect, Layer } from "effect";
 
 import type { ConfigService } from "../config.js";
 import type { DatabaseService } from "../db/client.js";
@@ -23,7 +23,6 @@ import type { OtpProvider } from "../services/phone-verification/otp-provider.js
 import type { Pretium } from "../services/pretium/pretium-client.js";
 import type { FileStorage } from "../services/storage/file-storage.js";
 import type { WalletSettings } from "../services/wallet/company-wallet.js";
-import type { PrivyWallets } from "../services/wallet/privy-wallets.js";
 import type { ZohoAccessTokens } from "../services/zoho/access-tokens.js";
 import type { AccountingTokenKey } from "../services/zoho/token-crypto.js";
 import type { Zoho } from "../services/zoho/zoho-client.js";
@@ -47,8 +46,16 @@ import { PaycrestLive } from "../services/paycrest/paycrest-client.js";
 import { OtpProviderLive } from "../services/phone-verification/telnyx-verify.js";
 import { PretiumLive } from "../services/pretium/pretium-client.js";
 import { FileStorageLive } from "../services/storage/r2.js";
+import {
+  positionReaderFrom,
+  TreasuryPositionReader,
+} from "../services/treasury/position-reader.js";
+import { earnVaultId } from "../services/treasury/turn-on.js";
 import { WalletSettingsLive } from "../services/wallet/company-wallet.js";
-import { PrivyWalletsLive } from "../services/wallet/privy-wallets.js";
+import {
+  PrivyWallets,
+  PrivyWalletsLive,
+} from "../services/wallet/privy-wallets.js";
 import { ZohoAccessTokensLive } from "../services/zoho/access-tokens.js";
 import { AccountingTokenKeyLive } from "../services/zoho/token-crypto.js";
 import { ZohoLive } from "../services/zoho/zoho-client.js";
@@ -59,6 +66,7 @@ export type AppDeps =
   | AuditLog
   | PrivyAuth
   | PrivyWallets
+  | TreasuryPositionReader
   | WalletSettings
   | AlchemyWebhook
   | BaseRpc
@@ -143,6 +151,19 @@ export function makeAppLayer(
       Layer.mergeAll(external.privyWallets, nearRpc, external.nearChain),
     ),
   );
+  const treasuryPositionReader = Layer.effect(
+    TreasuryPositionReader,
+    Effect.map(PrivyWallets, (privy) => ({
+      // Read per call, as every Treasury path does, so the vault can be set
+      // or unset without rebuilding the layer.
+      read: (privyWalletId: string) =>
+        earnVaultId.pipe(
+          Effect.flatMap((vault) =>
+            positionReaderFrom(vault, privy.vaultPosition).read(privyWalletId),
+          ),
+        ),
+    })),
+  ).pipe(Layer.provide(external.privyWallets));
   return Layer.mergeAll(
     DatabaseLive,
     AuditLogLive,
@@ -150,6 +171,7 @@ export function makeAppLayer(
     AccountingTokenKeyLive,
     external.privyAuth,
     external.privyWallets,
+    treasuryPositionReader,
     external.walletSettings,
     external.alchemyWebhook,
     external.baseRpc,

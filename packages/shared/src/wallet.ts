@@ -32,13 +32,20 @@ export const walletSetupSchema = z.discriminatedUnion("status", [
 
 export type WalletSetup = z.infer<typeof walletSetupSchema>;
 
-/** Money in adds to the balance; payouts and withdrawals take from it. */
+/**
+ * Money in adds to the balance; payouts and withdrawals take from it. The
+ * two Treasury types are the company's own money leaving for, or coming back
+ * from, its Treasury wallet: `to_treasury` is always negative, `from_treasury`
+ * always positive.
+ */
 export const WALLET_TRANSACTION_TYPES = [
   "deposit",
   "payout",
   "refund",
   "withdrawal",
   "topup",
+  "to_treasury",
+  "from_treasury",
 ] as const;
 export const walletTransactionTypeSchema = z.enum(WALLET_TRANSACTION_TYPES);
 export type WalletTransactionType = z.infer<typeof walletTransactionTypeSchema>;

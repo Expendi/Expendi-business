@@ -35,6 +35,8 @@ import { describeApprovalError } from "~/lib/approval";
 import { formatUsdc } from "~/lib/money";
 import { useApprovalPasskeyStatus } from "~/lib/use-approval";
 import { approxKes } from "./balance-card";
+import { passkeyGate } from "./passkey-gate";
+import { TreasuryOfferButton } from "./treasury-offer";
 import { GroupedAddress } from "./tx-sheet";
 import { parseUsdcAmount } from "./usdc-amount";
 import {
@@ -269,7 +271,10 @@ export function WithdrawSheet({
           </p>
         ) : null}
         {withdraw.isError ? (
-          <Callout tone="error">
+          <Callout
+            tone="error"
+            action={<TreasuryOfferButton error={withdraw.error} />}
+          >
             {describeWithdrawError(withdraw.error)}
           </Callout>
         ) : null}
@@ -386,47 +391,6 @@ function resultFor(withdrawal: Withdrawal) {
   if (withdrawal.status === "failed") return RESULTS.failed;
   if (withdrawal.status === "needs_review") return RESULTS.review;
   return RESULTS.sent;
-}
-
-/** What the approval passkey check shows instead of the form, if anything. */
-function passkeyGate(
-  status: ReturnType<typeof useApprovalPasskeyStatus>,
-): ReactNode {
-  if (status.isPending) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Checking your approval passkey…
-      </p>
-    );
-  }
-  if (status.isError) {
-    return (
-      <Callout
-        tone="error"
-        action={
-          <Button
-            variant="outline"
-            size="md"
-            onClick={() => void status.refetch()}
-          >
-            Try again
-          </Button>
-        }
-      >
-        {describeApiError(status.error)}
-      </Callout>
-    );
-  }
-  if (!status.data.enrolled) {
-    return (
-      <Callout tone="neutral" title="Set up your approval passkey first">
-        Paying needs your approval passkey. Set it up in the Expendi Business
-        app; then confirm here with “use a phone or tablet” in your
-        browser&apos;s passkey prompt.
-      </Callout>
-    );
-  }
-  return null;
 }
 
 function WithdrawForm({

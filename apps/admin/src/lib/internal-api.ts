@@ -34,6 +34,11 @@ import type {
   StaffIntentQuoteDetail,
   StaffMeResponse,
   StaffPayoutDetail,
+  StaffTreasury,
+  StaffTreasuryAction,
+  StaffTreasuryConfirmed,
+  StaffTreasuryPrepared,
+  StaffTreasuryPrepareRequest,
   SystemHealth,
   ZohoAccountsResponse,
   ZohoConnectLinkResponse,
@@ -67,6 +72,9 @@ import {
   staffIntentQuoteDetailSchema,
   staffMeResponseSchema,
   staffPayoutDetailSchema,
+  staffTreasuryConfirmedSchema,
+  staffTreasuryPreparedSchema,
+  staffTreasurySchema,
   systemHealthSchema,
   zohoAccountsResponseSchema,
   zohoConnectLinkResponseSchema,
@@ -102,6 +110,21 @@ export interface InternalApi {
       query: CompanySearchQuery,
     ) => Promise<CompanySearchResponse>;
     company: (companyId: string) => Promise<CompanyDetail>;
+    /** The company's Treasury: wallet, live position, alerts, moves and their evidence. */
+    companyTreasury: (companyId: string) => Promise<StaffTreasury>;
+    /** Starts a staff action on a Treasury move under review; needs `ops_admin` and a second confirmation. */
+    prepareTreasuryAction: (
+      companyId: string,
+      moveId: string,
+      action: StaffTreasuryAction,
+      body: StaffTreasuryPrepareRequest,
+    ) => Promise<StaffTreasuryPrepared>;
+    confirmTreasuryAction: (
+      companyId: string,
+      moveId: string,
+      action: StaffTreasuryAction,
+      token: string,
+    ) => Promise<StaffTreasuryConfirmed>;
     payoutQueue: (query: PayoutQueueQuery) => Promise<PayoutQueueResponse>;
     payout: (payoutId: string) => Promise<StaffPayoutDetail>;
     refetchPayout: (payoutId: string) => Promise<PayoutRefetchResponse>;
@@ -181,6 +204,25 @@ const payoutPath = (payoutId: string, suffix = "") =>
 const intentQuotePath = (quoteId: string, suffix = "") =>
   `/internal/intent-quotes/${encodeURIComponent(quoteId)}${suffix}` as const;
 
+const TREASURY_ACTION_SEGMENTS: Record<StaffTreasuryAction, string> = {
+  return_stranded_deposit: "return-stranded-deposit",
+  resume_return: "resume-return",
+};
+
+const treasuryPath = (companyId: string, suffix = "") =>
+  `/internal/companies/${encodeURIComponent(companyId)}/treasury${suffix}` as const;
+
+const treasuryActionPath = (
+  companyId: string,
+  moveId: string,
+  action: StaffTreasuryAction,
+  step: "prepare" | "confirm",
+) =>
+  treasuryPath(
+    companyId,
+    `/moves/${encodeURIComponent(moveId)}/${TREASURY_ACTION_SEGMENTS[action]}/${step}`,
+  );
+
 const zohoPath = (companyId: string, suffix = "") =>
   `/internal/companies/${encodeURIComponent(companyId)}/zoho${suffix}` as const;
 
@@ -237,6 +279,20 @@ export function createInternalApi(client: ApiClient): InternalApi {
         client.get(
           `/internal/companies/${encodeURIComponent(companyId)}`,
           companyDetailSchema,
+        ),
+      companyTreasury: (companyId) =>
+        client.get(treasuryPath(companyId), staffTreasurySchema),
+      prepareTreasuryAction: (companyId, moveId, action, body) =>
+        client.post(
+          treasuryActionPath(companyId, moveId, action, "prepare"),
+          body,
+          staffTreasuryPreparedSchema,
+        ),
+      confirmTreasuryAction: (companyId, moveId, action, token) =>
+        client.post(
+          treasuryActionPath(companyId, moveId, action, "confirm"),
+          { token },
+          staffTreasuryConfirmedSchema,
         ),
       payoutQueue: (query) =>
         client.get(

@@ -31,6 +31,7 @@ import {
   createIsolationFixture,
   expectRouteIsolation,
 } from "../helpers/isolation.js";
+import { saveTreasuryMove } from "../helpers/money-in.js";
 import {
   createNearUsdcPayingCompany,
   makeNearUsdcFakes,
@@ -593,6 +594,25 @@ describe("withdrawing to an allowlisted address", () => {
         status: response.status,
         withdrawals: await withdrawalPayouts(),
       }).toEqual({ status: 409, withdrawals: [] });
+    });
+
+    it("refuses what an open move to Treasury has reserved", async () => {
+      // #given 100 USDC in the wallet, 60 of it reserved for a move to Treasury
+      await saveTreasuryMove(
+        db,
+        { company: paying.company, walletId: paying.wallet.id },
+        { requestedUsdc: 60n * USDC },
+      );
+
+      // #when
+      const refused = await withdraw(40n * USDC + 1n);
+      const allowed = await withdraw(40n * USDC);
+
+      // #then
+      expect({ refused: refused.status, allowed: allowed.status }).toEqual({
+        refused: 409,
+        allowed: 201,
+      });
     });
 
     it("refuses a zero amount", async () => {
