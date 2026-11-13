@@ -3,6 +3,7 @@ import type { AuditEntry } from "@expendi-business/shared";
 import type { DataTableColumnDef } from "~/components/data/data-table";
 import { plainColumn } from "~/components/plain-column";
 import { Button } from "~/components/ui/button";
+import { auditActionLabel } from "~/lib/audit-actions";
 import { formatNairobiTime } from "~/lib/format";
 
 export function actorLabel(entry: AuditEntry): string {
@@ -61,9 +62,15 @@ export function auditColumns({
       id: "action",
       title: "Action",
       value: (entry) => entry.action,
-      cell: (entry) => (
-        <span className="font-mono text-xs">{entry.action}</span>
-      ),
+      cell: (entry) => {
+        const label = auditActionLabel(entry.action);
+        return (
+          <span className="block">
+            {label ? <span className="block text-sm">{label}</span> : null}
+            <span className="font-mono text-xs">{entry.action}</span>
+          </span>
+        );
+      },
     }),
     plainColumn<AuditEntry>({
       id: "entity",

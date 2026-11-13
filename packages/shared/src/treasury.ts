@@ -37,7 +37,11 @@ export type TreasuryOpenMove = z.infer<typeof treasuryOpenMoveSchema>;
  */
 export const treasuryStatusSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("unavailable") }),
-  z.object({ status: z.literal("off") }),
+  z.object({
+    status: z.literal("off"),
+    /** The vault's current yearly rate after Expendi's share, for the invitation; null if it can't be read. */
+    rateBps: z.number().int().nonnegative().nullable(),
+  }),
   z.object({
     status: z.literal("on"),
     address: z.string(),

@@ -13,6 +13,7 @@ import type { Snapshot, Step } from "./move-state.js";
 import { openTreasuryReturnQuote } from "../intents/treasury-quote.js";
 import { advanceTreasuryReturnQuote } from "../intents/treasury-return.js";
 import { idle, moved, needsReview } from "./move-state.js";
+import { committedOf } from "./return-eligibility.js";
 
 /**
  * Sending USDC that sits in the Treasury wallet back to the company wallet,
@@ -50,18 +51,14 @@ const usdc = formatUsdAmount;
 const expectedDelivery = (quote: IntentQuote): bigint =>
   quote.swappedAmountOut ?? quote.minAmountOut ?? quote.amountOut;
 
-const COMMITTED_STATUSES: readonly IntentQuote["status"][] = [
-  "quoted",
-  "depositing",
-  "succeeded",
-  "needs_review",
-];
-
-/** What is sent or on its way: money no longer in the Treasury wallet. */
-export const committedOf = (returns: readonly IntentQuote[]): bigint =>
-  returns
-    .filter((quote) => COMMITTED_STATUSES.includes(quote.status))
-    .reduce((sum, quote) => sum + quote.amountIn, 0n);
+/**
+ * The next part of `owed`: even parts rather than full parts and a
+ * remainder, which could be too small for 1Click to quote.
+ */
+export function evenPart(owed: bigint, cap: bigint): bigint {
+  const partsLeft = (owed + cap - 1n) / cap;
+  return (owed + partsLeft - 1n) / partsLeft;
+}
 
 const STILL_IN_TREASURY =
   "The USDC is still in the Treasury wallet; nothing was lost.";
@@ -95,11 +92,7 @@ function nextPart(snap: Snapshot, owed: bigint) {
       );
     }
 
-    // Even parts rather than full parts and a remainder, which could be too
-    // small for 1Click to quote.
-    const cap = wallet.perTransactionMaxUsdc;
-    const partsLeft = (owed + cap - 1n) / cap;
-    const part = (owed + partsLeft - 1n) / partsLeft;
+    const part = evenPart(owed, wallet.perTransactionMaxUsdc);
     const lastProgress = Math.max(
       move.createdAt.getTime(),
       ...snap.actions.flatMap((action) =>

@@ -260,7 +260,10 @@ export function groupByDay(items: readonly WalletHistoryItem[]): HistoryDay[] {
   return days;
 }
 
-/** Money in and out this Nairobi month, USDC base units: out is negative. */
+/**
+ * Money in and out this Nairobi month, USDC base units: out is negative.
+ * A move to or from Treasury is neither: the money stays the company's own.
+ */
 export function monthFlows(
   items: readonly WalletHistoryItem[],
   month: string,
@@ -269,6 +272,7 @@ export function monthFlows(
   let moneyOut = 0n;
   for (const item of items) {
     if (!nairobiDay(item.createdAt).startsWith(month)) continue;
+    if (item.type === "to_treasury" || item.type === "from_treasury") continue;
     const amount = BigInt(item.usdcAmount);
     if (amount > 0n) moneyIn += amount;
     else moneyOut += amount;

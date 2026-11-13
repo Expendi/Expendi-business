@@ -19,7 +19,8 @@ import type {
   MoneyOutRow,
   OutstandingBill,
 } from "./data.js";
-import type { Row, Sheet, ZipEntry } from "./format.js";
+import type { Cell, Row, Sheet, ZipEntry } from "./format.js";
+import type { TreasuryMonth, TreasuryValue } from "./treasury.js";
 import { query, withScope } from "../../db/scope.js";
 import { ServiceUnavailable } from "../../errors.js";
 import { FileStorage } from "../storage/file-storage.js";
@@ -65,11 +66,37 @@ export const OUTSTANDING_COLUMNS = [
   "Reference",
 ] as const;
 
+/** The Treasury sheet: one row for the month, for companies with Treasury on. */
+export const TREASURY_COLUMNS = [
+  "Value at the start (USD)",
+  "Start value read on",
+  "Value at the end (USD)",
+  "End value read on",
+  "Moved to Treasury (USD)",
+  "Moved to wallet (USD)",
+  "Yield for the month (USD)",
+  "Cost of moves (USD)",
+] as const;
+
+/** The Treasury moves sheet: one row per move that ended in the month. */
+export const TREASURY_MOVE_COLUMNS = [
+  "Date",
+  "Direction",
+  "Amount that left (USD)",
+  "Amount that arrived (USD)",
+  "Cost (USD)",
+  "Transaction references",
+] as const;
+
 export const SHEET_NAMES = {
   moneyOut: "Money out",
   outstanding: "Outstanding bills",
   floatTransfers: "Float transfers",
+  treasury: "Treasury",
+  treasuryMoves: "Treasury moves",
 } as const;
+
+export const NO_SNAPSHOT = "No snapshot";
 
 const KIND_LABELS: Readonly<Record<MoneyOutKind, string>> = {
   claim: "Reimbursement",
@@ -221,10 +248,70 @@ function outstandingRow(bill: OutstandingBill, lastDay: string): Row {
   ];
 }
 
+const DIRECTION_LABELS = {
+  to_treasury: "To Treasury",
+  to_wallet: "To wallet",
+} as const;
+
+/** A missing snapshot is said, not left blank or shown as zero. */
+const valueCell = (value: TreasuryValue): Cell =>
+  value.usdc === null ? NO_SNAPSHOT : usdCell(value.usdc);
+
+const valueDay = (value: TreasuryValue): string =>
+  value.snapshotDate ??
+  (value.note === "turned_on_later"
+    ? "Treasury was turned on after this date"
+    : "");
+
+function treasurySheets(treasury: TreasuryMonth): {
+  readonly summary: Sheet;
+  readonly moves: Sheet;
+} {
+  return {
+    summary: {
+      name: SHEET_NAMES.treasury,
+      rows: [
+        TREASURY_COLUMNS,
+        [
+          valueCell(treasury.opening),
+          valueDay(treasury.opening),
+          valueCell(treasury.closing),
+          valueDay(treasury.closing),
+          usdCell(treasury.movedToTreasuryUsdc),
+          usdCell(treasury.movedToWalletUsdc),
+          treasury.yieldUsdc === null
+            ? NO_SNAPSHOT
+            : usdCell(treasury.yieldUsdc),
+          usdCell(treasury.costUsdc),
+        ],
+      ],
+    },
+    moves: {
+      name: SHEET_NAMES.treasuryMoves,
+      rows: [
+        TREASURY_MOVE_COLUMNS,
+        ...treasury.moves.map((move): Row => [
+          move.date,
+          DIRECTION_LABELS[move.direction],
+          usdCell(move.leftUsdc),
+          usdCell(move.arrivedUsdc),
+          usdCell(move.costUsdc),
+          move.references.join("; "),
+        ]),
+      ],
+    },
+  };
+}
+
 export interface ExportSheets {
   readonly moneyOut: Sheet;
   readonly outstanding: Sheet;
   readonly floatTransfers: Sheet;
+  /** Only for a company with Treasury on. */
+  readonly treasury: {
+    readonly summary: Sheet;
+    readonly moves: Sheet;
+  } | null;
   readonly receipts: readonly NamedReceipt[];
 }
 
@@ -255,6 +342,7 @@ export function exportSheets(data: ExportData, month: string): ExportSheets {
         ...data.floatTransfers.map((row) => moneyOutRow(row, [])),
       ],
     },
+    treasury: data.treasury ? treasurySheets(data.treasury) : null,
     receipts: files,
   };
 }
@@ -335,7 +423,14 @@ export function renderExport(
       : [];
     return {
       workbook: workbookFile(
-        [sheets.moneyOut, sheets.outstanding, sheets.floatTransfers],
+        [
+          sheets.moneyOut,
+          sheets.outstanding,
+          sheets.floatTransfers,
+          ...(sheets.treasury
+            ? [sheets.treasury.summary, sheets.treasury.moves]
+            : []),
+        ],
         mtime,
       ),
       csv: zipFile(
@@ -349,6 +444,18 @@ export function renderExport(
             name: "float-transfers.csv",
             bytes: csvFile(sheets.floatTransfers.rows),
           },
+          ...(sheets.treasury
+            ? [
+                {
+                  name: "treasury.csv",
+                  bytes: csvFile(sheets.treasury.summary.rows),
+                },
+                {
+                  name: "treasury-moves.csv",
+                  bytes: csvFile(sheets.treasury.moves.rows),
+                },
+              ]
+            : []),
         ],
         mtime,
       ),

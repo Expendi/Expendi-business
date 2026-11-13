@@ -32,6 +32,7 @@ import type { LocalSheet, PaymentStep, SheetLink } from "./bills-sheet";
 import type { BillFilterParam, BillSortKey } from "~/features/bills/bill-list";
 import type { BillPaymentRequest } from "~/features/bills/bill-payment";
 import type { PreparedBillPayment } from "~/features/bills/bills-api";
+import { TreasuryOfferButton } from "~/app/(company)/wallet/_components/treasury-offer";
 import { Banner, Banners } from "~/components/data/banner";
 import { KesTotal } from "~/components/data/money";
 import { PageHeader } from "~/components/data/page-header";
@@ -252,12 +253,15 @@ function CompanyBills({
 
   const holdShown = payment?.step === "hold";
   const costChanged = pay.error instanceof CostChangedError;
-  const paymentError =
+  const paymentFailure: unknown =
     prepare.isError && !holdShown
-      ? describePaymentError(prepare.error)
+      ? prepare.error
       : pay.isError && !costChanged
-        ? describePaymentError(pay.error)
+        ? pay.error
         : null;
+  const paymentError = paymentFailure
+    ? describePaymentError(paymentFailure)
+    : null;
   const preparing = prepare.isPending;
   const busy = preparing || pay.isPending || payment !== null;
 
@@ -354,16 +358,19 @@ function CompanyBills({
             role="alert"
             title={paymentError}
             actions={
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => {
-                  prepare.reset();
-                  pay.reset();
-                }}
-              >
-                Done
-              </Button>
+              <>
+                <TreasuryOfferButton error={paymentFailure} />
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={() => {
+                    prepare.reset();
+                    pay.reset();
+                  }}
+                >
+                  Done
+                </Button>
+              </>
             }
           />
         ) : null}
@@ -442,6 +449,7 @@ function CompanyBills({
           costChanged,
           cancelled: pay.data?.status === "cancelled" && payment !== null,
           error: paymentError,
+          failure: paymentFailure,
           onPayBill: (bill) =>
             startPayment({
               billIds: [bill.id],

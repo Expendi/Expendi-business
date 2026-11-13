@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ActivityEntry } from "@expendi-business/shared";
 
 import {
+  areaOf,
   batchCount,
   batchNames,
   datePresets,
@@ -47,12 +48,33 @@ describe("describeAction", () => {
     ["staff_signed_in", "Staff signed in"],
     ["payout.paying", "Payment sent"],
     ["payee.restored", "Payee restored"],
+    ["treasury.turned_on", "Treasury turned on"],
+    ["treasury_move.started", "Treasury move started"],
+    ["treasury_move.completed", "Treasury move completed"],
+    ["treasury_move.returned", "Treasury move returned to the wallet"],
+    ["treasury_move.failed", "Treasury move failed"],
+    ["treasury_move.needs_review", "Treasury move needs review"],
+    ["treasury_move.return_started", "Treasury move return started"],
   ])("words %s as %j", (action, words) => {
     // #when
     const described = describeAction(action);
 
     // #then
     expect(described).toBe(words);
+  });
+});
+
+describe("the Treasury area", () => {
+  it("groups Treasury's own actions and its moves under one filter, linking to Accounts", () => {
+    // #then
+    expect([
+      areaOf("treasury.turned_on")?.label,
+      areaOf("treasury_move.completed")?.label,
+      recordLink(
+        { type: "treasury_move", id: id(5), label: null },
+        "treasury_move.started",
+      )?.page,
+    ]).toEqual(["Treasury", "Treasury", "Accounts"]);
   });
 });
 

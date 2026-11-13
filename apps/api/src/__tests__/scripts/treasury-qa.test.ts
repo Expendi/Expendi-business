@@ -166,6 +166,7 @@ describe("the QA flow", () => {
   it("turns on, previews, moves and shows the move", async () => {
     expect(await runtime.runPromise(status(options()))).toEqual({
       status: "off",
+      rateBps: 519,
     });
 
     await runtime.runPromise(enrol(options()));

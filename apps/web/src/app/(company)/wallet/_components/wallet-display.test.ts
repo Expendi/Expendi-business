@@ -80,6 +80,35 @@ describe("money in and out", () => {
     });
   });
 
+  it("leaves moves to and from Treasury out of money in and out: the money stays the company's", () => {
+    // #given
+    const deposit = LEDGER.find((row) => row.type === "deposit");
+    if (!deposit) throw new Error("No sample deposit");
+    const moves: WalletHistoryItem[] = [
+      {
+        ...deposit,
+        type: "to_treasury",
+        usdcAmount: "-5000000000",
+        payout: null,
+      },
+      {
+        ...deposit,
+        type: "from_treasury",
+        usdcAmount: "1000000000",
+        payout: null,
+      },
+    ];
+
+    // #when
+    const flows = monthFlows([...LEDGER, ...moves], "2026-11");
+
+    // #then
+    expect({ in: signedUsdc(flows.in), out: signedUsdc(flows.out) }).toEqual({
+      in: "+6,031.78",
+      out: "−4,257.75",
+    });
+  });
+
   it("filters money in and money out by sign", () => {
     // #when
     const moneyIn = filterHistory(LEDGER, "in").map((row) => row.type);
@@ -132,7 +161,7 @@ describe("a ledger row", () => {
       ["Twiga Foods", "KES 186,000 · Bill"],
       ["Deposit", "From mwangaza-treasury.near"],
       ["Refund", "Zuku payment failed, money returned"],
-      ["Withdrawal", "To Treasury on Coinbase"],
+      ["Withdrawal", "To Reserve on Coinbase"],
       ["Wanjiru Kamau", "KES 260,000 · Payroll"],
     ]);
   });

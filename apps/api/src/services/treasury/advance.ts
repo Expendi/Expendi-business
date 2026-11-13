@@ -34,7 +34,11 @@ import {
   totalsOf,
   treasuryWalletOf,
 } from "./move-state.js";
-import { stepStranded } from "./stranded.js";
+import {
+  carryOutReturnApproval,
+  pendingReturnApproval,
+  stepStranded,
+} from "./stranded.js";
 import { stepToWallet } from "./to-wallet.js";
 import { earnVaultId } from "./turn-on.js";
 
@@ -394,6 +398,9 @@ export function stepTreasuryMove(
     if (snap === null) return idle(null);
     const { move } = snap;
     if (move.status !== "open") return idle(move);
+    // Staff reopened a move under review and approved sending its USDC back.
+    const approval = yield* pendingReturnApproval(move);
+    if (approval !== null) return yield* carryOutReturnApproval(snap, approval);
     if (move.direction === "to_wallet") return yield* stepToWallet(snap);
     // A move whose deposit Privy rejected, and which staff sent back from
     // the Treasury wallet: its parts to the vault are over.

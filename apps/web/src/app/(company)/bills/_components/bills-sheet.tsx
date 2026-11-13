@@ -15,6 +15,7 @@ import type { RecurringConfirmKind } from "./recurring-sheet";
 import type { SheetStepper } from "~/components/data/detail-sheet";
 import type { BillPaymentRequest } from "~/features/bills/bill-payment";
 import type { PreparedBillPayment } from "~/features/bills/bills-api";
+import { TreasuryOfferButton } from "~/app/(company)/wallet/_components/treasury-offer";
 import { DetailSheet } from "~/components/data/detail-sheet";
 import { ErrorState } from "~/components/data/states";
 import { nairobiIsoDate } from "~/features/bills/bill-dates";
@@ -106,6 +107,8 @@ export interface PaymentControls {
   readonly cancelled: boolean;
   /** Why a payment couldn't start or go through. */
   readonly error: string | null;
+  /** What `error` was made from, for the "Move to wallet" offer on a short wallet. */
+  readonly failure: unknown;
   readonly onPayBill: (bill: Bill) => void;
   readonly onConfirmHold: () => void;
   readonly onPay: () => void;
@@ -271,6 +274,7 @@ export function BillsSheet({
         <BillDetailBody
           bill={loaded}
           error={payment.error}
+          errorAction={<TreasuryOfferButton error={payment.failure} />}
           onSeeRecurring={(recurringId) =>
             onNavigate({ billId: null, recurring: recurringId })
           }

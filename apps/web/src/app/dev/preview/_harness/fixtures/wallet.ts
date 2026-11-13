@@ -33,7 +33,7 @@ export const ACCOUNTS_WALLET: WalletResponse = {
 export const ALLOWED_ADDRESSES: WithdrawalAddress[] = [
   {
     id: sampleId(601),
-    label: "Treasury on Coinbase",
+    label: "Reserve on Coinbase",
     chain: "base",
     address: "0x12ab7c3e9f04d5b6a8c1e2f3d4b5a6c7e8f99f3c",
     confirmedAt: "2026-08-12T07:30:00.000Z",
@@ -248,7 +248,7 @@ export const LEDGER: WalletHistoryItem[] = [
     payout: payout(8, {
       subjectType: "withdrawal",
       method: "usdc",
-      recipientName: "Treasury on Coinbase",
+      recipientName: "Reserve on Coinbase",
       recipientDetail: ALLOWED_ADDRESSES[0]?.address ?? "",
       recipientChain: "base",
       amountKesCents: "25800000",

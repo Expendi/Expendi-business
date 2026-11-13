@@ -53,7 +53,7 @@ const address = (
 export const ALLOWLIST: readonly WithdrawalAddress[] = [
   address(
     2401,
-    "Treasury on Coinbase",
+    "Reserve on Coinbase",
     "base",
     "0x12ab7c3e9f04d5b6a8c1e2f3d4b5a6c7e8f99f3c",
   ),

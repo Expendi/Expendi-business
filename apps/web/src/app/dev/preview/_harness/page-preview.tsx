@@ -35,9 +35,9 @@ export function PagePreview({
       </main>
     );
   }
-  const { View, path } = preview;
+  const { View, path, treasury } = preview;
   return (
-    <PreviewProviders role={role} currentPath={path}>
+    <PreviewProviders role={role} currentPath={path} treasury={treasury}>
       <Suspense>
         <View />
       </Suspense>

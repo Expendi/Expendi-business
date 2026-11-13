@@ -261,7 +261,8 @@ export function getTreasuryStatus(
   DatabaseService | PrivyWallets | Paycrest | Pretium
 > {
   return Effect.gen(function* () {
-    if (Option.isNone(yield* earnVaultId)) return { status: "unavailable" };
+    const vault = yield* earnVaultId;
+    if (Option.isNone(vault)) return { status: "unavailable" };
     const wallet = yield* withScope(tenant, (tx) =>
       query(() =>
         tx
@@ -271,8 +272,14 @@ export function getTreasuryStatus(
           .limit(1),
       ),
     ).pipe(Effect.map(([row]) => row ?? null));
-    return wallet?.treasuryTurnedOnAt
-      ? yield* treasuryOnStatus(tenant, wallet)
-      : { status: "off" };
+    if (wallet?.treasuryTurnedOnAt)
+      return yield* treasuryOnStatus(tenant, wallet);
+    const privy = yield* PrivyWallets;
+    // The invitation to turn Treasury on carries the rate, but a Privy outage
+    // must never fail the status.
+    const details = yield* privy
+      .vaultDetails(vault.value)
+      .pipe(Effect.option, Effect.map(Option.getOrNull));
+    return { status: "off", rateBps: details?.userApyBps ?? null };
   });
 }

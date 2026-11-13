@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 import { BanIcon, KeyRoundIcon, PencilIcon, RotateCcwIcon } from "lucide-react";
 import Link from "next/link";
 
@@ -78,11 +78,14 @@ const personName = (who: BillDetail["markedPaidBy"]): string =>
 export function BillDetailBody({
   bill,
   error,
+  errorAction,
   onSeeRecurring,
 }: {
   bill: BillDetail;
   /** A payment that couldn't start, e.g. the network dropped. */
   error: string | null;
+  /** Beside the error, e.g. the offer to move Treasury money to the wallet. */
+  errorAction?: ReactNode;
   onSeeRecurring: (itemId: string) => void;
 }): JSX.Element {
   const reason = unpayableReason(bill);
@@ -110,7 +113,7 @@ export function BillDetailBody({
         </Callout>
       ) : null}
       {error ? (
-        <Callout tone="error">
+        <Callout tone="error" action={errorAction}>
           <p>{error}</p>
         </Callout>
       ) : null}

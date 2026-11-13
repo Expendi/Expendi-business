@@ -19,6 +19,7 @@ export * from "./internal-alerts.js";
 export * from "./internal-audit.js";
 export * from "./internal-intent-quotes.js";
 export * from "./internal-ops.js";
+export * from "./internal-treasury.js";
 export * from "./imports.js";
 export * from "./kes-amount.js";
 export * from "./me.js";

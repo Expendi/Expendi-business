@@ -1,5 +1,8 @@
+import type { TreasuryMoveRequest } from "@expendi-business/shared";
+
 import type { ApiClient } from "~/lib/api";
 import { ApiError } from "~/lib/api";
+import { previewFor } from "./fixtures/treasury";
 
 /**
  * The preview's API: nothing leaves the browser. A read that wasn't seeded
@@ -23,7 +26,10 @@ export function createPreviewApi(): ApiClient {
     );
   return {
     get: (path) => read(path),
-    post: (path) => write("POST", path),
+    post: (path, body, schema) =>
+      path.endsWith("/treasury/moves/preview")
+        ? Promise.resolve(schema.parse(previewFor(body as TreasuryMoveRequest)))
+        : write("POST", path),
     put: (path) => write("PUT", path),
     patch: (path) => write("PATCH", path),
     delete: (path) => write("DELETE", path),

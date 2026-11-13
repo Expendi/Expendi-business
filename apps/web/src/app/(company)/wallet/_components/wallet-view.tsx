@@ -16,6 +16,7 @@ import { AddAddressSheet, AllowedAddresses } from "./allowed-addresses";
 import { BalanceCard } from "./balance-card";
 import { FundInSheet } from "./fund-in-sheet";
 import { DepositCard, PaidFromAccounts } from "./rail-cards";
+import { TreasuryAccount } from "./treasury-card";
 import { useCompanyWallet, useFinishWalletSetup } from "./wallet-api";
 import { nairobiDay } from "./wallet-display";
 import { WalletHistory } from "./wallet-history";
@@ -180,7 +181,10 @@ function ActiveAccounts({
             today={today}
           />
         </div>
-        <div className="min-w-0 [animation-delay:210ms] motion-safe:animate-rise max-[1120px]:order-3">
+        <div className="min-w-0 [animation-delay:140ms] motion-safe:animate-rise empty:hidden max-[1120px]:order-2">
+          <TreasuryAccount organizationId={organizationId} canAct={canAct} />
+        </div>
+        <div className="min-w-0 [animation-delay:210ms] motion-safe:animate-rise max-[1120px]:order-4">
           <WalletHistory
             organizationId={organizationId}
             today={today}
@@ -189,7 +193,7 @@ function ActiveAccounts({
         </div>
       </div>
       <div className="flex min-w-0 flex-col gap-4 max-[1120px]:contents">
-        <div className="min-w-0 [animation-delay:140ms] motion-safe:animate-rise max-[1120px]:order-2">
+        <div className="min-w-0 [animation-delay:140ms] motion-safe:animate-rise max-[1120px]:order-3">
           <DepositCard
             address={wallet.address}
             chain={wallet.chain}
@@ -198,14 +202,14 @@ function ActiveAccounts({
             onFundIn={canAct ? onFundIn : null}
           />
         </div>
-        <div className="min-w-0 [animation-delay:280ms] motion-safe:animate-rise max-[1120px]:order-4">
+        <div className="min-w-0 [animation-delay:280ms] motion-safe:animate-rise max-[1120px]:order-5">
           <AllowedAddresses
             organizationId={organizationId}
             canAct={canAct}
             onAdd={onAddAddress}
           />
         </div>
-        <div className="min-w-0 [animation-delay:350ms] motion-safe:animate-rise max-[1120px]:order-5">
+        <div className="min-w-0 [animation-delay:350ms] motion-safe:animate-rise max-[1120px]:order-6">
           <PaidFromAccounts organizationId={organizationId} />
         </div>
       </div>

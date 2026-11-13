@@ -11,6 +11,7 @@ import {
   companyDetail,
   searchCompanies,
 } from "../../services/staff/companies.js";
+import { staffTreasury } from "../../services/staff/treasury.js";
 
 /** Mounted at `/internal`, behind staff login. Read-only, for every staff role. */
 export function createCompanyRoutes(
@@ -35,5 +36,8 @@ export function createCompanyRoutes(
     )
     .get("/companies/:organizationId", (c) =>
       runEffect(runtime, c, companyDetail(c.req.param("organizationId"))),
+    )
+    .get("/companies/:organizationId/treasury", (c) =>
+      runEffect(runtime, c, staffTreasury(c.req.param("organizationId"))),
     );
 }

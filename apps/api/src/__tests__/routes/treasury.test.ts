@@ -174,6 +174,7 @@ const treasuryWallets = () =>
 
 beforeEach(() => {
   privy.state.reset();
+  privy.state.setVaultApy(519);
   email.state.reset();
 });
 
@@ -186,7 +187,32 @@ describe("GET /organizations/:organizationId/treasury", () => {
     expect(await statusOf(company, company.admin, unconfiguredApp)).toEqual({
       status: "unavailable",
     });
-    expect(await statusOf(company, company.admin)).toEqual({ status: "off" });
+    expect(await statusOf(company, company.admin)).toEqual({
+      status: "off",
+      rateBps: 519,
+    });
+  });
+
+  it("carries the vault's current rate while off, and null when Privy can't give it", async () => {
+    // #given
+    const { company } = await setUp();
+    privy.state.setVaultApy(480);
+
+    // #then the invitation shows the rate
+    expect(await statusOf(company, company.admin)).toEqual({
+      status: "off",
+      rateBps: 480,
+    });
+
+    // #when Privy can't be reached, or has no rate
+    privy.state.failNext("vaultDetails");
+    const failed = await statusOf(company, company.admin);
+    privy.state.setVaultApy(null);
+    const noRate = await statusOf(company, company.admin);
+
+    // #then the status still answers
+    expect(failed).toEqual({ status: "off", rateBps: null });
+    expect(noRate).toEqual({ status: "off", rateBps: null });
   });
 
   it("shows an accountant the status and refuses an employee", async () => {
@@ -201,7 +227,10 @@ describe("GET /organizations/:organizationId/treasury", () => {
     const asEmployee = await sendJson(app, treasuryPath(company), employee);
 
     // #then
-    expect(await statusOf(company, accountant)).toEqual({ status: "off" });
+    expect(await statusOf(company, accountant)).toEqual({
+      status: "off",
+      rateBps: 519,
+    });
     expect(asEmployee.status).toBe(403);
   });
 });

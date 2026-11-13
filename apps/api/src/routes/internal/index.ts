@@ -13,6 +13,7 @@ import { createControlRoutes } from "./controls.js";
 import { createImportRoutes } from "./imports.js";
 import { createIntentQuoteRoutes } from "./intent-quotes.js";
 import { createPayoutRoutes } from "./payouts.js";
+import { createTreasuryActionRoutes } from "./treasury-actions.js";
 
 /**
  * Mounted at `/internal`: the Expendi team's admin app (spec §6.15). Every
@@ -37,5 +38,6 @@ export function createInternalRoutes(
     .route("/", createImportRoutes(runtime))
     .route("/", createPayoutRoutes(runtime))
     .route("/", createIntentQuoteRoutes(runtime))
-    .route("/", createControlRoutes(runtime));
+    .route("/", createControlRoutes(runtime))
+    .route("/", createTreasuryActionRoutes(runtime));
 }

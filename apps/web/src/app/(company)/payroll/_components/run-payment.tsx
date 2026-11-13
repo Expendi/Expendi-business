@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDownIcon, KeyRoundIcon } from "lucide-react";
 import Link from "next/link";
@@ -72,6 +72,8 @@ export interface RunPayment {
   readonly busy: boolean;
   readonly cancelled: boolean;
   readonly error: string | null;
+  /** What `error` was made from, for the "Move to wallet" offer on a short wallet. */
+  readonly failure: unknown;
   readonly start: (request: PayrollPaymentRequest) => void;
   readonly confirmHold: () => void;
   readonly pay: () => void;
@@ -123,13 +125,14 @@ export function useRunPayment(organizationId: string): RunPayment {
     });
   }
 
-  const error = held
+  const failure: unknown = held
     ? null
     : prepare.isError
-      ? describePaymentError(prepare.error)
+      ? prepare.error
       : payment.isError
-        ? describePaymentError(payment.error)
+        ? payment.error
         : null;
+  const error = failure ? describePaymentError(failure) : null;
 
   return {
     prepared,
@@ -144,6 +147,7 @@ export function useRunPayment(organizationId: string): RunPayment {
       held !== null,
     cancelled: payment.data?.status === "cancelled" && prepared !== null,
     error,
+    failure,
     start,
     confirmHold: () => {
       if (held) start({ ...held.request, secondConfirmation: true });
@@ -166,11 +170,13 @@ export function useRunPayment(organizationId: string): RunPayment {
 export function PayrollReview({
   prepared,
   error,
+  errorAction,
   cancelled,
 }: {
   prepared: PreparedPayrollPayment;
   /** e.g. the cost changed since the review; nothing was sent. */
   error: string | null;
+  errorAction?: ReactNode;
   cancelled: boolean;
 }): JSX.Element {
   const { payment } = prepared;
@@ -186,7 +192,7 @@ export function PayrollReview({
     <>
       {error ? (
         <div role="alert">
-          <Callout tone="warn">
+          <Callout tone="warn" action={errorAction}>
             <p>{error}</p>
           </Callout>
         </div>

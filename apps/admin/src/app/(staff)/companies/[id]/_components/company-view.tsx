@@ -20,6 +20,7 @@ import { describeApiError } from "~/lib/api";
 import { formatKesCents, formatNairobiTime, formatUsdc } from "~/lib/format";
 import { queryKeys } from "~/lib/query-keys";
 import { memberColumns } from "./columns";
+import { TreasurySection } from "./treasury-section";
 
 /** One company, as the Expendi team sees it (spec §6.15). Read-only except the pause. */
 export function CompanyView({ companyId }: { companyId: string }) {
@@ -145,6 +146,8 @@ export function CompanyView({ companyId }: { companyId: string }) {
           <MembersTable members={company.members} />
         )}
       </Card>
+
+      <TreasurySection companyId={company.id} canAct={canAct} />
 
       <Card className="mt-6 gap-0 overflow-hidden py-0">
         <CardHeader className="border-b py-4">
