@@ -162,6 +162,7 @@ describe("a history row's counterparty", () => {
       approvalId: null,
       approvedAt: null,
       paidAt: null,
+      categoryName: null,
       paymentReceipts: [],
       rate: null,
       failureReason: null,

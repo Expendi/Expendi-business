@@ -20,7 +20,11 @@ import { billKeys } from "~/features/payment-keys";
 import { ApiError } from "~/lib/api";
 import { FileContents } from "./file-sheet";
 import { nairobiMonth, shareMessage } from "./report-month";
-import { fetchReportFile, reportKeys } from "./reports-api";
+import {
+  fetchBillPaymentReceipt,
+  fetchReportFile,
+  reportKeys,
+} from "./reports-api";
 import {
   categoryRows,
   changeLine,
@@ -562,6 +566,74 @@ describe("downloading a month's file", () => {
     // #then
     await expect(outcome).rejects.toMatchObject({ status: 401 });
     expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
+describe("downloading a bill's payment receipt", () => {
+  const BILL = "22222222-2222-4222-8222-222222222222";
+
+  it("gets the receipt with the session's token and names it as the API does", async () => {
+    // #given
+    const fetcher = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), {
+          headers: {
+            "content-type": "application/pdf",
+            "content-disposition":
+              'attachment; filename="payment-receipt-RCT-AB12CD34.pdf"',
+          },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    // #when
+    const file = await fetchBillPaymentReceipt(API, ORG, BILL);
+
+    // #then
+    const [url, init] = fetcher.mock.calls[0] ?? [];
+    expect({
+      url,
+      authorization: new Headers(init?.headers).get("authorization"),
+      filename: file.filename,
+      bytes: [...new Uint8Array(await file.blob.arrayBuffer())],
+    }).toEqual({
+      url: `https://api.example.com/organizations/${ORG}/bills/${BILL}/payment-receipt`,
+      authorization: "Bearer accountant-token",
+      filename: "payment-receipt-RCT-AB12CD34.pdf",
+      bytes: [0x25, 0x50, 0x44, 0x46],
+    });
+  });
+
+  it("raises the API's refusal when the bill has no receipt", async () => {
+    // #given
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(
+        Response.json(
+          {
+            success: false,
+            error: {
+              _tag: "Conflict",
+              message:
+                "This bill wasn't paid through Expendi, so there's no payment receipt.",
+            },
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    // #when
+    const outcome = fetchBillPaymentReceipt(API, ORG, BILL);
+
+    // #then
+    await expect(outcome).rejects.toEqual(
+      new ApiError(
+        409,
+        "Conflict",
+        "This bill wasn't paid through Expendi, so there's no payment receipt.",
+      ),
+    );
   });
 });
 

@@ -1,5 +1,5 @@
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
-import { Effect } from "effect";
+import { Effect, Exit } from "effect";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -23,7 +23,7 @@ import type { PayoutRejected } from "../services/payout/payout-errors.js";
 import { BadRequest, NotFound, ServiceUnavailable } from "../errors.js";
 import { readBody, readOptionalBody } from "../http/body.js";
 import { payoutRejectionAsClientError } from "../http/payout-rejection.js";
-import { runEffect } from "../http/respond.js";
+import { failureResponse, runEffect } from "../http/respond.js";
 import { requireAdminOrReader, requireRole } from "../middleware/tenant.js";
 import {
   attachBillInvoices,
@@ -41,6 +41,11 @@ import {
   requestBillPayment,
   requestBillRetry,
 } from "../services/bills/pay.js";
+import {
+  billPaymentReceiptFilename,
+  getBillPaymentReceiptData,
+  renderBillPaymentReceiptPdf,
+} from "../services/bills/payment-receipt.js";
 
 const uuid = z.uuid();
 
@@ -193,6 +198,28 @@ export function createBillRoutes(
         ),
       ),
     )
+    .get("/:billId/payment-receipt", async (c) => {
+      c.header("Cache-Control", "no-store");
+      const exit = await runtime.runPromiseExit(
+        billIdFrom(c.req.param("billId")).pipe(
+          Effect.flatMap((billId) =>
+            getBillPaymentReceiptData(c.get("tenant"), billId),
+          ),
+          Effect.flatMap((data) =>
+            Effect.promise(() => renderBillPaymentReceiptPdf(data)).pipe(
+              Effect.map((bytes) => ({ bytes, number: data.receiptNumber })),
+            ),
+          ),
+        ),
+      );
+      if (Exit.isFailure(exit)) return failureResponse(c, exit.cause);
+      const { bytes, number } = exit.value;
+      return c.body(new Uint8Array(bytes), 200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${billPaymentReceiptFilename(number)}"`,
+        "X-Content-Type-Options": "nosniff",
+      });
+    })
     .post("/", (c) =>
       runEffect(
         runtime,

@@ -20,6 +20,7 @@ import { DetailSheet } from "~/components/data/detail-sheet";
 import { ErrorState } from "~/components/data/states";
 import { nairobiIsoDate } from "~/features/bills/bill-dates";
 import { useBill } from "~/features/bills/bills-api";
+import { useReceiptDownload } from "~/features/bills/receipt-download";
 import {
   useCreateRecurringItem,
   useRecurringItem,
@@ -174,6 +175,7 @@ export function BillsSheet({
   onBillCreated: (bill: BillDetail) => void;
 }): JSX.Element {
   const [footerSlot, setFooterSlot] = useState<HTMLDivElement | null>(null);
+  const receiptDownload = useReceiptDownload(organizationId);
   const detail = useBill(organizationId, billId ?? "", {
     enabled: billId !== null,
   });
@@ -275,6 +277,7 @@ export function BillsSheet({
           bill={loaded}
           error={payment.error}
           errorAction={<TreasuryOfferButton error={payment.failure} />}
+          receiptDownload={receiptDownload}
           onSeeRecurring={(recurringId) =>
             onNavigate({ billId: null, recurring: recurringId })
           }

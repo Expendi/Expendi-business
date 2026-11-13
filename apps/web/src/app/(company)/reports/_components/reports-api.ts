@@ -162,16 +162,19 @@ async function refusal(response: Response): Promise<ApiError> {
       );
 }
 
+interface AuthorisedFile {
+  readonly blob: Blob;
+  readonly contentDisposition: string | null;
+}
+
 /**
- * `GET …/reports/:month/:format` as a file. The JSON client can't carry a
- * download, so this sends the same bearer token itself.
+ * `GET <path>` as a file. The JSON client can't carry a download, so this
+ * sends the same bearer token itself.
  */
-export async function fetchReportFile(
+async function fetchAuthorisedFile(
   { baseUrl, getAccessToken }: ApiClientOptions,
-  organizationId: string,
-  month: string,
-  format: ReportFormat,
-): Promise<ReportFile> {
+  path: string,
+): Promise<AuthorisedFile> {
   const token = await getAccessToken();
   if (!token) {
     throw new ApiError(
@@ -183,22 +186,54 @@ export async function fetchReportFile(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
   try {
-    const response = await fetch(
-      `${baseUrl.replace(/\/+$/, "")}/organizations/${organizationId}/reports/${month}/${format}`,
-      {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal,
-      },
-    );
+    const response = await fetch(`${baseUrl.replace(/\/+$/, "")}${path}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
     if (!response.ok) throw await refusal(response);
     return {
-      filename: reportFilename(month, format),
       blob: await response.blob(),
+      contentDisposition: response.headers.get("Content-Disposition"),
     };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/** `GET …/reports/:month/:format` as a file. */
+export async function fetchReportFile(
+  options: ApiClientOptions,
+  organizationId: string,
+  month: string,
+  format: ReportFormat,
+): Promise<ReportFile> {
+  const { blob } = await fetchAuthorisedFile(
+    options,
+    `/organizations/${organizationId}/reports/${month}/${format}`,
+  );
+  return { filename: reportFilename(month, format), blob };
+}
+
+const RECEIPT_FALLBACK_FILENAME = "payment-receipt.pdf";
+
+/** The name the API gave the download: `attachment; filename="…"`. */
+function attachmentFilename(contentDisposition: string | null): string {
+  const match = /filename="([^"]+)"/.exec(contentDisposition ?? "");
+  return match?.[1] ?? RECEIPT_FALLBACK_FILENAME;
+}
+
+/** `GET …/bills/:billId/payment-receipt`: the PDF of a bill paid through Expendi. */
+export async function fetchBillPaymentReceipt(
+  options: ApiClientOptions,
+  organizationId: string,
+  billId: string,
+): Promise<ReportFile> {
+  const { blob, contentDisposition } = await fetchAuthorisedFile(
+    options,
+    `/organizations/${organizationId}/bills/${billId}/payment-receipt`,
+  );
+  return { filename: attachmentFilename(contentDisposition), blob };
 }
 
 function openDownload(href: string, filename: string): void {
@@ -238,6 +273,26 @@ export function useReportDownload(
         organizationId,
         month,
         format,
+      );
+      saveFile(file);
+      return file.filename;
+    },
+  });
+}
+
+/** Downloads a paid bill's payment receipt and saves it; resolves to its name. */
+export function useBillReceiptDownload(
+  organizationId: string,
+): UseMutationResult<string, Error, string> {
+  const { getAccessToken } = usePrivy();
+  return useMutation({
+    mutationFn: async (billId) => {
+      const env = readPublicEnv();
+      if (!env.ok) throw new Error("Dashboard API configuration is missing");
+      const file = await fetchBillPaymentReceipt(
+        { baseUrl: env.env.NEXT_PUBLIC_API_URL, getAccessToken },
+        organizationId,
+        billId,
       );
       saveFile(file);
       return file.filename;

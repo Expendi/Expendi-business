@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { WalletHistoryItem } from "@expendi-business/shared";
 
+import type { ReceiptDownload } from "~/features/bills/receipt-download";
 import { LEDGER } from "~/app/dev/preview/_harness/fixtures/wallet";
 import {
   pageText,
@@ -131,6 +132,183 @@ describe("a paid cash-out's receipt", () => {
 
     // #then
     expect(showsReceipt(page)).toBe(false);
+  });
+});
+
+describe("a bill payment's category and receipt download", () => {
+  const idle: ReceiptDownload = {
+    billId: null,
+    pending: false,
+    error: null,
+    start: vi.fn(),
+  };
+
+  function rowWhere(
+    find: (item: WalletHistoryItem) => boolean,
+  ): WalletHistoryItem {
+    const item = LEDGER.find(find);
+    if (!item) throw new Error("No sample row");
+    return item;
+  }
+
+  const paidBill = rowWhere(
+    (row) =>
+      row.type === "payout" &&
+      row.payout?.subjectType === "bill" &&
+      row.payout.payrollRunId === null &&
+      row.payout.status === "paid",
+  );
+
+  const unescaped = (html: string): string =>
+    html.replaceAll("&amp;", "&").replaceAll("&#x27;", "'");
+
+  function page(item: WalletHistoryItem, download = idle): string {
+    return unescaped(
+      pageText(
+        renderToStaticMarkup(
+          <TxDetails
+            item={item}
+            items={LEDGER}
+            today="2026-11-06"
+            rate="129"
+            receiptDownload={download}
+          />,
+        ),
+      ),
+    );
+  }
+
+  function withPayout(
+    item: WalletHistoryItem,
+    changes: Partial<NonNullable<WalletHistoryItem["payout"]>>,
+  ): WalletHistoryItem {
+    return {
+      ...item,
+      payout: item.payout && { ...item.payout, ...changes },
+    };
+  }
+
+  it("shows the bill's category right after what it was for", () => {
+    // #given
+    const bill = withPayout(paidBill, { categoryName: "Rent & utilities" });
+
+    // #when
+    const text = page(bill);
+
+    // #then
+    expect(text).toMatch(/For Bill\s+Category Rent & utilities/);
+  });
+
+  it("leaves the category out of a reimbursement and a bill without one", () => {
+    // #given
+    const claim = rowWhere((row) => row.payout?.subjectType === "claim");
+    const uncategorised = withPayout(paidBill, { categoryName: null });
+
+    // #when
+    const pages = [page(claim), page(uncategorised)];
+
+    // #then
+    expect(pages.map((text) => text.includes("Category"))).toEqual([
+      false,
+      false,
+    ]);
+  });
+
+  it("offers the receipt of a paid bill payment", () => {
+    // #when
+    const text = page(paidBill);
+
+    // #then
+    expect(text).toContain("Download receipt");
+  });
+
+  it.each(["awaiting_approval", "paying", "failed", "needs_review"] as const)(
+    "offers no receipt while the payment is %s",
+    (status) => {
+      // #when
+      const text = page(withPayout(paidBill, { status }));
+
+      // #then
+      expect(text).not.toContain("Download receipt");
+    },
+  );
+
+  it("offers no receipt for a reimbursement, a salary or a withdrawal", () => {
+    // #given
+    const kinds = ["claim", "withdrawal"] as const;
+    const salary = rowWhere((row) => row.payout?.payrollRunId != null);
+    const others = kinds.map((subject) =>
+      rowWhere(
+        (row) =>
+          row.payout?.subjectType === subject && row.payout.status === "paid",
+      ),
+    );
+
+    // #when
+    const pages = [...others, salary].map((item) => page(item));
+
+    // #then
+    expect(pages.map((text) => text.includes("Download receipt"))).toEqual([
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it("offers no receipt where nothing can be downloaded", () => {
+    // #when
+    const text = pageText(
+      renderToStaticMarkup(
+        <TxDetails
+          item={paidBill}
+          items={LEDGER}
+          today="2026-11-06"
+          rate="129"
+        />,
+      ),
+    );
+
+    // #then
+    expect(text).not.toContain("Download receipt");
+  });
+
+  it("disables the button while this bill's receipt downloads", () => {
+    // #given
+    const billId = paidBill.payout?.subjectId ?? null;
+
+    // #when
+    const html = renderToStaticMarkup(
+      <TxDetails
+        item={paidBill}
+        items={LEDGER}
+        today="2026-11-06"
+        rate="129"
+        receiptDownload={{ ...idle, billId, pending: true }}
+      />,
+    );
+
+    // #then
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>.*Preparing receipt/s);
+  });
+
+  it("shows a failed download under the button, only on the bill it was for", () => {
+    // #given
+    const billId = paidBill.payout?.subjectId ?? null;
+    const failed: ReceiptDownload = {
+      ...idle,
+      billId,
+      error:
+        "This bill's payment hasn't gone through yet, so there's no receipt.",
+    };
+    const elsewhere: ReceiptDownload = { ...failed, billId: "another-bill" };
+
+    // #when
+    const pages = [page(paidBill, failed), page(paidBill, elsewhere)];
+
+    // #then
+    expect(
+      pages.map((text) => text.includes("hasn't gone through yet")),
+    ).toEqual([true, false]);
   });
 });
 

@@ -70,6 +70,8 @@ export const walletHistoryPayoutSchema = z.object({
   approvalId: z.uuid().nullable(),
   approvedAt: z.iso.datetime().nullable(),
   paidAt: z.iso.datetime().nullable(),
+  /** The category of the bill a payout pays; null for anything that isn't a bill. */
+  categoryName: z.string().nullable(),
   /** A paid cash-out's receipt; always empty for USDC and withdrawals. */
   paymentReceipts: paymentReceiptsSchema,
   /** KES per USDC the payout was sent at; null until the cash-out has one. */

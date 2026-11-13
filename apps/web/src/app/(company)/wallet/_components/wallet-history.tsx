@@ -12,6 +12,7 @@ import { EmptyState, ErrorState } from "~/components/data/states";
 import { useDeepLinkParam } from "~/components/data/use-deep-link-param";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
+import { useReceiptDownload } from "~/features/bills/receipt-download";
 import { describeApiError } from "~/lib/api";
 import { historyColumns, TxPhoneCard } from "./columns";
 import { TxSheet } from "./tx-sheet";
@@ -44,6 +45,7 @@ export function WalletHistory({
   rate: string | null;
 }): JSX.Element {
   const history = useWalletHistory(organizationId);
+  const receiptDownload = useReceiptDownload(organizationId);
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const [openId, setOpenId] = useDeepLinkParam("txId");
   const items = useMemo(
@@ -142,6 +144,7 @@ export function WalletHistory({
         items={items}
         today={today}
         rate={rate}
+        receiptDownload={receiptDownload}
         onClose={() => setOpenId(null)}
         stepper={{
           index,
