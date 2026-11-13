@@ -666,6 +666,20 @@
       "when": 1794524145857,
       "tag": "0094_treasury_earn_actions_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1794529170286,
+      "tag": "0095_treasury_return_to_wallet",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1794529174433,
+      "tag": "0096_treasury_return_to_wallet_job",
+      "breakpoints": true
     }
   ]
 }

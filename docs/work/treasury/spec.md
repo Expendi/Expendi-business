@@ -518,6 +518,21 @@ The withdrawal, reading what arrived, the return quotes paid by the Treasury wal
 - A 1Click outage is retried for 5 minutes; a quote 1Click refuses outright fails the move at once; an expired quote is taken again up to 3 times.
 - If 1Click reports a delivery without its amount, the move goes to review instead of depositing anything.
 
+**How T4 differs from this spec** (2026-11-13):
+
+- What a withdrawal delivered is read from its own transaction: the USDC transfers to the Treasury wallet in the receipt, never more than was asked. USDC sent in any other transaction is never counted. A stranger's transfer inside the same bundled transaction would be, which is very unlikely; the vault's own address isn't known, so the transfers can't be filtered by sender.
+- If the withdrawal succeeded but its USDC can't be sent back (no quote, Privy refuses the transfer, the quote expires three times), the move goes to `needs_review`, not `failed`, so USDC sitting in the Treasury wallet is never hidden. Five refunded parts in one move also send it to review.
+- The live vault position is read before the passkey is used, so a refusal doesn't cost a confirmation.
+- `returnStrandedDeposit` sends a `to_treasury` move's undeposited USDC back, with audit action `treasury_move.return_started`. It has no route yet, and a `to_wallet` move in `needs_review` has no staff path at all.
+- `from_treasury` ledger rows now carry their quote. Debits stay one per quote; credits stay one per receipt, so a delivery that arrives in two transfers is credited in full.
+
+**What T4 left for T5 to T7:**
+
+- The move list doesn't show "all" or what a withdrawal delivered.
+- The alert for USDC sitting in a Treasury wallet must count a `to_wallet` move in `needs_review` as a reason.
+- A staff route for `returnStrandedDeposit` reaches code that signs, so it goes behind the staff confirmation flow and must keep `internal-routes.test.ts` green.
+- The export can work out a move to the wallet's cost as `delivered_usdc` less its `from_treasury` credits.
+
 ### T5: Figures, snapshots and alerts
 
 Position and rate on `GET /treasury`, the snapshot job, the four alert checks, the "wallet is short" message.

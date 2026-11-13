@@ -1,39 +1,44 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { Cause, Effect, Exit, Option } from "effect";
 
 import { formatUsdAmount } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
-import type {
-  IntentQuote,
-  TreasuryEarnAction,
-  TreasuryMove,
-  Wallet,
-} from "../../db/schema/index.js";
-import type { Transaction } from "../../db/scope.js";
+import type { IntentQuote, TreasuryMove } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
+import type { AuditLog } from "../audit/audit-log.js";
 import type { QuoteDepositDeps } from "../intents/quote-deposit.js";
-import type {
-  EarnActionRecord,
-  PrivyWallets as PrivyWalletsService,
-} from "../wallet/privy-wallets.js";
+import type { PrivyWallets as PrivyWalletsService } from "../wallet/privy-wallets.js";
+import type { Snapshot, Step, TreasuryAdvanceOptions } from "./move-state.js";
 import {
   companyWalletSends,
-  intentQuotes,
   treasuryEarnActions,
   treasuryMoves,
   wallets,
   walletTransactions,
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
-import { AuditLog } from "../audit/audit-log.js";
 import { baseUsdcBalance } from "../chain/base-rpc.js";
 import { advanceCompanyQuote } from "../intents/quote-deposit.js";
 import { openTreasuryQuote } from "../intents/treasury-quote.js";
-import { notify } from "../notification/notify.js";
-import { PrivyWallets } from "../wallet/privy-wallets.js";
+import {
+  advanceEarnAction,
+  depositsOf,
+  endMove,
+  idle,
+  isDeposited,
+  load,
+  moved,
+  needsReview,
+  totalsOf,
+  treasuryWalletOf,
+} from "./move-state.js";
+import { stepStranded } from "./stranded.js";
+import { stepToWallet } from "./to-wallet.js";
 import { earnVaultId } from "./turn-on.js";
+
+export type { TreasuryAdvanceOptions } from "./move-state.js";
 
 /**
  * Moving a company's USDC into Treasury, one part at a time
@@ -56,15 +61,11 @@ import { earnVaultId } from "./turn-on.js";
  * once, by unique indexes on `treasury_earn_actions`.
  */
 
-const ACTOR = { type: "system", id: "treasury-moves" } as const;
-
 /** Privy rejects a deposit this many times before a person looks. */
 export const EARN_MAX_ATTEMPTS = 3;
 /** A part's quote that expires unused is taken again this many times. */
 const QUOTE_MAX_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 30_000;
-/** Privy keeps an idempotency key for 24 hours; a repeat is never sent near that. */
-const UNKNOWN_CALL_LIMIT_MS = 60 * 60_000;
 /** How long a delivery may take to show in the Treasury wallet, or a refund to be credited. */
 const ARRIVAL_WAIT_MS = 30 * 60_000;
 /** A quote 1Click can't be asked for is retried this long before the move ends. */
@@ -74,234 +75,7 @@ const MAX_STEPS_PER_RUN = 12;
 
 export type TreasuryDeps = QuoteDepositDeps | AuditLog | PrivyWalletsService;
 
-export interface TreasuryAdvanceOptions {
-  /** How long after a rejected deposit the next attempt waits; tests pass 0. */
-  readonly retryDelayMs?: number;
-}
-
-interface Snapshot {
-  readonly move: TreasuryMove;
-  readonly wallet: Wallet;
-  /** The move's quotes, oldest first: one per attempt at a part. */
-  readonly quotes: readonly IntentQuote[];
-  readonly actions: readonly TreasuryEarnAction[];
-  /** Quotes whose send has already been debited. */
-  readonly debited: ReadonlySet<string>;
-}
-
-interface Step {
-  readonly move: TreasuryMove | null;
-  /** Whether something changed that a following step may build on. */
-  readonly progressed: boolean;
-}
-
-const idle = (move: TreasuryMove | null): Step => ({ move, progressed: false });
-const moved = (move: TreasuryMove | null): Step => ({ move, progressed: true });
-
 const usdc = formatUsdAmount;
-
-function load(
-  organizationId: string,
-  moveId: string,
-): Effect.Effect<Snapshot | null, DatabaseError, DatabaseService> {
-  return withScope({ organizationId }, (tx) =>
-    Effect.gen(function* () {
-      const [move] = yield* query(() =>
-        tx.select().from(treasuryMoves).where(eq(treasuryMoves.id, moveId)),
-      );
-      if (!move) return null;
-      const [wallet] = yield* query(() =>
-        tx.select().from(wallets).where(eq(wallets.id, move.walletId)),
-      );
-      if (!wallet) return null;
-      const quotes = yield* query(() =>
-        tx
-          .select()
-          .from(intentQuotes)
-          .where(eq(intentQuotes.treasuryMoveId, moveId))
-          .orderBy(asc(intentQuotes.createdAt), asc(intentQuotes.id)),
-      );
-      const actions = yield* query(() =>
-        tx
-          .select()
-          .from(treasuryEarnActions)
-          .where(eq(treasuryEarnActions.treasuryMoveId, moveId))
-          .orderBy(
-            asc(treasuryEarnActions.createdAt),
-            asc(treasuryEarnActions.attempt),
-          ),
-      );
-      const debits = yield* query(() =>
-        tx
-          .select({ quoteId: walletTransactions.intentQuoteId })
-          .from(walletTransactions)
-          .where(
-            and(
-              eq(walletTransactions.treasuryMoveId, moveId),
-              eq(walletTransactions.type, "to_treasury"),
-            ),
-          ),
-      );
-      return {
-        move,
-        wallet,
-        quotes,
-        actions,
-        debited: new Set(
-          debits.flatMap(({ quoteId }) => (quoteId === null ? [] : [quoteId])),
-        ),
-      };
-    }),
-  );
-}
-
-const depositsOf = (snap: Snapshot, quote: IntentQuote) =>
-  snap.actions.filter(
-    (action) => action.kind === "deposit" && action.intentQuoteId === quote.id,
-  );
-
-const isDeposited = (snap: Snapshot, quote: IntentQuote) =>
-  depositsOf(snap, quote).some((action) => action.status === "succeeded");
-
-const sumOf = (rows: readonly { readonly value: string | null }[]): bigint =>
-  BigInt(rows[0]?.value ?? "0");
-
-/** What the move has debited, credited back and put in the vault so far. */
-function totalsOf(tx: Transaction, moveId: string) {
-  return Effect.gen(function* () {
-    const debits = yield* query(() =>
-      tx
-        .select({
-          value: sql<string>`coalesce(-sum(${walletTransactions.usdcAmount}), 0)::text`,
-        })
-        .from(walletTransactions)
-        .where(
-          and(
-            eq(walletTransactions.treasuryMoveId, moveId),
-            eq(walletTransactions.type, "to_treasury"),
-          ),
-        ),
-    );
-    const credits = yield* query(() =>
-      tx
-        .select({
-          value: sql<string>`coalesce(sum(${walletTransactions.usdcAmount}), 0)::text`,
-        })
-        .from(walletTransactions)
-        .where(
-          and(
-            eq(walletTransactions.treasuryMoveId, moveId),
-            eq(walletTransactions.type, "from_treasury"),
-          ),
-        ),
-    );
-    const deposits = yield* query(() =>
-      tx
-        .select({
-          value: sql<string>`coalesce(sum(${treasuryEarnActions.rawAmount}), 0)::text`,
-        })
-        .from(treasuryEarnActions)
-        .where(
-          and(
-            eq(treasuryEarnActions.treasuryMoveId, moveId),
-            eq(treasuryEarnActions.kind, "deposit"),
-            eq(treasuryEarnActions.status, "succeeded"),
-          ),
-        ),
-    );
-    const debited = sumOf(debits);
-    const creditedBack = sumOf(credits);
-    const deposited = sumOf(deposits);
-    return {
-      debited,
-      creditedBack,
-      deposited,
-      cost: debited - creditedBack - deposited,
-    };
-  });
-}
-
-type Ending = "completed" | "returned" | "failed" | "needs_review";
-
-/**
- * Ends the move, once: only an `open` move changes, so a second call finds
- * it settled and does nothing. The totals, the audit entry and the
- * notification are written in the same transaction. A move under review
- * keeps its reservation and its totals stay empty until a person settles it.
- */
-function endMove(
-  snap: Snapshot,
-  status: Ending,
-  failure: string | null,
-): Effect.Effect<Step, DatabaseError, DatabaseService | AuditLog> {
-  const { organizationId, id } = snap.move;
-  return withScope({ organizationId }, (tx) =>
-    Effect.gen(function* () {
-      const audit = yield* AuditLog;
-      const totals = yield* totalsOf(tx, id);
-      const reviewing = status === "needs_review";
-      const [ended] = yield* query(() =>
-        tx
-          .update(treasuryMoves)
-          .set({
-            status,
-            failure,
-            movedUsdc: reviewing ? null : totals.deposited,
-            costUsdc: reviewing ? null : totals.cost,
-            settledAt: reviewing ? null : new Date(),
-          })
-          .where(
-            and(eq(treasuryMoves.id, id), eq(treasuryMoves.status, "open")),
-          )
-          .returning(),
-      );
-      if (!ended) {
-        const [current] = yield* query(() =>
-          tx.select().from(treasuryMoves).where(eq(treasuryMoves.id, id)),
-        );
-        return idle(current ?? null);
-      }
-      const short =
-        status === "completed" && totals.debited < ended.requestedUsdc;
-      yield* audit.record(tx, {
-        actor: ACTOR,
-        organizationId,
-        action: `treasury_move.${status}`,
-        entity: { type: "treasury_move", id },
-        before: { status: "open" },
-        after: {
-          status,
-          requestedUsdc: ended.requestedUsdc,
-          movedUsdc: ended.movedUsdc,
-          costUsdc: ended.costUsdc,
-          failure,
-          ...(short && { partlyFilled: true }),
-        },
-      });
-      const outcome = short
-        ? ("partly_filled" as const)
-        : status === "completed"
-          ? null
-          : status;
-      yield* notify(
-        tx,
-        outcome === null
-          ? {
-              kind: "treasury_move_completed",
-              organizationId,
-              moveId: id,
-            }
-          : {
-              kind: "treasury_move_ended",
-              organizationId,
-              moveId: id,
-              outcome,
-            },
-      );
-      return moved(ended);
-    }),
-  );
-}
 
 /**
  * A part couldn't go on and nothing of it moved: the move ends `completed`
@@ -313,9 +87,6 @@ function endShort(snap: Snapshot, reason: string) {
   );
   return endMove(snap, deposited ? "completed" : "failed", reason);
 }
-
-const needsReview = (snap: Snapshot, reason: string) =>
-  endMove(snap, "needs_review", reason);
 
 /**
  * The send's debit, written once: a quote has at most one `to_treasury`
@@ -488,44 +259,6 @@ function nextPart(snap: Snapshot) {
   });
 }
 
-/** Moves an Earn action to what Privy reports, once, from the status it was last seen in. */
-function applyAction(
-  snap: Snapshot,
-  action: TreasuryEarnAction,
-  record: EarnActionRecord,
-) {
-  const terminal = record.status !== "pending";
-  return withScope({ organizationId: snap.move.organizationId }, (tx) =>
-    query(() =>
-      tx
-        .update(treasuryEarnActions)
-        .set({
-          privyActionId: record.actionId,
-          status: record.status,
-          shareAmount: record.shareAmount,
-          txHash: record.txHash,
-          failure: record.failureReason,
-          settledAt: terminal ? new Date() : null,
-        })
-        .where(
-          and(
-            eq(treasuryEarnActions.id, action.id),
-            eq(treasuryEarnActions.status, action.status),
-          ),
-        )
-        .returning(),
-    ),
-  ).pipe(Effect.map(([updated]) => updated ?? null));
-}
-
-const treasuryWalletOf = (wallet: Wallet) =>
-  wallet.treasuryPrivyWalletId !== null && wallet.treasuryAddress !== null
-    ? {
-        privyWalletId: wallet.treasuryPrivyWalletId,
-        address: wallet.treasuryAddress,
-      }
-    : null;
-
 function depositPart(
   snap: Snapshot,
   quote: IntentQuote,
@@ -534,7 +267,6 @@ function depositPart(
   const { move, wallet } = snap;
   const { organizationId } = move;
   return Effect.gen(function* () {
-    const privy = yield* PrivyWallets;
     const treasury = treasuryWalletOf(wallet);
     const vault = yield* earnVaultId;
     if (treasury === null || Option.isNone(vault)) {
@@ -560,7 +292,7 @@ function depositPart(
         if (attempts.length >= EARN_MAX_ATTEMPTS) {
           return yield* needsReview(
             snap,
-            `Privy rejected the vault deposit of ${usdc(delivered)} ${attempts.length} times (${latest.failure ?? "no reason given"}). The USDC sits in the Treasury wallet. Returning it to the company wallet isn't automatic yet: a person has to send it back.`,
+            `Privy rejected the vault deposit of ${usdc(delivered)} ${attempts.length} times (${latest.failure ?? "no reason given"}). The USDC sits in the Treasury wallet. Staff can send it back to the company wallet.`,
           );
         }
         const retryDelay = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
@@ -604,92 +336,8 @@ function depositPart(
       return saved ? moved(move) : idle(move);
     }
 
-    if (latest.status === "saved") {
-      const startedAt = latest.callStartedAt;
-      if (
-        startedAt !== null &&
-        Date.now() - startedAt.getTime() > UNKNOWN_CALL_LIMIT_MS
-      ) {
-        return yield* needsReview(
-          snap,
-          `Privy hasn't confirmed the vault deposit ${latest.referenceId} for over an hour, and it only honours a repeated call for a day. Look the reference up in Privy before doing anything.`,
-        );
-      }
-      if (startedAt === null) {
-        yield* withScope({ organizationId }, (tx) =>
-          query(() =>
-            tx
-              .update(treasuryEarnActions)
-              .set({ callStartedAt: new Date() })
-              .where(
-                and(
-                  eq(treasuryEarnActions.id, latest.id),
-                  isNull(treasuryEarnActions.callStartedAt),
-                ),
-              ),
-          ),
-        );
-      }
-      const called = yield* privy
-        .earnDeposit({
-          privyWalletId: treasury.privyWalletId,
-          vaultId: vault.value,
-          rawAmount: latest.rawAmount,
-          referenceId: latest.referenceId,
-        })
-        .pipe(Effect.either);
-      if (called._tag === "Left") {
-        if (called.left._tag === "SendOutcomeUnknown") return idle(move);
-        if (startedAt !== null) {
-          return yield* needsReview(
-            snap,
-            `Privy refused a repeated vault deposit ${latest.referenceId} (${called.left.message}), so the first call may have gone through. Look the reference up in Privy before doing anything.`,
-          );
-        }
-        yield* withScope({ organizationId }, (tx) =>
-          query(() =>
-            tx
-              .update(treasuryEarnActions)
-              .set({
-                status: "rejected",
-                failure: called.left.message,
-                settledAt: new Date(),
-              })
-              .where(
-                and(
-                  eq(treasuryEarnActions.id, latest.id),
-                  eq(treasuryEarnActions.status, "saved"),
-                ),
-              ),
-          ),
-        );
-        return moved(move);
-      }
-      if (
-        called.right.rawAmount !== 0n &&
-        called.right.rawAmount !== latest.rawAmount
-      ) {
-        return yield* needsReview(
-          snap,
-          `Privy's action ${called.right.actionId} is for ${called.right.rawAmount} USDC base units, not the ${latest.rawAmount} that was asked.`,
-        );
-      }
-      yield* applyAction(snap, latest, called.right);
-      return moved(move);
-    }
-
-    if (latest.status === "pending" && latest.privyActionId !== null) {
-      const read = yield* privy
-        .getWalletAction({
-          privyWalletId: treasury.privyWalletId,
-          actionId: latest.privyActionId,
-        })
-        .pipe(Effect.either);
-      if (read._tag === "Left" || read.right.status === "pending") {
-        return idle(move);
-      }
-      yield* applyAction(snap, latest, read.right);
-      return moved(move);
+    if (latest.status === "saved" || latest.status === "pending") {
+      return yield* advanceEarnAction(snap, latest);
     }
 
     if (latest.status === "failed") {
@@ -733,8 +381,8 @@ function endWhenRefundCredited(snap: Snapshot, quote: IntentQuote) {
 }
 
 /**
- * One step of an open move to Treasury: the next thing the saved rows say
- * hasn't been done. `progressed` says whether it changed anything, so the
+ * One step of an open move: the next thing the saved rows say hasn't been
+ * done. Moves to the wallet are stepped in `to-wallet.ts`. `progressed` says whether it changed anything, so the
  * caller knows whether a following step may build on it.
  */
 export function stepTreasuryMove(
@@ -745,9 +393,11 @@ export function stepTreasuryMove(
     const snap = yield* load(input.organizationId, input.moveId);
     if (snap === null) return idle(null);
     const { move } = snap;
-    if (move.status !== "open" || move.direction !== "to_treasury") {
-      return idle(move);
-    }
+    if (move.status !== "open") return idle(move);
+    if (move.direction === "to_wallet") return yield* stepToWallet(snap);
+    // A move whose deposit Privy rejected, and which staff sent back from
+    // the Treasury wallet: its parts to the vault are over.
+    if (snap.returns.length > 0) return yield* stepStranded(snap);
     const quote = snap.quotes.at(-1);
 
     // A send that ran but wasn't debited yet: the ledger comes first.

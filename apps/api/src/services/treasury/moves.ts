@@ -40,9 +40,13 @@ import {
   verifyApproval,
 } from "../approval/passkeys.js";
 import { AuditLog } from "../audit/audit-log.js";
-import { estimateTreasuryPart } from "../intents/treasury-quote.js";
+import {
+  estimateTreasuryPart,
+  estimateTreasuryReturnPart,
+} from "../intents/treasury-quote.js";
 import { isPaused } from "../payout/guards.js";
 import { availableUsdc } from "../wallet/ledger.js";
+import { PrivyWallets } from "../wallet/privy-wallets.js";
 import { earnVaultId } from "./turn-on.js";
 
 /**
@@ -53,10 +57,9 @@ import { earnVaultId } from "./turn-on.js";
  */
 
 const SECONDS_PER_PART_OUTSIDE_THE_QUOTE = 30;
+/** The vault's withdrawal before the first part can be sent back. */
+const WITHDRAWAL_SECONDS = 30;
 
-const moveBackUnavailable = new ServiceUnavailable({
-  message: "Moving money back to the wallet isn't available yet.",
-});
 const adminsOnly = new Forbidden({
   message: "Only an admin of this company can move money to or from Treasury.",
 });
@@ -77,7 +80,16 @@ const pausedConflict = new Conflict({
   message: "Payouts are paused, so Treasury moves can't start. Nothing moved.",
 });
 const tooSmall = new BadRequest({
-  message: "The least you can move to Treasury is 10 USDC.",
+  message: "The least you can move is 10 USDC.",
+});
+const allOnlyToWallet = new BadRequest({
+  message: 'Only a move to your wallet can be "all".',
+});
+const nothingInTreasury = new Conflict({
+  message: "Treasury holds nothing to move.",
+});
+const positionUnreadable = new ServiceUnavailable({
+  message: "Treasury's value can't be read right now. Nothing moved.",
 });
 
 export type TreasuryMoveError =
@@ -85,8 +97,8 @@ export type TreasuryMoveError =
 
 export interface TreasuryMoveRequestInput {
   readonly direction: TreasuryMoveDirection;
-  /** USDC base units. */
-  readonly amountUsdc: bigint;
+  /** USDC base units, or `"all"` for everything the vault holds (to the wallet only). */
+  readonly amountUsdc: bigint | "all";
 }
 
 /** What the passkey signs: this company, the direction and the amount. */
@@ -111,9 +123,6 @@ const purposeOf = (direction: TreasuryMoveDirection): ConfirmationPurpose =>
 const requireAdmin = (tenant: Tenant) =>
   tenant.role === "admin" ? Effect.void : Effect.fail(adminsOnly);
 
-const requireMoveToTreasury = (direction: TreasuryMoveDirection) =>
-  direction === "to_treasury" ? Effect.void : Effect.fail(moveBackUnavailable);
-
 const requireVault = Effect.flatMap(earnVaultId, (vault) =>
   Option.isSome(vault) ? Effect.void : Effect.fail(notAvailable),
 );
@@ -123,16 +132,102 @@ export function partsOf(amount: bigint, cap: bigint): number {
   return Number((amount + cap - 1n) / cap);
 }
 
+/** What a request comes to once the vault's value is known. */
+interface ResolvedMove {
+  readonly direction: TreasuryMoveDirection;
+  readonly amount: bigint;
+  readonly isAll: boolean;
+  /** To the wallet only: what Treasury was worth when it was read. */
+  readonly inTreasury: bigint | null;
+}
+
 /**
- * Everything that must hold before a move to Treasury starts, read in `tx`.
- * With `lock` it takes the company wallet's row lock first, as payout
- * approval does, so a payout and a move started together queue and the
- * second sees what the first reserved.
+ * Turns a request into an amount. A move to the wallet reads what Treasury
+ * is worth now from Privy and refuses more than that; "all" is that value.
+ * Read before a passkey is spent, so a refusal doesn't cost a confirmation.
  */
-function checkMoveToTreasury(
+function resolveRequest(
+  tenant: Tenant,
+  request: TreasuryMoveRequestInput,
+): Effect.Effect<
+  ResolvedMove,
+  BadRequest | Conflict | ServiceUnavailable | DatabaseError,
+  DatabaseService | PrivyWallets
+> {
+  return Effect.gen(function* () {
+    if (request.direction === "to_treasury") {
+      if (request.amountUsdc === "all")
+        return yield* Effect.fail(allOnlyToWallet);
+      return {
+        direction: request.direction,
+        amount: request.amountUsdc,
+        isAll: false,
+        inTreasury: null,
+      };
+    }
+    const [wallet] = yield* withScope(tenant, (tx) =>
+      query(() =>
+        tx
+          .select()
+          .from(wallets)
+          .where(
+            and(
+              eq(wallets.organizationId, tenant.organizationId),
+              eq(wallets.status, "active"),
+            ),
+          ),
+      ),
+    );
+    if (wallet?.treasuryTurnedOnAt == null || !wallet.treasuryPrivyWalletId) {
+      return yield* Effect.fail(notTurnedOn);
+    }
+    const vault = yield* earnVaultId;
+    if (Option.isNone(vault)) return yield* Effect.fail(notAvailable);
+    const privy = yield* PrivyWallets;
+    const position = yield* privy
+      .vaultPosition({
+        privyWalletId: wallet.treasuryPrivyWalletId,
+        vaultId: vault.value,
+      })
+      .pipe(Effect.mapError(() => positionUnreadable));
+    const worth = position.assetsInVault;
+    if (request.amountUsdc === "all") {
+      if (worth <= 0n) return yield* Effect.fail(nothingInTreasury);
+      return {
+        direction: request.direction,
+        amount: worth,
+        isAll: true,
+        inTreasury: worth,
+      };
+    }
+    if (request.amountUsdc > worth) {
+      return yield* Effect.fail(
+        new Conflict({
+          message: "Treasury doesn't hold that much. Nothing moved.",
+          details: { inTreasuryUsdc: worth.toString() },
+        }),
+      );
+    }
+    return {
+      direction: request.direction,
+      amount: request.amountUsdc,
+      isAll: false,
+      inTreasury: worth,
+    };
+  });
+}
+
+/**
+ * Everything that must hold before a move starts, read in `tx`. With `lock`
+ * it takes the company wallet's row lock first, as payout approval does, so a
+ * payout and a move started together queue and the second sees what the first
+ * reserved. Only a move to Treasury needs the company wallet to have the
+ * USDC: a move to the wallet takes it from the vault.
+ */
+function checkMove(
   tx: Transaction,
   organizationId: string,
-  amount: bigint,
+  move: ResolvedMove,
   lock: boolean,
 ): Effect.Effect<
   { readonly wallet: Wallet; readonly available: bigint },
@@ -155,7 +250,9 @@ function checkMoveToTreasury(
     if (yield* isPaused(tx, organizationId)) {
       return yield* Effect.fail(pausedConflict);
     }
-    if (amount < MIN_TREASURY_MOVE_USDC) return yield* Effect.fail(tooSmall);
+    if (move.amount < MIN_TREASURY_MOVE_USDC && !move.isAll) {
+      return yield* Effect.fail(tooSmall);
+    }
     const [open] = yield* query(() =>
       tx
         .select({ id: treasuryMoves.id })
@@ -172,8 +269,8 @@ function checkMoveToTreasury(
     );
     if (open) return yield* Effect.fail(alreadyOpen);
     const available = yield* availableUsdc(tx, wallet.id);
-    if (available < amount) {
-      const shortfall = amount - available;
+    if (move.direction === "to_treasury" && available < move.amount) {
+      const shortfall = move.amount - available;
       return yield* Effect.fail(
         new Conflict({
           message:
@@ -199,20 +296,23 @@ export function previewTreasuryMove(
 ): Effect.Effect<
   TreasuryMovePreview,
   TreasuryMoveError,
-  DatabaseService | OneClick
+  DatabaseService | OneClick | PrivyWallets
 > {
   return Effect.gen(function* () {
     yield* requireAdmin(tenant);
-    yield* requireMoveToTreasury(request.direction);
     yield* requireVault;
+    const resolved = yield* resolveRequest(tenant, request);
     const { wallet, available } = yield* withScope(tenant, (tx) =>
-      checkMoveToTreasury(tx, tenant.organizationId, request.amountUsdc, false),
+      checkMove(tx, tenant.organizationId, resolved, false),
     );
     const cap = wallet.perTransactionMaxUsdc;
-    const parts = partsOf(request.amountUsdc, cap);
-    const largestPart =
-      (request.amountUsdc + BigInt(parts) - 1n) / BigInt(parts);
-    const estimate = yield* estimateTreasuryPart({
+    const parts = partsOf(resolved.amount, cap);
+    const largestPart = (resolved.amount + BigInt(parts) - 1n) / BigInt(parts);
+    const estimateOne =
+      resolved.direction === "to_treasury"
+        ? estimateTreasuryPart
+        : estimateTreasuryReturnPart;
+    const estimate = yield* estimateOne({
       organizationId: tenant.organizationId,
       amountIn: largestPart,
     }).pipe(
@@ -225,14 +325,19 @@ export function previewTreasuryMove(
       ),
     );
     return {
-      direction: request.direction,
-      amountUsdc: request.amountUsdc.toString(),
+      direction: resolved.direction,
+      amountUsdc: resolved.amount.toString(),
+      ...(resolved.isAll && { isAll: true }),
       parts,
       perPartMaxUsdc: cap.toString(),
       estimatedCostUsdc: (estimate.costUsdc * BigInt(parts)).toString(),
       estimatedSeconds:
-        parts * (estimate.seconds + SECONDS_PER_PART_OUTSIDE_THE_QUOTE),
+        parts * (estimate.seconds + SECONDS_PER_PART_OUTSIDE_THE_QUOTE) +
+        (resolved.direction === "to_wallet" ? WITHDRAWAL_SECONDS : 0),
       availableUsdc: (available > 0n ? available : 0n).toString(),
+      ...(resolved.inTreasury !== null && {
+        inTreasuryUsdc: resolved.inTreasury.toString(),
+      }),
     };
   });
 }
@@ -244,14 +349,14 @@ export function startMoveConfirmation(
 ): Effect.Effect<
   ApprovalChallenge,
   TreasuryMoveError,
-  DatabaseService | AuditLog | ApprovalSettings
+  DatabaseService | AuditLog | ApprovalSettings | PrivyWallets
 > {
   return Effect.gen(function* () {
     yield* requireAdmin(tenant);
-    yield* requireMoveToTreasury(request.direction);
     yield* requireVault;
+    const resolved = yield* resolveRequest(tenant, request);
     yield* withScope(tenant, (tx) =>
-      checkMoveToTreasury(tx, tenant.organizationId, request.amountUsdc, false),
+      checkMove(tx, tenant.organizationId, resolved, false),
     );
     return yield* startApproval({
       organizationId: tenant.organizationId,
@@ -264,10 +369,12 @@ export function startMoveConfirmation(
 
 /**
  * Starts a move once the admin's passkey has confirmed exactly this
- * direction and amount. Under the company wallet's row lock it checks Treasury
- * is on, payouts aren't paused, the amount is at least 10 USDC, nothing else
- * is open and the wallet has that much available, then saves the move open.
- * The reservation holds from that commit on.
+ * direction and amount (or "all"). Under the company wallet's row lock it
+ * checks Treasury is on, payouts aren't paused, the amount is at least 10
+ * USDC (unless "all"), nothing else is open and, to Treasury, the wallet has
+ * that much available, then saves the move open. To the wallet the most is
+ * what Treasury is worth now, read live before the passkey is spent. The
+ * reservation of a move to Treasury holds from that commit on.
  */
 export function startTreasuryMove(
   tenant: Tenant,
@@ -278,13 +385,13 @@ export function startTreasuryMove(
 ): Effect.Effect<
   TreasuryMove,
   TreasuryMoveError,
-  DatabaseService | AuditLog | ApprovalSettings
+  DatabaseService | AuditLog | ApprovalSettings | PrivyWallets
 > {
   const { organizationId } = tenant;
   return Effect.gen(function* () {
     yield* requireAdmin(tenant);
-    yield* requireMoveToTreasury(input.direction);
     yield* requireVault;
+    const resolved = yield* resolveRequest(tenant, input);
     const approval = yield* verifyApproval({
       organizationId,
       userId: tenant.userId,
@@ -298,12 +405,7 @@ export function startTreasuryMove(
     const audit = yield* AuditLog;
     return yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
-        const { wallet } = yield* checkMoveToTreasury(
-          tx,
-          organizationId,
-          input.amountUsdc,
-          true,
-        );
+        const { wallet } = yield* checkMove(tx, organizationId, resolved, true);
         const [move] = yield* query(() =>
           tx
             .insert(treasuryMoves)
@@ -311,7 +413,8 @@ export function startTreasuryMove(
               organizationId,
               walletId: wallet.id,
               direction: input.direction,
-              requestedUsdc: input.amountUsdc,
+              requestedUsdc: resolved.amount,
+              isAll: resolved.isAll,
               confirmedBy: tenant.userId,
               approvalId: approval.approvalId,
             })
@@ -327,6 +430,7 @@ export function startTreasuryMove(
           after: {
             direction: move.direction,
             requestedUsdc: move.requestedUsdc,
+            ...(move.isAll && { isAll: true }),
             approvalId: approval.approvalId,
             parts: partsOf(move.requestedUsdc, wallet.perTransactionMaxUsdc),
           },

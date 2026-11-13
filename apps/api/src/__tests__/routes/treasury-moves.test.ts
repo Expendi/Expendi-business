@@ -18,6 +18,7 @@ import { TEST_ORIGIN } from "../helpers/fakes.js";
 import { makeNearPayoutWorld } from "../helpers/near-payouts.js";
 import {
   createTreasuryCompany,
+  fundVault,
   USDC,
   VAULT_ID,
 } from "../helpers/treasury-moves.js";
@@ -226,7 +227,7 @@ describe("starting a move over the routes", () => {
     expect((await sendJson(app, movesPath(), employee)).status).toBe(403);
   });
 
-  it("refuses moving back to the wallet for now", async () => {
+  it("refuses moving back to the wallet more than Treasury holds, as a 409", async () => {
     // #when
     const asked = await sendJson(
       app,
@@ -239,6 +240,120 @@ describe("starting a move over the routes", () => {
     );
 
     // #then
-    expect(asked.status).toBe(503);
+    expect(asked.status).toBe(409);
+  });
+});
+
+describe("moving money back to the wallet over the routes", () => {
+  const toWallet = (amountUsdc: string) => ({
+    direction: "to_wallet",
+    amountUsdc,
+  });
+
+  beforeEach(() => {
+    fundVault(world, company, 60n * USDC);
+  });
+
+  it("previews all as what Treasury is worth now", async () => {
+    // #when
+    const response = await sendJson(
+      app,
+      movesPath("/preview"),
+      company.company.admin,
+      { method: "POST", body: toWallet("all") },
+    );
+
+    // #then
+    const preview = treasuryMovePreviewSchema.parse(await dataOf(response));
+    expect({
+      status: response.status,
+      direction: preview.direction,
+      amount: preview.amountUsdc,
+      isAll: preview.isAll,
+      parts: preview.parts,
+      inTreasury: preview.inTreasuryUsdc,
+    }).toEqual({
+      status: 200,
+      direction: "to_wallet",
+      amount: (60n * USDC).toString(),
+      isAll: true,
+      parts: 2,
+      inTreasury: (60n * USDC).toString(),
+    });
+  });
+
+  it("starts an all move with the passkey, and refuses a confirmation made for an amount", async () => {
+    // #given a confirmation for 60 USDC
+    const asked = await sendJson(
+      app,
+      movesPath("/confirmations"),
+      company.company.admin,
+      { method: "POST", body: toWallet((60n * USDC).toString()) },
+    );
+    expect(asked.status).toBe(201);
+    const challenge = approvalChallengeSchema.parse(await dataOf(asked));
+    const response = company.passkey.sign(challenge.options, TEST_ORIGIN);
+
+    // #when it is used to start "all"
+    const refused = await sendJson(app, movesPath(), company.company.admin, {
+      method: "POST",
+      body: {
+        ...toWallet("all"),
+        challengeId: challenge.challengeId,
+        response,
+      },
+    });
+
+    // #then it is refused, and a confirmation for "all" starts it
+    expect(refused.status).toBe(403);
+    const askedAll = await sendJson(
+      app,
+      movesPath("/confirmations"),
+      company.company.admin,
+      { method: "POST", body: toWallet("all") },
+    );
+    const challengeAll = approvalChallengeSchema.parse(await dataOf(askedAll));
+    const started = await sendJson(app, movesPath(), company.company.admin, {
+      method: "POST",
+      body: {
+        ...toWallet("all"),
+        challengeId: challengeAll.challengeId,
+        response: company.passkey.sign(challengeAll.options, TEST_ORIGIN),
+      },
+    });
+    expect({ status: started.status, data: await dataOf(started) }).toEqual({
+      status: 201,
+      data: expect.objectContaining({
+        direction: "to_wallet",
+        status: "open",
+        requestedUsdc: (60n * USDC).toString(),
+      }) as unknown,
+    });
+  });
+
+  it("refuses more than Treasury holds, a move to Treasury for all, and everything to an accountant or employee", async () => {
+    // #then
+    const asAdmin = (body: object) =>
+      sendJson(app, movesPath("/preview"), company.company.admin, {
+        method: "POST",
+        body,
+      });
+    expect((await asAdmin(toWallet((61n * USDC).toString()))).status).toBe(409);
+    expect(
+      (await asAdmin({ direction: "to_treasury", amountUsdc: "all" })).status,
+    ).toBe(400);
+    for (const user of [accountant, employee]) {
+      for (const path of [
+        movesPath("/preview"),
+        movesPath("/confirmations"),
+        movesPath(),
+      ]) {
+        const response = await sendJson(app, path, user, {
+          method: "POST",
+          body: toWallet("all"),
+        });
+        expect(response.status).toBe(403);
+      }
+    }
   });
 });

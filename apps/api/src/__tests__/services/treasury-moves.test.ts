@@ -809,7 +809,7 @@ describe("when something goes wrong with a move to Treasury", () => {
       ).toBe(true);
     });
 
-    it("goes to review after three rejections, and says the return isn't automatic", async () => {
+    it("goes to review after three rejections, and says staff can send the USDC back", async () => {
       // #given Privy rejecting every deposit
       privy.state.nextEarnCalls("rejected", "rejected", "rejected", "rejected");
       const move = await startMove(world, company, 20n * USDC);
@@ -828,7 +828,7 @@ describe("when something goes wrong with a move to Treasury", () => {
         status: "needs_review",
         attempts: EARN_MAX_ATTEMPTS,
         calls: EARN_MAX_ATTEMPTS,
-        failure: expect.stringContaining("isn't automatic yet") as string,
+        failure: expect.stringContaining("send it back") as string,
         debited: 80n * USDC,
       });
     });
@@ -1076,19 +1076,6 @@ describe("starting a move to Treasury", () => {
       });
     },
   );
-
-  it("refuses to move money back to the wallet until that flow exists", async () => {
-    // #when
-    const exit = await runtime.runPromiseExit(
-      startTreasuryMove(
-        company.tenant,
-        await confirmed(company, 20n * USDC, "to_wallet"),
-      ),
-    );
-
-    // #then
-    expect(failureOf(exit)).toBe("ServiceUnavailable");
-  });
 
   it("refuses when Treasury isn't turned on", async () => {
     // #given a company with a wallet and no Treasury

@@ -23,7 +23,13 @@ import {
  * from Expendi. The recipient is the company's Treasury wallet and the
  * refund goes to its company wallet, both read from its `wallets` row and
  * never from a request.
+ *
+ * The way back (`openTreasuryReturnQuote`) is the mirror image: USDC on Base
+ * to USDC on NEAR, paid by the Treasury wallet, recipient the company wallet
+ * and refund to the Treasury wallet.
  */
+
+const BASE_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
 const readWallet = (organizationId: string) =>
   withScope({ organizationId }, (tx) =>
@@ -231,6 +237,171 @@ export function openTreasuryQuote(input: {
             depositAddress: quoted.depositAddress,
             recipient: treasuryAddress,
             refundTo: companyAddress,
+            deadline: quoted.deadline,
+            quoteResponse: quoted.signedResponse,
+            treasuryMoveId: input.moveId,
+          })
+          .onConflictDoNothing({
+            target: [intentQuotes.organizationId, intentQuotes.quoteKey],
+          })
+          .returning(),
+      ),
+    ).pipe(Effect.map(([row]) => row ?? null));
+    if (inserted) return inserted;
+    const raced = yield* byKey;
+    return raced ?? (yield* Effect.dieMessage("intent quote insert vanished"));
+  });
+}
+
+/**
+ * What 1Click would charge to send `amountIn` from the Treasury wallet back
+ * to the company wallet and how long it says that takes: a dry quote, so no
+ * deposit address exists and nothing is saved.
+ */
+export function estimateTreasuryReturnPart(input: {
+  readonly organizationId: string;
+  readonly amountIn: bigint;
+}): Effect.Effect<
+  { readonly costUsdc: bigint; readonly seconds: number },
+  QuoteNotOpened | DatabaseError,
+  OneClick | DatabaseService
+> {
+  return Effect.gen(function* () {
+    const route = yield* treasuryRoute(input.organizationId);
+    const oneClick = yield* OneClick;
+    const quoted = yield* oneClick
+      .quote({
+        dry: true,
+        swapType: "EXACT_INPUT",
+        originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+        destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+        amount: input.amountIn,
+        recipient: route.companyAddress,
+        refundTo: route.treasuryAddress,
+        deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
+        slippageBps: STABLECOIN_SLIPPAGE_BPS,
+      })
+      .pipe(Effect.mapError(quoteFailure));
+    const cost = quoted.amountIn - quoted.amountOut;
+    if (cost < 0n || cost > maxQuoteCost(quoted.amountIn)) {
+      return yield* Effect.fail(
+        new QuoteNotOpened({
+          reason: "untrusted",
+          message: `1Click asks ${cost} USDC base units to move ${quoted.amountIn}, which is more than a USDC route costs.`,
+        }),
+      );
+    }
+    return { costUsdc: cost, seconds: quoted.timeEstimateSeconds ?? 45 };
+  });
+}
+
+/**
+ * Takes a firm `EXACT_INPUT` quote to send `amountIn` from the Treasury
+ * wallet to the company wallet and saves it, linked to its move. The same
+ * key returns the quote already saved under it and asks 1Click nothing.
+ * The Treasury wallet's policy caps one transfer, so a part over the
+ * wallet's per-transaction maximum is refused here too.
+ */
+export function openTreasuryReturnQuote(input: {
+  readonly organizationId: string;
+  readonly moveId: string;
+  readonly quoteKey: string;
+  readonly amountIn: bigint;
+}): Effect.Effect<
+  IntentQuote,
+  QuoteNotOpened | DatabaseError,
+  OneClick | DatabaseService
+> {
+  const { organizationId } = input;
+  const byKey = withScope({ organizationId }, (tx) =>
+    query(() =>
+      tx
+        .select()
+        .from(intentQuotes)
+        .where(
+          and(
+            eq(intentQuotes.organizationId, organizationId),
+            eq(intentQuotes.quoteKey, input.quoteKey),
+          ),
+        )
+        .limit(1),
+    ),
+  ).pipe(Effect.map(([quote]) => quote ?? null));
+
+  return Effect.gen(function* () {
+    const existing = yield* byKey;
+    if (existing) return existing;
+
+    const { wallet, companyAddress, treasuryAddress } =
+      yield* treasuryRoute(organizationId);
+    const untrusted = (message: string) =>
+      Effect.fail(new QuoteNotOpened({ reason: "untrusted", message }));
+    if (!BASE_ADDRESS.test(treasuryAddress)) {
+      return yield* untrusted("The Treasury wallet isn't a Base address.");
+    }
+    if (input.amountIn > wallet.perTransactionMaxUsdc) {
+      return yield* Effect.fail(
+        new QuoteNotOpened({
+          reason: "over_cap",
+          message: `The part needs ${input.amountIn} USDC base units in one transfer, over the Treasury wallet's per-transaction maximum of ${wallet.perTransactionMaxUsdc}.`,
+        }),
+      );
+    }
+    const oneClick = yield* OneClick;
+    const quoted = yield* oneClick
+      .quote({
+        dry: false,
+        swapType: "EXACT_INPUT",
+        originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+        destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+        amount: input.amountIn,
+        recipient: companyAddress,
+        refundTo: treasuryAddress,
+        deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
+        slippageBps: STABLECOIN_SLIPPAGE_BPS,
+      })
+      .pipe(Effect.mapError(quoteFailure));
+    if (quoted.dry)
+      return yield* untrusted("1Click answered with a dry quote.");
+    // The Treasury wallet pays an address on Base with a plain USDC transfer.
+    if (
+      quoted.depositMemo !== null ||
+      !BASE_ADDRESS.test(quoted.depositAddress) ||
+      quoted.depositAddress.toLowerCase() === treasuryAddress.toLowerCase()
+    ) {
+      return yield* untrusted(
+        "1Click's deposit address can't be paid with a plain USDC transfer.",
+      );
+    }
+    if (
+      quoted.amountIn !== input.amountIn ||
+      quoted.amountOut <= 0n ||
+      quoted.amountOut > quoted.amountIn ||
+      quoted.amountIn - quoted.amountOut > maxQuoteCost(quoted.amountIn)
+    ) {
+      return yield* untrusted(
+        `1Click asks ${quoted.amountIn} to deliver ${quoted.amountOut} USDC base units, which is more than a USDC route costs.`,
+      );
+    }
+
+    const inserted = yield* withScope({ organizationId }, (tx) =>
+      query(() =>
+        tx
+          .insert(intentQuotes)
+          .values({
+            organizationId,
+            walletId: wallet.id,
+            quoteKey: input.quoteKey,
+            purpose: "from_treasury",
+            swapType: "EXACT_INPUT",
+            originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+            destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+            amountIn: quoted.amountIn,
+            amountOut: quoted.amountOut,
+            minAmountOut: quoted.minAmountOut,
+            depositAddress: quoted.depositAddress,
+            recipient: companyAddress,
+            refundTo: treasuryAddress,
             deadline: quoted.deadline,
             quoteResponse: quoted.signedResponse,
             treasuryMoveId: input.moveId,

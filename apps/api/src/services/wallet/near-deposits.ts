@@ -318,6 +318,14 @@ function creditDeposit(
                 walletId: wallet.wallet_id,
                 type: fromTreasury ? "from_treasury" : "deposit",
                 treasuryMoveId: fromTreasury?.treasuryMoveId ?? null,
+                // Names the part a `from_treasury` quote delivered, so its
+                // move knows which part was credited. A refunded
+                // `to_treasury` part's return stays unlinked: that quote's
+                // own row is its debit.
+                intentQuoteId:
+                  fromTreasury?.purpose === "from_treasury"
+                    ? fromTreasury.id
+                    : null,
                 chain: "near",
                 usdcAmount: transfer.amount,
                 txHash: transfer.txHash,

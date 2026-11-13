@@ -83,6 +83,12 @@ export const treasuryEarnActions = pgTable(
     /** The step's `bundle_transaction_hash`, once Privy reports it. */
     txHash: text("tx_hash"),
     /**
+     * A withdrawal only: the USDC that transaction's logs show reaching the
+     * Treasury wallet, which a vault may fill in part. Saved once, and what a
+     * move to the wallet sends back, never the wallet's whole balance.
+     */
+    deliveredUsdc: bigint("delivered_usdc", { mode: "bigint" }),
+    /**
      * Set immediately before the first call to Privy. A row that has it and
      * is still `saved` is repeating a call whose outcome wasn't known.
      */
@@ -125,6 +131,15 @@ export const treasuryEarnActions = pgTable(
       .where(
         sql`${table.kind} = 'deposit' AND ${table.status} IN ('saved', 'pending', 'succeeded')`,
       ),
+    // A move to the wallet withdraws once, whatever came of it: a rejected
+    // or failed withdrawal ends the move, and the admin starts a new one.
+    uniqueIndex("treasury_earn_actions_one_withdrawal_per_move")
+      .on(table.treasuryMoveId)
+      .where(sql`${table.kind} = 'withdraw'`),
+    check(
+      "treasury_earn_actions_delivered_is_a_withdrawal",
+      sql`${table.deliveredUsdc} IS NULL OR (${table.kind}::text = 'withdraw' AND ${table.status}::text = 'succeeded' AND ${table.deliveredUsdc} > 0)`,
+    ),
     check(
       "treasury_earn_actions_raw_amount_positive",
       sql`${table.rawAmount} > 0`,

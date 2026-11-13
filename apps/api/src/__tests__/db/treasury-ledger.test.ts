@@ -503,7 +503,7 @@ describe("wallet_transactions, for Treasury", () => {
 
     // #then
     await expect(insert).rejects.toMatchObject({
-      cause: { constraint: "wallet_transactions_to_treasury_has_quote" },
+      cause: { constraint: "wallet_transactions_quote_link_is_treasury" },
     });
   });
 
@@ -533,6 +533,76 @@ describe("wallet_transactions, for Treasury", () => {
     // #then
     await expect(again).rejects.toMatchObject({
       cause: { constraint: "wallet_transactions_to_treasury_quote_unique" },
+    });
+  });
+
+  it("lets a from_treasury credit name the quote it delivered, in as many transfers as it came in", async () => {
+    // #given a quote the credit may name
+    const { company, wallet, move: saved, quote } = await toTreasuryContext();
+    const credit = (amount: bigint) =>
+      insertLedger(
+        company,
+        ledgerRow(company, wallet, {
+          type: "from_treasury",
+          usdcAmount: amount,
+          treasuryMoveId: saved.id,
+          intentQuoteId: quote.id,
+          chain: "near",
+          txHash: randomNearTxHash(),
+          receiptId: randomNearTxHash(),
+          logIndex: 0,
+          transferIndex: 0,
+        }),
+      );
+
+    // #then both transfers of one delivery are credited
+    await expect(credit(3_000_000n)).resolves.toBeDefined();
+    await expect(credit(2_000_000n)).resolves.toBeDefined();
+  });
+
+  it("still debits a quote once when a credit names it too", async () => {
+    // #given a credit that names the quote
+    const { company, wallet, move: saved, quote } = await toTreasuryContext();
+    const row = (type: "to_treasury" | "from_treasury", usdcAmount: bigint) =>
+      insertLedger(
+        company,
+        ledgerRow(company, wallet, {
+          type,
+          usdcAmount,
+          treasuryMoveId: saved.id,
+          intentQuoteId: quote.id,
+          chain: "near",
+          txHash: randomNearTxHash(),
+          receiptId: randomNearTxHash(),
+          logIndex: 0,
+          transferIndex: 0,
+        }),
+      );
+    await row("from_treasury", 1_000_000n);
+
+    // #when it is debited, and then debited again
+    await expect(row("to_treasury", -5_000_000n)).resolves.toBeDefined();
+    const again = row("to_treasury", -5_000_000n);
+
+    // #then
+    await expect(again).rejects.toMatchObject({
+      cause: { constraint: "wallet_transactions_to_treasury_quote_unique" },
+    });
+  });
+
+  it("rejects a top-up that names a quote", async () => {
+    // #given
+    const { company, wallet, quote } = await toTreasuryContext();
+
+    // #when
+    const insert = insertLedger(
+      company,
+      ledgerRow(company, wallet, { intentQuoteId: quote.id }),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "wallet_transactions_quote_link_is_treasury" },
     });
   });
 

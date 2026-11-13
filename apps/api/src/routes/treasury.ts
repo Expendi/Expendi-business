@@ -40,6 +40,10 @@ const startMoveSchema = startTreasuryMoveRequestSchema.extend({
   response: confirmSchema.shape.response,
 });
 
+/** `"all"` stays a word; every other amount is a base-unit integer string. */
+const amountOf = (amountUsdc: string): bigint | "all" =>
+  amountUsdc === "all" ? "all" : BigInt(amountUsdc);
+
 /**
  * Mounted at `/organizations/:organizationId/treasury`. Admins and
  * accountants read; only an admin changes anything. Turning on takes two
@@ -81,7 +85,7 @@ export function createTreasuryRoutes(
           Effect.flatMap(({ direction, amountUsdc }) =>
             previewTreasuryMove(c.get("tenant"), {
               direction,
-              amountUsdc: BigInt(amountUsdc),
+              amountUsdc: amountOf(amountUsdc),
             }),
           ),
         ),
@@ -95,7 +99,7 @@ export function createTreasuryRoutes(
           Effect.flatMap(({ direction, amountUsdc }) =>
             startMoveConfirmation(c.get("tenant"), {
               direction,
-              amountUsdc: BigInt(amountUsdc),
+              amountUsdc: amountOf(amountUsdc),
             }),
           ),
         ),
@@ -110,7 +114,7 @@ export function createTreasuryRoutes(
           Effect.flatMap(({ direction, amountUsdc, challengeId, response }) =>
             startTreasuryMove(c.get("tenant"), {
               direction,
-              amountUsdc: BigInt(amountUsdc),
+              amountUsdc: amountOf(amountUsdc),
               challengeId,
               response,
             }),

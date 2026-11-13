@@ -125,21 +125,27 @@ export const walletTransactions = pgTable(
       "wallet_transactions_amount_sign",
       sql`(${table.type}::text IN ('deposit', 'refund', 'topup', 'from_treasury') AND ${table.usdcAmount} > 0) OR (${table.type}::text IN ('payout', 'withdrawal', 'to_treasury') AND ${table.usdcAmount} < 0)`,
     ),
-    // Exactly the two Treasury types name their move, and a debit to
-    // Treasury names the quote it paid.
+    // Exactly the two Treasury types name their move. A debit to Treasury
+    // names the quote it paid; a credit from Treasury may name the
+    // `from_treasury` quote it delivered, and no other type names a quote.
     check(
       "wallet_transactions_treasury_has_move",
       sql`(${table.type}::text IN ('to_treasury', 'from_treasury')) = (${table.treasuryMoveId} IS NOT NULL)`,
     ),
     check(
-      "wallet_transactions_to_treasury_has_quote",
-      sql`(${table.type}::text = 'to_treasury') = (${table.intentQuoteId} IS NOT NULL)`,
+      "wallet_transactions_quote_link_is_treasury",
+      sql`(${table.type}::text = 'to_treasury') <= (${table.intentQuoteId} IS NOT NULL) AND (${table.intentQuoteId} IS NULL OR ${table.type}::text IN ('to_treasury', 'from_treasury'))`,
     ),
-    // A quote's send is debited once. The predicate has no enum literal:
-    // an index predicate must be immutable, and a cast of an enum isn't.
+    // A quote's send is debited once. Debits are the negative rows, so this
+    // binds them only (the predicate can't name the enum: it must be
+    // immutable). Credits that name a quote are kept once each by the
+    // transfer index, so a delivery that arrives in two transfers is credited
+    // in full.
     uniqueIndex("wallet_transactions_to_treasury_quote_unique")
       .on(table.intentQuoteId)
-      .where(sql`${table.intentQuoteId} IS NOT NULL`),
+      .where(
+        sql`${table.intentQuoteId} IS NOT NULL AND ${table.usdcAmount} < 0`,
+      ),
     check(
       "wallet_transactions_payout_has_payout",
       sql`${table.type} <> 'payout' OR ${table.payoutId} IS NOT NULL`,

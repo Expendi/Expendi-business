@@ -47,7 +47,8 @@ export const MIN_TREASURY_MOVE_USDC = 10_000_000n;
  */
 export const treasuryMoveRequestSchema = z.object({
   direction: treasuryMoveDirectionSchema,
-  amountUsdc: usdcUnits,
+  /** `"all"` is only for a move to the wallet: everything the vault holds then. */
+  amountUsdc: usdcUnits.or(z.literal("all")),
 });
 
 export type TreasuryMoveRequest = z.input<typeof treasuryMoveRequestSchema>;
@@ -55,7 +56,9 @@ export type TreasuryMoveRequest = z.input<typeof treasuryMoveRequestSchema>;
 /** What a move would cost and take, worked out before anything is committed. */
 export const treasuryMovePreviewSchema = z.object({
   direction: treasuryMoveDirectionSchema,
+  /** For "all", what the vault holds now. */
   amountUsdc: usdcUnits,
+  isAll: z.boolean().optional(),
   /** How many transfers the amount is split into, each within the wallet's cap. */
   parts: z.number().int().positive(),
   perPartMaxUsdc: usdcUnits,
@@ -64,6 +67,8 @@ export const treasuryMovePreviewSchema = z.object({
   estimatedSeconds: z.number().int().positive(),
   /** What the company wallet can spend now, after what is already reserved. */
   availableUsdc: usdcUnitsOrZero,
+  /** A move to the wallet only: what Treasury is worth now. */
+  inTreasuryUsdc: usdcUnitsOrZero.optional(),
 });
 
 export type TreasuryMovePreview = z.infer<typeof treasuryMovePreviewSchema>;
