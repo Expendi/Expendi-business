@@ -1,4 +1,4 @@
-# Treasury QA plan: T1 to T5
+# Treasury QA plan: T1 to T7
 
 **Status:** draft, 2026-11-13. Nothing in this plan has been run on staging yet.
 
@@ -10,7 +10,10 @@
 - **T4:** moving money from the vault back to the company wallet, an amount or all of it.
 - **T5:** Treasury's value, yield and rate, the daily snapshots, the four staff alerts, and the "Move to wallet" offer when a payment is short.
 
-**Doesn't cover yet:** any screen (T6), the export and the staff app's Treasury pages (T7).
+- **T6 (web):** Treasury on the web dashboard's Accounts page, the move sheets, history, and the "Move to wallet" offer on payment pages.
+- **T7:** the monthly export's Treasury sheets, Treasury on the staff app's company page, and the two staff approvals (return a stranded deposit, finish a return to the wallet) that the job carries out.
+
+**Doesn't cover yet:** the mobile app's Treasury screens, which wait for the K1 redesign to reach `staging`.
 
 **Read first:** `docs/work/treasury/spec.md` (sections 4, 5, 6 and 11) and `docs/decisions/treasury-on-base.md`. Terms are in `CONTEXT.md`.
 
@@ -24,7 +27,7 @@
 
 | #   | What                                                                                                                                                                                                                                                                                          | Who             |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| P1  | Merge `feat/treasury` into `staging` (or deploy the branch to the Railway `staging` API) so migrations 0092 to 0096 run                                                                                                                                                                       | Dennis          |
+| P1  | Merge `feat/treasury` into `staging` (or deploy the branch to the Railway `staging` API) so migrations 0092 to 0099 run                                                                                                                                                                       | Dennis          |
 | P2  | Leave `PRIVY_EARN_VAULT_ID` **unset** in Doppler `stg` until check L1 is done, then set it to `ry2qt6co7rkpwkr5mqudloo4`                                                                                                                                                                      | Dennis          |
 | P3  | A test company on staging with an active NEAR company wallet, admin A, admin B, an accountant and an employee. **Admin A is a dedicated QA account, not a real person's, with no passkey yet:** the driver enrols its own passkey for it, and `enrol` refuses an account that already has one | Dennis + Claude |
 | P4  | About 40 USDC on NEAR in that company wallet, sent as a fund-in                                                                                                                                                                                                                               | Dennis          |
@@ -179,6 +182,16 @@ Do L21 before L17, while Treasury still holds money.
 - [ ] **L21. The short-wallet offer.** Pay the bill from P7, which is more than what's available, while Treasury holds money. The refusal is a 409 that says how much is short and how much is in Treasury, and its `details.treasuryOffer` has `action: "move_to_wallet"`. Nothing is sent. With Treasury empty (after L17), the same payment gives the ordinary refusal with no offer.
 - [ ] **L22 (optional, strands 1.1 USDC). USDC left in the Treasury wallet.** With no move open, send 1.1 USDC on Base straight to the Treasury wallet. Within about a minute `alerts` shows the "USDC sitting in a Treasury wallet" alert, and the staff app lists it, linking to the company page. That USDC is never credited and needs a person to recover it.
 
+### T6 and T7: the web dashboard, the export and the staff app
+
+Do L23 to L25 on `https://staging.business.expendi.app`, signed in as each person, alongside the driver checks above. One of the moves can be made from the web instead of the driver.
+
+- [ ] **L23. Accounts page, admin.** Before turning on: Treasury invites you to turn it on and shows the current rate. After L4: it shows the value, yield, rate, any open move and the move history, and it matches `status`. Turning on and both move sheets work end to end with the browser's own passkey, including the preview and the API's refusals (try 9.99 USDC).
+- [ ] **L24. Accounts page, accountant and employee.** The accountant sees Treasury with no buttons. The employee doesn't see it.
+- [ ] **L25. "Move to wallet" on a short payment.** During L21, the Bills page shows the refusal with a "Move to wallet" button that opens the move sheet with the suggested amount filled in.
+- [ ] **L26. Staff app.** On the test company's page in the staff app: the Treasury wallet with its Basescan link, the live position, the open Treasury alerts (after L22, if run), and each move from L8 to L17 with its quotes, Earn calls and ledger rows.
+- [ ] **L27. Monthly export.** After the month of the QA moves ends, the company's export has a Treasury sheet with opening and closing value, moved in, moved out, yield and cost, and a Treasury moves sheet with one line per move. Its totals agree with `moves` and `inspect`.
+
 ### Not forced live (automated only)
 
 These can't be triggered on demand without risking money, so the automated tests are the evidence:
@@ -189,6 +202,7 @@ These can't be triggered on demand without risking money, so the automated tests
 - An Earn call or a send whose outcome stays unclear (repeated with the same key, then review)
 - A move stuck for 30 minutes, and Privy's record disagreeing with Expendi's (the other two alerts)
 - Privy unreachable (`status` answers from the last snapshot with `saved: true`)
+- The two staff approvals, which need a move stuck in review: tested in `treasury-staff-actions.test.ts` and `internal-treasury-actions.test.ts`, including that no staff route sends anything
 
 ---
 
@@ -230,5 +244,10 @@ These can't be triggered on demand without risking money, so the automated tests
 | L20       |      |        |                                       |
 | L21       |      |        |                                       |
 | L22       |      |        |                                       |
+| L23       |      |        |                                       |
+| L24       |      |        |                                       |
+| L25       |      |        |                                       |
+| L26       |      |        |                                       |
+| L27       |      |        |                                       |
 
 **Where the QA money ends up:** back in the test company's wallet after L17, less a few cents of 1Click costs per part, and less 1.1 USDC if L22 was run.

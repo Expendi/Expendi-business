@@ -560,11 +560,34 @@ The Accounts page listing the company wallet and Treasury, the Treasury account'
 
 **Depends on:** T1 for turning on, T3 to T5 for the rest. **Files:** `apps/mobile/src/app/(admin)/wallet/`, `apps/mobile/src/features/wallet/`, `apps/web/src/app/(company)/wallet/`. **Scope:** L.
 
+**Web, built 2026-11-13:**
+
+- Treasury sits under the company wallet on the Accounts page. It is hidden while unavailable. While off, it invites the admin to turn it on and shows the current rate, so `GET /treasury` now gives `rateBps` when off too. While on, it shows the value, yield, rate, an open move and the move history.
+- The move sheets show a live preview and refuse with the API's own messages. A returned or failed move shows the amount that was asked for, next to its badge.
+- "Move to wallet" is offered beside a short payment on Bills, Approvals, Payroll and the withdraw sheet. Floats aren't paid from the web.
+- Moves to and from Treasury no longer count in the wallet's "in" and "out" for the month: it is the company's own money.
+- Preview screens under `/dev/preview/treasury-*`, with `?role=accountant` for the read-only view. Mocks weren't drawn first: Treasury reuses the existing Accounts page and sheets.
+
+**Mobile is deferred** (Dennis, 2026-11-13) until the K1 mobile redesign, which is on `main`, is merged into `staging`, so it is built once, in the new design.
+
 ### T7: Export, audit log and the internal admin app
 
 The export's Treasury section, audit entries (`treasury.turned_on`, `treasury_move.started`, `treasury_move.completed`, `treasury_move.returned`, `treasury_move.failed`), the staff view.
 
 **Depends on:** T3, T4, T5. **Files:** `services/export/`, `services/audit/`, `services/staff/`, `apps/admin/`. **Scope:** M.
+
+**Built 2026-11-13:**
+
+- **Export:** a Treasury sheet and a Treasury moves sheet (and two CSVs) per month for companies with Treasury on.
+  - **Value:** opening and closing value are each the last daily snapshot on or before the month's first and last day; "No snapshot" when there isn't one.
+  - **Yield:** closing − opening − (moved in − moved out), counted from what reached or left the vault.
+  - **Lines:** one per move that ended in the month.
+- **Staff view:** a Treasury section on each company's page, showing the Treasury wallet, the live position (or that Privy couldn't be read), the open Treasury alerts, and every move with its quotes, Earn calls and ledger rows.
+- **Staff actions approve; the job sends** (Dennis, 2026-11-13). "Return a stranded deposit" and "Finish a return to the wallet" work like this:
+  1. Each needs the staff second confirmation, bound to the staff member, the move, the company and the amount owed.
+  2. Confirming records an approval in `treasury_return_approvals`, reopens the move and audits `treasury_move.return_started`. Nothing is sent from a staff route.
+  3. The `treasury-moves` job carries out the approval. It never sends more than the lesser of the approved amount and what is owed at that moment, and goes back to review if anything changed.
+  4. `internal-routes.test.ts` holds without any exception.
 
 ### What can run together
 
