@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TreasuryStatus } from "@expendi-business/shared";
 
 import {
+  OLDER_TREASURY_MOVES,
   previewFor,
   SHORT_WALLET_OFFER,
   SHORT_WALLET_REFUSAL,
@@ -20,10 +21,13 @@ import {
   treasuryOfferFrom,
 } from "~/lib/approval";
 import { moveSteps, treasuryKeys, turnOnSteps } from "./treasury-api";
-import { TreasuryAccount, TreasuryCard } from "./treasury-card";
+import { TreasuryAccount, TreasuryCard, TreasuryMoves } from "./treasury-card";
 import {
   formatDuration,
   formatRate,
+  moveFacts,
+  MOVES_PER_PAGE,
+  pageOfMoves,
   parseMoveAmount,
   prefillFromOffer,
 } from "./treasury-display";
@@ -245,7 +249,7 @@ describe("the Treasury account", () => {
     });
   });
 
-  it("lists each move with what arrived, what it cost and whether it was all of Treasury", () => {
+  it("lists each move with its title, its badge and what arrived", () => {
     // #when
     const html = card(shown("on"));
     const page = plain(html);
@@ -257,16 +261,88 @@ describe("the Treasury account", () => {
         page.includes("Moved to Treasury"),
       ],
       returned: page.includes("Returned to wallet"),
-      all: page.includes("All of Treasury"),
       delivered: page.includes("250.12"),
-      cost: page.includes("Cost 0.62 USDC"),
+      folded: !page.includes("Cost") && !page.includes("All of Treasury"),
     }).toEqual({
       titles: [true, true],
       returned: true,
-      all: true,
       delivered: true,
-      cost: true,
+      folded: true,
     });
+  });
+
+  it("unfolds a move to what it cost, what was asked and whether it was all of Treasury", () => {
+    // #when
+    const facts = TREASURY_MOVES.map(moveFacts);
+
+    // #then
+    expect(facts).toEqual([
+      [{ label: "Cost", value: "0.46 USDC" }],
+      [{ label: "Cost", value: "0.31 USDC" }],
+      [
+        { label: "Asked for", value: "5,200.00 USDC" },
+        { label: "Cost", value: "0.62 USDC" },
+      ],
+      [
+        { label: "Asked for", value: "All of Treasury" },
+        { label: "Cost", value: "0.43 USDC" },
+      ],
+    ]);
+  });
+
+  it("shows five moves at a time, with the page beside the heading", () => {
+    // #given twelve moves
+    const moves = [...TREASURY_MOVES, ...OLDER_TREASURY_MOVES];
+
+    // #when
+    const first = renderToStaticMarkup(
+      <TreasuryMoves moves={moves} failed={false} />,
+    );
+    const last = renderToStaticMarkup(
+      <TreasuryMoves moves={moves} failed={false} defaultPage={2} />,
+    );
+    const rows = (html: string) => html.match(/<li /g)?.length ?? 0;
+
+    // #then
+    expect({
+      first: [rows(first), plain(first).includes("Page 1 of 3")],
+      last: [rows(last), plain(last).includes("Page 3 of 3")],
+      previousOff:
+        /<button[^>]*disabled=""[^>]*aria-label="Previous page"/.test(first),
+      nextOff: /<button[^>]*disabled=""[^>]*aria-label="Next page"/.test(last),
+    }).toEqual({
+      first: [5, true],
+      last: [2, true],
+      previousOff: true,
+      nextOff: true,
+    });
+  });
+
+  it("shows no pages for five moves or fewer", () => {
+    // #when
+    const html = renderToStaticMarkup(
+      <TreasuryMoves moves={TREASURY_MOVES} failed={false} />,
+    );
+
+    // #then
+    expect(html).not.toContain("Next page");
+    expect(html.match(/<li /g)).toHaveLength(4);
+  });
+
+  it("reads a page past the end as the last one", () => {
+    // #given
+    const moves = [...TREASURY_MOVES, ...OLDER_TREASURY_MOVES];
+
+    // #when
+    const shown = pageOfMoves(moves, 9);
+
+    // #then
+    expect({
+      page: shown.page,
+      pageCount: shown.pageCount,
+      rows: shown.rows.length,
+      perPage: MOVES_PER_PAGE,
+    }).toEqual({ page: 2, pageCount: 3, rows: 2, perPage: 5 });
   });
 });
 

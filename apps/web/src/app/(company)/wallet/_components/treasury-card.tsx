@@ -6,6 +6,8 @@ import {
   ArrowDownLeftIcon,
   ArrowUpRightIcon,
   ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   LandmarkIcon,
 } from "lucide-react";
 import { useId, useState } from "react";
@@ -31,6 +33,9 @@ import {
   formatRate,
   MOVE_HISTORY_TITLES,
   MOVE_STATUS_BADGES,
+  moveAmountShown,
+  moveFacts,
+  pageOfMoves,
 } from "./treasury-display";
 import { MoveProgress } from "./treasury-progress";
 import { MoveSheet, RATE_WARNING, TurnOnSheet } from "./treasury-sheets";
@@ -371,14 +376,18 @@ function SignedYield({ units }: { units: string }): JSX.Element {
   );
 }
 
-/** Every move, newest first: what the admin asked, what arrived, what it cost. */
+/** Every move, newest first, five to a page. A row unfolds to what it cost and its steps. */
 export function TreasuryMoves({
   moves,
   failed,
+  defaultPage = 0,
 }: {
   moves: readonly TreasuryMoveSummary[] | null;
   failed: boolean;
+  defaultPage?: number;
 }): JSX.Element {
+  const [requestedPage, setRequestedPage] = useState(defaultPage);
+  const { rows, page, pageCount } = pageOfMoves(moves ?? [], requestedPage);
   let content: ReactNode;
   if (failed) {
     content = (
@@ -397,48 +406,61 @@ export function TreasuryMoves({
   } else {
     content = (
       <ul>
-        {moves.map((move) => (
+        {rows.map((move) => (
           <MoveRow key={move.id} move={move} />
         ))}
       </ul>
     );
   }
   return (
-    <section aria-labelledby="treasury-moves-title" className="border-t pt-4">
-      <h3
-        id="treasury-moves-title"
-        className="mb-1 text-sm leading-5 font-(--w-ui) text-foreground"
-      >
-        Moves
-      </h3>
+    <section aria-labelledby="treasury-moves-title" className="border-t pt-3">
+      <div className="mb-1 flex min-h-8 items-center justify-between gap-3">
+        <h3
+          id="treasury-moves-title"
+          className="text-sm leading-5 font-(--w-ui) text-foreground"
+        >
+          Moves
+        </h3>
+        {!failed && pageCount > 1 ? (
+          <nav aria-label="Pages of moves" className="flex items-center gap-3">
+            <p
+              aria-live="polite"
+              className="text-xs leading-4 text-muted-foreground tabular-nums"
+            >
+              Page {page + 1} of {pageCount}
+            </p>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className="size-8"
+                disabled={page === 0}
+                onClick={() => setRequestedPage(page - 1)}
+                aria-label="Previous page"
+              >
+                <ChevronLeftIcon aria-hidden="true" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className="size-8"
+                disabled={page === pageCount - 1}
+                onClick={() => setRequestedPage(page + 1)}
+                aria-label="Next page"
+              >
+                <ChevronRightIcon aria-hidden="true" />
+              </Button>
+            </div>
+          </nav>
+        ) : null}
+      </div>
       {content}
     </section>
   );
 }
 
-/**
- * What the move put where it was going, or what was asked while that isn't
- * known. A returned or failed move put nothing anywhere: its badge says so,
- * and the amount asked for is what the admin recognises.
- */
-function amountShown(move: TreasuryMoveSummary): string {
-  if (move.status === "returned" || move.status === "failed") {
-    return move.requestedUsdc;
-  }
-  if (move.direction === "to_wallet") {
-    return move.deliveredUsdc ?? move.movedUsdc ?? move.requestedUsdc;
-  }
-  return move.movedUsdc ?? move.requestedUsdc;
-}
-
-function moveDetail(move: TreasuryMoveSummary): string {
-  const parts = [formatNairobiDateTime(move.createdAt)];
-  if (move.isAll) parts.push("All of Treasury");
-  if (move.costUsdc !== null && BigInt(move.costUsdc) > 0n) {
-    parts.push(`Cost ${formatUsdc(move.costUsdc)} USDC`);
-  }
-  return parts.join(" · ");
-}
+const ROW_GRID =
+  "grid w-full grid-cols-[32px_minmax(0,1fr)_auto_16px] items-center gap-3 py-3 text-left";
 
 export function MoveRow({
   move,
@@ -448,66 +470,85 @@ export function MoveRow({
   defaultExpanded?: boolean;
 }): JSX.Element {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const stepsId = useId();
+  const detailsId = useId();
   const badge = MOVE_STATUS_BADGES[move.status];
   const Icon =
     move.direction === "to_treasury" ? ArrowUpRightIcon : ArrowDownLeftIcon;
-  const shown = amountShown(move);
-  const short =
-    move.status === "completed" &&
-    shown !== move.requestedUsdc &&
-    BigInt(shown) < BigInt(move.requestedUsdc);
-  return (
-    <li className="border-t border-border py-3 first:border-t-0">
-      <div className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3">
-        <span
-          aria-hidden="true"
-          className="inline-flex size-8 items-center justify-center rounded-control border border-border bg-card text-muted-foreground"
-        >
-          <Icon className="size-4" />
+  const facts = moveFacts(move);
+  const unfolds = facts.length > 0 || move.progress !== undefined;
+  const summary = (
+    <>
+      <span
+        aria-hidden="true"
+        className="inline-flex size-8 items-center justify-center rounded-control border border-border bg-card text-muted-foreground"
+      >
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="flex flex-wrap items-center gap-2 text-sm leading-5 font-(--w-name) text-foreground">
+          {MOVE_HISTORY_TITLES[move.direction]}
+          {badge ? (
+            <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+          ) : null}
         </span>
-        <div className="min-w-0">
-          <p className="flex flex-wrap items-center gap-2 text-sm leading-5 font-(--w-name) text-foreground">
-            {MOVE_HISTORY_TITLES[move.direction]}
-            {badge ? (
-              <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
-            ) : null}
-          </p>
-          <p className="truncate text-xs leading-4 text-muted-foreground tabular-nums">
-            {moveDetail(move)}
-          </p>
-          {short ? (
-            <p className="text-xs leading-4 text-muted-foreground tabular-nums">
-              {formatUsdc(shown)} of {formatUsdc(move.requestedUsdc)} USDC
-              arrived
-            </p>
+        <span className="block truncate text-xs leading-4 text-muted-foreground tabular-nums">
+          {formatNairobiDateTime(move.createdAt)}
+        </span>
+      </span>
+      <span className="whitespace-nowrap tabular-nums">
+        {formatUsdc(moveAmountShown(move))}{" "}
+        <span className="text-[0.72em] font-(--w-ui) tracking-[0.04em] text-muted-foreground">
+          USDC
+        </span>
+      </span>
+    </>
+  );
+  return (
+    <li className="border-t border-border first:border-t-0">
+      {unfolds ? (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          onClick={() => setExpanded(!expanded)}
+          className={cn(
+            ROW_GRID,
+            "group cursor-pointer rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--focus-ring)",
+          )}
+        >
+          {summary}
+          <ChevronDownIcon
+            aria-hidden="true"
+            className={cn(
+              "size-4 text-muted-foreground transition-[color,transform] duration-150 group-hover:text-foreground motion-reduce:transition-none",
+              expanded && "rotate-180",
+            )}
+          />
+        </button>
+      ) : (
+        <div className={ROW_GRID}>{summary}</div>
+      )}
+      {unfolds && expanded ? (
+        <div
+          id={detailsId}
+          className="flex flex-col gap-2 pr-7 pb-4 pl-11 max-[600px]:px-0"
+        >
+          {facts.length > 0 ? (
+            <dl>
+              {facts.map((fact) => (
+                <div
+                  key={fact.label}
+                  className="flex items-baseline justify-between gap-3 py-1 text-sm leading-5"
+                >
+                  <dt className="text-muted-foreground">{fact.label}</dt>
+                  <dd className="tabular-nums">{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
           ) : null}
           {move.progress ? (
-            <button
-              type="button"
-              aria-expanded={expanded}
-              aria-controls={stepsId}
-              onClick={() => setExpanded(!expanded)}
-              className="mt-0.5 inline-flex items-center gap-1 rounded-[4px] text-xs leading-4 font-(--w-ui) text-accent-foreground hover:underline"
-            >
-              {expanded ? "Hide steps" : "Show steps"}
-              <ChevronDownIcon
-                aria-hidden="true"
-                className={cn("size-3", expanded && "rotate-180")}
-              />
-            </button>
+            <MoveProgress progress={move.progress} showTimes />
           ) : null}
-        </div>
-        <p className="whitespace-nowrap tabular-nums">
-          {formatUsdc(shown)}{" "}
-          <span className="text-[0.72em] font-(--w-ui) tracking-[0.04em] text-muted-foreground">
-            USDC
-          </span>
-        </p>
-      </div>
-      {move.progress && expanded ? (
-        <div id={stepsId} className="mt-2 pl-11">
-          <MoveProgress progress={move.progress} showTimes />
         </div>
       ) : null}
     </li>

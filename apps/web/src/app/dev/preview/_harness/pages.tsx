@@ -83,6 +83,11 @@ export const PAGE_PREVIEWS: Readonly<Record<string, PagePreview>> = {
   },
   "treasury-progress": { path: "/wallet", View: TreasuryProgressPreview },
   "treasury-saved": { path: "/wallet", View: WalletView, treasury: "saved" },
+  "treasury-history": {
+    path: "/wallet",
+    View: WalletView,
+    treasury: "history",
+  },
   "treasury-short": {
     path: "/bills",
     View: TreasuryShortPreview,
