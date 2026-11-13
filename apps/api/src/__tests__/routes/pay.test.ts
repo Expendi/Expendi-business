@@ -20,17 +20,20 @@ import {
   intentQuotes,
   invoicePayments,
   invoices,
+  walletTransactions,
 } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 import {
   ONE_CLICK_FUND_IN_USDC_ASSET_IDS,
   ONE_CLICK_USDC_ASSET_IDS,
 } from "../../services/intents/one-click.js";
+import { getInvoicePdfData } from "../../services/invoices/invoice-pdf.js";
 import { createCompany } from "../helpers/db.js";
 import {
   asAdmin,
   createCustomerAndInvoice,
   insertDeposit,
+  insertInvoiceQuote,
 } from "../helpers/invoices.js";
 import { createFundedCompany, readQuote } from "../helpers/money-in.js";
 import { makeFakeOneClick } from "../helpers/one-click.js";
@@ -262,6 +265,129 @@ describe("GET /pay/:publicId", () => {
       allowed: preflight.headers.get("access-control-allow-origin"),
       other: other.headers.get("access-control-allow-origin"),
     }).toEqual({ allowed: DASHBOARD_ORIGIN, other: null });
+  });
+});
+
+describe("GET /pay/:publicId/pdf", () => {
+  const pdf = (publicId: string) => app.request(`/pay/${publicId}/pdf`);
+
+  it("serves an open invoice as a PDF download that isn't cached", async () => {
+    // #given
+    const invoice = await open({ number: "INV-0013" });
+
+    // #when
+    const response = await pdf(invoice.publicId ?? "");
+
+    // #then
+    const bytes = Buffer.from(await response.arrayBuffer());
+    expect({
+      status: response.status,
+      type: response.headers.get("content-type"),
+      disposition: response.headers.get("content-disposition"),
+      cache: response.headers.get("cache-control"),
+      magic: bytes.subarray(0, 5).toString(),
+    }).toEqual({
+      status: 200,
+      type: "application/pdf",
+      disposition: 'attachment; filename="INV-0013.pdf"',
+      cache: "no-store",
+      magic: "%PDF-",
+    });
+  });
+
+  it("answers 404 in the error envelope for an unknown ID", async () => {
+    // #when
+    const response = await pdf(randomBytes(32).toString("base64url"));
+
+    // #then
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: { _tag: "NotFound", message: "Invoice not found." },
+    });
+  });
+
+  it("answers 404 for something that isn't a public ID", async () => {
+    // #when
+    const response = await pdf("INV-0013");
+
+    // #then
+    expect(response.status).toBe(404);
+  });
+
+  it("reads the payment that settled a paid invoice", async () => {
+    // #given
+    const invoice = await open();
+    const quote = await insertInvoiceQuote(db, funded, invoice.invoiceId);
+    const depositId = await insertDeposit(db, funded);
+    await runInScope(db, asAdmin(funded.company), (tx) =>
+      tx.insert(invoicePayments).values({
+        organizationId: funded.company.organizationId,
+        invoiceId: invoice.invoiceId,
+        kind: "link",
+        intentQuoteId: quote.id,
+        walletTransactionId: depositId,
+        amountUsdc: 100_000_000n,
+        paidOn: "2026-11-12",
+      }),
+    );
+    await setInvoice(invoice.invoiceId, { status: "paid", paidAt: new Date() });
+    const [deposit] = await runInScope(
+      db,
+      { organizationId: funded.company.organizationId },
+      (tx) =>
+        tx
+          .select({ txHash: walletTransactions.txHash })
+          .from(walletTransactions)
+          .where(eq(walletTransactions.id, depositId)),
+    );
+
+    // #when
+    const data = await runtime.runPromise(
+      getInvoicePdfData(invoice.publicId ?? ""),
+    );
+    const response = await pdf(invoice.publicId ?? "");
+
+    // #then
+    expect(data.payUrl).toBeNull();
+    expect(data.payment).toEqual({
+      paidOn: "2026-11-12",
+      amountUsdc: 100_000_000n,
+      chain: "base",
+      txHash: deposit?.txHash,
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("gives an open invoice the pay link on the first dashboard origin", async () => {
+    // #given
+    const invoice = await open();
+
+    // #when
+    const data = await runtime.runPromise(
+      getInvoicePdfData(invoice.publicId ?? ""),
+    );
+
+    // #then
+    expect(data.payUrl).toBe(`${DASHBOARD_ORIGIN}/pay/${invoice.publicId}`);
+    expect(data.payment).toBeNull();
+  });
+
+  it("serves a void invoice", async () => {
+    // #given
+    const invoice = await open();
+    await setInvoice(invoice.invoiceId, {
+      status: "void",
+      voidedAt: new Date(),
+      voidedReason: "Duplicate",
+      voidedBy: funded.company.admin.id,
+    });
+
+    // #when
+    const response = await pdf(invoice.publicId ?? "");
+
+    // #then
+    expect(response.status).toBe(200);
   });
 });
 

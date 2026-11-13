@@ -45,6 +45,7 @@ import { makeFakeOneClick } from "../helpers/one-click.js";
 import { makeTestRuntime } from "../helpers/runtime.js";
 import { TEST_DATABASE_URL_MIGRATE } from "../setup/test-database.js";
 
+const DASHBOARD_ORIGIN = "https://business.expendi.test";
 const rpc = makeFakeNearRpc();
 const fastNear = makeFakeFastNear();
 const oneClick = makeFakeOneClick();
@@ -55,12 +56,15 @@ let owner: pg.Pool;
 let funded: FundedCompany;
 
 beforeAll(async () => {
-  runtime = makeTestRuntime({
-    nearRpc: rpc.layer,
-    fastNear: fastNear.layer,
-    oneClick: oneClick.layer,
-    emailSender: email.layer,
-  });
+  runtime = makeTestRuntime(
+    {
+      nearRpc: rpc.layer,
+      fastNear: fastNear.layer,
+      oneClick: oneClick.layer,
+      emailSender: email.layer,
+    },
+    { DASHBOARD_ORIGINS: DASHBOARD_ORIGIN },
+  );
   ({ db } = await runtime.runPromise(DatabaseService));
   owner = new pg.Pool({ connectionString: TEST_DATABASE_URL_MIGRATE, max: 1 });
 });
@@ -408,6 +412,12 @@ describe("the deposit watcher and an invoice payment quote's delivery", () => {
       idempotencyKey: `invoice-payment-${payment?.id}-receipt`,
       mentions: true,
     });
+    expect(receipt?.text).toContain(
+      `Download receipt (PDF): ${DASHBOARD_ORIGIN}/pay/${invoice.publicId}/pdf`,
+    );
+    expect(receipt?.html).toContain(
+      `href="${DASHBOARD_ORIGIN}/pay/${invoice.publicId}/pdf">Download receipt (PDF)</a>`,
+    );
   });
 
   it("keeps the credit and the paid invoice when the receipt can't be sent", async () => {

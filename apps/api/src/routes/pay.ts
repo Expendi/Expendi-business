@@ -1,5 +1,5 @@
 import type { RequestIdVariables } from "hono/request-id";
-import { Effect } from "effect";
+import { Effect, Exit } from "effect";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -8,7 +8,12 @@ import { invoicePayQuoteRequestSchema } from "@expendi-business/shared";
 import type { AppRuntime } from "../runtime.js";
 import { NotFound } from "../errors.js";
 import { readBody } from "../http/body.js";
-import { runEffect } from "../http/respond.js";
+import { failureResponse, runEffect } from "../http/respond.js";
+import {
+  getInvoicePdfData,
+  invoicePdfFilename,
+  renderInvoicePdf,
+} from "../services/invoices/invoice-pdf.js";
 import {
   getPayQuote,
   getPublicInvoice,
@@ -22,6 +27,25 @@ import {
  */
 export function createPayRoutes(runtime: AppRuntime) {
   return new Hono<{ Variables: RequestIdVariables }>()
+    .get("/:publicId/pdf", async (c) => {
+      c.header("Cache-Control", "no-store");
+      const exit = await runtime.runPromiseExit(
+        getInvoicePdfData(c.req.param("publicId")).pipe(
+          Effect.flatMap((data) =>
+            Effect.promise(() => renderInvoicePdf(data)).pipe(
+              Effect.map((bytes) => ({ bytes, number: data.invoice.number })),
+            ),
+          ),
+        ),
+      );
+      if (Exit.isFailure(exit)) return failureResponse(c, exit.cause);
+      const { bytes, number } = exit.value;
+      return c.body(new Uint8Array(bytes), 200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${invoicePdfFilename(number)}"`,
+        "X-Content-Type-Options": "nosniff",
+      });
+    })
     .get("/:publicId", (c) =>
       runEffect(runtime, c, getPublicInvoice(c.req.param("publicId"))),
     )

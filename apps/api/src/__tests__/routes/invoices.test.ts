@@ -418,6 +418,12 @@ describe("sending", () => {
     expect(message?.html).toContain(
       `href="${DASHBOARD}/pay/${invoice.publicId}"`,
     );
+    expect(message?.text).toContain(
+      `Download PDF: ${DASHBOARD}/pay/${invoice.publicId}/pdf`,
+    );
+    expect(message?.html).toContain(
+      `href="${DASHBOARD}/pay/${invoice.publicId}/pdf">Download PDF</a>`,
+    );
     expect(message?.text).toContain("Net 30, thanks");
   });
 
