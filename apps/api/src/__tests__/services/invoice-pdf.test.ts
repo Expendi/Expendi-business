@@ -151,9 +151,12 @@ describe("renderInvoicePdf", () => {
     };
 
     // #when
-    const { texts } = await render(data);
+    const { bytes, texts } = await render(data);
 
     // #then
+    expect(bytes.toString("latin1")).toContain(
+      `/URI (https://nearblocks.io/txns/${TX_HASH})`,
+    );
     expect(texts).toEqual(
       expect.arrayContaining([
         "PAID",

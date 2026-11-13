@@ -1,7 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import { Cause, Effect } from "effect";
 
-import { FUND_IN_CHAIN_NAMES } from "@expendi-business/shared";
+import {
+  FUND_IN_CHAIN_NAMES,
+  nearTransactionUrl,
+} from "@expendi-business/shared";
 
 import type { ConfigService } from "../../config.js";
 import type { Transaction } from "../../db/scope.js";
@@ -45,6 +48,8 @@ export function recordLinkPayment(
     readonly organizationId: string;
     readonly intentQuoteId: string;
     readonly walletTransactionId: string;
+    /** The NEAR transaction that delivered it. */
+    readonly txHash: string;
     /** USDC base units the company wallet received. */
     readonly receivedUsdc: bigint;
     readonly actor: AuditActor;
@@ -137,6 +142,7 @@ export function recordLinkPayment(
               paidOn,
               paymentId: recorded.paymentId,
               publicId: before.publicId,
+              transactionUrl: nearTransactionUrl(input.txHash),
             },
     };
   });
