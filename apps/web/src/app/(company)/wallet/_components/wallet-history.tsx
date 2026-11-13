@@ -58,7 +58,10 @@ export function WalletHistory({
     (item: WalletHistoryItem) => setOpenId(item.id),
     [setOpenId],
   );
-  const columns = useMemo(() => historyColumns(openItem), [openItem]);
+  const columns = useMemo(
+    () => historyColumns(openItem, today),
+    [openItem, today],
+  );
 
   return (
     <Card
@@ -113,6 +116,7 @@ export function WalletHistory({
           <DayGroup
             key={group.day}
             heading={dayHeading(group.day, today)}
+            today={today}
             items={group.items}
             columns={columns}
             openId={openId}
@@ -160,6 +164,7 @@ export function WalletHistory({
  */
 function DayGroup({
   heading,
+  today,
   items,
   columns,
   openId,
@@ -167,6 +172,7 @@ function DayGroup({
   showHead,
 }: {
   heading: string;
+  today: string;
   items: readonly WalletHistoryItem[];
   columns: DataTableColumnDef<WalletHistoryItem>[];
   openId: string | null;
@@ -194,6 +200,7 @@ function DayGroup({
           <TxPhoneCard
             key={row.id}
             item={row.original}
+            today={today}
             onOpen={() => onOpen(row.original)}
           />
         )}

@@ -10,9 +10,12 @@ import {
   dayHeading,
   filterHistory,
   groupByDay,
+  happenedAt,
   maxWithdrawal,
   monthFlows,
+  movedAt,
   nairobiDay,
+  nairobiTime,
   rowBadge,
   signedUsdc,
   splitUsdc,
@@ -40,6 +43,45 @@ describe("the ledger's days", () => {
 
     // #then
     expect(headings).toEqual(["Today", "Yesterday", "Wednesday 4 Nov"]);
+  });
+
+  it("tells morning from afternoon", () => {
+    // #when
+    const times = [
+      "2026-11-05T21:05:00Z",
+      "2026-11-06T04:28:00Z",
+      "2026-11-06T09:00:00Z",
+      "2026-11-06T13:42:00Z",
+    ].map(nairobiTime);
+
+    // #then
+    expect(times).toEqual(["12:05 AM", "7:28 AM", "12:00 PM", "4:42 PM"]);
+  });
+
+  it("gives a row its time today and its date too once the day has passed", () => {
+    // #when
+    const times = [
+      "2026-11-06T04:28:00Z",
+      "2026-11-05T13:42:00Z",
+      "2026-10-11T10:57:00Z",
+      "2025-12-30T06:15:00Z",
+    ].map((at) => movedAt(at, TODAY));
+
+    // #then
+    expect(times).toEqual([
+      "7:28 AM",
+      "5 Nov, 4:42 PM",
+      "11 Oct, 1:57 PM",
+      "30 Dec 2025, 9:15 AM",
+    ]);
+  });
+
+  it("names the year of a moment from another year", () => {
+    // #when
+    const when = happenedAt("2025-12-30T06:15:00Z", TODAY);
+
+    // #then
+    expect(when).toBe("30 Dec 2025, 9:15 AM");
   });
 
   it("counts a moment by its Nairobi day, not UTC's", () => {

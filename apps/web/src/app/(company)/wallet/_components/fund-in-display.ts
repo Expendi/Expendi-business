@@ -50,7 +50,7 @@ export const FUND_IN_STATUS: Record<
   },
   expired: {
     label: "Expired",
-    tone: "rejected",
+    tone: "failed",
     note: "The deadline passed with nothing sent. Start a new fund-in to get a new address.",
   },
 };

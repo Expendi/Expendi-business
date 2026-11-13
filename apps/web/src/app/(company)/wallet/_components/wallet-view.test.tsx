@@ -147,7 +147,8 @@ describe("Accounts", () => {
         "To Reserve on Coinbase",
       ].every((line) => page.includes(line)),
       moving: page.includes("On its way") && page.includes("Sending"),
-      time: page.includes("09:20"),
+      time: page.includes("9:20 AM"),
+      datedOnceOlder: /4 Nov, \d{1,2}:\d{2} [AP]M/.test(page),
       more: page.includes("Load more"),
     }).toEqual({
       days: true,
@@ -155,6 +156,7 @@ describe("Accounts", () => {
       rows: true,
       moving: true,
       time: true,
+      datedOnceOlder: true,
       more: true,
     });
   });

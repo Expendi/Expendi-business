@@ -9,13 +9,7 @@ import type { DataTableColumnDef } from "~/components/data/data-table";
 import { EntityMark, PhoneCard, RowTitle } from "~/components/data/cells";
 import { StatusBadge } from "~/components/data/status-badge";
 import { SignedUsdc } from "./balance-card";
-import {
-  nairobiTime,
-  rowBadge,
-  txDetail,
-  txKind,
-  txTitle,
-} from "./wallet-display";
+import { movedAt, rowBadge, txDetail, txKind, txTitle } from "./wallet-display";
 
 const TILES: Partial<Record<TxKind, LucideIcon>> = {
   deposit: ArrowDownLeftIcon,
@@ -53,6 +47,7 @@ export function TxMark({ item }: { item: WalletHistoryItem }): JSX.Element {
 
 export function historyColumns(
   onOpen: (item: WalletHistoryItem) => void,
+  today: string,
 ): DataTableColumnDef<WalletHistoryItem>[] {
   return [
     {
@@ -93,9 +88,9 @@ export function historyColumns(
       id: "time",
       accessorFn: (item) => item.createdAt,
       header: "Time",
-      cell: ({ row }) => nairobiTime(row.original.createdAt),
+      cell: ({ row }) => movedAt(row.original.createdAt, today),
       enableSorting: false,
-      meta: { kind: "date", label: "Time", className: "w-20" },
+      meta: { kind: "date", label: "Time", className: "w-44" },
     },
     {
       id: "amount",
@@ -114,9 +109,11 @@ export function historyColumns(
 
 export function TxPhoneCard({
   item,
+  today,
   onOpen,
 }: {
   item: WalletHistoryItem;
+  today: string;
   onOpen: () => void;
 }): JSX.Element {
   const badge = rowBadge(item);
@@ -136,7 +133,7 @@ export function TxPhoneCard({
             <SignedUsdc amount={item.usdcAmount} tint />
           </span>
           <span className="text-xs leading-4 text-muted-foreground tabular-nums">
-            {nairobiTime(item.createdAt)}
+            {movedAt(item.createdAt, today)}
           </span>
         </span>
       }

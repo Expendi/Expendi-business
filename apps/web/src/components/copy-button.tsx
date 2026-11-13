@@ -21,7 +21,7 @@ export function CopyButton({
   label?: string;
   /** Finishes the button's name for screen readers when `label` is short. */
   what?: string;
-  /** Fills its column; false sits beside the value it copies. */
+  /** Fills its column; false sits on the line of the value it copies, no taller than the text. */
   wide?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }): JSX.Element {
@@ -50,9 +50,9 @@ export function CopyButton({
         ref={ref}
         type="button"
         variant="outline"
-        size="md"
+        size={wide ? "md" : "xs"}
         onClick={copy}
-        className={wide ? "w-full" : undefined}
+        className={wide ? "w-full" : "-my-0.5"}
       >
         {state === "copied" ? (
           <CheckIcon aria-hidden="true" />
