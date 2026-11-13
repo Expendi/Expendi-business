@@ -20,7 +20,7 @@ const SidebarOpenContext = createContext(true);
 
 /**
  * The layout preferences the root layout read from cookies, as a store the
- * shell and the layout controls share. It follows the system theme while
+ * shell and Settings > Appearance share. It follows the system theme while
  * the mode is "System".
  */
 export function PreferencesStoreProvider({

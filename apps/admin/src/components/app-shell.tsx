@@ -12,8 +12,8 @@ import { useSidebarDefaultOpen } from "~/stores/preferences/preferences-provider
 
 /**
  * The staff frame from the shadcn admin template: a collapsible sidebar, a
- * 48px header and the page, centered or full width. The layout controls in
- * the header change all three.
+ * 48px header and the page, centered or full width. Settings > Appearance
+ * changes all three.
  */
 export function AppShell({
   email,

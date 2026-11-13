@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Opt-in looks from the layout controls; the Expendi brand below is "default". */
+/* Opt-in looks from Settings > Appearance; the Expendi brand below is "default". */
 @import "../styles/presets/tangerine.css";
 @import "../styles/presets/soft-pop.css";
 @import "../styles/presets/brutalist.css";
@@ -292,7 +292,7 @@
   --sidebar-ring: #ff9c84;
 }
 
-/* The font picked in the layout controls (`data-font` on <html>). */
+/* The font picked in Settings > Appearance (`data-font` on <html>). */
 html[data-font="geist"] {
   --app-font: var(--font-geist);
 }
