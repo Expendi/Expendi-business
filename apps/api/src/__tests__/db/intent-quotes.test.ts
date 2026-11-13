@@ -25,6 +25,7 @@ import {
   createIsolationFixture,
   expectTableIsolation,
 } from "../helpers/isolation.js";
+import { saveTreasuryMove } from "../helpers/money-in.js";
 import { randomNearAccount, randomNearTxHash } from "../helpers/near.js";
 import { makeTestRuntime } from "../helpers/runtime.js";
 
@@ -508,6 +509,345 @@ describe("intent_quotes", () => {
 
     // #then
     await expect(remove).rejects.toMatchObject({ cause: { code: "42501" } });
+  });
+});
+
+describe("a quote paid out of a confidential account", () => {
+  const paid = {
+    depositType: "CONFIDENTIAL_INTENTS",
+    refundType: "CONFIDENTIAL_INTENTS",
+  } as const;
+  // Final, so a job that walks every company never picks these rows up.
+  const started = {
+    ...paid,
+    status: "refunded",
+    settledAt: new Date("2026-11-11T11:52:00.000Z"),
+    depositStartedAt: new Date("2026-11-11T11:50:00.000Z"),
+  } as const;
+  const done = {
+    status: "refunded",
+    settledAt: new Date("2026-11-11T11:52:00.000Z"),
+  } as const;
+  const message = { standard: "nep413", payload: { message: "{}" } };
+  const messageDeadline = new Date("2026-11-14T11:50:00.000Z");
+  const signed = {
+    ...started,
+    signedIntent: message,
+    intentDeadline: messageDeadline,
+  } as const;
+  const treasuryMove = (company: TestCompany, wallet: TestWallet) =>
+    saveTreasuryMove(db, { company, walletId: wallet.id });
+
+  it.each([
+    ["a Base hop", { purpose: "base_hop" as const }],
+    ["a USDC payout", { purpose: "usdc_payout" as const }],
+  ])("accepts %s, which refunds into the account too", async (_name, row) => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertAs(
+      company,
+      hop(company, wallet, { ...paid, ...done, ...row }),
+    );
+
+    // #then
+    await expect(insert).resolves.toHaveLength(1);
+  });
+
+  it("accepts a move to Treasury", async () => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+    const move = await treasuryMove(company, wallet);
+
+    // #when
+    const insert = insertAs(
+      company,
+      hop(company, wallet, {
+        ...paid,
+        ...done,
+        purpose: "to_treasury",
+        swapType: "EXACT_INPUT",
+        treasuryMoveId: move.id,
+      }),
+    );
+
+    // #then
+    await expect(insert).resolves.toHaveLength(1);
+  });
+
+  it.each([
+    [
+      "a sweep",
+      { purpose: "sweep" as const, swapType: "EXACT_INPUT" as const },
+    ],
+    [
+      "a fund-in",
+      {
+        purpose: "fund_in" as const,
+        swapType: "EXACT_INPUT" as const,
+        refundType: "INTENTS" as const,
+      },
+    ],
+    [
+      "a move-in",
+      {
+        purpose: "move_in" as const,
+        swapType: "EXACT_INPUT" as const,
+        recipientType: "CONFIDENTIAL_INTENTS" as const,
+      },
+    ],
+    [
+      "a fee cover",
+      {
+        purpose: "fee_cover" as const,
+        swapType: "EXACT_INPUT" as const,
+        recipientType: "CONFIDENTIAL_INTENTS" as const,
+      },
+    ],
+  ])("rejects %s paid out of the account", async (_name, row) => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertAs(
+      company,
+      hop(company, wallet, { depositType: "CONFIDENTIAL_INTENTS", ...row }),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "intent_quotes_intents_side_matches_purpose" },
+    });
+  });
+
+  it.each([
+    [
+      "paid on chain but refunding into the account",
+      { refundType: "CONFIDENTIAL_INTENTS" as const },
+    ],
+    [
+      "paid from the account but refunding on chain",
+      { depositType: "CONFIDENTIAL_INTENTS" as const },
+    ],
+    [
+      "a fund-in refunding into the account",
+      {
+        purpose: "fund_in" as const,
+        swapType: "EXACT_INPUT" as const,
+        refundType: "CONFIDENTIAL_INTENTS" as const,
+      },
+    ],
+    [
+      "a payout refunding into NEAR Intents",
+      { refundType: "INTENTS" as const },
+    ],
+  ])("rejects a quote %s", async (_name, row) => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertAs(company, hop(company, wallet, row));
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "intent_quotes_intents_side_matches_purpose" },
+    });
+  });
+
+  it("accepts a signed message once its deposit has started", async () => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const [row] = await insertAs(company, hop(company, wallet, signed));
+
+    // #then
+    expect(row).toMatchObject({ signedIntent: message });
+  });
+
+  it.each([
+    ["on chain", { depositStartedAt: new Date() }],
+    ["before its deposit started", { ...paid }],
+  ])("rejects a signed message on a quote paid %s", async (_name, row) => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertAs(
+      company,
+      hop(company, wallet, {
+        ...row,
+        signedIntent: message,
+        intentDeadline: messageDeadline,
+      }),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "intent_quotes_signed_intent_is_confidential" },
+    });
+  });
+
+  it.each([
+    ["a company wallet send", "send"],
+    ["a deposit transaction", "deposit"],
+    ["a registration transaction", "registration"],
+    ["a fee cover", "fee cover"],
+  ] as const)("rejects one with %s", async (_name, kind) => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+    const send = await executedSend(company, wallet);
+    const overrides: Partial<NewIntentQuote> = {
+      send: { companyWalletSendId: send.id },
+      deposit: { depositTxHash: randomNearTxHash() },
+      registration: { depositRegistrationTxHash: randomNearTxHash() },
+      "fee cover": { feeCoverUsdc: 53_815n },
+    }[kind];
+
+    // #when
+    const insert = insertAs(
+      company,
+      hop(company, wallet, { ...paid, ...overrides }),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "intent_quotes_confidential_deposit_has_no_send" },
+    });
+  });
+
+  it("fails only after its signed message's own deadline", async () => {
+    // #given a quote whose message is still live, and one whose is dead
+    const live = await companyWithWallet();
+    const dead = await companyWithWallet();
+
+    // #when
+    const early = insertAs(
+      live.company,
+      hop(live.company, live.wallet, {
+        ...signed,
+        status: "failed",
+        settledAt: new Date("2026-11-13T00:00:00.000Z"),
+      }),
+    );
+    const late = insertAs(
+      dead.company,
+      hop(dead.company, dead.wallet, {
+        ...signed,
+        status: "failed",
+        settledAt: new Date("2026-11-14T11:50:01.000Z"),
+      }),
+    );
+
+    // #then
+    await expect(early).rejects.toMatchObject({
+      cause: { constraint: "intent_quotes_signed_fails_after_its_deadline" },
+    });
+    await expect(late).resolves.toHaveLength(1);
+  });
+
+  it("fails when nothing was signed, at any time", async () => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertAs(
+      company,
+      hop(company, wallet, {
+        ...started,
+        status: "failed",
+        settledAt: new Date("2026-11-11T11:52:00.000Z"),
+      }),
+    );
+
+    // #then
+    await expect(insert).resolves.toHaveLength(1);
+  });
+
+  it("can't be expired once a message was signed", async () => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertAs(
+      company,
+      hop(company, wallet, {
+        ...signed,
+        status: "expired",
+        settledAt: new Date("2026-11-11T11:52:00.000Z"),
+      }),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "intent_quotes_expired_never_deposited" },
+    });
+  });
+});
+
+describe("a fee cover quote", () => {
+  const cover = {
+    purpose: "fee_cover",
+    swapType: "EXACT_INPUT",
+    recipientType: "CONFIDENTIAL_INTENTS",
+  } as const;
+
+  it("is delivered into the company's confidential account", async () => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertAs(
+      company,
+      hop(company, wallet, {
+        ...cover,
+        status: "refunded",
+        settledAt: new Date("2026-11-11T11:52:00.000Z"),
+      }),
+    );
+
+    // #then
+    await expect(insert).resolves.toHaveLength(1);
+  });
+
+  it("can't be anywhere else", async () => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertAs(
+      company,
+      hop(company, wallet, { ...cover, recipientType: "DESTINATION_CHAIN" }),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "intent_quotes_recipient_type_matches_purpose" },
+    });
+  });
+
+  it("can't be credited to the ledger", async () => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertAs(
+      company,
+      hop(company, wallet, {
+        ...cover,
+        status: "succeeded",
+        settledAt: new Date(),
+        ledgerCreditedAt: new Date(),
+      }),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: {
+        constraint: "intent_quotes_ledger_credit_is_confidential_delivery",
+      },
+    });
   });
 });
 

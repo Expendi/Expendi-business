@@ -6,6 +6,7 @@ import type {
   TreasuryEarnAction,
   TreasuryMove,
 } from "../../db/schema/index.js";
+import type { WalletBalanceHome } from "../../db/schema/wallets.js";
 import type { Tenant } from "../../middleware/tenant.js";
 import type { TransferLogInput } from "./chain.js";
 import type { NearPayingCompany, NearPayoutWorld } from "./near-payouts.js";
@@ -47,6 +48,7 @@ export async function createTreasuryCompany(
   options: {
     readonly balance?: bigint;
     readonly perTransactionMaxUsdc?: bigint;
+    readonly balanceHome?: WalletBalanceHome;
   } = {},
 ): Promise<TreasuryCompany> {
   const paying = await createNearPayingCompany(world, db, options);

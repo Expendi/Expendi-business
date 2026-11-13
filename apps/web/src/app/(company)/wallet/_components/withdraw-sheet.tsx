@@ -344,7 +344,10 @@ export function WithdrawSheet({
         ) : null}
         {step.withdrawal.txHash ? (
           <p className="text-xs text-muted-foreground tabular-nums">
-            Transaction {shortAddress(step.withdrawal.txHash)}
+            {step.withdrawal.txChain
+              ? `${PAYEE_CHAIN_NAMES[step.withdrawal.txChain]} transaction`
+              : "Transaction"}{" "}
+            {shortAddress(step.withdrawal.txHash)}
           </p>
         ) : null}
       </div>

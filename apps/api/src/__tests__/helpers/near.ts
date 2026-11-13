@@ -436,6 +436,10 @@ export function makeFakeNearRpc(
           tokenIds.map((tokenId) => state.intentsBalanceOf(accountId, tokenId)),
         ),
       ),
+    intentsSalt: () =>
+      maybeFail("intentsSalt").pipe(
+        Effect.map(() => Uint8Array.from([0xe1, 0x10, 0xf3, 0x17])),
+      ),
     finalBlock: () =>
       maybeFail("finalBlock").pipe(
         Effect.map(() => ({

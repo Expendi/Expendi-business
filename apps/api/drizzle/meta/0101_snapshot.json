@@ -1,5 +1,5 @@
 {
-  "id": "318aaefb-05c2-49c6-82dd-5e4a16ceea4a",
+  "id": "5ef6e6a3-eb85-4ddd-8bf8-1f1fca6cdc9f",
   "prevId": "227f385a-bfcc-4727-815d-f8ca26989f0f",
   "version": "7",
   "dialect": "postgresql",
@@ -907,24 +907,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "card_purchase_id": {
-          "name": "card_purchase_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "card_declined_at": {
-          "name": "card_declined_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "card_decline_reason": {
-          "name": "card_decline_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -953,22 +935,6 @@
           ],
           "isUnique": true,
           "where": "\"bills\".\"payout_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "bills_card_purchase_id_unique": {
-          "name": "bills_card_purchase_id_unique",
-          "columns": [
-            {
-              "expression": "card_purchase_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"bills\".\"card_purchase_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1152,15 +1118,6 @@
           "columnsTo": ["id", "organization_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "bills_card_purchase_organization_fk": {
-          "name": "bills_card_purchase_organization_fk",
-          "tableFrom": "bills",
-          "tableTo": "card_purchases",
-          "columnsFrom": ["card_purchase_id", "organization_id"],
-          "columnsTo": ["id", "organization_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1199,15 +1156,11 @@
         },
         "bills_settled_has_amount": {
           "name": "bills_settled_has_amount",
-          "value": "\"bills\".\"status\"::text NOT IN ('paying', 'paid', 'paid_outside', 'paid_by_card') OR \"bills\".\"amount_kes\" IS NOT NULL OR \"bills\".\"amount_usdc\" IS NOT NULL"
+          "value": "\"bills\".\"status\" NOT IN ('paying', 'paid', 'paid_outside') OR \"bills\".\"amount_kes\" IS NOT NULL OR \"bills\".\"amount_usdc\" IS NOT NULL"
         },
         "bills_paid_has_dates": {
           "name": "bills_paid_has_dates",
-          "value": "(\"bills\".\"status\"::text IN ('paid', 'paid_outside', 'paid_by_card')) = (\"bills\".\"paid_on\" IS NOT NULL) AND (\"bills\".\"status\"::text IN ('paid', 'paid_outside', 'paid_by_card')) = (\"bills\".\"paid_at\" IS NOT NULL)"
-        },
-        "bills_paid_by_card_has_purchase": {
-          "name": "bills_paid_by_card_has_purchase",
-          "value": "(\"bills\".\"status\"::text = 'paid_by_card') = (\"bills\".\"card_purchase_id\" IS NOT NULL)"
+          "value": "(\"bills\".\"status\" IN ('paid', 'paid_outside')) = (\"bills\".\"paid_on\" IS NOT NULL) AND (\"bills\".\"status\" IN ('paid', 'paid_outside')) = (\"bills\".\"paid_at\" IS NOT NULL)"
         },
         "bills_paid_outside_recorded": {
           "name": "bills_paid_outside_recorded",
@@ -2190,7 +2143,7 @@
         },
         "expenses_card_recorded": {
           "name": "expenses_card_recorded",
-          "value": "\"expenses\".\"kind\"::text <> 'card' OR (\"expenses\".\"status\" = 'recorded' AND \"expenses\".\"paid_from_account_id\" IS NOT NULL)"
+          "value": "\"expenses\".\"kind\"::text <> 'card' OR (\"expenses\".\"status\" = 'recorded' AND \"expenses\".\"paid_from_account_id\" IS NOT NULL AND \"expenses\".\"bill_id\" IS NULL)"
         },
         "expenses_float_recorded": {
           "name": "expenses_float_recorded",
@@ -2688,6 +2641,14 @@
           "primaryKey": false,
           "notNull": true
         },
+        "recipient_type": {
+          "name": "recipient_type",
+          "type": "one_click_recipient_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'DESTINATION_CHAIN'"
+        },
         "refund_to": {
           "name": "refund_to",
           "type": "text",
@@ -2777,6 +2738,30 @@
         "deposit_registration_tx_hash": {
           "name": "deposit_registration_tx_hash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "signed_intent": {
+          "name": "signed_intent",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intent_hash": {
+          "name": "intent_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intent_deadline": {
+          "name": "intent_deadline",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intent_submitted_at": {
+          "name": "intent_submitted_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -3099,6 +3084,14 @@
         "intent_quotes_fee_cover_is_for_a_company_send": {
           "name": "intent_quotes_fee_cover_is_for_a_company_send",
           "value": "(\"intent_quotes\".\"fee_cover_usdc\" IS NULL OR (\"intent_quotes\".\"fee_cover_usdc\" > 0 AND \"intent_quotes\".\"purpose\" IN ('base_hop', 'usdc_payout'))) AND (\"intent_quotes\".\"fee_cover_tx_hash\" IS NULL OR \"intent_quotes\".\"fee_cover_usdc\" IS NOT NULL)"
+        },
+        "intent_quotes_signed_intent_has_deadline": {
+          "name": "intent_quotes_signed_intent_has_deadline",
+          "value": "(\"intent_quotes\".\"signed_intent\" IS NOT NULL) = (\"intent_quotes\".\"intent_deadline\" IS NOT NULL)"
+        },
+        "intent_quotes_intent_submitted_is_signed": {
+          "name": "intent_quotes_intent_submitted_is_signed",
+          "value": "\"intent_quotes\".\"signed_intent\" IS NOT NULL OR (\"intent_quotes\".\"intent_hash\" IS NULL AND \"intent_quotes\".\"intent_submitted_at\" IS NULL)"
         },
         "intent_quotes_expired_never_deposited": {
           "name": "intent_quotes_expired_never_deposited",
@@ -5566,148 +5559,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.card_merchants": {
-      "name": "card_merchants",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "card_id": {
-          "name": "card_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "merchant_key": {
-          "name": "merchant_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "descriptor": {
-          "name": "descriptor",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "recurring_item_id": {
-          "name": "recurring_item_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "blocked": {
-          "name": "blocked",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "card_merchants_card_merchant_unique": {
-          "name": "card_merchants_card_merchant_unique",
-          "columns": [
-            {
-              "expression": "card_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "merchant_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "card_merchants_recurring_item_idx": {
-          "name": "card_merchants_recurring_item_idx",
-          "columns": [
-            {
-              "expression": "recurring_item_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"card_merchants\".\"recurring_item_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "card_merchants_organization_id_organizations_id_fk": {
-          "name": "card_merchants_organization_id_organizations_id_fk",
-          "tableFrom": "card_merchants",
-          "tableTo": "organizations",
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "card_merchants_card_organization_fk": {
-          "name": "card_merchants_card_organization_fk",
-          "tableFrom": "card_merchants",
-          "tableTo": "cards",
-          "columnsFrom": ["card_id", "organization_id"],
-          "columnsTo": ["id", "organization_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "card_merchants_recurring_item_organization_fk": {
-          "name": "card_merchants_recurring_item_organization_fk",
-          "tableFrom": "card_merchants",
-          "tableTo": "recurring_items",
-          "columnsFrom": ["recurring_item_id", "organization_id"],
-          "columnsTo": ["id", "organization_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "card_merchants_blocked_unlinked": {
-          "name": "card_merchants_blocked_unlinked",
-          "value": "NOT (\"card_merchants\".\"blocked\" AND \"card_merchants\".\"recurring_item_id\" IS NOT NULL)"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.card_programs": {
       "name": "card_programs",
       "schema": "",
@@ -5903,7 +5754,7 @@
           "name": "membership_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "lithic_transaction_token": {
           "name": "lithic_transaction_token",
@@ -5931,43 +5782,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "merchant_key": {
-          "name": "merchant_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "recurring_item_id": {
-          "name": "recurring_item_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "bill_id": {
-          "name": "bill_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "review_state": {
-          "name": "review_state",
-          "type": "card_purchase_review_state",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reviewed_by": {
-          "name": "reviewed_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reviewed_at": {
-          "name": "reviewed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         },
         "mcc": {
           "name": "mcc",
@@ -6084,44 +5898,6 @@
           "method": "btree",
           "with": {}
         },
-        "card_purchases_bill_unique": {
-          "name": "card_purchases_bill_unique",
-          "columns": [
-            {
-              "expression": "bill_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"card_purchases\".\"bill_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "card_purchases_needs_review_idx": {
-          "name": "card_purchases_needs_review_idx",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "authorized_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"card_purchases\".\"review_state\" = 'needs_review'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "card_purchases_organization_authorized_idx": {
           "name": "card_purchases_organization_authorized_idx",
           "columns": [
@@ -6212,15 +5988,6 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "card_purchases_reviewed_by_users_id_fk": {
-          "name": "card_purchases_reviewed_by_users_id_fk",
-          "tableFrom": "card_purchases",
-          "tableTo": "users",
-          "columnsFrom": ["reviewed_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
         "card_purchases_card_organization_fk": {
           "name": "card_purchases_card_organization_fk",
           "tableFrom": "card_purchases",
@@ -6256,24 +6023,6 @@
           "columnsTo": ["id", "organization_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "card_purchases_recurring_item_organization_fk": {
-          "name": "card_purchases_recurring_item_organization_fk",
-          "tableFrom": "card_purchases",
-          "tableTo": "recurring_items",
-          "columnsFrom": ["recurring_item_id", "organization_id"],
-          "columnsTo": ["id", "organization_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "card_purchases_bill_organization_fk": {
-          "name": "card_purchases_bill_organization_fk",
-          "tableFrom": "card_purchases",
-          "tableTo": "bills",
-          "columnsFrom": ["bill_id", "organization_id"],
-          "columnsTo": ["id", "organization_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -6301,164 +6050,6 @@
         "card_purchases_expense_has_rate": {
           "name": "card_purchases_expense_has_rate",
           "value": "(\"card_purchases\".\"expense_id\" IS NULL) = (\"card_purchases\".\"usd_kes_rate\" IS NULL)"
-        },
-        "card_purchases_match_on_company_held": {
-          "name": "card_purchases_match_on_company_held",
-          "value": "\"card_purchases\".\"membership_id\" IS NULL OR (\"card_purchases\".\"recurring_item_id\" IS NULL AND \"card_purchases\".\"bill_id\" IS NULL AND \"card_purchases\".\"review_state\" IS NULL)"
-        },
-        "card_purchases_linked_or_reviewed": {
-          "name": "card_purchases_linked_or_reviewed",
-          "value": "\"card_purchases\".\"recurring_item_id\" IS NULL OR \"card_purchases\".\"review_state\" IS NULL"
-        },
-        "card_purchases_bill_is_linked": {
-          "name": "card_purchases_bill_is_linked",
-          "value": "\"card_purchases\".\"bill_id\" IS NULL OR \"card_purchases\".\"recurring_item_id\" IS NOT NULL"
-        },
-        "card_purchases_reviewed_recorded": {
-          "name": "card_purchases_reviewed_recorded",
-          "value": "(\"card_purchases\".\"reviewed_by\" IS NULL) = (\"card_purchases\".\"reviewed_at\" IS NULL)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.card_simulations": {
-      "name": "card_simulations",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "recurring_item_id": {
-          "name": "recurring_item_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "bill_id": {
-          "name": "bill_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "lithic_transaction_token": {
-          "name": "lithic_transaction_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount_usd_cents": {
-          "name": "amount_usd_cents",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "merchant_key": {
-          "name": "merchant_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "run_by_staff": {
-          "name": "run_by_staff",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "card_simulations_transaction_token_unique": {
-          "name": "card_simulations_transaction_token_unique",
-          "columns": [
-            {
-              "expression": "lithic_transaction_token",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "card_simulations_bill_idx": {
-          "name": "card_simulations_bill_idx",
-          "columns": [
-            {
-              "expression": "bill_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "card_simulations_organization_id_organizations_id_fk": {
-          "name": "card_simulations_organization_id_organizations_id_fk",
-          "tableFrom": "card_simulations",
-          "tableTo": "organizations",
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "card_simulations_run_by_staff_staff_users_id_fk": {
-          "name": "card_simulations_run_by_staff_staff_users_id_fk",
-          "tableFrom": "card_simulations",
-          "tableTo": "staff_users",
-          "columnsFrom": ["run_by_staff"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "card_simulations_recurring_item_organization_fk": {
-          "name": "card_simulations_recurring_item_organization_fk",
-          "tableFrom": "card_simulations",
-          "tableTo": "recurring_items",
-          "columnsFrom": ["recurring_item_id", "organization_id"],
-          "columnsTo": ["id", "organization_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "card_simulations_bill_organization_fk": {
-          "name": "card_simulations_bill_organization_fk",
-          "tableFrom": "card_simulations",
-          "tableTo": "bills",
-          "columnsFrom": ["bill_id", "organization_id"],
-          "columnsTo": ["id", "organization_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "card_simulations_amount_positive": {
-          "name": "card_simulations_amount_positive",
-          "value": "\"card_simulations\".\"amount_usd_cents\" > 0"
         }
       },
       "isRLSEnabled": false
@@ -6579,24 +6170,17 @@
           "primaryKey": false,
           "notNull": true
         },
-        "company_held": {
-          "name": "company_held",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "cardholder_id": {
           "name": "cardholder_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "membership_id": {
           "name": "membership_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "lithic_card_token": {
           "name": "lithic_card_token",
@@ -6809,10 +6393,6 @@
         "cards_closed_has_date": {
           "name": "cards_closed_has_date",
           "value": "(\"cards\".\"state\" = 'closed') = (\"cards\".\"closed_at\" IS NOT NULL)"
-        },
-        "cards_holder_unless_company_held": {
-          "name": "cards_holder_unless_company_held",
-          "value": "\"cards\".\"company_held\" = (\"cards\".\"cardholder_id\" IS NULL) AND \"cards\".\"company_held\" = (\"cards\".\"membership_id\" IS NULL)"
         }
       },
       "isRLSEnabled": false
@@ -7373,12 +6953,6 @@
           "notNull": true,
           "default": "'expendi'"
         },
-        "card_id": {
-          "name": "card_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "reminder_days": {
           "name": "reminder_days",
           "type": "integer",
@@ -7445,22 +7019,6 @@
           "method": "btree",
           "with": {}
         },
-        "recurring_items_card_id_idx": {
-          "name": "recurring_items_card_id_idx",
-          "columns": [
-            {
-              "expression": "card_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"recurring_items\".\"card_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "recurring_items_scheduled_idx": {
           "name": "recurring_items_scheduled_idx",
           "columns": [
@@ -7521,15 +7079,6 @@
           "columnsTo": ["id", "organization_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "recurring_items_card_organization_fk": {
-          "name": "recurring_items_card_organization_fk",
-          "tableFrom": "recurring_items",
-          "tableTo": "cards",
-          "columnsFrom": ["card_id", "organization_id"],
-          "columnsTo": ["id", "organization_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -7573,14 +7122,6 @@
         "recurring_items_salary_shape": {
           "name": "recurring_items_salary_shape",
           "value": "\"recurring_items\".\"overview_heading\" <> 'salaries' OR (\"recurring_items\".\"amount_kes\" IS NOT NULL AND \"recurring_items\".\"currency\" = 'kes' AND \"recurring_items\".\"schedule\" = 'monthly' AND \"recurring_items\".\"pay_via\" = 'expendi')"
-        },
-        "recurring_items_card_pays_by_card": {
-          "name": "recurring_items_card_pays_by_card",
-          "value": "(\"recurring_items\".\"pay_via\"::text = 'card') = (\"recurring_items\".\"card_id\" IS NOT NULL)"
-        },
-        "recurring_items_card_in_usd": {
-          "name": "recurring_items_card_in_usd",
-          "value": "\"recurring_items\".\"pay_via\"::text <> 'card' OR \"recurring_items\".\"currency\" = 'usd'"
         },
         "recurring_items_next_due_in_schedule": {
           "name": "recurring_items_next_due_in_schedule",
@@ -9138,6 +8679,14 @@
           "notNull": true,
           "default": "'creating'"
         },
+        "balance_home": {
+          "name": "balance_home",
+          "type": "wallet_balance_home",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'company_wallet'"
+        },
         "per_transaction_max_usdc": {
           "name": "per_transaction_max_usdc",
           "type": "bigint",
@@ -9802,7 +9351,6 @@
         "paid",
         "payout_failed",
         "paid_outside",
-        "paid_by_card",
         "cancelled"
       ]
     },
@@ -9882,7 +9430,8 @@
         "fund_in_return",
         "invoice_payment",
         "to_treasury",
-        "from_treasury"
+        "from_treasury",
+        "move_in"
       ]
     },
     "public.intent_quote_status": {
@@ -9906,7 +9455,12 @@
     "public.one_click_account_type": {
       "name": "one_click_account_type",
       "schema": "public",
-      "values": ["ORIGIN_CHAIN", "INTENTS"]
+      "values": ["ORIGIN_CHAIN", "INTENTS", "CONFIDENTIAL_INTENTS"]
+    },
+    "public.one_click_recipient_type": {
+      "name": "one_click_recipient_type",
+      "schema": "public",
+      "values": ["DESTINATION_CHAIN", "CONFIDENTIAL_INTENTS"]
     },
     "public.one_click_status": {
       "name": "one_click_status",
@@ -10046,11 +9600,6 @@
       "schema": "public",
       "values": ["purchase", "refund"]
     },
-    "public.card_purchase_review_state": {
-      "name": "card_purchase_review_state",
-      "schema": "public",
-      "values": ["needs_review", "one_off", "not_recognised"]
-    },
     "public.card_purchase_status": {
       "name": "card_purchase_status",
       "schema": "public",
@@ -10084,7 +9633,7 @@
     "public.recurring_pay_via": {
       "name": "recurring_pay_via",
       "schema": "public",
-      "values": ["expendi", "outside", "card"]
+      "values": ["expendi", "outside"]
     },
     "public.recurring_schedule": {
       "name": "recurring_schedule",
@@ -10146,6 +9695,11 @@
         "to_treasury",
         "from_treasury"
       ]
+    },
+    "public.wallet_balance_home": {
+      "name": "wallet_balance_home",
+      "schema": "public",
+      "values": ["company_wallet", "confidential_account"]
     },
     "public.wallet_chain": {
       "name": "wallet_chain",

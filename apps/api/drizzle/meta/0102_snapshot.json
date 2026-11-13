@@ -1,6 +1,6 @@
 {
-  "id": "0ed8d0f6-b4a8-42e7-953d-72ea60cae131",
-  "prevId": "318aaefb-05c2-49c6-82dd-5e4a16ceea4a",
+  "id": "34e674a4-3b48-44b9-9ea5-4738b1c7cef4",
+  "prevId": "5ef6e6a3-eb85-4ddd-8bf8-1f1fca6cdc9f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -142,10 +142,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"accounting_connections\".\"status\" <> 'disconnected'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "accounting_connections_connect_token_hash_unique": {
           "name": "accounting_connections_connect_token_hash_unique",
@@ -158,20 +158,20 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "accounting_connections_organization_id_organizations_id_fk": {
           "name": "accounting_connections_organization_id_organizations_id_fk",
           "tableFrom": "accounting_connections",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -308,19 +308,19 @@
         "accounting_syncs_organization_id_organizations_id_fk": {
           "name": "accounting_syncs_organization_id_organizations_id_fk",
           "tableFrom": "accounting_syncs",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "accounting_syncs_subject_unique": {
           "name": "accounting_syncs_subject_unique",
-          "columns": ["organization_id", "subject_type", "subject_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["organization_id", "subject_type", "subject_id"]
         }
       },
       "policies": {},
@@ -405,9 +405,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "approval_passkeys_user_id_idx": {
           "name": "approval_passkeys_user_id_idx",
@@ -420,20 +420,20 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "approval_passkeys_user_id_users_id_fk": {
           "name": "approval_passkeys_user_id_users_id_fk",
           "tableFrom": "approval_passkeys",
-          "columnsFrom": ["user_id"],
           "tableTo": "users",
+          "columnsFrom": ["user_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -522,29 +522,29 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "webauthn_challenges_user_id_users_id_fk": {
           "name": "webauthn_challenges_user_id_users_id_fk",
           "tableFrom": "webauthn_challenges",
-          "columnsFrom": ["user_id"],
           "tableTo": "users",
+          "columnsFrom": ["user_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "webauthn_challenges_organization_id_organizations_id_fk": {
           "name": "webauthn_challenges_organization_id_organizations_id_fk",
           "tableFrom": "webauthn_challenges",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -662,9 +662,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "audit_log_entity_idx": {
           "name": "audit_log_entity_idx",
@@ -683,9 +683,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "audit_log_occurred_at_id_idx": {
           "name": "audit_log_occurred_at_id_idx",
@@ -704,9 +704,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "audit_log_actor_idx": {
           "name": "audit_log_actor_idx",
@@ -731,20 +731,20 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "audit_log_organization_id_organizations_id_fk": {
           "name": "audit_log_organization_id_organizations_id_fk",
           "tableFrom": "audit_log",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -907,24 +907,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "card_purchase_id": {
-          "name": "card_purchase_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "card_declined_at": {
-          "name": "card_declined_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "card_decline_reason": {
-          "name": "card_decline_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -952,26 +934,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"bills\".\"payout_id\" IS NOT NULL",
-          "concurrently": false
-        },
-        "bills_card_purchase_id_unique": {
-          "name": "bills_card_purchase_id_unique",
-          "columns": [
-            {
-              "expression": "card_purchase_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "where": "\"bills\".\"card_purchase_id\" IS NOT NULL",
-          "concurrently": false
+          "with": {}
         },
         "bills_organization_due_on_idx": {
           "name": "bills_organization_due_on_idx",
@@ -990,9 +956,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "bills_payee_id_idx": {
           "name": "bills_payee_id_idx",
@@ -1005,9 +971,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "bills_recurring_item_outstanding_unique": {
           "name": "bills_recurring_item_outstanding_unique",
@@ -1020,10 +986,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"bills\".\"recurring_item_id\" IS NOT NULL AND \"bills\".\"payroll_run_id\" IS NULL AND \"bills\".\"status\" IN ('upcoming', 'due', 'overdue', 'payout_failed', 'paying')",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "bills_payroll_run_salary_unique": {
           "name": "bills_payroll_run_salary_unique",
@@ -1042,10 +1008,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"bills\".\"payroll_run_id\" IS NOT NULL AND \"bills\".\"recurring_item_id\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "bills_payroll_run_id_idx": {
           "name": "bills_payroll_run_id_idx",
@@ -1058,10 +1024,10 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"bills\".\"payroll_run_id\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "bills_dated_due_on_idx": {
           "name": "bills_dated_due_on_idx",
@@ -1074,101 +1040,92 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"bills\".\"status\" IN ('upcoming', 'due')",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "bills_organization_id_organizations_id_fk": {
           "name": "bills_organization_id_organizations_id_fk",
           "tableFrom": "bills",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "bills_marked_paid_by_users_id_fk": {
           "name": "bills_marked_paid_by_users_id_fk",
           "tableFrom": "bills",
-          "columnsFrom": ["marked_paid_by"],
           "tableTo": "users",
+          "columnsFrom": ["marked_paid_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "bills_cancelled_by_users_id_fk": {
           "name": "bills_cancelled_by_users_id_fk",
           "tableFrom": "bills",
-          "columnsFrom": ["cancelled_by"],
           "tableTo": "users",
+          "columnsFrom": ["cancelled_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "bills_payee_organization_fk": {
           "name": "bills_payee_organization_fk",
           "tableFrom": "bills",
-          "columnsFrom": ["payee_id", "organization_id"],
           "tableTo": "payees",
+          "columnsFrom": ["payee_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "bills_category_organization_fk": {
           "name": "bills_category_organization_fk",
           "tableFrom": "bills",
-          "columnsFrom": ["category_id", "organization_id"],
           "tableTo": "categories",
+          "columnsFrom": ["category_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "bills_recurring_item_organization_fk": {
           "name": "bills_recurring_item_organization_fk",
           "tableFrom": "bills",
-          "columnsFrom": ["recurring_item_id", "organization_id"],
           "tableTo": "recurring_items",
+          "columnsFrom": ["recurring_item_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "bills_payroll_run_organization_fk": {
           "name": "bills_payroll_run_organization_fk",
           "tableFrom": "bills",
-          "columnsFrom": ["payroll_run_id", "organization_id"],
           "tableTo": "payroll_runs",
+          "columnsFrom": ["payroll_run_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "bills_payout_organization_fk": {
           "name": "bills_payout_organization_fk",
           "tableFrom": "bills",
-          "columnsFrom": ["payout_id", "organization_id"],
           "tableTo": "payouts",
+          "columnsFrom": ["payout_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "bills_card_purchase_organization_fk": {
-          "name": "bills_card_purchase_organization_fk",
-          "tableFrom": "bills",
-          "columnsFrom": ["card_purchase_id", "organization_id"],
-          "tableTo": "card_purchases",
-          "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "bills_id_organization_id_unique": {
           "name": "bills_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -1199,15 +1156,11 @@
         },
         "bills_settled_has_amount": {
           "name": "bills_settled_has_amount",
-          "value": "\"bills\".\"status\"::text NOT IN ('paying', 'paid', 'paid_outside', 'paid_by_card') OR \"bills\".\"amount_kes\" IS NOT NULL OR \"bills\".\"amount_usdc\" IS NOT NULL"
+          "value": "\"bills\".\"status\" NOT IN ('paying', 'paid', 'paid_outside') OR \"bills\".\"amount_kes\" IS NOT NULL OR \"bills\".\"amount_usdc\" IS NOT NULL"
         },
         "bills_paid_has_dates": {
           "name": "bills_paid_has_dates",
-          "value": "(\"bills\".\"status\"::text IN ('paid', 'paid_outside', 'paid_by_card')) = (\"bills\".\"paid_on\" IS NOT NULL) AND (\"bills\".\"status\"::text IN ('paid', 'paid_outside', 'paid_by_card')) = (\"bills\".\"paid_at\" IS NOT NULL)"
-        },
-        "bills_paid_by_card_has_purchase": {
-          "name": "bills_paid_by_card_has_purchase",
-          "value": "(\"bills\".\"status\"::text = 'paid_by_card') = (\"bills\".\"card_purchase_id\" IS NOT NULL)"
+          "value": "(\"bills\".\"status\" IN ('paid', 'paid_outside')) = (\"bills\".\"paid_on\" IS NOT NULL) AND (\"bills\".\"status\" IN ('paid', 'paid_outside')) = (\"bills\".\"paid_at\" IS NOT NULL)"
         },
         "bills_paid_outside_recorded": {
           "name": "bills_paid_outside_recorded",
@@ -1294,35 +1247,35 @@
             },
             {
               "expression": "lower(\"name\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "NOT \"categories\".\"archived\"",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "categories_organization_id_organizations_id_fk": {
           "name": "categories_organization_id_organizations_id_fk",
           "tableFrom": "categories",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "categories_id_organization_id_unique": {
           "name": "categories_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -1479,10 +1432,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"company_wallet_sends\".\"status\" IN ('reserved', 'signed', 'executed', 'failed')",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "company_wallet_sends_one_in_flight_per_wallet": {
           "name": "company_wallet_sends_one_in_flight_per_wallet",
@@ -1495,10 +1448,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"company_wallet_sends\".\"status\" IN ('reserved', 'signed')",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "company_wallet_sends_wallet_nonce_unique": {
           "name": "company_wallet_sends_wallet_nonce_unique",
@@ -1517,37 +1470,37 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "company_wallet_sends_organization_id_organizations_id_fk": {
           "name": "company_wallet_sends_organization_id_organizations_id_fk",
           "tableFrom": "company_wallet_sends",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "company_wallet_sends_wallet_organization_fk": {
           "name": "company_wallet_sends_wallet_organization_fk",
           "tableFrom": "company_wallet_sends",
-          "columnsFrom": ["wallet_id", "organization_id"],
           "tableTo": "wallets",
+          "columnsFrom": ["wallet_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "company_wallet_sends_id_organization_id_unique": {
           "name": "company_wallet_sends_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -1655,28 +1608,28 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "customers_organization_id_organizations_id_fk": {
           "name": "customers_organization_id_organizations_id_fk",
           "tableFrom": "customers",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "customers_id_organization_id_unique": {
           "name": "customers_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -1910,10 +1863,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"expenses\".\"mpesa_code\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "expenses_etims_invoice_number_unique": {
           "name": "expenses_etims_invoice_number_unique",
@@ -1932,10 +1885,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"expenses\".\"etims_invoice_number\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "expenses_payout_id_unique": {
           "name": "expenses_payout_id_unique",
@@ -1948,10 +1901,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"expenses\".\"payout_id\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "expenses_bill_id_unique": {
           "name": "expenses_bill_id_unique",
@@ -1964,10 +1917,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"expenses\".\"bill_id\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "expenses_overspend_claim_id_unique": {
           "name": "expenses_overspend_claim_id_unique",
@@ -1980,10 +1933,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"expenses\".\"overspend_claim_id\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "expenses_float_id_idx": {
           "name": "expenses_float_id_idx",
@@ -1996,10 +1949,10 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"expenses\".\"float_id\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "expenses_organization_created_idx": {
           "name": "expenses_organization_created_idx",
@@ -2018,9 +1971,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "expenses_membership_created_idx": {
           "name": "expenses_membership_created_idx",
@@ -2039,9 +1992,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "expenses_organization_kind_spent_on_idx": {
           "name": "expenses_organization_kind_spent_on_idx",
@@ -2066,100 +2019,100 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "expenses_organization_id_organizations_id_fk": {
           "name": "expenses_organization_id_organizations_id_fk",
           "tableFrom": "expenses",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "expenses_approved_by_users_id_fk": {
           "name": "expenses_approved_by_users_id_fk",
           "tableFrom": "expenses",
-          "columnsFrom": ["approved_by"],
           "tableTo": "users",
+          "columnsFrom": ["approved_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "expenses_membership_organization_fk": {
           "name": "expenses_membership_organization_fk",
           "tableFrom": "expenses",
-          "columnsFrom": ["membership_id", "organization_id"],
           "tableTo": "memberships",
+          "columnsFrom": ["membership_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "expenses_category_organization_fk": {
           "name": "expenses_category_organization_fk",
           "tableFrom": "expenses",
-          "columnsFrom": ["category_id", "organization_id"],
           "tableTo": "categories",
+          "columnsFrom": ["category_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "expenses_paid_from_account_organization_fk": {
           "name": "expenses_paid_from_account_organization_fk",
           "tableFrom": "expenses",
-          "columnsFrom": ["paid_from_account_id", "organization_id"],
           "tableTo": "paid_from_accounts",
+          "columnsFrom": ["paid_from_account_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "expenses_payout_organization_fk": {
           "name": "expenses_payout_organization_fk",
           "tableFrom": "expenses",
-          "columnsFrom": ["payout_id", "organization_id"],
           "tableTo": "payouts",
+          "columnsFrom": ["payout_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "expenses_bill_organization_fk": {
           "name": "expenses_bill_organization_fk",
           "tableFrom": "expenses",
-          "columnsFrom": ["bill_id", "organization_id"],
           "tableTo": "bills",
+          "columnsFrom": ["bill_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "expenses_float_organization_fk": {
           "name": "expenses_float_organization_fk",
           "tableFrom": "expenses",
-          "columnsFrom": ["float_id", "organization_id"],
           "tableTo": "floats",
+          "columnsFrom": ["float_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "expenses_overspend_claim_organization_fk": {
           "name": "expenses_overspend_claim_organization_fk",
           "tableFrom": "expenses",
-          "columnsFrom": ["overspend_claim_id", "organization_id"],
           "tableTo": "expenses",
+          "columnsFrom": ["overspend_claim_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "expenses_id_organization_id_unique": {
           "name": "expenses_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -2190,7 +2143,7 @@
         },
         "expenses_card_recorded": {
           "name": "expenses_card_recorded",
-          "value": "\"expenses\".\"kind\"::text <> 'card' OR (\"expenses\".\"status\" = 'recorded' AND \"expenses\".\"paid_from_account_id\" IS NOT NULL)"
+          "value": "\"expenses\".\"kind\"::text <> 'card' OR (\"expenses\".\"status\" = 'recorded' AND \"expenses\".\"paid_from_account_id\" IS NOT NULL AND \"expenses\".\"bill_id\" IS NULL)"
         },
         "expenses_float_recorded": {
           "name": "expenses_float_recorded",
@@ -2305,10 +2258,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"float_movements\".\"status\" = 'pending'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "float_movements_payout_id_unique": {
           "name": "float_movements_payout_id_unique",
@@ -2321,10 +2274,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"float_movements\".\"payout_id\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "float_movements_float_created_idx": {
           "name": "float_movements_float_created_idx",
@@ -2343,47 +2296,47 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "float_movements_organization_id_organizations_id_fk": {
           "name": "float_movements_organization_id_organizations_id_fk",
           "tableFrom": "float_movements",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "float_movements_recorded_by_users_id_fk": {
           "name": "float_movements_recorded_by_users_id_fk",
           "tableFrom": "float_movements",
-          "columnsFrom": ["recorded_by"],
           "tableTo": "users",
+          "columnsFrom": ["recorded_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "float_movements_float_organization_fk": {
           "name": "float_movements_float_organization_fk",
           "tableFrom": "float_movements",
-          "columnsFrom": ["float_id", "organization_id"],
           "tableTo": "floats",
+          "columnsFrom": ["float_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "float_movements_payout_organization_fk": {
           "name": "float_movements_payout_organization_fk",
           "tableFrom": "float_movements",
-          "columnsFrom": ["payout_id", "organization_id"],
           "tableTo": "payouts",
+          "columnsFrom": ["payout_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2504,10 +2457,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"floats\".\"status\" = 'open'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "floats_organization_opened_idx": {
           "name": "floats_organization_opened_idx",
@@ -2526,46 +2479,46 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "floats_organization_id_organizations_id_fk": {
           "name": "floats_organization_id_organizations_id_fk",
           "tableFrom": "floats",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "floats_closed_by_users_id_fk": {
           "name": "floats_closed_by_users_id_fk",
           "tableFrom": "floats",
-          "columnsFrom": ["closed_by"],
           "tableTo": "users",
+          "columnsFrom": ["closed_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "floats_membership_organization_fk": {
           "name": "floats_membership_organization_fk",
           "tableFrom": "floats",
-          "columnsFrom": ["membership_id", "organization_id"],
           "tableTo": "memberships",
+          "columnsFrom": ["membership_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "floats_id_organization_id_unique": {
           "name": "floats_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -2688,6 +2641,14 @@
           "primaryKey": false,
           "notNull": true
         },
+        "recipient_type": {
+          "name": "recipient_type",
+          "type": "one_click_recipient_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'DESTINATION_CHAIN'"
+        },
         "refund_to": {
           "name": "refund_to",
           "type": "text",
@@ -2777,6 +2738,36 @@
         "deposit_registration_tx_hash": {
           "name": "deposit_registration_tx_hash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "signed_intent": {
+          "name": "signed_intent",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intent_hash": {
+          "name": "intent_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intent_deadline": {
+          "name": "intent_deadline",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intent_submitted_at": {
+          "name": "intent_submitted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ledger_credited_at": {
+          "name": "ledger_credited_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -2889,9 +2880,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "intent_quotes_deposit_address_unique": {
           "name": "intent_quotes_deposit_address_unique",
@@ -2904,9 +2895,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "intent_quotes_company_wallet_send_unique": {
           "name": "intent_quotes_company_wallet_send_unique",
@@ -2919,9 +2910,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "intent_quotes_unsettled_idx": {
           "name": "intent_quotes_unsettled_idx",
@@ -2934,10 +2925,10 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"intent_quotes\".\"status\" IN ('quoted', 'depositing', 'needs_review')",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "intent_quotes_treasury_move_id_idx": {
           "name": "intent_quotes_treasury_move_id_idx",
@@ -2950,10 +2941,10 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"intent_quotes\".\"treasury_move_id\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "intent_quotes_invoice_id_idx": {
           "name": "intent_quotes_invoice_id_idx",
@@ -2966,10 +2957,10 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"intent_quotes\".\"invoice_id\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "intent_quotes_near_tx_hashes_idx": {
           "name": "intent_quotes_near_tx_hashes_idx",
@@ -2982,9 +2973,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "gin",
-          "concurrently": false
+          "with": {}
         },
         "intent_quotes_destination_chain_tx_hashes_idx": {
           "name": "intent_quotes_destination_chain_tx_hashes_idx",
@@ -2997,73 +2988,89 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "gin",
-          "concurrently": false
+          "with": {}
+        },
+        "intent_quotes_ledger_credit_due_idx": {
+          "name": "intent_quotes_ledger_credit_due_idx",
+          "columns": [
+            {
+              "expression": "settled_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"intent_quotes\".\"recipient_type\" = 'CONFIDENTIAL_INTENTS' AND \"intent_quotes\".\"status\" = 'succeeded' AND \"intent_quotes\".\"ledger_credited_at\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "intent_quotes_organization_id_organizations_id_fk": {
           "name": "intent_quotes_organization_id_organizations_id_fk",
           "tableFrom": "intent_quotes",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "intent_quotes_wallet_organization_fk": {
           "name": "intent_quotes_wallet_organization_fk",
           "tableFrom": "intent_quotes",
-          "columnsFrom": ["wallet_id", "organization_id"],
           "tableTo": "wallets",
+          "columnsFrom": ["wallet_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "intent_quotes_company_wallet_send_organization_fk": {
           "name": "intent_quotes_company_wallet_send_organization_fk",
           "tableFrom": "intent_quotes",
-          "columnsFrom": ["company_wallet_send_id", "organization_id"],
           "tableTo": "company_wallet_sends",
+          "columnsFrom": ["company_wallet_send_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "intent_quotes_return_quote_organization_fk": {
           "name": "intent_quotes_return_quote_organization_fk",
           "tableFrom": "intent_quotes",
-          "columnsFrom": ["return_quote_id", "organization_id"],
           "tableTo": "intent_quotes",
+          "columnsFrom": ["return_quote_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "intent_quotes_invoice_organization_fk": {
           "name": "intent_quotes_invoice_organization_fk",
           "tableFrom": "intent_quotes",
-          "columnsFrom": ["invoice_id", "organization_id"],
           "tableTo": "invoices",
+          "columnsFrom": ["invoice_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "intent_quotes_treasury_move_organization_fk": {
           "name": "intent_quotes_treasury_move_organization_fk",
           "tableFrom": "intent_quotes",
-          "columnsFrom": ["treasury_move_id", "organization_id"],
           "tableTo": "treasury_moves",
+          "columnsFrom": ["treasury_move_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "intent_quotes_id_organization_id_unique": {
           "name": "intent_quotes_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -3078,7 +3085,15 @@
         },
         "intent_quotes_send_is_from_company_wallet": {
           "name": "intent_quotes_send_is_from_company_wallet",
-          "value": "\"intent_quotes\".\"company_wallet_send_id\" IS NULL OR \"intent_quotes\".\"purpose\"::text IN ('base_hop', 'usdc_payout', 'fund_in_return', 'to_treasury')"
+          "value": "\"intent_quotes\".\"company_wallet_send_id\" IS NULL OR \"intent_quotes\".\"purpose\"::text IN ('base_hop', 'usdc_payout', 'fund_in_return', 'to_treasury', 'move_in')"
+        },
+        "intent_quotes_recipient_type_matches_purpose": {
+          "name": "intent_quotes_recipient_type_matches_purpose",
+          "value": "(\"intent_quotes\".\"recipient_type\" = 'DESTINATION_CHAIN' OR \"intent_quotes\".\"purpose\"::text IN ('move_in', 'fund_in', 'invoice_payment', 'fund_in_return')) AND (\"intent_quotes\".\"purpose\"::text <> 'move_in' OR \"intent_quotes\".\"recipient_type\" = 'CONFIDENTIAL_INTENTS')"
+        },
+        "intent_quotes_ledger_credit_is_confidential_delivery": {
+          "name": "intent_quotes_ledger_credit_is_confidential_delivery",
+          "value": "\"intent_quotes\".\"ledger_credited_at\" IS NULL OR (\"intent_quotes\".\"status\" = 'succeeded' AND \"intent_quotes\".\"recipient_type\" = 'CONFIDENTIAL_INTENTS' AND \"intent_quotes\".\"purpose\"::text IN ('fund_in', 'invoice_payment', 'fund_in_return'))"
         },
         "intent_quotes_treasury_move_matches_purpose": {
           "name": "intent_quotes_treasury_move_matches_purpose",
@@ -3099,6 +3114,14 @@
         "intent_quotes_fee_cover_is_for_a_company_send": {
           "name": "intent_quotes_fee_cover_is_for_a_company_send",
           "value": "(\"intent_quotes\".\"fee_cover_usdc\" IS NULL OR (\"intent_quotes\".\"fee_cover_usdc\" > 0 AND \"intent_quotes\".\"purpose\" IN ('base_hop', 'usdc_payout'))) AND (\"intent_quotes\".\"fee_cover_tx_hash\" IS NULL OR \"intent_quotes\".\"fee_cover_usdc\" IS NOT NULL)"
+        },
+        "intent_quotes_signed_intent_has_deadline": {
+          "name": "intent_quotes_signed_intent_has_deadline",
+          "value": "(\"intent_quotes\".\"signed_intent\" IS NOT NULL) = (\"intent_quotes\".\"intent_deadline\" IS NOT NULL)"
+        },
+        "intent_quotes_intent_submitted_is_signed": {
+          "name": "intent_quotes_intent_submitted_is_signed",
+          "value": "\"intent_quotes\".\"signed_intent\" IS NOT NULL OR (\"intent_quotes\".\"intent_hash\" IS NULL AND \"intent_quotes\".\"intent_submitted_at\" IS NULL)"
         },
         "intent_quotes_expired_never_deposited": {
           "name": "intent_quotes_expired_never_deposited",
@@ -3199,69 +3222,69 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "invoice_payments_organization_id_organizations_id_fk": {
           "name": "invoice_payments_organization_id_organizations_id_fk",
           "tableFrom": "invoice_payments",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "invoice_payments_recorded_by_users_id_fk": {
           "name": "invoice_payments_recorded_by_users_id_fk",
           "tableFrom": "invoice_payments",
-          "columnsFrom": ["recorded_by"],
           "tableTo": "users",
+          "columnsFrom": ["recorded_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "invoice_payments_invoice_organization_fk": {
           "name": "invoice_payments_invoice_organization_fk",
           "tableFrom": "invoice_payments",
-          "columnsFrom": ["invoice_id", "organization_id"],
           "tableTo": "invoices",
+          "columnsFrom": ["invoice_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "invoice_payments_intent_quote_organization_fk": {
           "name": "invoice_payments_intent_quote_organization_fk",
           "tableFrom": "invoice_payments",
-          "columnsFrom": ["intent_quote_id", "organization_id"],
           "tableTo": "intent_quotes",
+          "columnsFrom": ["intent_quote_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "invoice_payments_wallet_transaction_organization_fk": {
           "name": "invoice_payments_wallet_transaction_organization_fk",
           "tableFrom": "invoice_payments",
-          "columnsFrom": ["wallet_transaction_id", "organization_id"],
           "tableTo": "wallet_transactions",
+          "columnsFrom": ["wallet_transaction_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "invoice_payments_intent_quote_id_unique": {
           "name": "invoice_payments_intent_quote_id_unique",
-          "columns": ["intent_quote_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["intent_quote_id"]
         },
         "invoice_payments_wallet_transaction_id_unique": {
           "name": "invoice_payments_wallet_transaction_id_unique",
-          "columns": ["wallet_transaction_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["wallet_transaction_id"]
         }
       },
       "policies": {},
@@ -3336,28 +3359,28 @@
         "invoice_line_items_organization_id_organizations_id_fk": {
           "name": "invoice_line_items_organization_id_organizations_id_fk",
           "tableFrom": "invoice_line_items",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "invoice_line_items_invoice_organization_fk": {
           "name": "invoice_line_items_invoice_organization_fk",
           "tableFrom": "invoice_line_items",
-          "columnsFrom": ["invoice_id", "organization_id"],
           "tableTo": "invoices",
+          "columnsFrom": ["invoice_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "invoice_line_items_invoice_position_unique": {
           "name": "invoice_line_items_invoice_position_unique",
-          "columns": ["invoice_id", "position"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["invoice_id", "position"]
         }
       },
       "policies": {},
@@ -3562,9 +3585,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "invoices_customer_id_idx": {
           "name": "invoices_customer_id_idx",
@@ -3577,65 +3600,65 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "invoices_organization_id_organizations_id_fk": {
           "name": "invoices_organization_id_organizations_id_fk",
           "tableFrom": "invoices",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "invoices_voided_by_users_id_fk": {
           "name": "invoices_voided_by_users_id_fk",
           "tableFrom": "invoices",
-          "columnsFrom": ["voided_by"],
           "tableTo": "users",
+          "columnsFrom": ["voided_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "invoices_created_by_users_id_fk": {
           "name": "invoices_created_by_users_id_fk",
           "tableFrom": "invoices",
-          "columnsFrom": ["created_by"],
           "tableTo": "users",
+          "columnsFrom": ["created_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "invoices_customer_organization_fk": {
           "name": "invoices_customer_organization_fk",
           "tableFrom": "invoices",
-          "columnsFrom": ["customer_id", "organization_id"],
           "tableTo": "customers",
+          "columnsFrom": ["customer_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "invoices_public_id_unique": {
           "name": "invoices_public_id_unique",
-          "columns": ["public_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["public_id"]
         },
         "invoices_id_organization_id_unique": {
           "name": "invoices_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         },
         "invoices_organization_number_unique": {
           "name": "invoices_organization_number_unique",
-          "columns": ["organization_id", "number"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["organization_id", "number"]
         }
       },
       "policies": {},
@@ -3744,51 +3767,51 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "memberships_organization_id_organizations_id_fk": {
           "name": "memberships_organization_id_organizations_id_fk",
           "tableFrom": "memberships",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "memberships_user_id_users_id_fk": {
           "name": "memberships_user_id_users_id_fk",
           "tableFrom": "memberships",
-          "columnsFrom": ["user_id"],
           "tableTo": "users",
+          "columnsFrom": ["user_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "memberships_invited_by_users_id_fk": {
           "name": "memberships_invited_by_users_id_fk",
           "tableFrom": "memberships",
-          "columnsFrom": ["invited_by"],
           "tableTo": "users",
+          "columnsFrom": ["invited_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "memberships_organization_user_unique": {
           "name": "memberships_organization_user_unique",
-          "columns": ["organization_id", "user_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["organization_id", "user_id"]
         },
         "memberships_id_organization_id_unique": {
           "name": "memberships_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -3956,9 +3979,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "notification_outbox_pending_idx": {
           "name": "notification_outbox_pending_idx",
@@ -3977,10 +4000,10 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"notification_outbox\".\"sent_at\" IS NULL AND \"notification_outbox\".\"abandoned_at\" IS NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "notification_outbox_unchecked_idx": {
           "name": "notification_outbox_unchecked_idx",
@@ -3993,39 +4016,39 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"notification_outbox\".\"receipts_checked_at\" IS NULL AND \"notification_outbox\".\"tickets\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "notification_outbox_organization_id_organizations_id_fk": {
           "name": "notification_outbox_organization_id_organizations_id_fk",
           "tableFrom": "notification_outbox",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "notification_outbox_recipient_organization_fk": {
           "name": "notification_outbox_recipient_organization_fk",
           "tableFrom": "notification_outbox",
-          "columnsFrom": ["recipient_membership_id", "organization_id"],
           "tableTo": "memberships",
+          "columnsFrom": ["recipient_membership_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "notification_outbox_except_organization_fk": {
           "name": "notification_outbox_except_organization_fk",
           "tableFrom": "notification_outbox",
-          "columnsFrom": ["except_membership_id", "organization_id"],
           "tableTo": "memberships",
+          "columnsFrom": ["except_membership_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4110,9 +4133,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "push_tokens_user_id_idx": {
           "name": "push_tokens_user_id_idx",
@@ -4125,20 +4148,20 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "push_tokens_user_id_users_id_fk": {
           "name": "push_tokens_user_id_users_id_fk",
           "tableFrom": "push_tokens",
-          "columnsFrom": ["user_id"],
           "tableTo": "users",
+          "columnsFrom": ["user_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4261,10 +4284,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"ops_alerts\".\"resolved_at\" IS NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "ops_alerts_payout_failed_once": {
           "name": "ops_alerts_payout_failed_once",
@@ -4277,10 +4300,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"ops_alerts\".\"kind\" = 'payout_failed'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "ops_alerts_unsent_idx": {
           "name": "ops_alerts_unsent_idx",
@@ -4293,21 +4316,21 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"ops_alerts\".\"notified_at\" IS NULL AND \"ops_alerts\".\"resolved_at\" IS NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "ops_alerts_organization_id_organizations_id_fk": {
           "name": "ops_alerts_organization_id_organizations_id_fk",
           "tableFrom": "ops_alerts",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4492,35 +4515,35 @@
             },
             {
               "expression": "lower(\"name\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "NOT \"paid_from_accounts\".\"archived\"",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "paid_from_accounts_organization_id_organizations_id_fk": {
           "name": "paid_from_accounts_organization_id_organizations_id_fk",
           "tableFrom": "paid_from_accounts",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "paid_from_accounts_id_organization_id_unique": {
           "name": "paid_from_accounts_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -4670,9 +4693,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "payees_one_active_per_membership": {
           "name": "payees_one_active_per_membership",
@@ -4691,38 +4714,38 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"payees\".\"membership_id\" IS NOT NULL AND NOT \"payees\".\"archived\"",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "payees_organization_id_organizations_id_fk": {
           "name": "payees_organization_id_organizations_id_fk",
           "tableFrom": "payees",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "payees_membership_organization_fk": {
           "name": "payees_membership_organization_fk",
           "tableFrom": "payees",
-          "columnsFrom": ["membership_id", "organization_id"],
           "tableTo": "memberships",
+          "columnsFrom": ["membership_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "payees_id_organization_id_unique": {
           "name": "payees_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -5063,9 +5086,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "payouts_delivery_quote_id_unique": {
           "name": "payouts_delivery_quote_id_unique",
@@ -5078,9 +5101,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "payouts_idempotency_key_unique": {
           "name": "payouts_idempotency_key_unique",
@@ -5099,9 +5122,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "payouts_one_live_per_subject": {
           "name": "payouts_one_live_per_subject",
@@ -5132,10 +5155,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"payouts\".\"status\" <> 'failed'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "payouts_provider_order_id_unique": {
           "name": "payouts_provider_order_id_unique",
@@ -5154,9 +5177,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "payouts_refund_tx_hash_unique": {
           "name": "payouts_refund_tx_hash_unique",
@@ -5169,10 +5192,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"payouts\".\"refund_tx_hash\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "payouts_status_idx": {
           "name": "payouts_status_idx",
@@ -5185,9 +5208,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "payouts_gateway_order_id_idx": {
           "name": "payouts_gateway_order_id_idx",
@@ -5200,73 +5223,73 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "payouts_organization_id_organizations_id_fk": {
           "name": "payouts_organization_id_organizations_id_fk",
           "tableFrom": "payouts",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "payouts_approved_by_users_id_fk": {
           "name": "payouts_approved_by_users_id_fk",
           "tableFrom": "payouts",
-          "columnsFrom": ["approved_by"],
           "tableTo": "users",
+          "columnsFrom": ["approved_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "payouts_wallet_organization_fk": {
           "name": "payouts_wallet_organization_fk",
           "tableFrom": "payouts",
-          "columnsFrom": ["wallet_id", "organization_id"],
           "tableTo": "wallets",
+          "columnsFrom": ["wallet_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "payouts_payroll_run_organization_fk": {
           "name": "payouts_payroll_run_organization_fk",
           "tableFrom": "payouts",
-          "columnsFrom": ["payroll_run_id", "organization_id"],
           "tableTo": "payroll_runs",
+          "columnsFrom": ["payroll_run_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "payouts_base_hop_quote_organization_fk": {
           "name": "payouts_base_hop_quote_organization_fk",
           "tableFrom": "payouts",
-          "columnsFrom": ["base_hop_quote_id", "organization_id"],
           "tableTo": "intent_quotes",
+          "columnsFrom": ["base_hop_quote_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "payouts_delivery_quote_organization_fk": {
           "name": "payouts_delivery_quote_organization_fk",
           "tableFrom": "payouts",
-          "columnsFrom": ["delivery_quote_id", "organization_id"],
           "tableTo": "intent_quotes",
+          "columnsFrom": ["delivery_quote_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "payouts_id_organization_id_unique": {
           "name": "payouts_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -5400,33 +5423,33 @@
         "payroll_runs_organization_id_organizations_id_fk": {
           "name": "payroll_runs_organization_id_organizations_id_fk",
           "tableFrom": "payroll_runs",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "payroll_runs_approved_by_users_id_fk": {
           "name": "payroll_runs_approved_by_users_id_fk",
           "tableFrom": "payroll_runs",
-          "columnsFrom": ["approved_by"],
           "tableTo": "users",
+          "columnsFrom": ["approved_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "payroll_runs_id_organization_id_unique": {
           "name": "payroll_runs_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         },
         "payroll_runs_organization_pay_date_unique": {
           "name": "payroll_runs_organization_pay_date_unique",
-          "columns": ["organization_id", "pay_date"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["organization_id", "pay_date"]
         }
       },
       "policies": {},
@@ -5522,29 +5545,29 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "card_loads_organization_id_organizations_id_fk": {
           "name": "card_loads_organization_id_organizations_id_fk",
           "tableFrom": "card_loads",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "card_loads_loaded_by_users_id_fk": {
           "name": "card_loads_loaded_by_users_id_fk",
           "tableFrom": "card_loads",
-          "columnsFrom": ["loaded_by"],
           "tableTo": "users",
+          "columnsFrom": ["loaded_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5562,148 +5585,6 @@
         "card_loads_simulated": {
           "name": "card_loads_simulated",
           "value": "\"card_loads\".\"simulated\""
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.card_merchants": {
-      "name": "card_merchants",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "card_id": {
-          "name": "card_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "merchant_key": {
-          "name": "merchant_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "descriptor": {
-          "name": "descriptor",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "recurring_item_id": {
-          "name": "recurring_item_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "blocked": {
-          "name": "blocked",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "card_merchants_card_merchant_unique": {
-          "name": "card_merchants_card_merchant_unique",
-          "columns": [
-            {
-              "expression": "card_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "merchant_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "card_merchants_recurring_item_idx": {
-          "name": "card_merchants_recurring_item_idx",
-          "columns": [
-            {
-              "expression": "recurring_item_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "where": "\"card_merchants\".\"recurring_item_id\" IS NOT NULL",
-          "concurrently": false
-        }
-      },
-      "foreignKeys": {
-        "card_merchants_organization_id_organizations_id_fk": {
-          "name": "card_merchants_organization_id_organizations_id_fk",
-          "tableFrom": "card_merchants",
-          "columnsFrom": ["organization_id"],
-          "tableTo": "organizations",
-          "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "card_merchants_card_organization_fk": {
-          "name": "card_merchants_card_organization_fk",
-          "tableFrom": "card_merchants",
-          "columnsFrom": ["card_id", "organization_id"],
-          "tableTo": "cards",
-          "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "card_merchants_recurring_item_organization_fk": {
-          "name": "card_merchants_recurring_item_organization_fk",
-          "tableFrom": "card_merchants",
-          "columnsFrom": ["recurring_item_id", "organization_id"],
-          "tableTo": "recurring_items",
-          "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "card_merchants_blocked_unlinked": {
-          "name": "card_merchants_blocked_unlinked",
-          "value": "NOT (\"card_merchants\".\"blocked\" AND \"card_merchants\".\"recurring_item_id\" IS NOT NULL)"
         }
       },
       "isRLSEnabled": false
@@ -5836,38 +5717,38 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "card_programs_organization_id_organizations_id_fk": {
           "name": "card_programs_organization_id_organizations_id_fk",
           "tableFrom": "card_programs",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "card_programs_turned_on_by_users_id_fk": {
           "name": "card_programs_turned_on_by_users_id_fk",
           "tableFrom": "card_programs",
-          "columnsFrom": ["turned_on_by"],
           "tableTo": "users",
+          "columnsFrom": ["turned_on_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "card_programs_paid_from_account_organization_fk": {
           "name": "card_programs_paid_from_account_organization_fk",
           "tableFrom": "card_programs",
-          "columnsFrom": ["paid_from_account_id", "organization_id"],
           "tableTo": "paid_from_accounts",
+          "columnsFrom": ["paid_from_account_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -5903,7 +5784,7 @@
           "name": "membership_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "lithic_transaction_token": {
           "name": "lithic_transaction_token",
@@ -5931,43 +5812,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "merchant_key": {
-          "name": "merchant_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "recurring_item_id": {
-          "name": "recurring_item_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "bill_id": {
-          "name": "bill_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "review_state": {
-          "name": "review_state",
-          "type": "card_purchase_review_state",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reviewed_by": {
-          "name": "reviewed_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reviewed_at": {
-          "name": "reviewed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         },
         "mcc": {
           "name": "mcc",
@@ -6064,9 +5908,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "card_purchases_expense_unique": {
           "name": "card_purchases_expense_unique",
@@ -6079,48 +5923,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"card_purchases\".\"expense_id\" IS NOT NULL",
-          "concurrently": false
-        },
-        "card_purchases_bill_unique": {
-          "name": "card_purchases_bill_unique",
-          "columns": [
-            {
-              "expression": "bill_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "where": "\"card_purchases\".\"bill_id\" IS NOT NULL",
-          "concurrently": false
-        },
-        "card_purchases_needs_review_idx": {
-          "name": "card_purchases_needs_review_idx",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "authorized_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "where": "\"card_purchases\".\"review_state\" = 'needs_review'",
-          "concurrently": false
+          "with": {}
         },
         "card_purchases_organization_authorized_idx": {
           "name": "card_purchases_organization_authorized_idx",
@@ -6139,9 +5945,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "card_purchases_card_authorized_idx": {
           "name": "card_purchases_card_authorized_idx",
@@ -6160,9 +5966,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "card_purchases_membership_authorized_idx": {
           "name": "card_purchases_membership_authorized_idx",
@@ -6181,9 +5987,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "card_purchases_unfinished_idx": {
           "name": "card_purchases_unfinished_idx",
@@ -6196,92 +6002,65 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"card_purchases\".\"status\" = 'pending' OR \"card_purchases\".\"hold_usd_cents\" > 0 OR (\"card_purchases\".\"kind\" = 'purchase' AND \"card_purchases\".\"status\" = 'settled' AND \"card_purchases\".\"expense_id\" IS NULL)",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "card_purchases_organization_id_organizations_id_fk": {
           "name": "card_purchases_organization_id_organizations_id_fk",
           "tableFrom": "card_purchases",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "card_purchases_reviewed_by_users_id_fk": {
-          "name": "card_purchases_reviewed_by_users_id_fk",
-          "tableFrom": "card_purchases",
-          "columnsFrom": ["reviewed_by"],
-          "tableTo": "users",
-          "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "card_purchases_card_organization_fk": {
           "name": "card_purchases_card_organization_fk",
           "tableFrom": "card_purchases",
-          "columnsFrom": ["card_id", "organization_id"],
           "tableTo": "cards",
+          "columnsFrom": ["card_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "card_purchases_membership_organization_fk": {
           "name": "card_purchases_membership_organization_fk",
           "tableFrom": "card_purchases",
-          "columnsFrom": ["membership_id", "organization_id"],
           "tableTo": "memberships",
+          "columnsFrom": ["membership_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "card_purchases_category_organization_fk": {
           "name": "card_purchases_category_organization_fk",
           "tableFrom": "card_purchases",
-          "columnsFrom": ["category_id", "organization_id"],
           "tableTo": "categories",
+          "columnsFrom": ["category_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "card_purchases_expense_organization_fk": {
           "name": "card_purchases_expense_organization_fk",
           "tableFrom": "card_purchases",
-          "columnsFrom": ["expense_id", "organization_id"],
           "tableTo": "expenses",
+          "columnsFrom": ["expense_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "card_purchases_recurring_item_organization_fk": {
-          "name": "card_purchases_recurring_item_organization_fk",
-          "tableFrom": "card_purchases",
-          "columnsFrom": ["recurring_item_id", "organization_id"],
-          "tableTo": "recurring_items",
-          "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "card_purchases_bill_organization_fk": {
-          "name": "card_purchases_bill_organization_fk",
-          "tableFrom": "card_purchases",
-          "columnsFrom": ["bill_id", "organization_id"],
-          "tableTo": "bills",
-          "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "card_purchases_id_organization_id_unique": {
           "name": "card_purchases_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -6301,164 +6080,6 @@
         "card_purchases_expense_has_rate": {
           "name": "card_purchases_expense_has_rate",
           "value": "(\"card_purchases\".\"expense_id\" IS NULL) = (\"card_purchases\".\"usd_kes_rate\" IS NULL)"
-        },
-        "card_purchases_match_on_company_held": {
-          "name": "card_purchases_match_on_company_held",
-          "value": "\"card_purchases\".\"membership_id\" IS NULL OR (\"card_purchases\".\"recurring_item_id\" IS NULL AND \"card_purchases\".\"bill_id\" IS NULL AND \"card_purchases\".\"review_state\" IS NULL)"
-        },
-        "card_purchases_linked_or_reviewed": {
-          "name": "card_purchases_linked_or_reviewed",
-          "value": "\"card_purchases\".\"recurring_item_id\" IS NULL OR \"card_purchases\".\"review_state\" IS NULL"
-        },
-        "card_purchases_bill_is_linked": {
-          "name": "card_purchases_bill_is_linked",
-          "value": "\"card_purchases\".\"bill_id\" IS NULL OR \"card_purchases\".\"recurring_item_id\" IS NOT NULL"
-        },
-        "card_purchases_reviewed_recorded": {
-          "name": "card_purchases_reviewed_recorded",
-          "value": "(\"card_purchases\".\"reviewed_by\" IS NULL) = (\"card_purchases\".\"reviewed_at\" IS NULL)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.card_simulations": {
-      "name": "card_simulations",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "recurring_item_id": {
-          "name": "recurring_item_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "bill_id": {
-          "name": "bill_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "lithic_transaction_token": {
-          "name": "lithic_transaction_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount_usd_cents": {
-          "name": "amount_usd_cents",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "merchant_key": {
-          "name": "merchant_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "run_by_staff": {
-          "name": "run_by_staff",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "card_simulations_transaction_token_unique": {
-          "name": "card_simulations_transaction_token_unique",
-          "columns": [
-            {
-              "expression": "lithic_transaction_token",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "card_simulations_bill_idx": {
-          "name": "card_simulations_bill_idx",
-          "columns": [
-            {
-              "expression": "bill_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        }
-      },
-      "foreignKeys": {
-        "card_simulations_organization_id_organizations_id_fk": {
-          "name": "card_simulations_organization_id_organizations_id_fk",
-          "tableFrom": "card_simulations",
-          "columnsFrom": ["organization_id"],
-          "tableTo": "organizations",
-          "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "card_simulations_run_by_staff_staff_users_id_fk": {
-          "name": "card_simulations_run_by_staff_staff_users_id_fk",
-          "tableFrom": "card_simulations",
-          "columnsFrom": ["run_by_staff"],
-          "tableTo": "staff_users",
-          "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "card_simulations_recurring_item_organization_fk": {
-          "name": "card_simulations_recurring_item_organization_fk",
-          "tableFrom": "card_simulations",
-          "columnsFrom": ["recurring_item_id", "organization_id"],
-          "tableTo": "recurring_items",
-          "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "card_simulations_bill_organization_fk": {
-          "name": "card_simulations_bill_organization_fk",
-          "tableFrom": "card_simulations",
-          "columnsFrom": ["bill_id", "organization_id"],
-          "tableTo": "bills",
-          "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "card_simulations_amount_positive": {
-          "name": "card_simulations_amount_positive",
-          "value": "\"card_simulations\".\"amount_usd_cents\" > 0"
         }
       },
       "isRLSEnabled": false
@@ -6525,37 +6146,37 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "cardholders_organization_id_organizations_id_fk": {
           "name": "cardholders_organization_id_organizations_id_fk",
           "tableFrom": "cardholders",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "cardholders_membership_organization_fk": {
           "name": "cardholders_membership_organization_fk",
           "tableFrom": "cardholders",
-          "columnsFrom": ["membership_id", "organization_id"],
           "tableTo": "memberships",
+          "columnsFrom": ["membership_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "cardholders_id_organization_id_unique": {
           "name": "cardholders_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -6579,24 +6200,17 @@
           "primaryKey": false,
           "notNull": true
         },
-        "company_held": {
-          "name": "company_held",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "cardholder_id": {
           "name": "cardholder_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "membership_id": {
           "name": "membership_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "lithic_card_token": {
           "name": "lithic_card_token",
@@ -6688,9 +6302,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "cards_organization_created_idx": {
           "name": "cards_organization_created_idx",
@@ -6709,9 +6323,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "cards_membership_idx": {
           "name": "cards_membership_idx",
@@ -6724,9 +6338,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "cards_close_requested_idx": {
           "name": "cards_close_requested_idx",
@@ -6739,65 +6353,65 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"cards\".\"close_requested_at\" IS NOT NULL AND \"cards\".\"state\" <> 'closed'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "cards_organization_id_organizations_id_fk": {
           "name": "cards_organization_id_organizations_id_fk",
           "tableFrom": "cards",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "cards_issued_by_users_id_fk": {
           "name": "cards_issued_by_users_id_fk",
           "tableFrom": "cards",
-          "columnsFrom": ["issued_by"],
           "tableTo": "users",
+          "columnsFrom": ["issued_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "cards_cardholder_organization_fk": {
           "name": "cards_cardholder_organization_fk",
           "tableFrom": "cards",
-          "columnsFrom": ["cardholder_id", "organization_id"],
           "tableTo": "cardholders",
+          "columnsFrom": ["cardholder_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "cards_membership_organization_fk": {
           "name": "cards_membership_organization_fk",
           "tableFrom": "cards",
-          "columnsFrom": ["membership_id", "organization_id"],
           "tableTo": "memberships",
+          "columnsFrom": ["membership_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "cards_default_category_organization_fk": {
           "name": "cards_default_category_organization_fk",
           "tableFrom": "cards",
-          "columnsFrom": ["default_category_id", "organization_id"],
           "tableTo": "categories",
+          "columnsFrom": ["default_category_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "cards_id_organization_id_unique": {
           "name": "cards_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -6809,10 +6423,6 @@
         "cards_closed_has_date": {
           "name": "cards_closed_has_date",
           "value": "(\"cards\".\"state\" = 'closed') = (\"cards\".\"closed_at\" IS NOT NULL)"
-        },
-        "cards_holder_unless_company_held": {
-          "name": "cards_holder_unless_company_held",
-          "value": "\"cards\".\"company_held\" = (\"cards\".\"cardholder_id\" IS NULL) AND \"cards\".\"company_held\" = (\"cards\".\"membership_id\" IS NULL)"
         }
       },
       "isRLSEnabled": false
@@ -6913,9 +6523,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "phone_verification_challenges_one_pending": {
           "name": "phone_verification_challenges_one_pending",
@@ -6928,21 +6538,21 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"phone_verification_challenges\".\"status\" = 'pending'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "phone_verification_challenges_user_id_users_id_fk": {
           "name": "phone_verification_challenges_user_id_users_id_fk",
           "tableFrom": "phone_verification_challenges",
-          "columnsFrom": ["user_id"],
           "tableTo": "users",
+          "columnsFrom": ["user_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -7133,9 +6743,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "receipt_files_storage_key_unique": {
           "name": "receipt_files_storage_key_unique",
@@ -7148,9 +6758,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "receipt_files_expense_id_idx": {
           "name": "receipt_files_expense_id_idx",
@@ -7163,9 +6773,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "receipt_files_bill_id_idx": {
           "name": "receipt_files_bill_id_idx",
@@ -7178,9 +6788,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "receipt_files_card_purchase_id_idx": {
           "name": "receipt_files_card_purchase_id_idx",
@@ -7193,56 +6803,56 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "receipt_files_organization_id_organizations_id_fk": {
           "name": "receipt_files_organization_id_organizations_id_fk",
           "tableFrom": "receipt_files",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "receipt_files_uploaded_by_users_id_fk": {
           "name": "receipt_files_uploaded_by_users_id_fk",
           "tableFrom": "receipt_files",
-          "columnsFrom": ["uploaded_by"],
           "tableTo": "users",
+          "columnsFrom": ["uploaded_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "receipt_files_expense_organization_fk": {
           "name": "receipt_files_expense_organization_fk",
           "tableFrom": "receipt_files",
-          "columnsFrom": ["expense_id", "organization_id"],
           "tableTo": "expenses",
+          "columnsFrom": ["expense_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "receipt_files_bill_organization_fk": {
           "name": "receipt_files_bill_organization_fk",
           "tableFrom": "receipt_files",
-          "columnsFrom": ["bill_id", "organization_id"],
           "tableTo": "bills",
+          "columnsFrom": ["bill_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "receipt_files_card_purchase_organization_fk": {
           "name": "receipt_files_card_purchase_organization_fk",
           "tableFrom": "receipt_files",
-          "columnsFrom": ["card_purchase_id", "organization_id"],
           "tableTo": "card_purchases",
+          "columnsFrom": ["card_purchase_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -7373,12 +6983,6 @@
           "notNull": true,
           "default": "'expendi'"
         },
-        "card_id": {
-          "name": "card_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "reminder_days": {
           "name": "reminder_days",
           "type": "integer",
@@ -7426,9 +7030,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "recurring_items_payee_id_idx": {
           "name": "recurring_items_payee_id_idx",
@@ -7441,25 +7045,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
-        },
-        "recurring_items_card_id_idx": {
-          "name": "recurring_items_card_id_idx",
-          "columns": [
-            {
-              "expression": "card_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "where": "\"recurring_items\".\"card_id\" IS NOT NULL",
-          "concurrently": false
+          "with": {}
         },
         "recurring_items_scheduled_idx": {
           "name": "recurring_items_scheduled_idx",
@@ -7472,10 +7060,10 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"recurring_items\".\"active\" AND \"recurring_items\".\"next_due_on\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "recurring_items_one_salary_per_payee": {
           "name": "recurring_items_one_salary_per_payee",
@@ -7488,56 +7076,47 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"recurring_items\".\"overview_heading\" = 'salaries' AND \"recurring_items\".\"next_due_on\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "recurring_items_organization_id_organizations_id_fk": {
           "name": "recurring_items_organization_id_organizations_id_fk",
           "tableFrom": "recurring_items",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "recurring_items_payee_organization_fk": {
           "name": "recurring_items_payee_organization_fk",
           "tableFrom": "recurring_items",
-          "columnsFrom": ["payee_id", "organization_id"],
           "tableTo": "payees",
+          "columnsFrom": ["payee_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "recurring_items_category_organization_fk": {
           "name": "recurring_items_category_organization_fk",
           "tableFrom": "recurring_items",
-          "columnsFrom": ["category_id", "organization_id"],
           "tableTo": "categories",
+          "columnsFrom": ["category_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "recurring_items_card_organization_fk": {
-          "name": "recurring_items_card_organization_fk",
-          "tableFrom": "recurring_items",
-          "columnsFrom": ["card_id", "organization_id"],
-          "tableTo": "cards",
-          "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "recurring_items_id_organization_id_unique": {
           "name": "recurring_items_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -7573,14 +7152,6 @@
         "recurring_items_salary_shape": {
           "name": "recurring_items_salary_shape",
           "value": "\"recurring_items\".\"overview_heading\" <> 'salaries' OR (\"recurring_items\".\"amount_kes\" IS NOT NULL AND \"recurring_items\".\"currency\" = 'kes' AND \"recurring_items\".\"schedule\" = 'monthly' AND \"recurring_items\".\"pay_via\" = 'expendi')"
-        },
-        "recurring_items_card_pays_by_card": {
-          "name": "recurring_items_card_pays_by_card",
-          "value": "(\"recurring_items\".\"pay_via\"::text = 'card') = (\"recurring_items\".\"card_id\" IS NOT NULL)"
-        },
-        "recurring_items_card_in_usd": {
-          "name": "recurring_items_card_in_usd",
-          "value": "\"recurring_items\".\"pay_via\"::text <> 'card' OR \"recurring_items\".\"currency\" = 'usd'"
         },
         "recurring_items_next_due_in_schedule": {
           "name": "recurring_items_next_due_in_schedule",
@@ -7650,9 +7221,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "report_export_links_recipient_unique": {
           "name": "report_export_links_recipient_unique",
@@ -7671,39 +7242,39 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"report_export_links\".\"membership_id\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "report_export_links_organization_id_organizations_id_fk": {
           "name": "report_export_links_organization_id_organizations_id_fk",
           "tableFrom": "report_export_links",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "report_export_links_export_organization_fk": {
           "name": "report_export_links_export_organization_fk",
           "tableFrom": "report_export_links",
-          "columnsFrom": ["export_id", "organization_id"],
           "tableTo": "report_exports",
+          "columnsFrom": ["export_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "report_export_links_membership_organization_fk": {
           "name": "report_export_links_membership_organization_fk",
           "tableFrom": "report_export_links",
-          "columnsFrom": ["membership_id", "organization_id"],
           "tableTo": "memberships",
+          "columnsFrom": ["membership_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -7796,10 +7367,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"report_exports\".\"monthly\"",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "report_exports_organization_created_idx": {
           "name": "report_exports_organization_created_idx",
@@ -7818,37 +7389,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "report_exports_organization_id_organizations_id_fk": {
           "name": "report_exports_organization_id_organizations_id_fk",
           "tableFrom": "report_exports",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "report_exports_created_by_users_id_fk": {
           "name": "report_exports_created_by_users_id_fk",
           "tableFrom": "report_exports",
-          "columnsFrom": ["created_by"],
           "tableTo": "users",
+          "columnsFrom": ["created_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "report_exports_id_organization_id_unique": {
           "name": "report_exports_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -7948,20 +7519,20 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "staff_confirmations_staff_user_id_staff_users_id_fk": {
           "name": "staff_confirmations_staff_user_id_staff_users_id_fk",
           "tableFrom": "staff_confirmations",
-          "columnsFrom": ["staff_user_id"],
           "tableTo": "staff_users",
+          "columnsFrom": ["staff_user_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -8028,8 +7599,8 @@
       "uniqueConstraints": {
         "staff_users_email_unique": {
           "name": "staff_users_email_unique",
-          "columns": ["email"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -8173,9 +7744,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "treasury_earn_actions_privy_action_id_unique": {
           "name": "treasury_earn_actions_privy_action_id_unique",
@@ -8188,10 +7759,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"treasury_earn_actions\".\"privy_action_id\" IS NOT NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "treasury_earn_actions_one_live_per_move": {
           "name": "treasury_earn_actions_one_live_per_move",
@@ -8204,10 +7775,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"treasury_earn_actions\".\"status\" IN ('saved', 'pending')",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "treasury_earn_actions_one_deposit_per_quote": {
           "name": "treasury_earn_actions_one_deposit_per_quote",
@@ -8220,10 +7791,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"treasury_earn_actions\".\"kind\" = 'deposit' AND \"treasury_earn_actions\".\"status\" IN ('saved', 'pending', 'succeeded')",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "treasury_earn_actions_one_withdrawal_per_move": {
           "name": "treasury_earn_actions_one_withdrawal_per_move",
@@ -8236,47 +7807,47 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"treasury_earn_actions\".\"kind\" = 'withdraw'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "treasury_earn_actions_organization_id_organizations_id_fk": {
           "name": "treasury_earn_actions_organization_id_organizations_id_fk",
           "tableFrom": "treasury_earn_actions",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "treasury_earn_actions_move_organization_fk": {
           "name": "treasury_earn_actions_move_organization_fk",
           "tableFrom": "treasury_earn_actions",
-          "columnsFrom": ["treasury_move_id", "organization_id"],
           "tableTo": "treasury_moves",
+          "columnsFrom": ["treasury_move_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "treasury_earn_actions_quote_organization_fk": {
           "name": "treasury_earn_actions_quote_organization_fk",
           "tableFrom": "treasury_earn_actions",
-          "columnsFrom": ["intent_quote_id", "organization_id"],
           "tableTo": "intent_quotes",
+          "columnsFrom": ["intent_quote_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "treasury_earn_actions_attempt_unique": {
           "name": "treasury_earn_actions_attempt_unique",
-          "columns": ["treasury_move_id", "intent_quote_id", "kind", "attempt"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["treasury_move_id", "intent_quote_id", "kind", "attempt"]
         }
       },
       "policies": {},
@@ -8426,47 +7997,47 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"treasury_moves\".\"status\" IN ('open', 'needs_review')",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "treasury_moves_organization_id_organizations_id_fk": {
           "name": "treasury_moves_organization_id_organizations_id_fk",
           "tableFrom": "treasury_moves",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "treasury_moves_confirmed_by_users_id_fk": {
           "name": "treasury_moves_confirmed_by_users_id_fk",
           "tableFrom": "treasury_moves",
-          "columnsFrom": ["confirmed_by"],
           "tableTo": "users",
+          "columnsFrom": ["confirmed_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "treasury_moves_wallet_organization_fk": {
           "name": "treasury_moves_wallet_organization_fk",
           "tableFrom": "treasury_moves",
-          "columnsFrom": ["wallet_id", "organization_id"],
           "tableTo": "wallets",
+          "columnsFrom": ["wallet_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "treasury_moves_id_organization_id_unique": {
           "name": "treasury_moves_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -8569,48 +8140,48 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"treasury_return_approvals\".\"consumed_at\" IS NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "treasury_return_approvals_organization_id_organizations_id_fk": {
           "name": "treasury_return_approvals_organization_id_organizations_id_fk",
           "tableFrom": "treasury_return_approvals",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "treasury_return_approvals_approved_by_staff_users_id_fk": {
           "name": "treasury_return_approvals_approved_by_staff_users_id_fk",
           "tableFrom": "treasury_return_approvals",
-          "columnsFrom": ["approved_by"],
           "tableTo": "staff_users",
+          "columnsFrom": ["approved_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "treasury_return_approvals_confirmation_id_staff_confirmations_id_fk": {
           "name": "treasury_return_approvals_confirmation_id_staff_confirmations_id_fk",
           "tableFrom": "treasury_return_approvals",
-          "columnsFrom": ["confirmation_id"],
           "tableTo": "staff_confirmations",
+          "columnsFrom": ["confirmation_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "treasury_return_approvals_move_organization_fk": {
           "name": "treasury_return_approvals_move_organization_fk",
           "tableFrom": "treasury_return_approvals",
-          "columnsFrom": ["treasury_move_id", "organization_id"],
           "tableTo": "treasury_moves",
+          "columnsFrom": ["treasury_move_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -8688,19 +8259,19 @@
         "treasury_snapshots_organization_id_organizations_id_fk": {
           "name": "treasury_snapshots_organization_id_organizations_id_fk",
           "tableFrom": "treasury_snapshots",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "treasury_snapshots_organization_day_unique": {
           "name": "treasury_snapshots_organization_day_unique",
-          "columns": ["organization_id", "snapshot_date"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["organization_id", "snapshot_date"]
         }
       },
       "policies": {},
@@ -8778,18 +8349,18 @@
       "uniqueConstraints": {
         "users_privy_user_id_unique": {
           "name": "users_privy_user_id_unique",
-          "columns": ["privy_user_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["privy_user_id"]
         },
         "users_email_unique": {
           "name": "users_email_unique",
-          "columns": ["email"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["email"]
         },
         "users_phone_unique": {
           "name": "users_phone_unique",
-          "columns": ["phone"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["phone"]
         }
       },
       "policies": {},
@@ -8917,8 +8488,8 @@
           "columns": [
             {
               "expression": "lower(\"tx_hash\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             },
             {
@@ -8929,10 +8500,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"wallet_transactions\".\"chain\" = 'base'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "wallet_transactions_near_transfer_unique": {
           "name": "wallet_transactions_near_transfer_unique",
@@ -8957,10 +8528,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"wallet_transactions\".\"chain\" <> 'base'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "wallet_transactions_wallet_id_idx": {
           "name": "wallet_transactions_wallet_id_idx",
@@ -8973,9 +8544,25 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
+        },
+        "wallet_transactions_quote_settled_credit_unique": {
+          "name": "wallet_transactions_quote_settled_credit_unique",
+          "columns": [
+            {
+              "expression": "intent_quote_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"wallet_transactions\".\"intent_quote_id\" IS NOT NULL AND \"wallet_transactions\".\"tx_hash\" IS NULL AND \"wallet_transactions\".\"usdc_amount\" > 0",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "wallet_transactions_to_treasury_quote_unique": {
           "name": "wallet_transactions_to_treasury_quote_unique",
@@ -8988,10 +8575,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"wallet_transactions\".\"intent_quote_id\" IS NOT NULL AND \"wallet_transactions\".\"usdc_amount\" < 0",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "wallet_transactions_payout_debit_unique": {
           "name": "wallet_transactions_payout_debit_unique",
@@ -9004,65 +8591,65 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"wallet_transactions\".\"type\" IN ('payout', 'withdrawal')",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "wallet_transactions_organization_id_organizations_id_fk": {
           "name": "wallet_transactions_organization_id_organizations_id_fk",
           "tableFrom": "wallet_transactions",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "wallet_transactions_payout_id_payouts_id_fk": {
           "name": "wallet_transactions_payout_id_payouts_id_fk",
           "tableFrom": "wallet_transactions",
-          "columnsFrom": ["payout_id"],
           "tableTo": "payouts",
+          "columnsFrom": ["payout_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "wallet_transactions_wallet_organization_fk": {
           "name": "wallet_transactions_wallet_organization_fk",
           "tableFrom": "wallet_transactions",
-          "columnsFrom": ["wallet_id", "organization_id"],
           "tableTo": "wallets",
+          "columnsFrom": ["wallet_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "wallet_transactions_treasury_move_organization_fk": {
           "name": "wallet_transactions_treasury_move_organization_fk",
           "tableFrom": "wallet_transactions",
-          "columnsFrom": ["treasury_move_id", "organization_id"],
           "tableTo": "treasury_moves",
+          "columnsFrom": ["treasury_move_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "wallet_transactions_intent_quote_organization_fk": {
           "name": "wallet_transactions_intent_quote_organization_fk",
           "tableFrom": "wallet_transactions",
-          "columnsFrom": ["intent_quote_id", "organization_id"],
           "tableTo": "intent_quotes",
+          "columnsFrom": ["intent_quote_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "wallet_transactions_id_organization_id_unique": {
           "name": "wallet_transactions_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -9077,15 +8664,15 @@
         },
         "wallet_transactions_quote_link_is_treasury": {
           "name": "wallet_transactions_quote_link_is_treasury",
-          "value": "(\"wallet_transactions\".\"type\"::text = 'to_treasury') <= (\"wallet_transactions\".\"intent_quote_id\" IS NOT NULL) AND (\"wallet_transactions\".\"intent_quote_id\" IS NULL OR \"wallet_transactions\".\"type\"::text IN ('to_treasury', 'from_treasury'))"
+          "value": "(\"wallet_transactions\".\"type\"::text = 'to_treasury') <= (\"wallet_transactions\".\"intent_quote_id\" IS NOT NULL) AND (\"wallet_transactions\".\"intent_quote_id\" IS NULL OR \"wallet_transactions\".\"type\"::text IN ('to_treasury', 'from_treasury', 'deposit'))"
         },
         "wallet_transactions_payout_has_payout": {
           "name": "wallet_transactions_payout_has_payout",
           "value": "\"wallet_transactions\".\"type\" <> 'payout' OR \"wallet_transactions\".\"payout_id\" IS NOT NULL"
         },
-        "wallet_transactions_deposit_is_onchain": {
-          "name": "wallet_transactions_deposit_is_onchain",
-          "value": "\"wallet_transactions\".\"type\" <> 'deposit' OR (\"wallet_transactions\".\"tx_hash\" IS NOT NULL AND \"wallet_transactions\".\"log_index\" IS NOT NULL AND \"wallet_transactions\".\"block_number\" IS NOT NULL)"
+        "wallet_transactions_deposit_has_source": {
+          "name": "wallet_transactions_deposit_has_source",
+          "value": "\"wallet_transactions\".\"type\" <> 'deposit' OR (\"wallet_transactions\".\"intent_quote_id\" IS NULL AND \"wallet_transactions\".\"tx_hash\" IS NOT NULL AND \"wallet_transactions\".\"log_index\" IS NOT NULL AND \"wallet_transactions\".\"block_number\" IS NOT NULL) OR (\"wallet_transactions\".\"intent_quote_id\" IS NOT NULL AND \"wallet_transactions\".\"chain\" <> 'base' AND \"wallet_transactions\".\"tx_hash\" IS NULL AND \"wallet_transactions\".\"receipt_id\" IS NULL AND \"wallet_transactions\".\"log_index\" IS NULL AND \"wallet_transactions\".\"transfer_index\" IS NULL AND \"wallet_transactions\".\"block_number\" IS NULL)"
         },
         "wallet_transactions_receipt_is_near": {
           "name": "wallet_transactions_receipt_is_near",
@@ -9093,7 +8680,7 @@
         },
         "wallet_transactions_near_deposit_has_receipt": {
           "name": "wallet_transactions_near_deposit_has_receipt",
-          "value": "\"wallet_transactions\".\"chain\" = 'base' OR \"wallet_transactions\".\"type\" <> 'deposit' OR \"wallet_transactions\".\"receipt_id\" IS NOT NULL"
+          "value": "\"wallet_transactions\".\"chain\" = 'base' OR \"wallet_transactions\".\"type\" <> 'deposit' OR \"wallet_transactions\".\"receipt_id\" IS NOT NULL OR \"wallet_transactions\".\"intent_quote_id\" IS NOT NULL"
         },
         "wallet_transactions_positions_not_negative": {
           "name": "wallet_transactions_positions_not_negative",
@@ -9137,6 +8724,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'creating'"
+        },
+        "balance_home": {
+          "name": "balance_home",
+          "type": "wallet_balance_home",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'company_wallet'"
         },
         "per_transaction_max_usdc": {
           "name": "per_transaction_max_usdc",
@@ -9204,6 +8799,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "confidential_usdc": {
+          "name": "confidential_usdc",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confidential_usdc_read_at": {
+          "name": "confidential_usdc_read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "onchain_activated_at": {
           "name": "onchain_activated_at",
           "type": "timestamp with time zone",
@@ -9255,9 +8862,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "wallets_privy_wallet_id_unique": {
           "name": "wallets_privy_wallet_id_unique",
@@ -9270,24 +8877,24 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "wallets_address_unique": {
           "name": "wallets_address_unique",
           "columns": [
             {
               "expression": "lower(\"address\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "wallets_transit_privy_wallet_id_unique": {
           "name": "wallets_transit_privy_wallet_id_unique",
@@ -9300,24 +8907,24 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "wallets_transit_address_unique": {
           "name": "wallets_transit_address_unique",
           "columns": [
             {
               "expression": "lower(\"transit_address\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "wallets_treasury_privy_wallet_id_unique": {
           "name": "wallets_treasury_privy_wallet_id_unique",
@@ -9330,52 +8937,52 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "wallets_treasury_address_unique": {
           "name": "wallets_treasury_address_unique",
           "columns": [
             {
               "expression": "lower(\"treasury_address\")",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "wallets_organization_id_organizations_id_fk": {
           "name": "wallets_organization_id_organizations_id_fk",
           "tableFrom": "wallets",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "wallets_treasury_turned_on_by_users_id_fk": {
           "name": "wallets_treasury_turned_on_by_users_id_fk",
           "tableFrom": "wallets",
-          "columnsFrom": ["treasury_turned_on_by"],
           "tableTo": "users",
+          "columnsFrom": ["treasury_turned_on_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "wallets_id_organization_id_unique": {
           "name": "wallets_id_organization_id_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -9387,6 +8994,10 @@
         "wallets_active_is_complete": {
           "name": "wallets_active_is_complete",
           "value": "\"wallets\".\"status\" <> 'active' OR (\"wallets\".\"privy_policy_id\" IS NOT NULL AND \"wallets\".\"privy_wallet_id\" IS NOT NULL AND \"wallets\".\"address\" IS NOT NULL AND (\"wallets\".\"chain\" = 'base' OR (\"wallets\".\"transit_privy_wallet_id\" IS NOT NULL AND \"wallets\".\"transit_address\" IS NOT NULL AND \"wallets\".\"onchain_activated_at\" IS NOT NULL)))"
+        },
+        "wallets_confidential_reading_is_whole": {
+          "name": "wallets_confidential_reading_is_whole",
+          "value": "(\"wallets\".\"confidential_usdc\" IS NULL) = (\"wallets\".\"confidential_usdc_read_at\" IS NULL)"
         },
         "wallets_per_transaction_max_positive": {
           "name": "wallets_per_transaction_max_positive",
@@ -9487,10 +9098,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"withdrawal_addresses\".\"removed_at\" IS NULL",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "withdrawal_addresses_organization_id_idx": {
           "name": "withdrawal_addresses_organization_id_idx",
@@ -9503,38 +9114,38 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "withdrawal_addresses_organization_id_organizations_id_fk": {
           "name": "withdrawal_addresses_organization_id_organizations_id_fk",
           "tableFrom": "withdrawal_addresses",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "withdrawal_addresses_added_by_users_id_fk": {
           "name": "withdrawal_addresses_added_by_users_id_fk",
           "tableFrom": "withdrawal_addresses",
-          "columnsFrom": ["added_by"],
           "tableTo": "users",
+          "columnsFrom": ["added_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "withdrawal_addresses_removed_by_users_id_fk": {
           "name": "withdrawal_addresses_removed_by_users_id_fk",
           "tableFrom": "withdrawal_addresses",
-          "columnsFrom": ["removed_by"],
           "tableTo": "users",
+          "columnsFrom": ["removed_by"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -9582,28 +9193,28 @@
         "import_rows_organization_id_organizations_id_fk": {
           "name": "import_rows_organization_id_organizations_id_fk",
           "tableFrom": "import_rows",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "import_rows_run_id_organization_id_import_runs_id_organization_id_fk": {
           "name": "import_rows_run_id_organization_id_import_runs_id_organization_id_fk",
           "tableFrom": "import_rows",
-          "columnsFrom": ["run_id", "organization_id"],
           "tableTo": "import_runs",
+          "columnsFrom": ["run_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "import_rows_company_hash_unique": {
           "name": "import_rows_company_hash_unique",
-          "columns": ["organization_id", "row_hash"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["organization_id", "row_hash"]
         }
       },
       "policies": {},
@@ -9700,37 +9311,37 @@
         "import_runs_organization_id_organizations_id_fk": {
           "name": "import_runs_organization_id_organizations_id_fk",
           "tableFrom": "import_runs",
-          "columnsFrom": ["organization_id"],
           "tableTo": "organizations",
+          "columnsFrom": ["organization_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "import_runs_staff_user_id_staff_users_id_fk": {
           "name": "import_runs_staff_user_id_staff_users_id_fk",
           "tableFrom": "import_runs",
-          "columnsFrom": ["staff_user_id"],
           "tableTo": "staff_users",
+          "columnsFrom": ["staff_user_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "import_runs_membership_organization_fk": {
           "name": "import_runs_membership_organization_fk",
           "tableFrom": "import_runs",
-          "columnsFrom": ["membership_id", "organization_id"],
           "tableTo": "memberships",
+          "columnsFrom": ["membership_id", "organization_id"],
           "columnsTo": ["id", "organization_id"],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "import_runs_id_organization_unique": {
           "name": "import_runs_id_organization_unique",
-          "columns": ["id", "organization_id"],
-          "nullsNotDistinct": false
+          "nullsNotDistinct": false,
+          "columns": ["id", "organization_id"]
         }
       },
       "policies": {},
@@ -9802,7 +9413,6 @@
         "paid",
         "payout_failed",
         "paid_outside",
-        "paid_by_card",
         "cancelled"
       ]
     },
@@ -9882,7 +9492,8 @@
         "fund_in_return",
         "invoice_payment",
         "to_treasury",
-        "from_treasury"
+        "from_treasury",
+        "move_in"
       ]
     },
     "public.intent_quote_status": {
@@ -9906,7 +9517,12 @@
     "public.one_click_account_type": {
       "name": "one_click_account_type",
       "schema": "public",
-      "values": ["ORIGIN_CHAIN", "INTENTS"]
+      "values": ["ORIGIN_CHAIN", "INTENTS", "CONFIDENTIAL_INTENTS"]
+    },
+    "public.one_click_recipient_type": {
+      "name": "one_click_recipient_type",
+      "schema": "public",
+      "values": ["DESTINATION_CHAIN", "CONFIDENTIAL_INTENTS"]
     },
     "public.one_click_status": {
       "name": "one_click_status",
@@ -9972,7 +9588,8 @@
         "treasury_move_stuck",
         "treasury_usdc_idle",
         "treasury_position_mismatch",
-        "treasury_partial_fill"
+        "treasury_partial_fill",
+        "confidential_balance_mismatch"
       ]
     },
     "public.overview_heading": {
@@ -10046,11 +9663,6 @@
       "schema": "public",
       "values": ["purchase", "refund"]
     },
-    "public.card_purchase_review_state": {
-      "name": "card_purchase_review_state",
-      "schema": "public",
-      "values": ["needs_review", "one_off", "not_recognised"]
-    },
     "public.card_purchase_status": {
       "name": "card_purchase_status",
       "schema": "public",
@@ -10084,7 +9696,7 @@
     "public.recurring_pay_via": {
       "name": "recurring_pay_via",
       "schema": "public",
-      "values": ["expendi", "outside", "card"]
+      "values": ["expendi", "outside"]
     },
     "public.recurring_schedule": {
       "name": "recurring_schedule",
@@ -10147,6 +9759,11 @@
         "from_treasury"
       ]
     },
+    "public.wallet_balance_home": {
+      "name": "wallet_balance_home",
+      "schema": "public",
+      "values": ["company_wallet", "confidential_account"]
+    },
     "public.wallet_chain": {
       "name": "wallet_chain",
       "schema": "public",
@@ -10159,10 +9776,10 @@
     }
   },
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

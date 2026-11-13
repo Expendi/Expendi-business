@@ -7,7 +7,6 @@ import { formatUsdAmount } from "@expendi-business/shared";
 import type { DatabaseService } from "../../db/client.js";
 import type { IntentQuote, TreasuryMove } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
-import type { AuditLog } from "../audit/audit-log.js";
 import type { QuoteDepositDeps } from "../intents/quote-deposit.js";
 import type { PrivyWallets as PrivyWalletsService } from "../wallet/privy-wallets.js";
 import type { Snapshot, Step, TreasuryAdvanceOptions } from "./move-state.js";
@@ -19,10 +18,13 @@ import {
   walletTransactions,
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
+import { AuditLog } from "../audit/audit-log.js";
 import { baseUsdcBalance } from "../chain/base-rpc.js";
 import { advanceCompanyQuote } from "../intents/quote-deposit.js";
+import { isIntentPaid } from "../intents/quote-intent.js";
 import { openTreasuryQuote } from "../intents/treasury-quote.js";
 import {
+  ACTOR,
   advanceEarnAction,
   depositsOf,
   endMove,
@@ -54,6 +56,9 @@ export type { TreasuryAdvanceOptions } from "./move-state.js";
  * 2. the gas relayer registers the deposit address and the company wallet
  *    pays it, once, through `advanceCompanyQuote`;
  * 3. the `to_treasury` debit is written once the send is known to have run;
+ *    for a company whose USDC is in a confidential account there is no send
+ *    on chain, so it is written when 1Click's status settles the quote
+ *    (`recordIntentOutcome`);
  * 4. 1Click's status settles the quote;
  * 5. what the quote delivered, and never the Treasury wallet's whole
  *    balance, is deposited into the vault with one Privy Earn call, saved
@@ -93,14 +98,119 @@ function endShort(snap: Snapshot, reason: string) {
 }
 
 /**
- * The send's debit, written once: a quote has at most one `to_treasury`
- * row. Written as soon as the company wallet's send is known to have run,
- * which is before anything of this quote can be refunded and credited back.
+ * A part paid out of a confidential account that 1Click refunded without
+ * saying how much, or saying more than was paid: nothing can be credited, so
+ * nothing is written and the move goes to review.
+ */
+const refundUnusable = (quote: IntentQuote): boolean =>
+  quote.status === "refunded" &&
+  (quote.refundedAmount === null ||
+    quote.refundedAmount <= 0n ||
+    quote.refundedAmount > quote.amountIn);
+
+/**
+ * What a part paid out of a confidential account writes once 1Click has
+ * settled it (phase-3-4-design.md, B3). Nothing moves on chain, so a send
+ * can't prove the payment: the ledger follows the quote's own outcome, and a
+ * 200 from the message's submit is never enough.
+ *
+ * - `succeeded`: the debit, `-amountIn`;
+ * - `refunded`: the debit and a `from_treasury` credit of what 1Click says
+ *   it returned, in one transaction, so the ledger is never short by a
+ *   refund that is already in the account. The credit isn't
+ *   `quote-credit.ts`'s: a refund isn't a delivery.
+ *
+ * Both rows are unique per quote, so running twice writes nothing twice.
+ */
+function recordIntentOutcome(
+  snap: Snapshot,
+  quote: IntentQuote,
+): Effect.Effect<boolean, DatabaseError, DatabaseService | AuditLog> {
+  const { organizationId, id: moveId } = snap.move;
+  const refunded = quote.status === "refunded";
+  if (quote.status !== "succeeded" && !refunded) {
+    return Effect.succeed(false);
+  }
+  const { refundedAmount } = quote;
+  if (refundUnusable(quote)) return Effect.succeed(false);
+  return withScope({ organizationId }, (tx) =>
+    Effect.gen(function* () {
+      const audit = yield* AuditLog;
+      const debit = yield* query(() =>
+        tx
+          .insert(walletTransactions)
+          .values({
+            organizationId,
+            walletId: quote.walletId,
+            type: "to_treasury",
+            chain: "near",
+            usdcAmount: -quote.amountIn,
+            txHash: null,
+            blockNumber: null,
+            counterpartyAddress: quote.depositAddress,
+            treasuryMoveId: moveId,
+            intentQuoteId: quote.id,
+          })
+          .onConflictDoNothing()
+          .returning({ id: walletTransactions.id }),
+      );
+      let credited = false;
+      if (refunded && refundedAmount !== null) {
+        const [credit] = yield* query(() =>
+          tx
+            .insert(walletTransactions)
+            .values({
+              organizationId,
+              walletId: quote.walletId,
+              type: "from_treasury",
+              chain: "near",
+              usdcAmount: refundedAmount,
+              txHash: null,
+              blockNumber: null,
+              counterpartyAddress: null,
+              treasuryMoveId: moveId,
+              intentQuoteId: quote.id,
+            })
+            .onConflictDoNothing()
+            .returning({ id: walletTransactions.id }),
+        );
+        if (credit) {
+          credited = true;
+          yield* audit.record(tx, {
+            actor: ACTOR,
+            organizationId,
+            action: "wallet.treasury_returned",
+            entity: { type: "wallet_transaction", id: credit.id },
+            after: {
+              treasuryMoveId: moveId,
+              treasuryQuoteId: quote.id,
+              treasuryQuotePurpose: quote.purpose,
+              walletId: quote.walletId,
+              chain: "near",
+              usdcAmount: refundedAmount,
+              source: "one_click_refunded",
+            },
+          });
+        }
+      }
+      return debit.length > 0 || credited;
+    }),
+  );
+}
+
+/**
+ * The part's debit, written once: a quote has at most one `to_treasury`
+ * row. For a part paid by a transfer on chain it is written as soon as the
+ * company wallet's send is known to have run, which is before anything of
+ * this quote can be refunded and credited back. A part paid out of a
+ * confidential account follows `recordIntentOutcome` instead, chosen by the
+ * quote's own columns and never by the company's `balance_home` now.
  */
 function recordDebit(
   snap: Snapshot,
   quote: IntentQuote,
-): Effect.Effect<boolean, DatabaseError, DatabaseService> {
+): Effect.Effect<boolean, DatabaseError, DatabaseService | AuditLog> {
+  if (isIntentPaid(quote)) return recordIntentOutcome(snap, quote);
   const { organizationId, id: moveId } = snap.move;
   const sendId = quote.companyWalletSendId;
   if (sendId === null || quote.depositTxHash === null) {
@@ -356,13 +466,20 @@ function depositPart(
 
 /**
  * 1Click refunded a part: the USDC is back in the company wallet, and the
- * deposit watcher credits it as `from_treasury`. The move ends `returned`
+ * deposit watcher credits it as `from_treasury` (a part paid from a
+ * confidential account had its refund credited with its debit). The move ends `returned`
  * only once that credit is in the ledger, so the ledger never lags a move
  * that says its money is home.
  */
 function endWhenRefundCredited(snap: Snapshot, quote: IntentQuote) {
   const { organizationId, id } = snap.move;
   return Effect.gen(function* () {
+    if (isIntentPaid(quote) && refundUnusable(quote)) {
+      return yield* needsReview(
+        snap,
+        "1Click refunded a part paid from the confidential account without saying how much came back. Nothing was written to the ledger. Check the account before doing anything.",
+      );
+    }
     const totals = yield* withScope({ organizationId }, (tx) =>
       totalsOf(tx, id),
     );
@@ -407,8 +524,16 @@ export function stepTreasuryMove(
     if (snap.returns.length > 0) return yield* stepStranded(snap);
     const quote = snap.quotes.at(-1);
 
-    // A send that ran but wasn't debited yet: the ledger comes first.
-    if (quote?.companyWalletSendId != null && !snap.debited.has(quote.id)) {
+    // A send that ran, or a part paid out of a confidential account that
+    // 1Click has settled, and isn't debited yet: the ledger comes first.
+    if (
+      quote !== undefined &&
+      !snap.debited.has(quote.id) &&
+      (quote.companyWalletSendId !== null ||
+        (isIntentPaid(quote) &&
+          (quote.status === "succeeded" ||
+            (quote.status === "refunded" && !refundUnusable(quote)))))
+    ) {
       return (yield* recordDebit(snap, quote)) ? moved(move) : idle(move);
     }
 

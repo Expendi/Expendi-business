@@ -6,6 +6,8 @@ Every company's money sits as USDC in its own company wallet on NEAR. We chose t
 
 Cash-outs still need Base. Paycrest takes USDC on Base and refunds to a Base address, so each company also has a transit wallet on Base. A cash-out first moves the exact amount from the company wallet to the transit wallet (the Base hop, through NEAR Intents), then pays Paycrest from the transit wallet with the code path that existed before the port. Refunds land in the transit wallet and are swept back.
 
+_Added 2026-11-13: for a company with a confidential account, the reason given above for a public company wallet no longer holds. See `confidential-accounts.md`._
+
 Terms are defined in `CONTEXT.md`.
 
 ## What was proved

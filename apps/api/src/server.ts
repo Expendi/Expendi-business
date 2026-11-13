@@ -9,9 +9,11 @@ import { cardReceiptRemindersJob } from "./station/card-receipt-reminders.js";
 import { cardSimulationsJob } from "./station/card-simulations.js";
 import { closeCardsJob } from "./station/close-cards.js";
 import { confirmOnchainJob } from "./station/confirm-onchain.js";
+import { feeCoversJob } from "./station/fee-covers.js";
 import { fundInReturnsJob } from "./station/fund-in-returns.js";
 import { fundInsJob } from "./station/fund-ins.js";
 import { monthlyExportJob } from "./station/monthly-export.js";
+import { moveInsJob } from "./station/move-ins.js";
 import { nearDepositsJob } from "./station/near-deposits.js";
 import {
   outboundQuotesJob,
@@ -65,6 +67,8 @@ const stopStation = startStation(
     nearDepositsJob,
     fundInsJob,
     fundInReturnsJob,
+    moveInsJob,
+    feeCoversJob,
     outboundQuotesJob,
     sweepTransitWalletsJob,
     treasuryMovesJob,

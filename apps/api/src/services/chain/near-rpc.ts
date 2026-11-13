@@ -46,6 +46,11 @@ export interface NearRpcShape {
     accountId: string,
     tokenIds: readonly string[],
   ) => Effect.Effect<readonly bigint[], NearRpcError>;
+  /**
+   * The NEAR Intents contract's `current_salt`, the four bytes a versioned
+   * nonce must carry for the contract to accept it.
+   */
+  readonly intentsSalt: () => Effect.Effect<Uint8Array, NearRpcError>;
   /** The latest block that can no longer be reverted. */
   readonly finalBlock: () => Effect.Effect<NearBlock, NearRpcError>;
   /**
@@ -378,6 +383,19 @@ export function makeNearRpc(
                   );
             }),
           ),
+
+    intentsSalt: () =>
+      viewContract(intentsContractId, "current_salt", {}).pipe(
+        Effect.flatMap((salt) => {
+          const parsed = z
+            .string()
+            .regex(/^[0-9a-f]{8}$/)
+            .safeParse(salt);
+          return parsed.success
+            ? Effect.succeed(Uint8Array.from(Buffer.from(parsed.data, "hex")))
+            : Effect.fail(malformed("query current_salt", parsed.error));
+        }),
+      ),
 
     finalBlock: () => block({ finality: "final" }),
 

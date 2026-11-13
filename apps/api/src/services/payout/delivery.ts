@@ -18,7 +18,9 @@ import {
   advanceCompanyQuote,
   openCompanyQuote,
 } from "../intents/quote-deposit.js";
+import { isIntentPaid } from "../intents/quote-intent.js";
 import { isPaused, lockPayout } from "./guards.js";
+import { prepareRecipient } from "./near-recipient.js";
 import { applyPayoutOutcome } from "./subjects.js";
 import { failPayout, movePayout, reviewPayout } from "./transitions.js";
 
@@ -29,6 +31,12 @@ import { failPayout, movePayout, reviewPayout } from "./transitions.js";
  * approved USDC on the payee chain. Expendi's gas relayer covers what the
  * quote costs beyond that, as it does for a Base hop.
  *
+ * A company whose USDC is kept in a confidential account pays every payee
+ * this way, one on NEAR included, but out of the account by a signed message
+ * (`quote-intent.ts`) instead of a transfer on chain. Nothing is debited
+ * when the message is accepted: a 200 from 1Click isn't proof it ran. The
+ * ledger is written at the quote's outcome (`settleIntentDelivery`).
+ *
  * The payout follows its quote (`delivery_quote_id`):
  *
  * - `approved`: the quote is saved, nothing has left the company wallet;
@@ -37,7 +45,9 @@ import { failPayout, movePayout, reviewPayout } from "./transitions.js";
  * - `paying`: the deposit ran. The ledger is debited here, as for a payee
  *   on NEAR once the company wallet's send has run;
  * - `paid`: 1Click reports the delivery, and its transaction on the payee
- *   chain is the payout's reference;
+ *   chain is the payout's reference (for a payout paid out of a
+ *   confidential account it is never `paying`: the debit and `paid` come
+ *   together, from `funding`);
  * - `failed`: nothing was sent, or 1Click refunded the deposit to the
  *   company wallet, in which case the debit is credited back;
  * - `needs_review`: where the deposit is isn't certain.
@@ -254,6 +264,123 @@ function recordRefunded(
 }
 
 /**
+ * 1Click delivered a payout paid out of a confidential account: in one
+ * transaction the payout is `paid` and debited for exactly the approved
+ * USDC. What the quote cost on top came out of Expendi's float. No chain
+ * transaction of the company's is involved, so the ledger row carries no
+ * hash; the payee chain's transaction is the payout's reference.
+ */
+function recordDelivered(
+  payout: Payout,
+  quote: IntentQuote,
+): Effect.Effect<Payout, DatabaseError, DatabaseService | AuditLog> {
+  const { id, organizationId } = payout;
+  return withScope({ organizationId }, (tx) =>
+    Effect.gen(function* () {
+      const audit = yield* AuditLog;
+      const locked = yield* lockPayout(tx, id);
+      if (locked?.status !== "funding") {
+        return locked ?? (yield* Effect.dieMessage(`payout ${id} vanished`));
+      }
+      const reference = quote.destinationChainTxHashes[0] ?? null;
+      const [paid] = yield* query(() =>
+        tx
+          .update(payouts)
+          .set({
+            status: "paid",
+            paidAt: new Date(),
+            providerReference: reference,
+            providerCheckedAt: new Date(),
+          })
+          .where(eq(payouts.id, id))
+          .returning(),
+      );
+      if (!paid) return yield* Effect.dieMessage(`payout ${id} vanished`);
+      const amount = paid.amountToTransferUsdc ?? paid.quotedUsdc;
+      yield* query(() =>
+        tx.insert(walletTransactions).values({
+          organizationId,
+          walletId: paid.walletId,
+          type: paid.subjectType === "withdrawal" ? "withdrawal" : "payout",
+          chain: "near",
+          usdcAmount: -amount,
+          counterpartyAddress: paid.depositAddress,
+          payoutId: id,
+        }),
+      );
+      yield* audit.record(tx, {
+        actor: ACTOR,
+        organizationId,
+        action: "payout.paid",
+        entity: { type: "payout", id },
+        before: { status: "funding" },
+        after: {
+          status: paid.status,
+          providerReference: reference,
+          amount,
+          deliveryQuoteId: quote.id,
+        },
+      });
+      yield* applyPayoutOutcome(tx, paid);
+      return paid;
+    }),
+  );
+}
+
+/**
+ * Applies where a quote paid out of a confidential account stands to its
+ * payout. The payout is `funding` from the moment the deposit may start, and
+ * nothing is debited until 1Click reports the outcome:
+ *
+ * - `succeeded`: debited and `paid`, together (`recordDelivered`);
+ * - `refunded`: `failed`. The refund went back into the account, so the
+ *   ledger never moved and there is nothing to credit;
+ * - `expired`, `failed`: `failed`, nothing moved;
+ * - `needs_review`: `needs_review`, still reserving the payout's USDC. A late
+ *   `SUCCESS` or `REFUNDED` settles the quote but not the payout: staff hand
+ *   it back to `funding`, and this applies the outcome.
+ */
+function settleIntentDelivery(
+  payout: Payout,
+  quote: IntentQuote,
+): Effect.Effect<Payout, DatabaseError, DatabaseService | AuditLog> {
+  return Effect.gen(function* () {
+    if (payout.status !== "approved" && payout.status !== "funding") {
+      return payout;
+    }
+    const failure = quote.failure ?? "The payment couldn't be sent.";
+    const nothingSent = /nothing (?:was sent|moved)\.$/i.test(failure)
+      ? failure
+      : `${failure} Nothing was sent.`;
+    switch (quote.status) {
+      case "succeeded":
+        return payout.status === "funding"
+          ? yield* recordDelivered(payout, quote)
+          : payout;
+      case "refunded":
+        return yield* failPayout(
+          payout,
+          "NEAR Intents refunded the payment: the USDC is back in the company's account. Nothing was sent.",
+          ACTOR,
+        );
+      case "expired":
+      case "failed":
+        return yield* failPayout(payout, nothingSent, ACTOR);
+      case "needs_review":
+        return payout.status === "funding"
+          ? yield* reviewPayout(
+              payout,
+              `The payment's outcome is unclear (quote ${quote.id}): ${quote.failure ?? "check NEAR Intents."} Never send again before it is resolved.`,
+              ACTOR,
+            )
+          : payout;
+      default:
+        return payout;
+    }
+  });
+}
+
+/**
  * Applies where a delivery quote stands to its payout. Only reads the
  * quote and updates records; safe to repeat.
  */
@@ -263,6 +390,7 @@ export function settleDelivery(
   return Effect.gen(function* () {
     let payout = yield* payoutOfQuote(quote);
     if (payout === null) return null;
+    if (isIntentPaid(quote)) return yield* settleIntentDelivery(payout, quote);
     const nothingSent = `${quote.failure ?? "The payment couldn't be sent."}${quote.failure?.endsWith("Nothing was sent.") ? "" : " Nothing was sent."}`;
     const unclear = `The payment's outcome is unclear (quote ${quote.id}): ${quote.failure ?? "check NEAR Intents."} Never send again before it is resolved.`;
 
@@ -318,11 +446,16 @@ export function continueDelivery(
 }
 
 /**
- * Pays an approved USDC payout to its payee on Base or Solana. Takes the
- * delivery quote (one per payout, keyed by the payout), then moves it as
- * far as it goes within this call; the job follows the rest. A quote that
- * can't be taken fails the payout with nothing sent. The payout comes back
- * as it now stands.
+ * Pays an approved USDC payout to its payee through a delivery quote (one
+ * per payout, keyed by the payout), then moves it as far as it goes within
+ * this call; the job follows the rest. A payee on Base or Solana, and every
+ * payee of a company whose USDC is kept in a confidential account, are paid
+ * this way. A quote that can't be taken fails the payout with nothing sent.
+ * The payout comes back as it now stands.
+ *
+ * A payee on NEAR must be able to hold USDC before the quote is taken, as
+ * for a direct transfer: a payout to a named account the USDC contract
+ * doesn't know fails here, before anything is signed.
  */
 export function deliverUsdcPayout(
   payout: Payout,
@@ -330,14 +463,29 @@ export function deliverUsdcPayout(
   const { organizationId } = payout;
   return Effect.gen(function* () {
     const recipient = payout.recipient;
-    if (
-      payout.status !== "approved" ||
-      recipient.method !== "usdc" ||
-      recipient.chain === "near"
-    ) {
+    if (payout.status !== "approved" || recipient.method !== "usdc") {
       return yield* Effect.dieMessage(
-        `payout ${payout.id} isn't an approved USDC payout to another chain`,
+        `payout ${payout.id} isn't an approved USDC payout`,
       );
+    }
+    if (recipient.chain === "near") {
+      const prepared = yield* prepareRecipient(recipient.address).pipe(
+        Effect.either,
+      );
+      if (prepared._tag === "Left") {
+        console.warn(
+          `[payout] couldn't prepare ${recipient.address} to receive payout ${payout.id}`,
+          prepared.left.message,
+        );
+        return yield* failPayout(
+          payout,
+          `${recipient.address} couldn't be registered to receive USDC on NEAR. Nothing was sent.`,
+          ACTOR,
+        );
+      }
+      if (prepared.right !== null) {
+        return yield* failPayout(payout, prepared.right, ACTOR);
+      }
     }
     const opened = yield* openCompanyQuote({
       organizationId,

@@ -52,6 +52,13 @@ export interface InvoicePdfPayment {
   readonly chain: FundInChain | null;
   /** The NEAR transaction that credited the company wallet. */
   readonly txHash: string | null;
+  /**
+   * The payer's own transaction on `chain`, for a payment into a
+   * confidential account, which has no NEAR transaction to show. Never
+   * linked: its chain's explorer isn't known to be right. Set only when
+   * `txHash` is null.
+   */
+  readonly payerTxHash?: string | null;
 }
 
 export interface InvoicePdfData {
@@ -74,6 +81,7 @@ function readPayment(target: {
           paidOn: invoicePayments.paidOn,
           amountUsdc: invoicePayments.amountUsdc,
           originAsset: intentQuotes.originAsset,
+          originTxHashes: intentQuotes.originChainTxHashes,
           txHash: walletTransactions.txHash,
         })
         .from(invoicePayments)
@@ -104,6 +112,10 @@ function readPayment(target: {
             chain:
               row.originAsset === null ? null : chainOfAsset(row.originAsset),
             txHash: row.txHash,
+            ...(row.txHash === null &&
+              row.originTxHashes?.[0] !== undefined && {
+                payerTxHash: row.originTxHashes[0],
+              }),
           },
     ),
   );
@@ -434,6 +446,10 @@ export function renderInvoicePdf(
         details.push({
           text: `NEAR transaction ${payment.txHash}`,
           link: nearTransactionUrl(payment.txHash),
+        });
+      } else if (payment.payerTxHash && payment.chain !== null) {
+        details.push({
+          text: `${FUND_IN_CHAIN_NAMES[payment.chain]} transaction ${payment.payerTxHash}`,
         });
       }
     }

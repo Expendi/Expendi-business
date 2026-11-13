@@ -1,6 +1,14 @@
 import { eq } from "drizzle-orm";
 import pg from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 
 import type { Database } from "../../db/client.js";
 import type { OneClickStatus } from "../../db/schema/index.js";
@@ -15,14 +23,24 @@ import {
   walletTransactions,
 } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
+import { invoiceReceiptEmail } from "../../services/email/invoice-receipt-email.js";
 import { nairobiToday } from "../../services/expenses/rules.js";
 import { refreshOpenFundIns } from "../../services/intents/fund-in.js";
-import { quoteForPayment } from "../../services/invoices/pay-link.js";
+import { creditSettledQuotes } from "../../services/intents/quote-credit.js";
+import {
+  getPayQuote,
+  quoteForPayment,
+} from "../../services/invoices/pay-link.js";
 import {
   NEAR_INTENTS_ACCOUNT_ID,
   watchNearDeposits,
 } from "../../services/wallet/near-deposits.js";
-import { makeFakeEmailSender } from "../helpers/fakes.js";
+import {
+  createDeliveryCompany,
+  settleOpenQuotes,
+  switchBalanceHome,
+} from "../helpers/confidential-delivery.js";
+import { makeFakeEmailSender, makeFakePrivyWallets } from "../helpers/fakes.js";
 import { makeFakeFastNear } from "../helpers/fast-near.js";
 import {
   asAdmin,
@@ -50,6 +68,7 @@ const rpc = makeFakeNearRpc();
 const fastNear = makeFakeFastNear();
 const oneClick = makeFakeOneClick();
 const email = makeFakeEmailSender();
+const privy = makeFakePrivyWallets();
 let runtime: AppRuntime;
 let db: Database;
 let owner: pg.Pool;
@@ -62,6 +81,7 @@ beforeAll(async () => {
       fastNear: fastNear.layer,
       oneClick: oneClick.layer,
       emailSender: email.layer,
+      privyWallets: privy.layer,
     },
     { DASHBOARD_ORIGINS: DASHBOARD_ORIGIN },
   );
@@ -534,5 +554,270 @@ describe("refreshOpenFundIns and invoice payment quotes", () => {
       status: (await readQuote(db, funded, quote.id)).status,
       settled: summary.settled,
     }).toEqual({ status: "expired", settled: 1 });
+  });
+});
+
+describe("invoiceReceiptEmail", () => {
+  const receipt = {
+    to: "ap@customer.test",
+    invoiceNumber: "INV-1",
+    companyName: "Acme",
+    amountUsdc: 100_000_000n,
+    chainName: "Base",
+    paidOn: "2026-11-13",
+    paymentId: "payment-1",
+    pdfUrl: "https://business.expendi.test/pay/abc/pdf",
+  };
+
+  it("names the transaction when a chain shows the delivery", () => {
+    // #when
+    const message = invoiceReceiptEmail({
+      ...receipt,
+      transactionUrl: "https://nearblocks.io/txns/abc",
+    });
+
+    // #then
+    expect(message.text).toBe(
+      [
+        "Acme received your payment for invoice INV-1.",
+        "Amount: 100.00 USDC",
+        "Paid from: Base",
+        "Date: 2026-11-13",
+        "Transaction: https://nearblocks.io/txns/abc",
+        "",
+        "Keep this email as your receipt.",
+        "Download receipt (PDF): https://business.expendi.test/pay/abc/pdf",
+        "",
+      ].join("\n"),
+    );
+    expect(message.html).toContain("View the transaction on NEAR");
+  });
+
+  it("has no transaction line when no chain shows the delivery", () => {
+    // #when
+    const message = invoiceReceiptEmail({ ...receipt, transactionUrl: null });
+
+    // #then
+    expect(message.text).toBe(
+      [
+        "Acme received your payment for invoice INV-1.",
+        "Amount: 100.00 USDC",
+        "Paid from: Base",
+        "Date: 2026-11-13",
+        "",
+        "Keep this email as your receipt.",
+        "Download receipt (PDF): https://business.expendi.test/pay/abc/pdf",
+        "",
+      ].join("\n"),
+    );
+    expect(message.html).not.toContain("transaction");
+  });
+});
+
+describe("an invoice payment quote of a company with a confidential account", () => {
+  const refresh = () => runtime.runPromise(refreshOpenFundIns());
+
+  afterEach(async () => {
+    await settleOpenQuotes(db, funded);
+  });
+
+  const callsFor = (depositAddress: string, call: string) =>
+    oneClick.state.calls.filter(
+      (entry) => entry.depositAddress === depositAddress && entry.call === call,
+    );
+
+  it("is quoted for delivery to the confidential account with the company's session, the rest unchanged", async () => {
+    // #given
+    funded = await createDeliveryCompany(db, privy);
+    const invoice = await openInvoice();
+    const before = oneClick.state.quoteRequests.length;
+    const callsBefore = oneClick.state.calls.length;
+
+    // #when
+    const quote = await takeQuote(invoice.publicId, "base");
+
+    // #then
+    const [request] = oneClick.state.quoteRequests.slice(before);
+    const [call] = oneClick.state.calls.slice(callsBefore);
+    expect({
+      request: {
+        recipient: request?.recipient,
+        recipientType: request?.recipientType,
+        refundTo: request?.refundTo,
+        refundType: request?.refundType,
+        swapType: request?.swapType,
+        amount: request?.amount,
+      },
+      sessionSent: call?.session !== undefined,
+      saved: {
+        recipientType: quote.recipientType,
+        refundType: quote.refundType,
+        depositType: quote.depositType,
+        purpose: quote.purpose,
+      },
+    }).toEqual({
+      request: {
+        recipient: funded.accountId,
+        recipientType: "CONFIDENTIAL_INTENTS",
+        refundTo: funded.accountId,
+        refundType: "INTENTS",
+        swapType: "EXACT_INPUT",
+        amount: 100_000_000n,
+      },
+      sessionSent: true,
+      saved: {
+        recipientType: "CONFIDENTIAL_INTENTS",
+        refundType: "INTENTS",
+        depositType: "ORIGIN_CHAIN",
+        purpose: "invoice_payment",
+      },
+    });
+  });
+
+  it("is quoted for a company wallet's invoice exactly as before: no recipient type, no session", async () => {
+    // #given
+    funded = await createDeliveryCompany(db, privy, "company_wallet");
+    const invoice = await openInvoice();
+    const before = oneClick.state.quoteRequests.length;
+    const callsBefore = oneClick.state.calls.length;
+
+    // #when
+    const quote = await takeQuote(invoice.publicId, "base");
+
+    // #then
+    const [request] = oneClick.state.quoteRequests.slice(before);
+    const [call] = oneClick.state.calls.slice(callsBefore);
+    expect({
+      hasRecipientType: request !== undefined && "recipientType" in request,
+      session: call?.session,
+      saved: quote.recipientType,
+      signIns: oneClick.state.signIns.filter(
+        (signer) => signer === funded.accountId,
+      ),
+    }).toEqual({
+      hasRecipientType: false,
+      session: undefined,
+      saved: "DESTINATION_CHAIN",
+      signIns: [],
+    });
+  });
+
+  it("is asked about with the session when the customer's page polls it", async () => {
+    // #given
+    funded = await createDeliveryCompany(db, privy);
+    const invoice = await openInvoice();
+    const quote = await takeQuote(invoice.publicId, "base");
+    await runInScope(
+      db,
+      { organizationId: funded.company.organizationId },
+      (tx) =>
+        tx
+          .update(intentQuotes)
+          .set({ oneClickCheckedAt: new Date(Date.now() - 60_000) })
+          .where(eq(intentQuotes.id, quote.id)),
+    );
+
+    // #when
+    await runtime.runPromise(getPayQuote(invoice.publicId ?? "", quote.id));
+
+    // #then
+    expect(
+      callsFor(quote.depositAddress, "status").map(
+        (call) => call.session !== undefined,
+      ),
+    ).toEqual([true]);
+  });
+
+  it("is credited once, at settlement, and never again by the deposit watcher", async () => {
+    // #given
+    funded = await createDeliveryCompany(db, privy);
+    const invoice = await openInvoice();
+    const quote = await takeQuote(invoice.publicId, "base");
+    oneClick.state.deliverConfidential(quote.depositAddress, quote.amountOut);
+    await refresh();
+    await runtime.runPromise(creditSettledQuotes());
+    const stray = nearOutcome(
+      [
+        {
+          executorId: TEST_USDC_CONTRACT,
+          logs: [
+            ftTransferLog([
+              {
+                from: NEAR_INTENTS_ACCOUNT_ID,
+                to: funded.accountId,
+                amount: quote.amountOut,
+              },
+            ]),
+          ],
+        },
+      ],
+      { signerId: NEAR_INTENTS_ACCOUNT_ID },
+    );
+    oneClick.state.setStatus(quote.depositAddress, {
+      status: "SUCCESS",
+      depositedAmount: quote.amountIn,
+      amountOut: quote.amountOut,
+      destinationChainTxHashes: [stray.txHash],
+    });
+    rpc.state.outcomes.set(stray.txHash, stray);
+    fastNear.state.index(funded.accountId, stray);
+    await runInScope(
+      db,
+      { organizationId: funded.company.organizationId },
+      (tx) =>
+        tx
+          .update(intentQuotes)
+          .set({ destinationChainTxHashes: [stray.txHash] })
+          .where(eq(intentQuotes.id, quote.id)),
+    );
+
+    // #when
+    const summary = await watch();
+
+    // #then
+    expect({
+      credited: summary.credited,
+      internal: summary.internal >= 1,
+      ledger: (await ledgerOf(db, funded)).map((row) => row.usdcAmount),
+      payments: (await paymentsOf(invoice.invoiceId)).length,
+      receipts: email.state.sent.length,
+    }).toEqual({
+      credited: 0,
+      internal: true,
+      ledger: [quote.amountOut],
+      payments: 1,
+      receipts: 1,
+    });
+  });
+
+  it("is credited by the deposit watcher, not at settlement, once the company is switched after the quote", async () => {
+    // #given
+    funded = await createDeliveryCompany(db, privy, "company_wallet");
+    const invoice = await openInvoice();
+    const quote = await takeQuote(invoice.publicId, "base");
+    await switchBalanceHome(db, funded, "confidential_account");
+    delivered(quote);
+
+    // #when
+    await refresh();
+    await runtime.runPromise(creditSettledQuotes());
+    const atSettlement = await ledgerOf(db, funded);
+    await watch();
+
+    // #then
+    const [credit] = await ledgerOf(db, funded);
+    expect({
+      atSettlement,
+      credit: {
+        usdcAmount: credit?.usdcAmount,
+        intentQuoteId: credit?.intentQuoteId,
+      },
+      invoice: (await readInvoice(db, funded.company, invoice.invoiceId))
+        .status,
+    }).toEqual({
+      atSettlement: [],
+      credit: { usdcAmount: quote.amountOut, intentQuoteId: null },
+      invoice: "paid",
+    });
   });
 });

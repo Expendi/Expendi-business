@@ -5,10 +5,12 @@ import type { DatabaseService } from "../../db/client.js";
 import type { IntentQuote } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
 import type { BaseRpc } from "../chain/base-rpc.js";
+import type { ConfidentialAccounts } from "./confidential-account.js";
 import { intentQuotes, treasuryMoves, wallets } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { baseUsdcBalance } from "../chain/base-rpc.js";
 import { PrivyWallets } from "../wallet/privy-wallets.js";
+import { sessionForQuote } from "./company-session.js";
 import { OneClick } from "./one-click.js";
 import { DEPOSIT_MARGIN_MS } from "./quote-deposit.js";
 import { moveQuote, quoteById, settleFromOneClick } from "./quote-settle.js";
@@ -18,11 +20,17 @@ import { moveQuote, quoteById, settleFromOneClick } from "./quote-settle.js";
  * "Move to wallet"): the Treasury wallet sends the part to the quote's
  * deposit address through Privy, as the transit wallet pays a sweep, then
  * 1Click's status settles the quote. A part is never a ledger entry itself:
- * its delivery to the company wallet is, once the deposit watcher confirms it.
+ * its delivery to the company wallet is, once the deposit watcher confirms it,
+ * or, for a part delivered into a confidential account, once 1Click reports
+ * it `SUCCESS` (`quote-credit.ts`).
+ *
+ * 1Click reports a part that delivers into a confidential account only to the
+ * company's session, so such a part never starts, and is never settled,
+ * without one.
  */
 
 export type TreasuryReturnDeps =
-  DatabaseService | OneClick | BaseRpc | PrivyWallets;
+  DatabaseService | OneClick | BaseRpc | PrivyWallets | ConfidentialAccounts;
 
 /** The key Privy replays rather than repeats, one per quote. */
 export const treasuryReturnSendKey = (quoteId: string): string =>
@@ -102,6 +110,13 @@ export function advanceTreasuryReturnQuote(
   const { organizationId } = input;
   return Effect.gen(function* () {
     let quote = yield* quoteById(organizationId, input.id);
+    const signIn = sessionForQuote(quote).pipe(
+      Effect.map((session) => ({ session })),
+      Effect.catchIf(
+        (error) => error._tag !== "DatabaseError",
+        () => Effect.succeed(null),
+      ),
+    );
     const reread = quoteById(organizationId, quote.id);
     const untouched = and(
       eq(intentQuotes.status, "quoted"),
@@ -131,6 +146,7 @@ export function advanceTreasuryReturnQuote(
         Effect.either,
       );
       if (held._tag === "Left" || held.right < quote.amountIn) return quote;
+      if ((yield* signIn) === null) return quote;
 
       const started = yield* moveQuote(quote, untouched, {
         status: "depositing",
@@ -188,10 +204,13 @@ export function advanceTreasuryReturnQuote(
     if (quote.status !== "depositing" && quote.status !== "needs_review") {
       return quote;
     }
+    const signedIn = yield* signIn;
+    if (signedIn === null) return quote;
+    const { session } = signedIn;
     if (quote.depositTxHash !== null && quote.depositSubmittedAt === null) {
       const oneClick = yield* OneClick;
       const told = yield* oneClick
-        .submitDeposit(quote.depositAddress, quote.depositTxHash)
+        .submitDeposit(quote.depositAddress, quote.depositTxHash, session)
         .pipe(Effect.either);
       if (told._tag === "Right") {
         yield* moveQuote(quote, isNull(intentQuotes.depositSubmittedAt), {
@@ -200,6 +219,6 @@ export function advanceTreasuryReturnQuote(
         quote = yield* reread;
       }
     }
-    return yield* settleFromOneClick(quote);
+    return yield* settleFromOneClick(quote, session);
   });
 }

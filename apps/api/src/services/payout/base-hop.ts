@@ -5,6 +5,7 @@ import type { DatabaseService } from "../../db/client.js";
 import type { IntentQuote, Payout } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
 import type { AuditLog } from "../audit/audit-log.js";
+import type { ConfidentialAccounts } from "../intents/confidential-account.js";
 import type { OneClick } from "../intents/one-click.js";
 import type { QuoteDepositDeps } from "../intents/quote-deposit.js";
 import { intentQuotes, payouts, wallets } from "../../db/schema/index.js";
@@ -14,6 +15,7 @@ import {
   openCompanyQuote,
   STABLECOIN_SLIPPAGE_BPS,
 } from "../intents/quote-deposit.js";
+import { isIntentPaid } from "../intents/quote-intent.js";
 import { isPaused } from "./guards.js";
 import { failPayout, reviewPayout } from "./transitions.js";
 
@@ -107,7 +109,11 @@ const waitingForHop = and(
 export function planBaseHops(input: {
   readonly organizationId: string;
   readonly payoutIds: readonly string[];
-}): Effect.Effect<void, DatabaseError, DatabaseService | AuditLog | OneClick> {
+}): Effect.Effect<
+  void,
+  DatabaseError,
+  DatabaseService | AuditLog | OneClick | ConfidentialAccounts
+> {
   const { organizationId } = input;
   return Effect.gen(function* () {
     if (input.payoutIds.length === 0) return;
@@ -277,7 +283,9 @@ export function settleHopPayouts<R>(input: {
         case "refunded":
           yield* failPayout(
             payout,
-            "NEAR Intents refunded the Base hop: the USDC is back in the company wallet. Nothing was sent.",
+            isIntentPaid(quote)
+              ? "NEAR Intents refunded the Base hop: the USDC is back in the company's confidential account. Nothing was sent."
+              : "NEAR Intents refunded the Base hop: the USDC is back in the company wallet. Nothing was sent.",
             ACTOR,
           );
           break;

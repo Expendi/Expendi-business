@@ -230,9 +230,12 @@ const MONEY_MOVING_MODULES = [
 
 /**
  * Privy's send, Paycrest's order creation, and Pretium's pay and refund
- * (Pretium is told to pay, or to refund, after the USDC is already sent).
+ * (Pretium is told to pay, or to refund, after the USDC is already sent),
+ * and the intents that pay out of a confidential account: staff code must
+ * never generate, sign or submit one, least of all a saved one.
  */
-const MONEY_MOVING_CALL = /\.(sendUsdc|createOrder|pay|refund)\s*\(/;
+const MONEY_MOVING_CALL =
+  /\.(sendUsdc|createOrder|pay|refund|generateIntent|signIntent|submitIntent)\s*\(/;
 
 /**
  * Whether `source` calls money-moving code. Comment lines are left out,

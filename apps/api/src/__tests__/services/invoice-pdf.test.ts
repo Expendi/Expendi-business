@@ -170,6 +170,56 @@ describe("renderInvoicePdf", () => {
     expect(texts).not.toContain("PAY IN USDC");
   });
 
+  it("shows a payment into a confidential account by the payer's own transaction, unlinked", async () => {
+    // #given the credit has no NEAR transaction
+    const payerTxHash = `0x${"e".repeat(64)}`;
+    const data = {
+      invoice: invoiceOf({ status: "paid", canPay: false }),
+      payUrl: null,
+      payment: {
+        paidOn: "2026-11-12",
+        amountUsdc: 5_800_000_000n,
+        chain: "base" as const,
+        txHash: null,
+        payerTxHash,
+      },
+    };
+
+    // #when
+    const { bytes, texts } = await render(data);
+
+    // #then
+    expect(texts).toContain(`Base transaction ${payerTxHash}`);
+    expect(texts.some((text) => text.startsWith("NEAR transaction"))).toBe(
+      false,
+    );
+    expect(bytes.toString("latin1")).not.toContain("/URI");
+  });
+
+  it("shows only the NEAR transaction when the credit has one, whatever the payer's", async () => {
+    // #given
+    const data = {
+      invoice: invoiceOf({ status: "paid", canPay: false }),
+      payUrl: null,
+      payment: {
+        paidOn: "2026-11-12",
+        amountUsdc: 5_800_000_000n,
+        chain: "base" as const,
+        txHash: TX_HASH,
+        payerTxHash: null,
+      },
+    };
+
+    // #when
+    const { texts } = await render(data);
+
+    // #then
+    expect(texts).toContain(`NEAR transaction ${TX_HASH}`);
+    expect(texts.some((text) => text.startsWith("Base transaction"))).toBe(
+      false,
+    );
+  });
+
   it("stamps a paid invoice settled outside Expendi PAID without chain details", async () => {
     // #given
     const data = {

@@ -3,7 +3,7 @@ import type {
   PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/server";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
-import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { Cause, Data, Effect, Option, Redacted } from "effect";
 
 import type {
@@ -21,6 +21,7 @@ import type { DatabaseError } from "../../src/errors.js";
 import type { AppDeps } from "../../src/layers/main.js";
 import type { Tenant } from "../../src/middleware/tenant.js";
 import type { StrandedReturn } from "../../src/services/treasury/stranded.js";
+import type { BalanceReconciliation } from "../../src/services/wallet/reconcile.js";
 import { ConfigService } from "../../src/config.js";
 import { DatabaseService } from "../../src/db/client.js";
 import {
@@ -29,7 +30,6 @@ import {
   memberships,
   opsAlerts,
   organizations,
-  payouts,
   treasuryEarnActions,
   treasuryMoves,
   users,
@@ -43,8 +43,6 @@ import {
   finishPasskeyEnrolment,
   startPasskeyEnrolment,
 } from "../../src/services/approval/passkeys.js";
-import { baseUsdcBalance } from "../../src/services/chain/base-rpc.js";
-import { NearRpc } from "../../src/services/chain/near-rpc.js";
 import { getTreasuryStatus } from "../../src/services/treasury/figures.js";
 import {
   listTreasuryMoves,
@@ -59,8 +57,8 @@ import {
   earnVaultId,
   startTurnOnTreasuryConfirmation,
 } from "../../src/services/treasury/turn-on.js";
-import { ledgerBalance } from "../../src/services/wallet/ledger.js";
 import { PrivyWallets } from "../../src/services/wallet/privy-wallets.js";
+import { reconcileBalances } from "../../src/services/wallet/reconcile.js";
 import { SoftwarePasskey } from "./software-passkey.js";
 
 /**
@@ -581,152 +579,18 @@ export const inspect = (
     };
   });
 
-export interface Reconciliation {
-  readonly ledgerUsdc: bigint;
-  /** What the company wallet holds on NEAR now. */
-  readonly nearUsdc: bigint | null;
-  /** What the transit wallet holds on Base now. */
-  readonly baseUsdc: bigint | null;
-  /** On chain less the ledger; null if a chain couldn't be read. */
-  readonly differenceUsdc: bigint | null;
-  /** Reasons the two can legitimately differ right now. */
-  readonly inFlight: readonly string[];
-  readonly errors: readonly string[];
-}
-
-/** A Treasury move that settled this recently may still be waiting to be credited. */
-const CREDIT_WINDOW_MINUTES = 30;
+export type Reconciliation = BalanceReconciliation;
 
 export const reconcile = (
   options: QaOptions,
 ): Effect.Effect<Reconciliation, unknown, AppDeps> =>
-  Effect.gen(function* () {
-    const { organizationId } = options;
-    const read = yield* withScope({ organizationId }, (tx) =>
-      Effect.gen(function* () {
-        const [wallet] = yield* query(() =>
-          tx
-            .select()
-            .from(wallets)
-            .where(
-              and(
-                eq(wallets.organizationId, organizationId),
-                eq(wallets.status, "active"),
-              ),
-            ),
-        );
-        if (!wallet) return null;
-        const quotes = yield* query(() =>
-          tx
-            .select({
-              purpose: intentQuotes.purpose,
-              status: intentQuotes.status,
-            })
-            .from(intentQuotes)
-            .where(
-              and(
-                eq(intentQuotes.walletId, wallet.id),
-                inArray(intentQuotes.status, ["quoted", "depositing"]),
-              ),
-            ),
-        );
-        const sends = yield* query(() =>
-          tx
-            .select({ id: companyWalletSends.id })
-            .from(companyWalletSends)
-            .where(
-              and(
-                eq(companyWalletSends.walletId, wallet.id),
-                inArray(companyWalletSends.status, ["reserved", "signed"]),
-              ),
-            ),
-        );
-        const funding = yield* query(() =>
-          tx
-            .select({ id: payouts.id })
-            .from(payouts)
-            .where(
-              and(
-                eq(payouts.walletId, wallet.id),
-                eq(payouts.status, "funding"),
-              ),
-            ),
-        );
-        const recentMoves = yield* query(() =>
-          tx
-            .select({ id: treasuryMoves.id, status: treasuryMoves.status })
-            .from(treasuryMoves)
-            .where(
-              and(
-                eq(treasuryMoves.walletId, wallet.id),
-                or(
-                  inArray(treasuryMoves.status, ["open", "needs_review"]),
-                  gt(
-                    treasuryMoves.settledAt,
-                    sql`now() - make_interval(mins => ${CREDIT_WINDOW_MINUTES})`,
-                  ),
-                ),
-              ),
-            ),
-        );
-        return {
-          wallet,
-          ledger: yield* ledgerBalance(tx, wallet.id),
-          quotes,
-          sends,
-          funding,
-          recentMoves,
-        };
-      }),
-    );
-    if (read === null) {
-      return yield* usage("The company has no active company wallet");
-    }
-    const { wallet } = read;
-
-    const errors: string[] = [];
-    const nearUsdc = wallet.address
-      ? yield* NearRpc.pipe(
-          Effect.flatMap((rpc) => rpc.usdcBalance(wallet.address ?? "")),
-          Effect.catchAll((error) => {
-            errors.push(`NEAR balance not read: ${error.message}`);
-            return Effect.succeed(null);
-          }),
-        )
-      : null;
-    const baseUsdc = wallet.transitAddress
-      ? yield* baseUsdcBalance(wallet.transitAddress).pipe(
-          Effect.catchAll((error) => {
-            errors.push(`Base balance not read: ${error.message}`);
-            return Effect.succeed(null);
-          }),
-        )
-      : null;
-
-    const inFlight = [
-      ...read.quotes.map(
-        (quote) => `a ${quote.purpose} quote is ${quote.status}`,
-      ),
-      ...read.sends.map(() => "a company wallet send is not final"),
-      ...read.funding.map(() => "a payout is being funded"),
-      ...read.recentMoves.map((move) =>
-        move.status === "open" || move.status === "needs_review"
-          ? `a Treasury move is ${move.status}`
-          : `a Treasury move settled in the last ${CREDIT_WINDOW_MINUTES} minutes`,
-      ),
-    ];
-    return {
-      ledgerUsdc: read.ledger,
-      nearUsdc,
-      baseUsdc,
-      differenceUsdc:
-        nearUsdc === null || baseUsdc === null
-          ? null
-          : nearUsdc + baseUsdc - read.ledger,
-      inFlight,
-      errors,
-    };
-  });
+  reconcileBalances(options.organizationId).pipe(
+    Effect.flatMap((result) =>
+      result === null
+        ? usage("The company has no active company wallet")
+        : Effect.succeed(result),
+    ),
+  );
 
 export const TREASURY_ALERT_KINDS = [
   "treasury_move_stuck",

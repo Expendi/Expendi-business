@@ -27,6 +27,7 @@ import {
   requestPayoutApproval,
 } from "../payout/payout-service.js";
 import { withTreasuryOfferOnRejection } from "../treasury/short-wallet.js";
+import { deliveryTransactionOf } from "../wallet/history.js";
 import { availableUsdc } from "../wallet/ledger.js";
 
 /**
@@ -48,7 +49,10 @@ export interface WithdrawalView {
   readonly label: string;
   readonly amountUsdc: bigint;
   readonly status: Payout["status"];
+  /** The company's own send, else the payee chain's delivery. */
   readonly txHash: string | null;
+  /** The chain `txHash` is on; absent while `txHash` is null. */
+  readonly txChain?: PayeeChain;
   readonly failureReason: string | null;
 }
 
@@ -60,6 +64,31 @@ const reject = (reason: PayoutRejected["reason"], message: string) =>
   Effect.fail(new PayoutRejected({ reason, message }));
 
 const notFound = new NotFound({ message: "That withdrawal wasn't found." });
+
+/**
+ * A transaction the company sent is shown as it always was, with no chain
+ * named, so a withdrawal from a company wallet reads exactly as before. With
+ * no send of its own, as for a confidential account, the payee chain's
+ * delivery is the only transaction there is, and it is named by its chain so
+ * nobody takes it for the company's.
+ */
+export function withdrawalTransactionOf(
+  payout: Pick<
+    Payout,
+    | "txHash"
+    | "provider"
+    | "status"
+    | "recipient"
+    | "deliveryQuoteId"
+    | "providerReference"
+  >,
+): Pick<WithdrawalView, "txHash" | "txChain"> {
+  if (payout.txHash !== null) return { txHash: payout.txHash };
+  const delivery = deliveryTransactionOf(payout);
+  return delivery
+    ? { txHash: delivery.txHash, txChain: delivery.chain }
+    : { txHash: null };
+}
 
 function toView(payout: Payout): Effect.Effect<WithdrawalView> {
   const { recipient } = payout;
@@ -73,7 +102,7 @@ function toView(payout: Payout): Effect.Effect<WithdrawalView> {
     label: recipient.accountName,
     amountUsdc: payout.quotedUsdc,
     status: payout.status,
-    txHash: payout.txHash,
+    ...withdrawalTransactionOf(payout),
     failureReason: payout.failureReason,
   });
 }

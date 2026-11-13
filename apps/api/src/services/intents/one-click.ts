@@ -9,6 +9,7 @@ import type { FundInChain, PayeeChain } from "@expendi-business/shared";
 import type {
   IntentQuoteSwapType,
   OneClickAccountType,
+  OneClickRecipientType,
   OneClickStatus,
 } from "../../db/schema/intent-quotes.js";
 import { ONE_CLICK_STATUSES } from "../../db/schema/intent-quotes.js";
@@ -92,18 +93,26 @@ export interface OneClickQuoteRequest {
   readonly destinationAsset: string;
   /** In the smallest unit of the asset `swapType` makes exact. */
   readonly amount: bigint;
-  /** Who receives the destination asset, on its own chain. */
-  readonly recipient: string;
   /**
-   * Where the origin asset returns to: on its own chain, or an account
-   * inside NEAR Intents when `refundType` is `INTENTS`.
+   * Who receives the destination asset: an address on its own chain, or a
+   * confidential account when `recipientType` is `CONFIDENTIAL_INTENTS`.
+   */
+  readonly recipient: string;
+  /** `DESTINATION_CHAIN` unless given. */
+  readonly recipientType?: OneClickRecipientType;
+  /**
+   * Where the origin asset returns to: on its own chain, an account inside
+   * NEAR Intents when `refundType` is `INTENTS`, or a confidential account
+   * when it is `CONFIDENTIAL_INTENTS`.
    */
   readonly refundTo: string;
   /** `ORIGIN_CHAIN` unless given. */
   readonly refundType?: OneClickAccountType;
   /**
    * `INTENTS` to pay the deposit address from inside NEAR Intents instead
-   * of on the origin chain; `ORIGIN_CHAIN` unless given.
+   * of on the origin chain, or `CONFIDENTIAL_INTENTS` to pay it from a
+   * confidential account (a quote then needs the company's session);
+   * `ORIGIN_CHAIN` unless given.
    */
   readonly depositType?: OneClickAccountType;
   /** After this, 1Click refunds a deposit instead of delivering it. */
@@ -182,25 +191,99 @@ export interface OneClickSwapStatus {
   readonly destinationChainTxHashes: readonly string[];
 }
 
+/**
+ * The short-lived access token of one company, from signing in to its
+ * confidential account. It stays redacted until the header is built.
+ */
+export type OneClickSession = Redacted.Redacted<string>;
+
+/**
+ * A NEP-413 payload exactly as 1Click generated it. `message` is a JSON
+ * string and must be kept byte-for-byte: the signature covers it.
+ */
+export interface OneClickUnsignedIntent {
+  readonly message: string;
+  readonly nonce: string;
+  readonly recipient: string;
+}
+
+/** A NEP-413 intent with its signature; field names are 1Click's wire names. */
+export interface OneClickSignedIntent {
+  readonly standard: "nep413";
+  readonly payload: OneClickUnsignedIntent;
+  readonly public_key: string;
+  readonly signature: string;
+}
+
+export interface OneClickConfidentialBalance {
+  readonly tokenId: string;
+  readonly available: bigint;
+}
+
 export interface OneClickShape {
   /**
    * A quote whose signature is 1Click's and which answers exactly this
-   * request. Only then may anything be sent to its deposit address.
+   * request. Only then may anything be sent to its deposit address. A quote
+   * from or to a confidential account carries the company's `session`.
    */
   readonly quote: (
     request: OneClickQuoteRequest,
+    session?: OneClickSession,
   ) => Effect.Effect<OneClickQuote, OneClickError | OneClickQuoteUntrusted>;
-  /** What 1Click says became of the quote with this deposit address. */
+  /**
+   * What 1Click says became of the quote with this deposit address. A quote
+   * made with a session is reported only to that session.
+   */
   readonly status: (
     depositAddress: string,
+    session?: OneClickSession,
   ) => Effect.Effect<OneClickSwapStatus, OneClickError>;
   /**
+   * Signs a company in to its confidential account with an intent its wallet
+   * signed. Sessions aren't stored: the refresh token is dropped here, and
+   * the API signs in again when a session runs out.
+   */
+  readonly authenticate: (signed: OneClickSignedIntent) => Effect.Effect<
+    {
+      readonly session: OneClickSession;
+      /** When the answer was received plus the session's lifetime. */
+      readonly expiresAt: Date;
+    },
+    OneClickError
+  >;
+  /** What the company holds in its confidential account, per token. */
+  readonly balances: (
+    session: OneClickSession,
+  ) => Effect.Effect<readonly OneClickConfidentialBalance[], OneClickError>;
+  /**
+   * Asks 1Click for the message that pays a quote's deposit address out of
+   * the company's confidential account. Nothing is signed or moved here.
+   */
+  readonly generateIntent: (
+    input: {
+      readonly depositAddress: string;
+      readonly signerId: string;
+    },
+    session: OneClickSession,
+  ) => Effect.Effect<OneClickUnsignedIntent, OneClickError>;
+  /**
+   * Posts an intent the company's wallet signed. A failure that is not a
+   * refusal doesn't mean 1Click didn't accept the intent: ask the quote's
+   * status.
+   */
+  readonly submitIntent: (
+    signed: OneClickSignedIntent,
+    session: OneClickSession,
+  ) => Effect.Effect<{ readonly intentHash: string }, OneClickError>;
+  /**
    * Tells 1Click which transaction paid a deposit address, so it doesn't
-   * have to find it. Safe to repeat.
+   * have to find it. Safe to repeat. A quote that touches a confidential
+   * account carries the company's `session`.
    */
   readonly submitDeposit: (
     depositAddress: string,
     txHash: string,
+    session?: OneClickSession,
   ) => Effect.Effect<void, OneClickError>;
 }
 
@@ -278,6 +361,36 @@ const statusResponseSchema = z.object({
   }),
 });
 
+const authenticateResponseSchema = z.object({
+  accessToken: z.string().min(1),
+  expiresIn: z.number().positive(),
+});
+
+const balancesResponseSchema = z.object({
+  balances: z.array(
+    z.object({ tokenId: z.string().min(1), available: amount }),
+  ),
+});
+
+/**
+ * Strict on purpose: the signer must know exactly what it signs, so any other
+ * standard or any extra key in the payload is not an answer to trust.
+ */
+const generateIntentResponseSchema = z.object({
+  intent: z.strictObject({
+    standard: z.literal("nep413"),
+    payload: z.strictObject({
+      message: z.string().min(1),
+      nonce: z.string().min(1),
+      recipient: z.string().min(1),
+    }),
+  }),
+});
+
+const submitIntentResponseSchema = z.object({
+  intentHash: z.string().min(1),
+});
+
 const errorBodySchema = z.object({ message: z.string() });
 
 const toBigInt = (value: string | null | undefined): bigint | null =>
@@ -286,18 +399,20 @@ const toBigInt = (value: string | null | undefined): bigint | null =>
 const toDate = (value: string | null | undefined): Date | null =>
   value === null || value === undefined ? null : new Date(value);
 
-const RECIPIENT_TYPE = "DESTINATION_CHAIN";
-
 const depositTypeOf = (request: OneClickQuoteRequest): OneClickAccountType =>
   request.depositType ?? "ORIGIN_CHAIN";
 const refundTypeOf = (request: OneClickQuoteRequest): OneClickAccountType =>
   request.refundType ?? "ORIGIN_CHAIN";
+const recipientTypeOf = (
+  request: OneClickQuoteRequest,
+): OneClickRecipientType => request.recipientType ?? "DESTINATION_CHAIN";
 
 /**
- * The body of `POST /v0/quote`. Deliveries are always on the destination
- * asset's own chain. Deposits and refunds are too, except for a fund-in,
- * which refunds into the company's own NEAR Intents account, and the quote
- * that returns it from there (docs/decisions/near-main-chain.md, "Fund-in").
+ * The body of `POST /v0/quote`. Deliveries are on the destination asset's
+ * own chain unless the request says `CONFIDENTIAL_INTENTS`. Deposits and
+ * refunds are too, except for a fund-in, which refunds into the company's
+ * own NEAR Intents account, and the quote that returns it from there
+ * (docs/decisions/near-main-chain.md, "Fund-in").
  */
 export function oneClickQuoteBody(
   request: OneClickQuoteRequest,
@@ -313,7 +428,7 @@ export function oneClickQuoteBody(
     refundTo: request.refundTo,
     refundType: refundTypeOf(request),
     recipient: request.recipient,
-    recipientType: RECIPIENT_TYPE,
+    recipientType: recipientTypeOf(request),
     deadline: request.deadline.toISOString(),
     ...(request.quoteWaitingTimeMs !== undefined && {
       quoteWaitingTimeMs: request.quoteWaitingTimeMs,
@@ -342,7 +457,7 @@ function requestMismatch(
     ["refundTo", echoed.refundTo !== request.refundTo],
     ["depositType", echoed.depositType !== depositTypeOf(request)],
     ["refundType", echoed.refundType !== refundTypeOf(request)],
-    ["recipientType", echoed.recipientType !== RECIPIENT_TYPE],
+    ["recipientType", echoed.recipientType !== recipientTypeOf(request)],
     ["slippageTolerance", echoed.slippageTolerance !== request.slippageBps],
     // 1Click rewrites the timestamp's format, so compare the instants.
     ["deadline", Date.parse(echoed.deadline) !== request.deadline.getTime()],
@@ -393,7 +508,12 @@ function toQuote(
 
 export interface OneClickSettings {
   readonly baseUrl: string;
-  /** Sent as a bearer token; 1Click also answers without one. */
+  /**
+   * The partner key, sent as `X-API-Key`; 1Click also answers without one.
+   * A company session travels separately as the bearer token, and 1Click
+   * reads a bearer token alone as the partner's, so a call with a session
+   * needs both.
+   */
   readonly apiKey: Option.Option<Redacted.Redacted>;
   /** Whose signature a quote must carry; only tests pass another key. */
   readonly quoteSignerPublicKey?: string;
@@ -406,13 +526,14 @@ export function makeOneClick(
   const signerPublicKey =
     settings.quoteSignerPublicKey ?? ONE_CLICK_QUOTE_SIGNER_PUBLIC_KEY;
 
-  const headers = (): Record<string, string> => ({
+  const headers = (session?: OneClickSession): Record<string, string> => ({
     "content-type": "application/json",
     ...Option.match(settings.apiKey, {
       onNone: () => ({}),
-      onSome: (apiKey) => ({
-        authorization: `Bearer ${Redacted.value(apiKey)}`,
-      }),
+      onSome: (apiKey) => ({ "x-api-key": Redacted.value(apiKey) }),
+    }),
+    ...(session !== undefined && {
+      authorization: `Bearer ${Redacted.value(session)}`,
     }),
   });
 
@@ -424,13 +545,14 @@ export function makeOneClick(
       readonly method: "GET" | "POST";
       readonly body?: unknown;
       readonly timeoutMs?: number;
+      readonly session?: OneClickSession;
     },
   ): Effect.Effect<unknown, OneClickError> =>
     Effect.tryPromise({
       try: async () => {
         const response = await fetchImpl(new URL(path, settings.baseUrl), {
           method: init.method,
-          headers: headers(),
+          headers: headers(init.session),
           ...(init.body !== undefined && { body: JSON.stringify(init.body) }),
           signal: AbortSignal.timeout(init.timeoutMs ?? REQUEST_TIMEOUT_MS),
         });
@@ -489,11 +611,12 @@ export function makeOneClick(
   };
 
   return {
-    quote: (quoteRequest) =>
+    quote: (quoteRequest, session) =>
       Effect.gen(function* () {
         const body = yield* request("quote", "/v0/quote", {
           method: "POST",
           body: oneClickQuoteBody(quoteRequest),
+          session,
           timeoutMs:
             REQUEST_TIMEOUT_MS + (quoteRequest.quoteWaitingTimeMs ?? 0),
         });
@@ -529,12 +652,12 @@ export function makeOneClick(
         return quote;
       }),
 
-    status: (depositAddress) =>
+    status: (depositAddress, session) =>
       Effect.gen(function* () {
         const body = yield* request(
           "status",
           `/v0/status?${new URLSearchParams({ depositAddress }).toString()}`,
-          { method: "GET" },
+          { method: "GET", session },
         );
         const response = yield* parsed("status", statusResponseSchema, body);
         const reportedFor = response.quoteResponse?.quote?.depositAddress;
@@ -564,11 +687,82 @@ export function makeOneClick(
         };
       }),
 
-    submitDeposit: (depositAddress, txHash) =>
+    submitDeposit: (depositAddress, txHash, session) =>
       request("deposit submit", "/v0/deposit/submit", {
         method: "POST",
         body: { txHash, depositAddress },
+        session,
       }).pipe(Effect.asVoid),
+
+    authenticate: (signed) =>
+      Effect.gen(function* () {
+        const body = yield* request("sign-in", "/v0/auth/authenticate", {
+          method: "POST",
+          body: { signedData: signed },
+        });
+        const receivedAt = Date.now();
+        const response = yield* parsed(
+          "sign-in",
+          authenticateResponseSchema,
+          body,
+        );
+        return {
+          session: Redacted.make(response.accessToken),
+          expiresAt: new Date(receivedAt + response.expiresIn * 1000),
+        };
+      }),
+
+    balances: (session) =>
+      Effect.gen(function* () {
+        const body = yield* request("balances", "/v0/account/balances", {
+          method: "GET",
+          session,
+        });
+        const response = yield* parsed(
+          "balances",
+          balancesResponseSchema,
+          body,
+        );
+        return response.balances.map(({ tokenId, available }) => ({
+          tokenId,
+          available: BigInt(available),
+        }));
+      }),
+
+    generateIntent: ({ depositAddress, signerId }, session) =>
+      Effect.gen(function* () {
+        const body = yield* request("intent", "/v0/generate-intent", {
+          method: "POST",
+          body: {
+            type: "swap_transfer",
+            standard: "nep413",
+            signerId,
+            depositAddress,
+          },
+          session,
+        });
+        const response = yield* parsed(
+          "intent",
+          generateIntentResponseSchema,
+          body,
+        );
+        return response.intent.payload;
+      }),
+
+    submitIntent: (signed, session) =>
+      Effect.gen(function* () {
+        const body = yield* request("intent submit", "/v0/submit-intent", {
+          method: "POST",
+          body: { type: "swap_transfer", signedData: signed },
+          session,
+        });
+        const response = yield* parsed(
+          "intent submit",
+          submitIntentResponseSchema,
+          body,
+        );
+        return { intentHash: response.intentHash };
+      }),
   };
 }
 

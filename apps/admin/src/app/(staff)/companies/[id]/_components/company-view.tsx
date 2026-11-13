@@ -134,6 +134,14 @@ export function CompanyView({ companyId }: { companyId: string }) {
           ({company.wallet.status})
         </p>
       ) : null}
+      {company.wallet?.balanceHome === "confidential_account" ? (
+        <p className="mt-2 text-sm text-muted-foreground">
+          {company.wallet.confidentialUsdc !== null &&
+          company.wallet.confidentialUsdcReadAt !== null
+            ? `Confidential account, as of ${formatNairobiTime(company.wallet.confidentialUsdcReadAt)}: ${formatUsdc(company.wallet.confidentialUsdc)}`
+            : "Confidential account: not read yet"}
+        </p>
+      ) : null}
 
       <Card className="mt-6 gap-0 overflow-hidden py-0">
         <CardHeader className="border-b py-4">

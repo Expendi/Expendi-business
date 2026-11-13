@@ -5,7 +5,7 @@ import { Effect } from "effect";
 import type { DatabaseService } from "../../db/client.js";
 import type { IntentQuote } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
-import type { OneClick } from "./one-click.js";
+import type { OneClick, OneClickSession } from "./one-click.js";
 import { intentQuotes } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { refreshQuoteStatus } from "./quote-status.js";
@@ -17,6 +17,13 @@ import { refreshQuoteStatus } from "./quote-status.js";
  * without reaching anything that signs: `internal-routes.test.ts` follows
  * their imports.
  */
+
+/**
+ * No deposit is started with less than this left before the deadline: a
+ * company wallet send stays valid for about two minutes, and one that lands
+ * after the deadline is only refunded.
+ */
+export const DEPOSIT_MARGIN_MS = 3 * 60_000;
 
 /** A deposit 1Click hasn't settled this long after the deadline is for a person. */
 export const UNSETTLED_REVIEW_MS = 30 * 60_000;
@@ -74,7 +81,9 @@ export const orCurrent = (
 /**
  * Brings a quote's lifecycle status in line with what 1Click reports for
  * its deposit address, saving 1Click's fields (transaction hashes included)
- * on the way. Shared by every quote Expendi pays itself:
+ * on the way. A quote that touches a confidential account needs the
+ * company's `session` to be heard about. Shared by every quote Expendi pays
+ * itself:
  *
  * - `SUCCESS` and `REFUNDED` are final, whatever we knew before: they also
  *   resolve a quote under review whose deposit we lost track of;
@@ -87,9 +96,10 @@ export const orCurrent = (
  */
 export function settleFromOneClick(
   quote: IntentQuote,
+  session?: OneClickSession,
 ): Effect.Effect<IntentQuote, DatabaseError, OneClick | DatabaseService> {
   return Effect.gen(function* () {
-    const refreshed = yield* refreshQuoteStatus(quote).pipe(
+    const refreshed = yield* refreshQuoteStatus(quote, session).pipe(
       Effect.catchTags({
         OneClickRefused: () => Effect.succeed(null),
         OneClickOutcomeUnknown: () => Effect.succeed(null),

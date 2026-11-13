@@ -191,9 +191,18 @@ export function TxDetails({
 }): JSX.Element {
   const payout = item.payout;
   const when = happenedAt(item.createdAt, today);
-  const transaction = item.txHash ? (
-    <DetailItem label={`${PAYEE_CHAIN_NAMES[item.chain]} transaction`}>
-      {shortAddress(item.txHash)}
+  const delivery =
+    payout?.deliveryTxHash && payout.deliveryTxChain
+      ? { hash: payout.deliveryTxHash, chain: payout.deliveryTxChain }
+      : null;
+  const shownTransaction = item.txHash
+    ? { hash: item.txHash, chain: item.chain }
+    : delivery;
+  const transaction = shownTransaction ? (
+    <DetailItem
+      label={`${PAYEE_CHAIN_NAMES[shownTransaction.chain]} transaction`}
+    >
+      {shortAddress(shownTransaction.hash)}
     </DetailItem>
   ) : null;
   switch (txKind(item)) {

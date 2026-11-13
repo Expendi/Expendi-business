@@ -7,7 +7,10 @@ import { ConfigProvider, Effect, Exit, Layer, Option, Redacted } from "effect";
 import { baseEncode, KeyPair } from "near-api-js";
 import { describe, expect, it } from "vitest";
 
-import type { OneClickQuoteRequest } from "../../services/intents/one-click.js";
+import type {
+  OneClickQuoteRequest,
+  OneClickSignedIntent,
+} from "../../services/intents/one-click.js";
 import {
   makeOneClick,
   ONE_CLICK_FUND_IN_USDC_ASSET_IDS,
@@ -32,6 +35,8 @@ const TRANSIT_WALLET = "0x1111111111111111111111111111111111111111";
 const DEPOSIT_ADDRESS = "ab".repeat(32);
 const DEADLINE = new Date("2026-11-11T12:00:00.000Z");
 const API_KEY = "one-click-test-key";
+const SESSION_TOKEN = "company-session-token";
+const SESSION = Redacted.make(SESSION_TOKEN);
 
 const baseHop: OneClickQuoteRequest = {
   dry: false,
@@ -274,7 +279,7 @@ describe("OneClick.quote", () => {
     });
   });
 
-  it("sends the API key as a bearer token", async () => {
+  it("sends the API key as X-API-Key and never as a bearer token", async () => {
     // #given
     const { oneClick, calls } = oneClickAnswering(
       { json: signed(quoteResponse(baseHop)) },
@@ -285,7 +290,68 @@ describe("OneClick.quote", () => {
     await Effect.runPromise(oneClick.quote(baseHop));
 
     // #then
-    expect(calls[0]?.headers.authorization).toBe(`Bearer ${API_KEY}`);
+    expect(calls[0]?.headers["x-api-key"]).toBe(API_KEY);
+    expect(calls[0]?.headers).not.toHaveProperty("authorization");
+  });
+
+  it("sends a company's session as the bearer token beside the API key", async () => {
+    // #given
+    const { oneClick, calls } = oneClickAnswering(
+      { json: signed(quoteResponse(baseHop)) },
+      { apiKey: API_KEY },
+    );
+
+    // #when
+    await Effect.runPromise(oneClick.quote(baseHop, SESSION));
+
+    // #then
+    expect(calls[0]?.headers.authorization).toBe(`Bearer ${SESSION_TOKEN}`);
+    expect(calls[0]?.headers["x-api-key"]).toBe(API_KEY);
+  });
+
+  it("asks for delivery into a confidential account when the request says so", async () => {
+    // #given
+    const confidential = {
+      ...baseHop,
+      recipient: COMPANY_WALLET,
+      recipientType: "CONFIDENTIAL_INTENTS",
+    } as const;
+    const { oneClick, calls } = oneClickAnswering({
+      json: signed(quoteResponse(confidential)),
+    });
+
+    // #when
+    await Effect.runPromise(oneClick.quote(confidential, SESSION));
+
+    // #then
+    expect(calls[0]?.body).toMatchObject({
+      recipientType: "CONFIDENTIAL_INTENTS",
+    });
+  });
+
+  it("refuses a signed quote that delivers on the chain when a confidential account was asked", async () => {
+    // #given
+    const confidential = {
+      ...baseHop,
+      recipientType: "CONFIDENTIAL_INTENTS",
+    } as const;
+    const { oneClick } = oneClickAnswering({
+      json: signed(
+        quoteResponse(confidential, {
+          quoteRequest: { recipientType: "DESTINATION_CHAIN" },
+        }),
+      ),
+    });
+
+    // #when
+    const error = await failureOf(oneClick.quote(confidential, SESSION));
+
+    // #then
+    expect(error).toMatchObject({
+      _tag: "OneClickQuoteUntrusted",
+      reason: "request_mismatch",
+    });
+    expect(error.message).toContain("recipientType");
   });
 
   it("sends no authorization without an API key", async () => {
@@ -679,7 +745,23 @@ describe("OneClick.status", () => {
     expect([...(calls[0]?.url.searchParams.entries() ?? [])]).toEqual([
       ["depositAddress", DEPOSIT_ADDRESS],
     ]);
-    expect(calls[0]?.headers.authorization).toBe(`Bearer ${API_KEY}`);
+    expect(calls[0]?.headers["x-api-key"]).toBe(API_KEY);
+    expect(calls[0]?.headers).not.toHaveProperty("authorization");
+  });
+
+  it("asks as the company when given its session", async () => {
+    // #given
+    const { oneClick, calls } = oneClickAnswering(
+      { json: settled },
+      { apiKey: API_KEY },
+    );
+
+    // #when
+    await Effect.runPromise(oneClick.status(DEPOSIT_ADDRESS, SESSION));
+
+    // #then
+    expect(calls[0]?.headers.authorization).toBe(`Bearer ${SESSION_TOKEN}`);
+    expect(calls[0]?.headers["x-api-key"]).toBe(API_KEY);
   });
 
   it("can't be made to ask about anything else by the address", async () => {
@@ -873,6 +955,34 @@ describe("OneClick.submitDeposit", () => {
     });
   });
 
+  it("sends no authorization without a session", async () => {
+    // #given
+    const { oneClick, calls } = oneClickAnswering({
+      json: { status: "KNOWN_DEPOSIT_TX" },
+    });
+
+    // #when
+    await Effect.runPromise(oneClick.submitDeposit(DEPOSIT_ADDRESS, TX_HASH));
+
+    // #then
+    expect(calls[0]?.headers).not.toHaveProperty("authorization");
+  });
+
+  it("tells 1Click as the company when given its session", async () => {
+    // #given
+    const { oneClick, calls } = oneClickAnswering({
+      json: { status: "KNOWN_DEPOSIT_TX" },
+    });
+
+    // #when
+    await Effect.runPromise(
+      oneClick.submitDeposit(DEPOSIT_ADDRESS, TX_HASH, SESSION),
+    );
+
+    // #then
+    expect(calls[0]?.headers.authorization).toBe(`Bearer ${SESSION_TOKEN}`);
+  });
+
   it("reports a refusal", async () => {
     // #given
     const { oneClick } = oneClickAnswering({
@@ -902,6 +1012,330 @@ describe("OneClick.submitDeposit", () => {
 
     // #then
     expect(error._tag).toBe("OneClickOutcomeUnknown");
+  });
+});
+
+const fixtureLegs = (
+  JSON.parse(
+    readFileSync(path.join(FIXTURES, "confidential-intents.json"), "utf8"),
+  ) as { legs: { generated: Json }[] }
+).legs;
+
+const SIGNED_INTENT: OneClickSignedIntent = {
+  standard: "nep413",
+  payload: {
+    message: '{"signer_id":"abc","deadline":"2026-11-16T08:19:27.521Z"}',
+    nonce: "Vij2xgDhEPMXQKrcWrR46BiC3wIETEPvXnOFhLItR5w=",
+    recipient: "intents.far",
+  },
+  public_key: "ed25519:11111111111111111111111111111111",
+  signature: "ed25519:2222222222222222222222222222222222222222222222",
+};
+
+const failureCases = [
+  ["a refusal", { json: { message: "Invalid token" }, httpStatus: 401 }],
+  ["HTTP 500", { text: "Internal Server Error", httpStatus: 500 }],
+  ["a timeout", { fails: new DOMException("timed out", "TimeoutError") }],
+] satisfies [string, Answer][];
+
+describe("OneClick.authenticate", () => {
+  const answer = {
+    accessToken: "access-secret",
+    refreshToken: "refresh-secret",
+    expiresIn: 900,
+    refreshExpiresIn: 86_400,
+  };
+
+  it("signs in with the signed intent and sends the partner key alone", async () => {
+    // #given
+    const { oneClick, calls } = oneClickAnswering(
+      { json: answer },
+      { apiKey: API_KEY },
+    );
+
+    // #when
+    await Effect.runPromise(oneClick.authenticate(SIGNED_INTENT));
+
+    // #then
+    expect(calls[0]?.url.href).toBe("https://1click.test/v0/auth/authenticate");
+    expect(calls[0]?.method).toBe("POST");
+    expect(calls[0]?.body).toEqual({ signedData: SIGNED_INTENT });
+    expect(calls[0]?.headers["x-api-key"]).toBe(API_KEY);
+    expect(calls[0]?.headers).not.toHaveProperty("authorization");
+  });
+
+  it("counts the session's lifetime from when the answer arrived and drops the refresh token", async () => {
+    // #given
+    const { oneClick } = oneClickAnswering({ json: answer });
+    const before = Date.now();
+
+    // #when
+    const result = await Effect.runPromise(
+      oneClick.authenticate(SIGNED_INTENT),
+    );
+
+    // #then
+    const after = Date.now();
+    expect(Redacted.value(result.session)).toBe("access-secret");
+    expect(result.expiresAt.getTime()).toBeGreaterThanOrEqual(before + 900_000);
+    expect(result.expiresAt.getTime()).toBeLessThanOrEqual(after + 900_000);
+    expect(Object.keys(result).sort()).toEqual(["expiresAt", "session"]);
+    expect(JSON.stringify(result)).not.toContain("refresh-secret");
+    expect(JSON.stringify(result)).not.toContain("access-secret");
+  });
+
+  it.each([
+    ["no access token", { expiresIn: 900 }],
+    ["no lifetime", { accessToken: "a" }],
+  ])("doesn't guess at an answer with %s", async (_name, json) => {
+    // #given
+    const { oneClick } = oneClickAnswering({ json });
+
+    // #when
+    const error = await failureOf(oneClick.authenticate(SIGNED_INTENT));
+
+    // #then
+    expect(error._tag).toBe("OneClickOutcomeUnknown");
+  });
+
+  it.each(failureCases)("reports %s", async (_name, reply) => {
+    // #given
+    const { oneClick } = oneClickAnswering(reply);
+
+    // #when
+    const error = await failureOf(oneClick.authenticate(SIGNED_INTENT));
+
+    // #then
+    expect(error._tag).toBe(
+      "httpStatus" in reply && reply.httpStatus === 401
+        ? "OneClickRefused"
+        : "OneClickOutcomeUnknown",
+    );
+  });
+});
+
+describe("OneClick.balances", () => {
+  it("reads the company's private balances with its session", async () => {
+    // #given
+    const { oneClick, calls } = oneClickAnswering(
+      {
+        json: {
+          balances: [
+            { tokenId: "nep141:usdc", available: "1500000", source: "private" },
+            { tokenId: "nep141:other", available: "0", source: "private" },
+          ],
+        },
+      },
+      { apiKey: API_KEY },
+    );
+
+    // #when
+    const balances = await Effect.runPromise(oneClick.balances(SESSION));
+
+    // #then
+    expect(calls[0]?.method).toBe("GET");
+    expect(calls[0]?.url.href).toBe("https://1click.test/v0/account/balances");
+    expect(calls[0]?.body).toBeNull();
+    expect(calls[0]?.headers.authorization).toBe(`Bearer ${SESSION_TOKEN}`);
+    expect(calls[0]?.headers["x-api-key"]).toBe(API_KEY);
+    expect(balances).toEqual([
+      { tokenId: "nep141:usdc", available: 1_500_000n },
+      { tokenId: "nep141:other", available: 0n },
+    ]);
+  });
+
+  it.each([
+    ["an amount that isn't a whole number", { tokenId: "t", available: "1.5" }],
+    ["no token", { available: "1" }],
+  ])("doesn't guess at a balance with %s", async (_name, balance) => {
+    // #given
+    const { oneClick } = oneClickAnswering({ json: { balances: [balance] } });
+
+    // #when
+    const error = await failureOf(oneClick.balances(SESSION));
+
+    // #then
+    expect(error._tag).toBe("OneClickOutcomeUnknown");
+  });
+
+  it.each(failureCases)("reports %s", async (_name, reply) => {
+    // #given
+    const { oneClick } = oneClickAnswering(reply);
+
+    // #when
+    const error = await failureOf(oneClick.balances(SESSION));
+
+    // #then
+    expect(error._tag).toBe(
+      "httpStatus" in reply && reply.httpStatus === 401
+        ? "OneClickRefused"
+        : "OneClickOutcomeUnknown",
+    );
+  });
+});
+
+describe("OneClick.generateIntent", () => {
+  const input = { depositAddress: DEPOSIT_ADDRESS, signerId: COMPANY_WALLET };
+  const generated = (): { intent: { standard: string; payload: Json } } =>
+    structuredClone(fixtureLegs[0]?.generated) as {
+      intent: { standard: string; payload: Json };
+    };
+
+  it("asks for a swap transfer message with the session", async () => {
+    // #given
+    const { oneClick, calls } = oneClickAnswering(
+      { json: generated() },
+      { apiKey: API_KEY },
+    );
+
+    // #when
+    await Effect.runPromise(oneClick.generateIntent(input, SESSION));
+
+    // #then
+    expect(calls[0]?.method).toBe("POST");
+    expect(calls[0]?.url.href).toBe("https://1click.test/v0/generate-intent");
+    expect(calls[0]?.body).toEqual({
+      type: "swap_transfer",
+      standard: "nep413",
+      signerId: COMPANY_WALLET,
+      depositAddress: DEPOSIT_ADDRESS,
+    });
+    expect(calls[0]?.headers.authorization).toBe(`Bearer ${SESSION_TOKEN}`);
+    expect(calls[0]?.headers["x-api-key"]).toBe(API_KEY);
+  });
+
+  it.each(fixtureLegs.map((leg, index) => [index, leg.generated] as const))(
+    "returns the payload 1Click generated, byte for byte (fixture leg %i)",
+    async (_index, body) => {
+      // #given
+      const { oneClick } = oneClickAnswering({ json: body });
+
+      // #when
+      const intent = await Effect.runPromise(
+        oneClick.generateIntent(input, SESSION),
+      );
+
+      // #then
+      const expected = (body as { intent: { payload: Json } }).intent.payload;
+      expect(intent).toEqual(expected);
+      expect(intent.message).toBe(expected.message);
+    },
+  );
+
+  it("rejects a payload with a key beyond message, nonce and recipient", async () => {
+    // #given
+    const body = generated();
+    body.intent.payload.callbackUrl = "https://attacker.example";
+    const { oneClick } = oneClickAnswering({ json: body });
+
+    // #when
+    const error = await failureOf(oneClick.generateIntent(input, SESSION));
+
+    // #then
+    expect(error._tag).toBe("OneClickOutcomeUnknown");
+    expect(error.message).toContain("unexpected shape");
+  });
+
+  it("rejects a standard other than nep413", async () => {
+    // #given
+    const body = generated();
+    body.intent.standard = "erc191";
+    const { oneClick } = oneClickAnswering({ json: body });
+
+    // #when
+    const error = await failureOf(oneClick.generateIntent(input, SESSION));
+
+    // #then
+    expect(error._tag).toBe("OneClickOutcomeUnknown");
+  });
+
+  it.each(failureCases)("reports %s", async (_name, reply) => {
+    // #given
+    const { oneClick } = oneClickAnswering(reply);
+
+    // #when
+    const error = await failureOf(oneClick.generateIntent(input, SESSION));
+
+    // #then
+    expect(error._tag).toBe(
+      "httpStatus" in reply && reply.httpStatus === 401
+        ? "OneClickRefused"
+        : "OneClickOutcomeUnknown",
+    );
+  });
+});
+
+describe("OneClick.submitIntent", () => {
+  const accepted = { intentHash: "Fq3dHash", correlationId: "c1" };
+
+  it("posts the signed intent with the session and returns its hash", async () => {
+    // #given
+    const { oneClick, calls } = oneClickAnswering(
+      { json: accepted },
+      { apiKey: API_KEY },
+    );
+
+    // #when
+    const result = await Effect.runPromise(
+      oneClick.submitIntent(SIGNED_INTENT, SESSION),
+    );
+
+    // #then
+    expect(calls[0]?.method).toBe("POST");
+    expect(calls[0]?.url.href).toBe("https://1click.test/v0/submit-intent");
+    expect(calls[0]?.body).toEqual({
+      type: "swap_transfer",
+      signedData: SIGNED_INTENT,
+    });
+    expect(calls[0]?.headers.authorization).toBe(`Bearer ${SESSION_TOKEN}`);
+    expect(calls[0]?.headers["x-api-key"]).toBe(API_KEY);
+    expect(result).toEqual({ intentHash: "Fq3dHash" });
+  });
+
+  it("doesn't guess at an answer without an intent hash", async () => {
+    // #given
+    const { oneClick } = oneClickAnswering({ json: { correlationId: "c1" } });
+
+    // #when
+    const error = await failureOf(
+      oneClick.submitIntent(SIGNED_INTENT, SESSION),
+    );
+
+    // #then
+    expect(error._tag).toBe("OneClickOutcomeUnknown");
+  });
+
+  it.each(failureCases)("reports %s", async (_name, reply) => {
+    // #given
+    const { oneClick } = oneClickAnswering(reply);
+
+    // #when
+    const error = await failureOf(
+      oneClick.submitIntent(SIGNED_INTENT, SESSION),
+    );
+
+    // #then
+    expect(error._tag).toBe(
+      "httpStatus" in reply && reply.httpStatus === 401
+        ? "OneClickRefused"
+        : "OneClickOutcomeUnknown",
+    );
+  });
+
+  it("never puts the session in an error", async () => {
+    // #given
+    const { oneClick } = oneClickAnswering({
+      json: { message: "Invalid token" },
+      httpStatus: 401,
+    });
+
+    // #when
+    const error = await failureOf(
+      oneClick.submitIntent(SIGNED_INTENT, SESSION),
+    );
+
+    // #then
+    expect(error.message).not.toContain(SESSION_TOKEN);
   });
 });
 

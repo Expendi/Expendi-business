@@ -6,6 +6,7 @@ import type {
 } from "@expendi-business/shared";
 
 import type { Database } from "../../db/client.js";
+import type { WalletBalanceHome } from "../../db/schema/wallets.js";
 import {
   memberships,
   organizations,
@@ -143,6 +144,7 @@ export async function createActiveNearWallet(
   company: TestCompany,
   nearWallet: { readonly privyWalletId: string; readonly accountId: string },
   perTransactionMaxUsdc = 5_000_000_000n,
+  balanceHome?: WalletBalanceHome,
 ): Promise<TestWallet> {
   return runInScope(
     db,
@@ -154,6 +156,7 @@ export async function createActiveNearWallet(
           organizationId: company.organizationId,
           status: "active",
           perTransactionMaxUsdc,
+          ...(balanceHome !== undefined && { balanceHome }),
           privyWalletId: nearWallet.privyWalletId,
           address: nearWallet.accountId,
           privyPolicyId: `policy-${randomUUID()}`,

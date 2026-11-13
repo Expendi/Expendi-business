@@ -18,24 +18,30 @@ import {
   ONE_CLICK_FUND_IN_USDC_ASSET_IDS,
   ONE_CLICK_USDC_ASSET_IDS,
 } from "../../services/intents/one-click.js";
+import { createDeliveryCompany } from "../helpers/confidential-delivery.js";
 import {
   addMember,
   createActiveWallet,
   createCompany,
   createUser,
 } from "../helpers/db.js";
+import { makeFakePrivyWallets } from "../helpers/fakes.js";
 import { createFundedCompany, readQuote } from "../helpers/money-in.js";
 import { makeFakeOneClick } from "../helpers/one-click.js";
 import { bearer, makeTestRuntime } from "../helpers/runtime.js";
 
 const oneClick = makeFakeOneClick();
+const privy = makeFakePrivyWallets();
 let runtime: AppRuntime;
 let db: Database;
 let app: App;
 let funded: FundedCompany;
 
 beforeAll(async () => {
-  runtime = makeTestRuntime({ oneClick: oneClick.layer });
+  runtime = makeTestRuntime({
+    oneClick: oneClick.layer,
+    privyWallets: privy.layer,
+  });
   ({ db } = await runtime.runPromise(DatabaseService));
   app = createApp({ runtime });
 });
@@ -265,6 +271,85 @@ describe("POST /organizations/:id/wallet/fund-ins", () => {
       });
     },
   );
+
+  it("quotes a company with a confidential account for delivery to it, with its session, and shows the fund-in as usual", async () => {
+    // #given
+    funded = await createDeliveryCompany(db, privy);
+    const before = oneClick.state.quoteRequests.length;
+    const callsBefore = oneClick.state.calls.length;
+
+    // #when
+    const response = await start(fromBase("25000000"));
+
+    // #then
+    const fundIn = fundInSchema.parse(await data(response));
+    const [request] = oneClick.state.quoteRequests.slice(before);
+    const [call] = oneClick.state.calls.slice(callsBefore);
+    const saved = await readQuote(db, funded, fundIn.id);
+    expect({
+      status: response.status,
+      shown: fundIn.status,
+      request: {
+        recipient: request?.recipient,
+        recipientType: request?.recipientType,
+        refundTo: request?.refundTo,
+        refundType: request?.refundType,
+        amount: request?.amount,
+      },
+      sessionSent: call?.session !== undefined,
+      saved: saved.recipientType,
+    }).toEqual({
+      status: 201,
+      shown: "awaiting_deposit",
+      request: {
+        recipient: funded.accountId,
+        recipientType: "CONFIDENTIAL_INTENTS",
+        refundTo: funded.accountId,
+        refundType: "INTENTS",
+        amount: 25_000_000n,
+      },
+      sessionSent: true,
+      saved: "CONFIDENTIAL_INTENTS",
+    });
+  });
+
+  it("quotes a company wallet's fund-in with no recipient type and no session, as before", async () => {
+    // #given
+    const before = oneClick.state.quoteRequests.length;
+    const callsBefore = oneClick.state.calls.length;
+
+    // #when
+    const response = await start(fromBase());
+
+    // #then
+    const fundIn = fundInSchema.parse(await data(response));
+    const [request] = oneClick.state.quoteRequests.slice(before);
+    const [call] = oneClick.state.calls.slice(callsBefore);
+    expect({
+      hasRecipientType: request !== undefined && "recipientType" in request,
+      session: call?.session,
+      saved: (await readQuote(db, funded, fundIn.id)).recipientType,
+    }).toEqual({
+      hasRecipientType: false,
+      session: undefined,
+      saved: "DESTINATION_CHAIN",
+    });
+  });
+
+  it("is unavailable, and saves nothing, when a confidential company can't be signed in", async () => {
+    // #given
+    funded = await createDeliveryCompany(db, privy);
+    privy.state.nextNearSignings("refused");
+
+    // #when
+    const response = await start(fromBase());
+
+    // #then
+    expect({ status: response.status, saved: await savedFundIns() }).toEqual({
+      status: 503,
+      saved: [],
+    });
+  });
 
   it("refuses a company whose wallet is still on Base", async () => {
     // #given

@@ -23,6 +23,17 @@ import { users } from "./users.js";
 
 export const walletChain = pgEnum("wallet_chain", WALLET_CHAINS);
 
+export const WALLET_BALANCE_HOMES = [
+  "company_wallet",
+  "confidential_account",
+] as const;
+export type WalletBalanceHome = (typeof WALLET_BALANCE_HOMES)[number];
+
+export const walletBalanceHome = pgEnum(
+  "wallet_balance_home",
+  WALLET_BALANCE_HOMES,
+);
+
 /**
  * `creating` until the company wallet and its transit wallet both exist and
  * the company wallet's account is usable on chain. Creation resumes from
@@ -54,6 +65,14 @@ export const wallets = pgTable(
       .notNull()
       .$default(() => MAIN_CHAIN),
     status: walletStatus("status").notNull().default("creating"),
+    /**
+     * Where the company's USDC sits at rest. `confidential_account` means
+     * its confidential account in NEAR Intents, and the company wallet holds
+     * nothing at rest (docs/decisions/confidential-accounts.md).
+     */
+    balanceHome: walletBalanceHome("balance_home")
+      .notNull()
+      .default("company_wallet"),
     /**
      * The most USDC one transaction may move, in base units. Privy enforces
      * it on the transit wallet through its policy; on the company wallet,
@@ -91,6 +110,15 @@ export const wallets = pgTable(
     treasuryTurnedOnBy: uuid("treasury_turned_on_by").references(
       () => users.id,
     ),
+    /**
+     * What the company's confidential account held when the alert check last
+     * read it, in USDC base units. Staff code cannot sign in to read it, so
+     * the check saves each reading for them.
+     */
+    confidentialUsdc: bigint("confidential_usdc", { mode: "bigint" }),
+    confidentialUsdcReadAt: timestamp("confidential_usdc_read_at", {
+      withTimezone: true,
+    }),
     /**
      * When the gas relayer had created the company wallet's account on chain
      * and registered it with the USDC contract.
@@ -150,6 +178,10 @@ export const wallets = pgTable(
     check(
       "wallets_active_is_complete",
       sql`${table.status} <> 'active' OR (${table.privyPolicyId} IS NOT NULL AND ${table.privyWalletId} IS NOT NULL AND ${table.address} IS NOT NULL AND (${table.chain} = 'base' OR (${table.transitPrivyWalletId} IS NOT NULL AND ${table.transitAddress} IS NOT NULL AND ${table.onchainActivatedAt} IS NOT NULL)))`,
+    ),
+    check(
+      "wallets_confidential_reading_is_whole",
+      sql`(${table.confidentialUsdc} IS NULL) = (${table.confidentialUsdcReadAt} IS NULL)`,
     ),
     check(
       "wallets_per_transaction_max_positive",

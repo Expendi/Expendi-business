@@ -631,3 +631,553 @@ describe("wallet_transactions, for Treasury", () => {
     });
   });
 });
+
+describe("wallet_transactions, for a delivery into a confidential account", () => {
+  async function deliveredQuote() {
+    const { company, wallet } = await companyWithWallet();
+    const [quote] = await insertQuote(
+      company,
+      treasuryQuote(company, wallet, {
+        quoteKey: `fund_in:${randomUUID()}`,
+        purpose: "fund_in",
+        originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+        destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+        recipient: wallet.address,
+        recipientType: "CONFIDENTIAL_INTENTS",
+        refundType: "INTENTS",
+        status: "succeeded",
+        settledAt: new Date(),
+      }),
+    );
+    if (!quote) throw new Error("quote insert returned no row");
+    return { company, wallet, quote };
+  }
+
+  /** A deposit that records a quote's delivery: no chain transaction at all. */
+  const settlement = (
+    company: TestCompany,
+    wallet: TestWallet,
+    quoteId: string,
+    overrides: Partial<NewWalletTransaction> = {},
+  ) =>
+    ledgerRow(company, wallet, {
+      type: "deposit",
+      chain: "near",
+      intentQuoteId: quoteId,
+      ...overrides,
+    });
+
+  it("records the delivery of a quote with no chain transaction", async () => {
+    // #given
+    const { company, wallet, quote } = await deliveredQuote();
+
+    // #when
+    const insert = insertLedger(company, settlement(company, wallet, quote.id));
+
+    // #then
+    await expect(insert).resolves.toBeDefined();
+  });
+
+  it("credits a quote once", async () => {
+    // #given
+    const { company, wallet, quote } = await deliveredQuote();
+    await insertLedger(company, settlement(company, wallet, quote.id));
+
+    // #when
+    const again = insertLedger(
+      company,
+      settlement(company, wallet, quote.id, { usdcAmount: 2_000_000n }),
+    );
+
+    // #then
+    await expect(again).rejects.toMatchObject({
+      cause: { constraint: "wallet_transactions_quote_settled_credit_unique" },
+    });
+  });
+
+  it("credits two quotes of one company, one each", async () => {
+    // #given
+    const { company, wallet, quote } = await deliveredQuote();
+    const [other] = await insertQuote(
+      company,
+      treasuryQuote(company, wallet, {
+        quoteKey: `fund_in:${randomUUID()}`,
+        purpose: "fund_in",
+        recipientType: "CONFIDENTIAL_INTENTS",
+        refundType: "INTENTS",
+      }),
+    );
+    if (!other) throw new Error("quote insert returned no row");
+    await insertLedger(company, settlement(company, wallet, quote.id));
+
+    // #when
+    const second = insertLedger(company, settlement(company, wallet, other.id));
+
+    // #then
+    await expect(second).resolves.toBeDefined();
+  });
+
+  it.each([
+    ["on Base", { chain: "base" as const }],
+    ["with a transaction hash", { txHash: randomNearTxHash() }],
+    ["with a block", { blockNumber: 10n }],
+    ["with a log position", { logIndex: 0 }],
+  ])("rejects a delivery recorded %s", async (_name, overrides) => {
+    // #given
+    const { company, wallet, quote } = await deliveredQuote();
+
+    // #when
+    const insert = insertLedger(
+      company,
+      settlement(company, wallet, quote.id, overrides),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "wallet_transactions_deposit_has_source" },
+    });
+  });
+
+  it("rejects an on-chain deposit that also names a quote", async () => {
+    // #given
+    const { company, wallet, quote } = await deliveredQuote();
+
+    // #when
+    const insert = insertLedger(
+      company,
+      settlement(company, wallet, quote.id, {
+        txHash: randomNearTxHash(),
+        receiptId: randomNearTxHash(),
+        logIndex: 0,
+        transferIndex: 0,
+        blockNumber: 10n,
+      }),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "wallet_transactions_deposit_has_source" },
+    });
+  });
+
+  it("rejects a deposit with neither a chain transaction nor a quote", async () => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertLedger(
+      company,
+      ledgerRow(company, wallet, { type: "deposit", chain: "near" }),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "wallet_transactions_deposit_has_source" },
+    });
+  });
+
+  it("rejects a NEAR deposit with a transaction but no receipt and no quote", async () => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertLedger(
+      company,
+      ledgerRow(company, wallet, {
+        type: "deposit",
+        chain: "near",
+        txHash: randomNearTxHash(),
+        logIndex: 0,
+        blockNumber: 10n,
+      }),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "wallet_transactions_near_deposit_has_receipt" },
+    });
+  });
+
+  it("still records an ordinary NEAR deposit with its receipt", async () => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertLedger(
+      company,
+      ledgerRow(company, wallet, {
+        type: "deposit",
+        chain: "near",
+        txHash: randomNearTxHash(),
+        receiptId: randomNearTxHash(),
+        logIndex: 0,
+        transferIndex: 0,
+        blockNumber: 10n,
+      }),
+    );
+
+    // #then
+    await expect(insert).resolves.toBeDefined();
+  });
+
+  it("still records an ordinary deposit on Base", async () => {
+    // #given
+    const { company, wallet } = await companyWithWallet();
+
+    // #when
+    const insert = insertLedger(
+      company,
+      ledgerRow(company, wallet, {
+        type: "deposit",
+        chain: "base",
+        txHash: `0x${randomBytes(32).toString("hex")}`,
+        logIndex: 0,
+        blockNumber: 10n,
+      }),
+    );
+
+    // #then
+    await expect(insert).resolves.toBeDefined();
+  });
+
+  it("still names a quote on a Treasury row, and credits one from Treasury in several transfers", async () => {
+    // #given the Treasury quote the move paid, and a credit that names it
+    const { company, wallet, move: saved, quote } = await toTreasuryContext();
+    const treasuryRow = (
+      type: "to_treasury" | "from_treasury",
+      amount: bigint,
+    ) =>
+      insertLedger(
+        company,
+        ledgerRow(company, wallet, {
+          type,
+          usdcAmount: amount,
+          treasuryMoveId: saved.id,
+          intentQuoteId: quote.id,
+          chain: "near",
+          txHash: randomNearTxHash(),
+          receiptId: randomNearTxHash(),
+          logIndex: 0,
+          transferIndex: 0,
+        }),
+      );
+
+    // #then
+    await expect(
+      treasuryRow("to_treasury", -5_000_000n),
+    ).resolves.toBeDefined();
+    await expect(
+      treasuryRow("from_treasury", 3_000_000n),
+    ).resolves.toBeDefined();
+    await expect(
+      treasuryRow("from_treasury", 2_000_000n),
+    ).resolves.toBeDefined();
+  });
+
+  async function toTreasuryContext() {
+    const { company, wallet } = await companyWithWallet();
+    const saved = await savedMove(company, wallet);
+    const quote = await savedQuote(company, wallet, saved.id);
+    return { company, wallet, move: saved, quote };
+  }
+
+  it.each(["refund", "topup"] as const)(
+    "still rejects a %s that names a quote",
+    async (type) => {
+      // #given
+      const { company, wallet, quote } = await deliveredQuote();
+
+      // #when
+      const insert = insertLedger(
+        company,
+        ledgerRow(company, wallet, { type, intentQuoteId: quote.id }),
+      );
+
+      // #then
+      await expect(insert).rejects.toMatchObject({
+        cause: { constraint: "wallet_transactions_quote_link_is_treasury" },
+      });
+    },
+  );
+});
+
+describe("wallet_transactions, for a Treasury part paid from a confidential account", () => {
+  async function paidFromAccount() {
+    const { company, wallet } = await companyWithWallet();
+    const saved = await savedMove(company, wallet);
+    const quote = await savedQuote(company, wallet, saved.id, {
+      depositType: "CONFIDENTIAL_INTENTS",
+      refundType: "CONFIDENTIAL_INTENTS",
+      status: "refunded",
+      settledAt: new Date(),
+    });
+    return { company, wallet, move: saved, quote };
+  }
+
+  const debit = (
+    company: TestCompany,
+    wallet: TestWallet,
+    moveId: string,
+    quoteId: string,
+    amount = -5_000_000n,
+  ) =>
+    insertLedger(
+      company,
+      ledgerRow(company, wallet, {
+        type: "to_treasury",
+        chain: "near",
+        usdcAmount: amount,
+        treasuryMoveId: moveId,
+        intentQuoteId: quoteId,
+      }),
+    );
+
+  const refundCredit = (
+    company: TestCompany,
+    wallet: TestWallet,
+    moveId: string,
+    quoteId: string,
+    amount = 5_000_000n,
+  ) =>
+    insertLedger(
+      company,
+      ledgerRow(company, wallet, {
+        type: "from_treasury",
+        chain: "near",
+        usdcAmount: amount,
+        treasuryMoveId: moveId,
+        intentQuoteId: quoteId,
+      }),
+    );
+
+  it("records the debit with no chain transaction", async () => {
+    // #given
+    const { company, wallet, move: saved, quote } = await paidFromAccount();
+
+    // #when
+    const insert = debit(company, wallet, saved.id, quote.id);
+
+    // #then
+    await expect(insert).resolves.toBeDefined();
+  });
+
+  it("debits a quote once", async () => {
+    // #given
+    const { company, wallet, move: saved, quote } = await paidFromAccount();
+    await debit(company, wallet, saved.id, quote.id);
+
+    // #when
+    const again = debit(company, wallet, saved.id, quote.id, -4_000_000n);
+
+    // #then
+    await expect(again).rejects.toMatchObject({
+      cause: { constraint: "wallet_transactions_to_treasury_quote_unique" },
+    });
+  });
+
+  it("records a refunded part's debit and its credit, both naming the quote", async () => {
+    // #given
+    const { company, wallet, move: saved, quote } = await paidFromAccount();
+    await debit(company, wallet, saved.id, quote.id);
+
+    // #when
+    const credit = refundCredit(company, wallet, saved.id, quote.id);
+
+    // #then
+    await expect(credit).resolves.toBeDefined();
+  });
+
+  it("credits a refunded part once", async () => {
+    // #given
+    const { company, wallet, move: saved, quote } = await paidFromAccount();
+    await debit(company, wallet, saved.id, quote.id);
+    await refundCredit(company, wallet, saved.id, quote.id);
+
+    // #when
+    const again = refundCredit(company, wallet, saved.id, quote.id, 1_000_000n);
+
+    // #then
+    await expect(again).rejects.toMatchObject({
+      cause: { constraint: "wallet_transactions_quote_settled_credit_unique" },
+    });
+  });
+
+  it("records the settlement credit of a return delivered into the account, once", async () => {
+    // #given a Move to wallet quote 1Click delivered to the confidential account
+    const { company, wallet } = await companyWithWallet();
+    const saved = await savedMove(company, wallet, {
+      direction: "to_wallet",
+    });
+    const quote = await savedQuote(company, wallet, saved.id, {
+      quoteKey: `from_treasury:${randomUUID()}`,
+      purpose: "from_treasury",
+      originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+      destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+      recipient: wallet.address,
+      recipientType: "CONFIDENTIAL_INTENTS",
+      refundTo: baseAddress(),
+      status: "succeeded",
+      settledAt: new Date(),
+    });
+
+    // #when
+    const credit = refundCredit(company, wallet, saved.id, quote.id);
+    const again = refundCredit(company, wallet, saved.id, quote.id);
+
+    // #then
+    await expect(credit).resolves.toBeDefined();
+    await expect(again).rejects.toMatchObject({
+      cause: { constraint: "wallet_transactions_quote_settled_credit_unique" },
+    });
+  });
+
+  it("rejects a credit with no move", async () => {
+    // #given
+    const { company, wallet, quote } = await paidFromAccount();
+
+    // #when
+    const insert = insertLedger(
+      company,
+      ledgerRow(company, wallet, {
+        type: "from_treasury",
+        chain: "near",
+        intentQuoteId: quote.id,
+      }),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "wallet_transactions_treasury_has_move" },
+    });
+  });
+});
+
+describe("intent_quotes, for Treasury and a confidential account", () => {
+  async function moveContext(direction: "to_treasury" | "to_wallet") {
+    const { company, wallet } = await companyWithWallet();
+    const saved = await savedMove(company, wallet, { direction });
+    return { company, wallet, move: saved };
+  }
+
+  const returnQuote = (
+    wallet: TestWallet,
+    overrides: Partial<NewIntentQuote> = {},
+  ): Partial<NewIntentQuote> => ({
+    quoteKey: `from_treasury:${randomUUID()}`,
+    purpose: "from_treasury",
+    originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+    destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+    recipient: wallet.address,
+    refundTo: baseAddress(),
+    ...overrides,
+  });
+
+  it("saves a part paid from and refunding into a confidential account", async () => {
+    // #given
+    const { company, wallet, move: saved } = await moveContext("to_treasury");
+
+    // #when
+    const insert = savedQuote(company, wallet, saved.id, {
+      depositType: "CONFIDENTIAL_INTENTS",
+      refundType: "CONFIDENTIAL_INTENTS",
+    });
+
+    // #then
+    await expect(insert).resolves.toMatchObject({
+      depositType: "CONFIDENTIAL_INTENTS",
+      refundType: "CONFIDENTIAL_INTENTS",
+    });
+  });
+
+  it.each([
+    [
+      "a confidential deposit refunding on the origin chain",
+      {
+        depositType: "CONFIDENTIAL_INTENTS" as const,
+      },
+    ],
+    [
+      "a confidential refund for a deposit on the origin chain",
+      {
+        refundType: "CONFIDENTIAL_INTENTS" as const,
+      },
+    ],
+  ])("rejects %s", async (_name, overrides) => {
+    // #given
+    const { company, wallet, move: saved } = await moveContext("to_treasury");
+
+    // #when
+    const insert = savedQuote(company, wallet, saved.id, overrides);
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: { constraint: "intent_quotes_intents_side_matches_purpose" },
+    });
+  });
+
+  it("saves a return delivering into a confidential account, and lets it be marked credited once settled", async () => {
+    // #given
+    const { company, wallet, move: saved } = await moveContext("to_wallet");
+
+    // #when
+    const quote = await savedQuote(
+      company,
+      wallet,
+      saved.id,
+      returnQuote(wallet, {
+        recipientType: "CONFIDENTIAL_INTENTS",
+        status: "succeeded",
+        settledAt: new Date(),
+        ledgerCreditedAt: new Date(),
+      }),
+    );
+
+    // #then
+    expect(quote.ledgerCreditedAt).not.toBeNull();
+  });
+
+  it("rejects a return delivered to a chain address being marked credited", async () => {
+    // #given
+    const { company, wallet, move: saved } = await moveContext("to_wallet");
+
+    // #when
+    const insert = savedQuote(
+      company,
+      wallet,
+      saved.id,
+      returnQuote(wallet, {
+        status: "succeeded",
+        settledAt: new Date(),
+        ledgerCreditedAt: new Date(),
+      }),
+    );
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: {
+        constraint: "intent_quotes_ledger_credit_is_confidential_delivery",
+      },
+    });
+  });
+
+  it("rejects a part paid from a confidential account being marked credited", async () => {
+    // #given
+    const { company, wallet, move: saved } = await moveContext("to_treasury");
+
+    // #when
+    const insert = savedQuote(company, wallet, saved.id, {
+      depositType: "CONFIDENTIAL_INTENTS",
+      refundType: "CONFIDENTIAL_INTENTS",
+      status: "succeeded",
+      settledAt: new Date(),
+      ledgerCreditedAt: new Date(),
+    });
+
+    // #then
+    await expect(insert).rejects.toMatchObject({
+      cause: {
+        constraint: "intent_quotes_ledger_credit_is_confidential_delivery",
+      },
+    });
+  });
+});

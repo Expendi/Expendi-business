@@ -29,8 +29,10 @@ const blankIsAbsent = (value: unknown) => (value === "" ? undefined : value);
  * USDC payee on Base or Solana) and `fund_in_return` (a refunded fund-in,
  * from the company's NEAR Intents account back to its company wallet) and
  * `invoice_payment` (a customer paying an invoice), `to_treasury` (company
- * wallet to the Treasury wallet on Base) and `from_treasury` (the Treasury
- * wallet back to the company wallet).
+ * wallet to the Treasury wallet on Base), `from_treasury` (the Treasury
+ * wallet back to the company wallet), `move_in` (company wallet into the
+ * company's confidential account) and `fee_cover` (Expendi's relayer
+ * topping up the float that covers a confidential account's payout costs).
  */
 export const INTENT_QUOTE_PURPOSES = [
   "base_hop",
@@ -41,6 +43,8 @@ export const INTENT_QUOTE_PURPOSES = [
   "invoice_payment",
   "to_treasury",
   "from_treasury",
+  "move_in",
+  "fee_cover",
 ] as const;
 export const intentQuotePurposeSchema = z.enum(INTENT_QUOTE_PURPOSES);
 export type IntentQuotePurpose = z.infer<typeof intentQuotePurposeSchema>;
@@ -144,6 +148,21 @@ export const staffIntentQuoteDetailSchema =
     depositTxHash: z.string().nullable(),
     companyWalletSendId: z.uuid().nullable(),
     depositPrivyTransactionId: z.string().nullable(),
+    /**
+     * Where 1Click takes the deposit from, delivers, and returns a refund:
+     * `CONFIDENTIAL_INTENTS` for a quote paid out of the company's
+     * confidential account by a signed message.
+     */
+    depositType: z.enum(["ORIGIN_CHAIN", "INTENTS", "CONFIDENTIAL_INTENTS"]),
+    recipientType: z.enum(["DESTINATION_CHAIN", "CONFIDENTIAL_INTENTS"]),
+    refundType: z.enum(["ORIGIN_CHAIN", "INTENTS", "CONFIDENTIAL_INTENTS"]),
+    /**
+     * What a quote paid by a signed message records of it. The message
+     * itself is never sent: it is spendable until its deadline.
+     */
+    intentHash: z.string().nullable(),
+    intentDeadline: z.iso.datetime().nullable(),
+    intentSubmittedAt: z.iso.datetime().nullable(),
     oneClickCheckedAt: z.iso.datetime().nullable(),
     /** Every transaction 1Click has listed for the quote, as it gave them. */
     nearTxHashes: z.array(z.string()),

@@ -104,6 +104,16 @@ const QUOTE_ROUTES: Readonly<
     originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
     destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
   },
+  move_in: {
+    swapType: "EXACT_INPUT",
+    originAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+    destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+  },
+  fee_cover: {
+    swapType: "EXACT_INPUT",
+    originAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+    destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+  },
 };
 
 /**
@@ -111,6 +121,14 @@ const QUOTE_ROUTES: Readonly<
  * code that runs hops, sweeps and USDC payouts saves one. A Treasury quote
  * stands the transit wallet's Base address in for the Treasury wallet's, and
  * needs its move in `options.row.treasuryMoveId`.
+ *
+ * A `move_in` and a `fee_cover` always deliver to the company's confidential
+ * account, and `options.confidential` makes a fund-in return or a return
+ * from Treasury do so too.
+ * `options.intentPaid` makes a hop, a USDC payout or a move to Treasury be
+ * paid out of the account and refund into it. All are quoted with a session
+ * of the company, signed in on the fake 1Click directly: a test of the real
+ * sign-in uses a company whose wallet exists in the fake Privy.
  */
 export async function saveQuote(
   runtime: AppRuntime,
@@ -119,31 +137,83 @@ export async function saveQuote(
   purpose: Exclude<IntentQuotePurpose, "fund_in" | "invoice_payment">,
   options: {
     readonly amount?: bigint;
+    /** What 1Click may move the price by; 1% unless given. */
+    readonly slippageBps?: number;
+    readonly confidential?: boolean;
+    /** Paid out of the company's confidential account, by a signed message. */
+    readonly intentPaid?: boolean;
     readonly row?: Partial<NewIntentQuote>;
   } = {},
 ): Promise<IntentQuote> {
   const route = QUOTE_ROUTES[purpose];
   const intents = purpose === "fund_in_return";
+  if (
+    options.confidential &&
+    purpose !== "fund_in_return" &&
+    purpose !== "from_treasury"
+  ) {
+    throw new Error(`a ${purpose} quote has no confidential variant`);
+  }
+  if (
+    options.intentPaid &&
+    purpose !== "base_hop" &&
+    purpose !== "usdc_payout" &&
+    purpose !== "to_treasury"
+  ) {
+    throw new Error(`a ${purpose} quote is never paid from the account`);
+  }
+  const recipientType =
+    purpose === "move_in" || purpose === "fee_cover" || options.confidential
+      ? ("CONFIDENTIAL_INTENTS" as const)
+      : ("DESTINATION_CHAIN" as const);
   const fromCompanyWallet = purpose !== "sweep" && purpose !== "from_treasury";
   const recipient =
-    fromCompanyWallet && !intents ? funded.transitAddress : funded.accountId;
+    fromCompanyWallet &&
+    !intents &&
+    purpose !== "move_in" &&
+    purpose !== "fee_cover"
+      ? funded.transitAddress
+      : funded.accountId;
   const refundTo = fromCompanyWallet ? funded.accountId : funded.transitAddress;
   const sides = intents
     ? ({ depositType: "INTENTS", refundType: "INTENTS" } as const)
-    : ({ depositType: "ORIGIN_CHAIN", refundType: "ORIGIN_CHAIN" } as const);
+    : options.intentPaid
+      ? ({
+          depositType: "CONFIDENTIAL_INTENTS",
+          refundType: "CONFIDENTIAL_INTENTS",
+        } as const)
+      : ({ depositType: "ORIGIN_CHAIN", refundType: "ORIGIN_CHAIN" } as const);
   const quote = await runtime.runPromise(
-    Effect.flatMap(OneClick, (oneClick) =>
-      oneClick.quote({
-        dry: false,
-        ...route,
-        amount: options.amount ?? 5_000_000n,
-        recipient,
-        refundTo,
-        ...sides,
-        deadline: new Date(Date.now() + 10 * 60_000),
-        slippageBps: 100,
-      }),
-    ),
+    Effect.gen(function* () {
+      const oneClick = yield* OneClick;
+      const session =
+        recipientType === "CONFIDENTIAL_INTENTS" || options.intentPaid
+          ? (yield* oneClick.authenticate({
+              standard: "nep413",
+              payload: {
+                message: JSON.stringify({ signer_id: funded.accountId }),
+                nonce: "",
+                recipient: "",
+              },
+              public_key: "",
+              signature: "",
+            })).session
+          : undefined;
+      return yield* oneClick.quote(
+        {
+          dry: false,
+          ...route,
+          amount: options.amount ?? 5_000_000n,
+          recipient,
+          recipientType,
+          refundTo,
+          ...sides,
+          deadline: new Date(Date.now() + 10 * 60_000),
+          slippageBps: options.slippageBps ?? 100,
+        },
+        session,
+      );
+    }),
   );
   if (quote.dry) throw new Error("the fake 1Click gave a dry quote");
   const [row] = await runInScope(
@@ -164,6 +234,7 @@ export async function saveQuote(
           minAmountOut: quote.minAmountOut,
           depositAddress: quote.depositAddress,
           recipient,
+          recipientType,
           refundTo,
           ...sides,
           deadline: quote.deadline,
@@ -208,6 +279,7 @@ export function ledgerOf(db: Database, funded: FundedCompany) {
           blockNumber: walletTransactions.blockNumber,
           counterpartyAddress: walletTransactions.counterpartyAddress,
           payoutId: walletTransactions.payoutId,
+          intentQuoteId: walletTransactions.intentQuoteId,
         })
         .from(walletTransactions)
         .where(eq(walletTransactions.walletId, funded.walletId))

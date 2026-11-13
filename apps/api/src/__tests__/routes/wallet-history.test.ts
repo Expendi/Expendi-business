@@ -26,6 +26,7 @@ import {
 import { randomTxHash } from "../helpers/chain.js";
 import { addCategory } from "../helpers/claims.js";
 import { addMember, createUser } from "../helpers/db.js";
+import { insertDeliveredBillPayment } from "../helpers/delivered-payout.js";
 import {
   makeFakePaycrest,
   makeFakePrivyWallets,
@@ -168,6 +169,103 @@ async function seedHistory() {
 }
 
 describe("GET /organizations/:id/wallet/history", () => {
+  async function deliveredBill(
+    delivery: Parameters<typeof insertDeliveredBillPayment>[4],
+  ) {
+    const categoryId = await addCategory(db, paying.company, "Utilities");
+    const payeeId = await insertPayee(db, paying.company);
+    const billId = await insertBill(db, paying.company, {
+      payeeId,
+      categoryId,
+      status: "due",
+    });
+    return insertDeliveredBillPayment(
+      db,
+      paying.company,
+      paying.wallet,
+      billId,
+      delivery,
+    );
+  }
+
+  it("shows a confidential account's payout with no row hash and the payee chain's transaction", async () => {
+    // #given
+    const deliveryTxHash = randomTxHash();
+    const payoutId = await deliveredBill({
+      chain: "base",
+      address: randomAddress(),
+      deliveryTxHash,
+    });
+
+    // #when
+    const page = await historyPage();
+
+    // #then
+    const row = page.items.find((item) => item.payout?.id === payoutId);
+    expect({
+      type: row?.type,
+      chain: row?.chain,
+      txHash: row?.txHash,
+      deliveryTxHash: row?.payout?.deliveryTxHash,
+      deliveryTxChain: row?.payout?.deliveryTxChain,
+      recipientChain: row?.payout?.recipientChain,
+    }).toEqual({
+      type: "payout",
+      chain: "near",
+      txHash: null,
+      deliveryTxHash,
+      deliveryTxChain: "base",
+      recipientChain: "base",
+    });
+  });
+
+  it("keeps a NEAR hash's case in the payee chain's transaction", async () => {
+    // #given
+    const deliveryTxHash = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";
+    const payoutId = await deliveredBill({
+      chain: "near",
+      address: "acme.near",
+      deliveryTxHash,
+    });
+
+    // #when
+    const page = await historyPage();
+
+    // #then
+    const row = page.items.find((item) => item.payout?.id === payoutId);
+    expect(row?.payout).toMatchObject({
+      deliveryTxHash,
+      deliveryTxChain: "near",
+    });
+  });
+
+  it("leaves the payee chain's transaction out of a cash-out, a claim and a payout still in flight", async () => {
+    // #given
+    await seedHistory();
+    const categoryId = await addCategory(db, paying.company, "Utilities");
+    const payeeId = await insertPayee(db, paying.company);
+    const billId = await insertBill(db, paying.company, {
+      payeeId,
+      categoryId,
+      status: "due",
+    });
+    await insertBillPayment(db, paying.company, paying.wallet.id, billId);
+
+    // #when
+    const response = await history();
+    const body = (await response.json()) as {
+      data: { items: { payout: Record<string, unknown> | null }[] };
+    };
+
+    // #then
+    const payouts = body.data.items.flatMap((item) =>
+      item.payout ? [item.payout] : [],
+    );
+    expect(payouts.length).toBeGreaterThan(2);
+    expect(payouts.some((payout) => "deliveryTxHash" in payout)).toBe(false);
+    expect(payouts.some((payout) => "deliveryTxChain" in payout)).toBe(false);
+  });
+
   it("lists deposits, payouts, refunds and withdrawals, newest first", async () => {
     // #given
     await seedHistory();

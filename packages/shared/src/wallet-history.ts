@@ -78,6 +78,16 @@ export const walletHistoryPayoutSchema = z.object({
   rate: z.string().nullable(),
   /** Why it failed, for people to read. */
   failureReason: z.string().nullable(),
+  /**
+   * The payee chain's own transaction that delivered a paid USDC payout
+   * through NEAR Intents; absent for anything else. For a company
+   * whose USDC is in a confidential account the ledger row has no
+   * `txHash`, and this is the only transaction there is. Case-sensitive:
+   * show it exactly as given.
+   */
+  deliveryTxHash: z.string().nullable().optional(),
+  /** The chain `deliveryTxHash` is on (the payee chain); absent with it. */
+  deliveryTxChain: payeeChainSchema.nullable().optional(),
 });
 
 export type WalletHistoryPayout = z.infer<typeof walletHistoryPayoutSchema>;

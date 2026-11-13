@@ -35,15 +35,25 @@ const chain = (name: keyof typeof PAYEE_CHAIN_NAMES | null) =>
 const hashes = (list: readonly string[]) =>
   list.length === 0 ? "—" : list.join(", ");
 
+/** Paid out of the company's confidential account by a signed message. */
+const isPaidByMessage = (quote: StaffIntentQuoteDetail) =>
+  quote.depositType === "CONFIDENTIAL_INTENTS";
+
 /**
  * Whether staff can resolve the quote: it is under review, or 1Click
  * settled it while a payout or a company wallet send it holds was left
- * open.
+ * open. A quote paid by a signed message is never resolved while under
+ * review: the job settles it, and staff only hand back what it held.
  */
 const resolvable = (quote: StaffIntentQuoteDetail) =>
-  quote.status === "needs_review" ||
-  ((quote.status === "succeeded" || quote.status === "refunded") &&
-    (quote.payoutsInReview > 0 || quote.openSends > 0));
+  isPaidByMessage(quote)
+    ? (quote.status === "succeeded" ||
+        quote.status === "refunded" ||
+        quote.status === "failed") &&
+      quote.payoutsInReview > 0
+    : quote.status === "needs_review" ||
+      ((quote.status === "succeeded" || quote.status === "refunded") &&
+        (quote.payoutsInReview > 0 || quote.openSends > 0));
 
 /** One NEAR Intents quote, with what's needed to check it against 1Click and the chains. */
 export function IntentQuoteView({ quoteId }: { quoteId: string }) {
@@ -112,7 +122,17 @@ export function IntentQuoteView({ quoteId }: { quoteId: string }) {
             Resolving needs an ops admin.
           </p>
         ) : resolvable(quote) ? (
-          <ResolveQuoteFlow quoteId={quote.id} />
+          <ResolveQuoteFlow
+            quoteId={quote.id}
+            paidByMessage={isPaidByMessage(quote)}
+          />
+        ) : isPaidByMessage(quote) && quote.status === "needs_review" ? (
+          <p className="text-sm text-muted-foreground">
+            This quote settles when the job hears SUCCESS or REFUNDED from
+            1Click, or fails once the signed message&apos;s deadline (
+            {time(quote.intentDeadline)}) has passed. There is nothing to
+            resolve until then.
+          </p>
         ) : null}
       </div>
 
@@ -135,16 +155,36 @@ export function IntentQuoteView({ quoteId }: { quoteId: string }) {
                 ["Refund address", quote.refundTo],
                 ["Deadline", time(quote.deadline)],
                 ["Deposit started", time(quote.depositStartedAt)],
-                ["Deposit transaction", quote.depositTxHash ?? "—"],
-                ["Company wallet send", quote.companyWalletSendId ?? "—"],
-                ["Privy transaction", quote.depositPrivyTransactionId ?? "—"],
+                ...(isPaidByMessage(quote)
+                  ? ([
+                      [
+                        "Paid by",
+                        "A signed message out of the company's confidential account",
+                      ],
+                      ["Message hash", quote.intentHash ?? "—"],
+                      ["Message deadline", time(quote.intentDeadline)],
+                      ["Message submitted", time(quote.intentSubmittedAt)],
+                    ] as const)
+                  : ([
+                      ["Deposit transaction", quote.depositTxHash ?? "—"],
+                      ["Company wallet send", quote.companyWalletSendId ?? "—"],
+                      [
+                        "Privy transaction",
+                        quote.depositPrivyTransactionId ?? "—",
+                      ],
+                    ] as const)),
                 [
                   "1Click status",
                   quote.oneClickStatus
                     ? `${quote.oneClickStatus} (checked ${time(quote.oneClickCheckedAt)})`
                     : "—",
                 ],
-                ["1Click NEAR transactions", hashes(quote.nearTxHashes)],
+                [
+                  isPaidByMessage(quote)
+                    ? "1Click NEAR transactions (the shared account's)"
+                    : "1Click NEAR transactions",
+                  hashes(quote.nearTxHashes),
+                ],
                 [
                   "1Click origin transactions",
                   hashes(quote.originChainTxHashes),
@@ -177,7 +217,10 @@ export function IntentQuoteView({ quoteId }: { quoteId: string }) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <QuoteEvidence quoteId={quote.id} />
+          <QuoteEvidence
+            quoteId={quote.id}
+            paidByMessage={isPaidByMessage(quote)}
+          />
         </CardContent>
       </Card>
 
@@ -227,7 +270,13 @@ export function IntentQuoteView({ quoteId }: { quoteId: string }) {
   );
 }
 
-function QuoteEvidence({ quoteId }: { quoteId: string }) {
+function QuoteEvidence({
+  quoteId,
+  paidByMessage,
+}: {
+  quoteId: string;
+  paidByMessage: boolean;
+}) {
   const { api } = useStaffAuth();
   const result = useQuery({
     queryKey: queryKeys.intentQuoteEvidence(quoteId),
@@ -239,5 +288,10 @@ function QuoteEvidence({ quoteId }: { quoteId: string }) {
   if (result.isError) {
     return <PageError>{describeApiError(result.error)}</PageError>;
   }
-  return <QuoteEvidenceSummary evidence={result.data} />;
+  return (
+    <QuoteEvidenceSummary
+      evidence={result.data}
+      paidByMessage={paidByMessage}
+    />
+  );
 }
