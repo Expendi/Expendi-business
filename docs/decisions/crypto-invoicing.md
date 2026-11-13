@@ -45,6 +45,12 @@ Terms are defined in `CONTEXT.md`.
 3. **By hand:** "Match a deposit" links an open invoice to a deposit in the company's wallet history that no invoice payment uses yet. "Mark paid" records a payment made outside Expendi: date, optional reference and note.
 4. **The customer's receipt** is emailed once a payment is recorded through the link.
 
+### The PDF
+
+1. `/pay/<public ID>/pdf` downloads the invoice as a PDF, behind the same capability as the pay link. The API renders it (pdfkit, Outfit embedded); the web app serves it from the dashboard's origin so emails link to one address.
+2. It shows the invoice as the pay page does, stamped PAID (date, USDC received, chain, NEAR transaction), VOID or OVERDUE. An open invoice carries its pay link.
+3. The invoice email, the receipt email, the pay page and the invoice detail link to it. It is rendered on each request and never stored.
+
 ### Access
 
 Admins create, send and change invoices and customers. Accountants read them. Employees can't see them. The pay routes are public and know only the public ID.
@@ -58,4 +64,5 @@ Admins create, send and change invoices and customers. Accountants read them. Em
 - A delivery whose invoice payment can't be recorded rolls its credit back, and the watcher retries that wallet every run. We judged this unreachable for a real quote and preferable to a deposit with no payment.
 - Not proved on mainnet yet: that 1Click lists the delivery for an invoice payment quote in the fields the watcher reads, as it does for fund-ins.
 - Only USDC on four chains. USDT, cards and bank transfers, which Acctual takes, need more work: other decimals, and fiat collection partners.
-- No PDF: the pay page prints cleanly instead. No recurring invoices, scheduled reminders or Zoho sync yet.
+- The PDF is rendered on every request to a public route, with no rate limit by IP, like the pay page.
+- No recurring invoices, scheduled reminders or Zoho sync yet.
