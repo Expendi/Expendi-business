@@ -8,6 +8,7 @@ import type { DatabaseError } from "../../errors.js";
 import type { AuditActor } from "../audit/audit-log.js";
 import type { BaseRpcError } from "../chain/base-rpc.js";
 import type { TransactionReceipt, UsdcTransfer } from "../chain/base.js";
+import type { ConfidentialAccounts } from "../intents/confidential-account.js";
 import type { OneClick } from "../intents/one-click.js";
 import type { GatewayOrderInfo } from "../paycrest/gateway.js";
 import {
@@ -22,6 +23,7 @@ import { raiseAlert } from "../alerts/ops-alerts.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { BaseRpc } from "../chain/base-rpc.js";
 import { USDC_BASE_ADDRESS, usdcTransfersIn } from "../chain/base.js";
+import { sessionForQuote } from "../intents/company-session.js";
 import {
   quotesToRecheck,
   refreshQuoteStatus,
@@ -440,7 +442,11 @@ type TransitOutcome = "internal" | "flagged";
  *
  * 1Click can list a transaction a little after it lands. So while a hop or
  * sweep could still explain this amount, or one that could wasn't
- * answerable, the answer is "not yet" rather than an alert.
+ * answerable, the answer is "not yet" rather than an alert. A hop or sweep
+ * that touches a confidential account is asked about with the company's
+ * session, which 1Click requires; when none can be had it can't be asked,
+ * so it keeps the answer at "not yet" instead of flagging the company's own
+ * money.
  */
 function settleTransitTransfer(
   wallet: DepositWallet,
@@ -448,7 +454,7 @@ function settleTransitTransfer(
 ): Effect.Effect<
   TransitOutcome,
   HopArrivalUnconfirmed | DatabaseError,
-  DatabaseService | OneClick
+  DatabaseService | OneClick | ConfidentialAccounts
 > {
   const organizationId = wallet.organization_id;
   return Effect.gen(function* () {
@@ -459,7 +465,11 @@ function settleTransitTransfer(
       organizationId,
       TRANSIT_QUOTE_PURPOSES,
     )) {
-      const exit = yield* Effect.exit(refreshQuoteStatus(quote));
+      const exit = yield* Effect.exit(
+        sessionForQuote(quote).pipe(
+          Effect.flatMap((session) => refreshQuoteStatus(quote, session)),
+        ),
+      );
       if (Exit.isFailure(exit)) {
         console.warn(
           `[deposits] quote ${quote.id} not refreshed`,
@@ -535,7 +545,7 @@ export function creditUsdcDeposits(
 ): Effect.Effect<
   DepositSummary,
   ReceiptUnavailable | HopArrivalUnconfirmed | BaseRpcError | DatabaseError,
-  BaseRpc | DatabaseService | AuditLog | OneClick
+  BaseRpc | DatabaseService | AuditLog | OneClick | ConfidentialAccounts
 > {
   return Effect.gen(function* () {
     const rpc = yield* BaseRpc;

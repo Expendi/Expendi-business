@@ -154,6 +154,22 @@ describe("describeChanges", () => {
     ]);
   });
 
+  it("shows a transaction hash as it is written and nothing when there is none", () => {
+    // #given
+    const hash = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";
+
+    // #when
+    const shown = [hash, null].map((txHash) =>
+      showValue("txHash", txHash, "payout"),
+    );
+
+    // #then
+    expect(shown).toEqual([
+      { kind: "text", text: "9xQeWv…VFin" },
+      { kind: "none" },
+    ]);
+  });
+
   it("names a field it doesn't know in plain words", () => {
     // #when
     const shown = showValue("invitedAt", null, "membership");

@@ -54,3 +54,43 @@ describe("walletHistoryPayoutSchema", () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe("a payout's delivery transaction", () => {
+  it("parses a payout that has none, as every client before it sent", () => {
+    // #when
+    const parsed = walletHistoryPayoutSchema.parse(payout);
+
+    // #then
+    expect(parsed.deliveryTxHash).toBeUndefined();
+    expect(parsed.deliveryTxChain).toBeUndefined();
+  });
+
+  it("carries the payee chain's transaction with the chain it is on", () => {
+    // #when
+    const parsed = walletHistoryPayoutSchema.parse({
+      ...payout,
+      method: "usdc",
+      recipientChain: "base",
+      deliveryTxHash: `0x${"ab".repeat(32)}`,
+      deliveryTxChain: "base",
+    });
+
+    // #then
+    expect([parsed.deliveryTxHash, parsed.deliveryTxChain]).toEqual([
+      `0x${"ab".repeat(32)}`,
+      "base",
+    ]);
+  });
+
+  it("refuses a chain that isn't a payee chain", () => {
+    // #when
+    const result = walletHistoryPayoutSchema.safeParse({
+      ...payout,
+      deliveryTxHash: "abc",
+      deliveryTxChain: "ethereum",
+    });
+
+    // #then
+    expect(result.success).toBe(false);
+  });
+});

@@ -1,9 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 
 import type { Database } from "../../db/client.js";
+import type { FundedCompany } from "../helpers/money-in.js";
 import type { NearPayingCompany } from "../helpers/near-payouts.js";
 import { DatabaseService } from "../../db/client.js";
+import { payrollRuns } from "../../db/schema/index.js";
+import { runInScope } from "../../db/scope.js";
 import { sweepTransitWallets } from "../../services/intents/sweep.js";
 import { approvePayouts } from "../../services/payout/approve.js";
 import { advanceBaseHop } from "../../services/payout/base-hop.js";
@@ -20,7 +31,9 @@ import {
 } from "../../services/payout/sync.js";
 import { mineCompanySends } from "../helpers/base-mining.js";
 import { randomTxHash } from "../helpers/chain.js";
+import { settleOpenQuotes } from "../helpers/confidential-delivery.js";
 import { randomAddress, TEST_ORIGIN } from "../helpers/fakes.js";
+import { saveQuote } from "../helpers/money-in.js";
 import {
   createNearPayingCompany,
   deliverHop,
@@ -31,6 +44,7 @@ import {
 import {
   allowlistAddress,
   claimRequest,
+  ledgerBalance,
   payClaims,
   readPayout,
   updatePayout,
@@ -436,6 +450,177 @@ describe("a Pretium cash-out waiting for its hop", () => {
       reason: "Funding never started after approval. Nothing was sent.",
       sends: 0,
       pays: 0,
+    });
+  });
+});
+
+describe("the outbound quotes job for a company whose USDC is in a confidential account", () => {
+  let funded: FundedCompany;
+
+  beforeEach(async () => {
+    paying = await createNearPayingCompany(world, db, {
+      balanceHome: "confidential_account",
+    });
+    await mineCompanySends(
+      privy,
+      world.base.state.receipts,
+      db,
+      paying.company,
+    );
+    oneClick.state.fundConfidential(paying.accountId, 100n * USDC);
+    funded = {
+      company: paying.company,
+      walletId: paying.wallet.id,
+      accountId: paying.accountId,
+      transitAddress: paying.transitAddress,
+    };
+    await saveQuote(runtime, db, funded, "fee_cover", {
+      amount: 2n * USDC,
+      row: { status: "succeeded", settledAt: new Date() },
+    });
+  });
+
+  afterEach(async () => {
+    await settleOpenQuotes(db, funded);
+  });
+
+  async function payroll(salaries: number) {
+    const payrollRunId = randomUUID();
+    await runInScope(
+      db,
+      { organizationId: paying.company.organizationId, role: "admin" },
+      (tx) =>
+        tx.insert(payrollRuns).values({
+          id: payrollRunId,
+          organizationId: paying.company.organizationId,
+          payDate: "2026-11-25",
+          totalKes: 150_000n * BigInt(salaries),
+          capKes: 540_000n,
+        }),
+    );
+    return payClaims(
+      runtime,
+      db,
+      paying,
+      Array.from({ length: salaries }, () =>
+        claimRequest({
+          subjectType: "bill",
+          payrollRunId,
+          idempotencyKey: `salary:${randomUUID()}:1`,
+          amountKesCents: 150_000n,
+        }),
+      ),
+    );
+  }
+
+  const hops = async () =>
+    (await readQuotes(db, paying.company)).filter(
+      (quote) => quote.purpose === "base_hop",
+    );
+
+  it("funds each cash-out of a payroll run once the one hop out of the account succeeds", async () => {
+    // #given a run of two salaries hopped once, out of the account
+    const batch = await payroll(2);
+    const [hop, ...others] = await hops();
+    if (!hop || others.length > 0) throw new Error("expected one hop");
+    await job();
+    expect(
+      (
+        await Promise.all(
+          batch.map((p) => readPayout(db, paying.company, p.id)),
+        )
+      ).map((payout) => payout.status),
+    ).toEqual(["approved", "approved"]);
+
+    // #when 1Click delivers and the job runs, twice
+    oneClick.state.deliverIntentPayout(hop.depositAddress);
+    world.setBaseUsdc(paying.transitAddress, hop.amountOut);
+    await job();
+    await job();
+
+    // #then each salary was funded from the transit wallet, once
+    const funded = await Promise.all(
+      batch.map((p) => readPayout(db, paying.company, p.id)),
+    );
+    expect({
+      statuses: funded.map((payout) => payout.status),
+      sends: privy.state.sends
+        .filter((send) => send.privyWalletId === paying.transitPrivyWalletId)
+        .map((send) => send.idempotencyKey)
+        .sort(),
+      intents: oneClick.state.submittedIntents.filter(
+        (intent) => intent.depositAddress === hop.depositAddress,
+      ).length,
+    }).toEqual({
+      statuses: ["paying", "paying"],
+      sends: batch.map((payout) => `payout-${payout.id}`).sort(),
+      intents: 1,
+    });
+  });
+
+  it("fails every cash-out with no ledger row when the job hears the shared hop was refunded", async () => {
+    // #given a run whose hop 1Click refunded
+    const batch = await payroll(2);
+    const [hop] = await hops();
+    if (!hop) throw new Error("no hop");
+    oneClick.state.refundIntentPayout(hop.depositAddress);
+
+    // #when the job runs, twice
+    await job();
+    await job();
+
+    // #then
+    expect({
+      statuses: (
+        await Promise.all(
+          batch.map((p) => readPayout(db, paying.company, p.id)),
+        )
+      ).map((payout) => payout.status),
+      hop: (await hops())[0]?.status,
+      ledger: await ledgerBalance(db, paying.company),
+      sends: privy.state.sends.filter(
+        (send) => send.privyWalletId === paying.transitPrivyWalletId,
+      ).length,
+    }).toEqual({
+      statuses: ["failed", "failed"],
+      hop: "refunded",
+      ledger: 100n * USDC,
+      sends: 0,
+    });
+  });
+
+  it("sweeps what is left in the transit wallet into the account, and the job settles it without a ledger row", async () => {
+    // #given 5 USDC left in the transit wallet
+    world.setBaseUsdc(paying.transitAddress, 5n * USDC);
+
+    // #when the sweep job runs, 1Click delivers and the quotes job runs
+    await runtime.runPromise(sweepTransitWallets());
+    const [sweep, ...others] = (await readQuotes(db, paying.company)).filter(
+      (quote) => quote.purpose === "sweep",
+    );
+    if (!sweep || others.length > 0) throw new Error("expected one sweep");
+    oneClick.state.setStatus(sweep.depositAddress, {
+      status: "SUCCESS",
+      depositedAmount: sweep.amountIn,
+      amountIn: sweep.amountIn,
+      amountOut: sweep.amountOut,
+    });
+    world.setBaseUsdc(paying.transitAddress, 0n);
+    await job();
+
+    // #then it delivered into the account and settled, and the ledger holds
+    // only the opening deposit
+    const settled = (await readQuotes(db, paying.company)).find(
+      (quote) => quote.id === sweep.id,
+    );
+    expect({
+      recipientType: sweep.recipientType,
+      status: settled?.status,
+      ledger: await ledgerBalance(db, paying.company),
+    }).toEqual({
+      recipientType: "CONFIDENTIAL_INTENTS",
+      status: "succeeded",
+      ledger: 100n * USDC,
     });
   });
 });

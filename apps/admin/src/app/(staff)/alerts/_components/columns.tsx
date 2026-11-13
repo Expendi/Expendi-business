@@ -21,6 +21,7 @@ export const KIND_LABELS: Record<OpsAlertKind, string> = {
   treasury_usdc_idle: "USDC idle in a Treasury wallet",
   treasury_position_mismatch: "Treasury position doesn't match its moves",
   treasury_partial_fill: "Treasury withdrawal filled in part",
+  confidential_balance_mismatch: "Confidential balance mismatch",
 };
 
 /** Where staff look into an alert's cause. */
@@ -39,6 +40,7 @@ export function causeLink(
     case "treasury_usdc_idle":
     case "treasury_position_mismatch":
     case "treasury_partial_fill":
+    case "confidential_balance_mismatch":
       return alert.organization
         ? {
             href: `/companies/${alert.organization.id}`,

@@ -5,12 +5,15 @@ import PDFDocument from "pdfkit";
 import type {
   CashOutReceipt,
   CashOutReceiptKind,
+  PayeeChain,
   PayoutMethod,
   WalletChain,
 } from "@expendi-business/shared";
 import {
   cashOutReceiptLabel,
   nearTransactionUrl,
+  PAYEE_CHAIN_NAMES,
+  payeeChainTransactionUrl,
 } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
@@ -43,7 +46,7 @@ import {
   RULE,
 } from "../invoices/pdf-style.js";
 import { cashOutReceiptsOf } from "../payout/receipts.js";
-import { describeRecipient } from "../wallet/history.js";
+import { deliveryTransactionOf, describeRecipient } from "../wallet/history.js";
 
 /**
  * The receipt of a bill paid through Expendi, for
@@ -84,6 +87,13 @@ export interface BillPaymentReceiptData {
   readonly providerReceipts: readonly CashOutReceipt[];
   readonly txHash: string | null;
   readonly txChain: WalletChain | null;
+  /**
+   * The payee chain's transaction, for a USDC payout delivered through NEAR
+   * Intents that left no transaction of the company's own (a confidential
+   * account). Only set when `txHash` is null.
+   */
+  readonly deliveryTxHash: string | null;
+  readonly deliveryTxChain: PayeeChain | null;
 }
 
 /** Short, stable and readable aloud: the payout's first 8 hex digits. */
@@ -159,6 +169,7 @@ export function getBillPaymentReceiptData(
           .limit(1),
       );
       const txHash = ledger?.txHash ?? payout.txHash;
+      const delivery = txHash === null ? deliveryTransactionOf(payout) : null;
 
       return {
         receiptNumber: receiptNumberOf(payout.id),
@@ -177,6 +188,8 @@ export function getBillPaymentReceiptData(
         providerReceipts: cashOutReceiptsOf([payout]),
         txHash,
         txChain: txHash === null ? null : (ledger?.chain ?? null),
+        deliveryTxHash: delivery?.txHash ?? null,
+        deliveryTxChain: delivery?.chain ?? null,
       };
     }),
   );
@@ -209,6 +222,9 @@ export function nairobiDateTime(instant: Date): string {
     parts.find((candidate) => candidate.type === type)?.value ?? "";
   return `${part("day")} ${part("month")} ${part("year")}, ${part("hour")}:${part("minute")} ${part("dayPeriod").toUpperCase()}`;
 }
+
+const linkOf = (url: string | null): { link?: string } =>
+  url === null ? {} : { link: url };
 
 /** One line per kind, e.g. "M-Pesa receipt: UKDCW299LW". */
 function receiptRows(
@@ -364,6 +380,20 @@ export function renderBillPaymentReceiptPdf(
             ...(data.txChain === "near"
               ? { link: nearTransactionUrl(data.txHash) }
               : {}),
+          },
+        ]),
+    ...(data.deliveryTxHash === null || data.deliveryTxChain === null
+      ? []
+      : [
+          {
+            label: `${PAYEE_CHAIN_NAMES[data.deliveryTxChain]} transaction`,
+            value: data.deliveryTxHash,
+            ...linkOf(
+              payeeChainTransactionUrl(
+                data.deliveryTxChain,
+                data.deliveryTxHash,
+              ),
+            ),
           },
         ]),
   ];

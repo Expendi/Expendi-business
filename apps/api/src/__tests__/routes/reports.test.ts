@@ -307,6 +307,76 @@ describe("the month's money out", () => {
     expect(data.moneyOut).toHaveLength(2);
   });
 
+  describe("the payout reference of a USDC payout", () => {
+    const usdcBill = async (
+      payout: { txHash: string | null; providerReference: string | null },
+      chain: "near" | "base" = "base",
+    ) => {
+      const { company: target, officeId, seed } = await company();
+      const payeeId = await insertPayee(db, target, { name: "Vercel" });
+      const paid = await seed.paidBill(
+        {
+          payeeId,
+          categoryId: officeId,
+          currency: "usd",
+          amountKes: null,
+          amountUsdc: 100_000_000n,
+        },
+        [
+          {
+            provider: "onchain",
+            method: "usdc",
+            recipient: {
+              method: "usdc",
+              chain,
+              address: `0x${"b".repeat(40)}`,
+              accountName: "Vercel",
+            },
+            providerOrderId: null,
+            requestedKesCents: 1_290_012n,
+            amountKes: 1_290_012n,
+            ...payout,
+          },
+        ],
+      );
+      const data = await readOctober(target);
+      return data.moneyOut.find((row) => row.id === paid.billId);
+    };
+
+    it("is the payee chain's transaction when the company sent none of its own", async () => {
+      // #given a confidential account's payout: no hash, only the delivery
+      const delivery = `0x${"d".repeat(64)}`;
+
+      // #when
+      const row = await usdcBill({ txHash: null, providerReference: delivery });
+
+      // #then
+      expect(row?.payoutReference).toBe(delivery);
+    });
+
+    it("stays the company's own transaction, as before, when it has one", async () => {
+      // #given
+      const own = "6mKzv7RfQ9cYw2PqL8nXbT3jDe4HsUa1VgCoNiEp5MtY";
+
+      // #when
+      const row = await usdcBill({
+        txHash: own,
+        providerReference: `0x${"d".repeat(64)}`,
+      });
+
+      // #then
+      expect(row?.payoutReference).toBe(own);
+    });
+
+    it("is empty while there is neither", async () => {
+      // #when
+      const row = await usdcBill({ txHash: null, providerReference: null });
+
+      // #then
+      expect(row?.payoutReference).toBe("");
+    });
+  });
+
   it("lists salaries per person, with every part of a split salary's reference", async () => {
     // #given
     const { company: target, rentId, seed } = await company();

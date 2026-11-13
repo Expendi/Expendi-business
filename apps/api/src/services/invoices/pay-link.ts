@@ -13,6 +13,7 @@ import type { DatabaseService } from "../../db/client.js";
 import type { IntentQuote } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
 import type { AuditActor } from "../audit/audit-log.js";
+import type { ConfidentialAccounts } from "../intents/confidential-account.js";
 import {
   intentQuotes,
   invoiceLineItems,
@@ -29,6 +30,7 @@ import {
   chainOfAsset,
   FUND_IN_DEADLINE_MS,
   FUND_IN_SLIPPAGE_BPS,
+  quoteDelivery,
   refreshFundIn,
 } from "../intents/fund-in.js";
 import {
@@ -90,6 +92,8 @@ function activeWallet(organizationId: string) {
           chain: wallets.chain,
           status: wallets.status,
           address: wallets.address,
+          balanceHome: wallets.balanceHome,
+          privyWalletId: wallets.privyWalletId,
         })
         .from(wallets)
         .where(eq(wallets.organizationId, organizationId))
@@ -100,7 +104,12 @@ function activeWallet(organizationId: string) {
       wallet?.status === "active" &&
       wallet.chain === "near" &&
       wallet.address !== null
-        ? { id: wallet.id, accountId: wallet.address }
+        ? {
+            id: wallet.id,
+            accountId: wallet.address,
+            balanceHome: wallet.balanceHome,
+            privyWalletId: wallet.privyWalletId,
+          }
         : null,
     ),
   );
@@ -252,7 +261,7 @@ export function quoteForPayment(
 ): Effect.Effect<
   PublicPayQuote,
   Conflict | NotFound | ServiceUnavailable | DatabaseError,
-  DatabaseService | OneClick | AuditLog
+  DatabaseService | OneClick | AuditLog | ConfidentialAccounts
 > {
   return Effect.gen(function* () {
     const oneClick = yield* OneClick;
@@ -289,19 +298,33 @@ export function quoteForPayment(
     );
     if (open) return yield* toPublicQuote(open, false);
 
+    const delivery = yield* quoteDelivery({
+      balanceHome: wallet.balanceHome,
+      privyWalletId: wallet.privyWalletId,
+      address: wallet.accountId,
+    }).pipe(
+      Effect.catchAll((error) => {
+        console.error(`[pay-link] no session to quote with: ${error.message}`);
+        return Effect.fail(quoteUnavailable);
+      }),
+    );
     const quote = yield* oneClick
-      .quote({
-        dry: false,
-        swapType: "EXACT_INPUT",
-        originAsset,
-        destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
-        amount: centsToUsdc(invoice.totalCents),
-        recipient: wallet.accountId,
-        refundTo: wallet.accountId,
-        refundType: "INTENTS",
-        deadline: new Date(Date.now() + FUND_IN_DEADLINE_MS),
-        slippageBps: FUND_IN_SLIPPAGE_BPS,
-      })
+      .quote(
+        {
+          dry: false,
+          swapType: "EXACT_INPUT",
+          originAsset,
+          destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+          amount: centsToUsdc(invoice.totalCents),
+          recipient: wallet.accountId,
+          ...delivery.deliverTo,
+          refundTo: wallet.accountId,
+          refundType: "INTENTS",
+          deadline: new Date(Date.now() + FUND_IN_DEADLINE_MS),
+          slippageBps: FUND_IN_SLIPPAGE_BPS,
+        },
+        delivery.session,
+      )
       .pipe(
         Effect.catchTags({
           OneClickRefused: (error) => {
@@ -345,6 +368,7 @@ export function quoteForPayment(
               minAmountOut: quote.minAmountOut,
               depositAddress: quote.depositAddress,
               recipient: wallet.accountId,
+              ...delivery.deliverTo,
               refundTo: wallet.accountId,
               refundType: "INTENTS",
               deadline: quote.deadline,
@@ -401,7 +425,7 @@ export function getPayQuote(
 ): Effect.Effect<
   PublicPayQuote,
   NotFound | DatabaseError,
-  DatabaseService | OneClick
+  DatabaseService | OneClick | ConfidentialAccounts
 > {
   return Effect.gen(function* () {
     const { organizationId, invoiceId } = yield* resolve(publicId);
@@ -435,6 +459,9 @@ export function getPayQuote(
               OneClickRefused: (error) => unrefreshed(stored, error.message),
               OneClickOutcomeUnknown: (error) =>
                 unrefreshed(stored, error.message),
+              SendRefused: (error) => unrefreshed(stored, error.message),
+              PrivyWalletError: (error) => unrefreshed(stored, error.message),
+              NearRpcError: (error) => unrefreshed(stored, error.message),
             }),
           )
         : stored;

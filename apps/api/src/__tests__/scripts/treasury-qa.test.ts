@@ -2,6 +2,7 @@ import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { eq } from "drizzle-orm";
 import { Cause, Effect, Exit, Option } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -28,9 +29,13 @@ import {
   status,
   turnOn,
 } from "../../../scripts/lib/treasury-qa-commands.js";
+import { formatReconciliation } from "../../../scripts/lib/treasury-qa-format.js";
 import { DatabaseService } from "../../db/client.js";
+import { intentQuotes } from "../../db/schema/index.js";
+import { runInScope } from "../../db/scope.js";
 import { advanceTreasuryMove } from "../../services/treasury/advance.js";
 import { addMember, createUser } from "../helpers/db.js";
+import { saveQuote } from "../helpers/money-in.js";
 import {
   createNearPayingCompany,
   makeNearPayoutWorld,
@@ -258,5 +263,241 @@ describe("the QA flow", () => {
     const cause = await failureOf(Effect.die(new Error("boom")));
     expect(Option.isNone(Cause.failureOption(cause))).toBe(true);
     expect(describeFailure(cause)).toMatch(/Failed unexpectedly/);
+  });
+});
+
+describe("reconcile", () => {
+  const optionsFor = (company: NearPayingCompany) => ({
+    organizationId: company.company.organizationId,
+    adminEmail: qaAdmin.email,
+    passkeys,
+  });
+
+  it("prints what it always did for a company that keeps its USDC in the company wallet, and Expendi's recorded surplus", async () => {
+    // #given
+    const wallet = await createNearPayingCompany(world, db, {
+      balance: 40n * USDC,
+    });
+
+    // #when
+    const result = await runtime.runPromise(reconcile(optionsFor(wallet)));
+
+    // #then
+    expect(result).toMatchObject({
+      balanceHome: "company_wallet",
+      ledgerUsdc: 40n * USDC,
+      nearUsdc: 40n * USDC,
+      baseUsdc: 0n,
+      confidentialUsdc: null,
+      expendiSurplusUsdc: 0n,
+      differenceUsdc: 0n,
+    });
+    expect(formatReconciliation(result)).toEqual([
+      "Ledger balance:            40.000000 USDC",
+      "Company wallet (NEAR):     40.000000 USDC",
+      "Transit wallet (Base):     0.000000 USDC",
+      "Difference (chain less ledger): 0.000000 USDC",
+      "Expendi's recorded surplus:     0.000000 USDC",
+      "The ledger matches the chain.",
+    ]);
+    expect(world.oneClick.state.signIns).not.toContain(wallet.accountId);
+  });
+
+  it("counts the confidential account of a company that keeps its USDC there, and shows it", async () => {
+    // #given
+    const confidential = await createNearPayingCompany(world, db, {
+      balance: 40n * USDC,
+      balanceHome: "confidential_account",
+    });
+    world.near.state.balances.set(confidential.accountId, 3n * USDC);
+    world.oneClick.state.fundConfidential(confidential.accountId, 36n * USDC);
+
+    // #when
+    const result = await runtime.runPromise(
+      reconcile(optionsFor(confidential)),
+    );
+
+    // #then
+    expect(result).toMatchObject({
+      balanceHome: "confidential_account",
+      nearUsdc: 3n * USDC,
+      baseUsdc: 0n,
+      confidentialUsdc: 36n * USDC,
+      differenceUsdc: -1n * USDC,
+    });
+    expect(formatReconciliation(result)).toEqual([
+      "Ledger balance:            40.000000 USDC",
+      "Company wallet (NEAR):     3.000000 USDC",
+      "Transit wallet (Base):     0.000000 USDC",
+      "Confidential account:      36.000000 USDC",
+      "Difference (chain less ledger): -1.000000 USDC",
+      "Expendi's recorded surplus:     0.000000 USDC",
+      "  of which in the company wallet: 0.000000 USDC",
+    ]);
+    expect(world.oneClick.state.signIns).toContain(confidential.accountId);
+  });
+
+  it("shows Expendi's float in the confidential account as surplus, apart from what sits in the company wallet", async () => {
+    // #given a delivered fee cover of 1 USDC, held in the account above the ledger
+    const confidential = await createNearPayingCompany(world, db, {
+      balance: 40n * USDC,
+      balanceHome: "confidential_account",
+    });
+    const funded = {
+      company: confidential.company,
+      walletId: confidential.wallet.id,
+      accountId: confidential.accountId,
+      transitAddress: confidential.transitAddress,
+    };
+    await saveQuote(runtime, db, funded, "fee_cover", {
+      amount: 1n * USDC,
+      row: {
+        status: "succeeded",
+        settledAt: new Date(Date.now() - 60 * 60_000),
+        depositStartedAt: new Date(Date.now() - 60 * 60_000),
+        swappedAmountOut: 1n * USDC,
+      },
+    });
+    world.near.state.balances.set(confidential.accountId, 0n);
+    world.oneClick.state.fundConfidential(confidential.accountId, 41n * USDC);
+
+    // #when
+    const result = await runtime.runPromise(
+      reconcile(optionsFor(confidential)),
+    );
+
+    // #then the float explains the whole difference
+    expect(result).toMatchObject({
+      differenceUsdc: 1n * USDC,
+      expendiSurplusUsdc: 1n * USDC,
+      companyWalletSurplusUsdc: 0n,
+    });
+    expect(formatReconciliation(result)).toEqual(
+      expect.arrayContaining([
+        "Expendi's recorded surplus:     1.000000 USDC",
+        "  of which in the company wallet: 0.000000 USDC",
+      ]),
+    );
+  });
+
+  it("says when a hop paid out of the confidential account is in flight", async () => {
+    // #given
+    const confidential = await createNearPayingCompany(world, db, {
+      balance: 40n * USDC,
+      balanceHome: "confidential_account",
+    });
+    const hop = await saveQuote(
+      runtime,
+      db,
+      {
+        company: confidential.company,
+        walletId: confidential.wallet.id,
+        accountId: confidential.accountId,
+        transitAddress: confidential.transitAddress,
+      },
+      "base_hop",
+      { intentPaid: true, row: { status: "depositing" } },
+    );
+
+    // #when
+    const result = await runtime.runPromise(
+      reconcile(optionsFor(confidential)),
+    );
+    await runInScope(
+      db,
+      { organizationId: confidential.company.organizationId },
+      (tx) =>
+        tx
+          .update(intentQuotes)
+          .set({ status: "failed", settledAt: new Date() })
+          .where(eq(intentQuotes.id, hop.id)),
+    );
+
+    // #then
+    expect(result.inFlight).toEqual([
+      "a base_hop quote paid out of the confidential account is depositing",
+    ]);
+  });
+
+  it("names a confidential account it couldn't read and gives no difference", async () => {
+    // #given
+    const confidential = await createNearPayingCompany(world, db, {
+      balance: 40n * USDC,
+      balanceHome: "confidential_account",
+    });
+    world.privy.state.nextNearSignings("unavailable");
+
+    // #when
+    const result = await runtime.runPromise(
+      reconcile(optionsFor(confidential)),
+    );
+
+    // #then
+    expect(result.confidentialUsdc).toBeNull();
+    expect(result.differenceUsdc).toBeNull();
+    expect(result.errors.join(" ")).toMatch(
+      /Confidential account balance not read/,
+    );
+  });
+
+  it("says when an in-flight move-in explains a difference", async () => {
+    // #given
+    const confidential = await createNearPayingCompany(world, db, {
+      balance: 40n * USDC,
+      balanceHome: "confidential_account",
+    });
+    const funded = {
+      company: confidential.company,
+      walletId: confidential.wallet.id,
+      accountId: confidential.accountId,
+      transitAddress: confidential.transitAddress,
+    };
+    await saveQuote(runtime, db, funded, "move_in", {
+      row: { status: "depositing" },
+    });
+
+    // #when
+    const result = await runtime.runPromise(
+      reconcile(optionsFor(confidential)),
+    );
+
+    // #then
+    expect(result.inFlight).toEqual(["a move_in quote is depositing"]);
+  });
+
+  it("prints the deliveries 1Click reported that the ledger doesn't hold after 10 minutes", async () => {
+    // #given
+    const confidential = await createNearPayingCompany(world, db, {
+      balance: 40n * USDC,
+      balanceHome: "confidential_account",
+    });
+    const late = await saveQuote(
+      runtime,
+      db,
+      {
+        company: confidential.company,
+        walletId: confidential.wallet.id,
+        accountId: confidential.accountId,
+        transitAddress: confidential.transitAddress,
+      },
+      "fund_in_return",
+      {
+        confidential: true,
+        row: {
+          status: "succeeded",
+          settledAt: new Date(Date.now() - 11 * 60_000),
+        },
+      },
+    );
+
+    // #when
+    const result = await runtime.runPromise(
+      reconcile(optionsFor(confidential)),
+    );
+
+    // #then
+    expect(result.overdueCredits).toEqual([late.id]);
+    expect(result.inFlight).toEqual([]);
+    expect(formatReconciliation(result).join("\n")).toContain(late.id);
   });
 });

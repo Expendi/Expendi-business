@@ -7,6 +7,7 @@ import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { AuditActor } from "../audit/audit-log.js";
 import type { CompanyWalletSendInput } from "../wallet/company-wallet-send.js";
+import type { ConfidentialAccounts } from "./confidential-account.js";
 import type { QuoteDepositDeps } from "./quote-deposit.js";
 import {
   intentQuotes,
@@ -19,7 +20,8 @@ import { NearRpc } from "../chain/near-rpc.js";
 import { isImplicitNearAccount } from "../chain/near.js";
 import { isPaused } from "../payout/guards.js";
 import { sendIntentsTokenFromCompanyWallet } from "../wallet/company-wallet-send.js";
-import { FUND_IN_SLIPPAGE_BPS } from "./fund-in.js";
+import { sessionForQuote } from "./company-session.js";
+import { FUND_IN_SLIPPAGE_BPS, quoteDelivery } from "./fund-in.js";
 import {
   ONE_CLICK_FUND_IN_USDC_ASSET_IDS,
   ONE_CLICK_USDC_ASSET_IDS,
@@ -43,7 +45,10 @@ import { moveQuote, orCurrent, quoteById } from "./quote-settle.js";
  * The company wallet signs the one transfer, inside NEAR Intents, to the
  * quote's deposit account; nothing else of the company's moves. The
  * delivery is a deposit: that money never reached the company wallet
- * before, so the deposit watcher credits it, once, when it arrives.
+ * before, so the deposit watcher credits it, once, when it arrives. For a
+ * company that keeps its USDC in a confidential account the delivery goes
+ * there instead and `quote-credit.ts` credits it when 1Click reports
+ * `SUCCESS`.
  *
  * The balance is read rather than worked out from the fund-ins, so
  * whatever reaches the account is returned, however it got there: a
@@ -64,7 +69,8 @@ export const FUND_IN_RETURN_ASSETS: readonly string[] = Object.values(
  */
 export const RETURN_RETRY_AFTER_MS = 30 * 60_000;
 
-export type FundInReturnDeps = QuoteDepositDeps | NearRpc | AuditLog;
+export type FundInReturnDeps =
+  QuoteDepositDeps | NearRpc | AuditLog | ConfidentialAccounts;
 
 const sendFromIntents =
   (quote: IntentQuote) => (input: CompanyWalletSendInput) =>
@@ -82,6 +88,11 @@ const sendFromIntents =
  *   sends twice, and `needs_review` if still unknown after the deadline;
  * - 1Click `REFUNDED`: the balance is back in the company's NEAR Intents
  *   account, and a later run returns it again.
+ *
+ * A return that delivers to a confidential account is only started, paid or
+ * followed up with the company's session. If it can't be signed in, the
+ * return is left as it is: a deposit must not start for a quote that can't
+ * then be settled.
  */
 export function advanceFundInReturn(
   input: Pick<IntentQuote, "id" | "organizationId">,
@@ -89,6 +100,16 @@ export function advanceFundInReturn(
   return Effect.gen(function* () {
     let quote = yield* quoteById(input.organizationId, input.id);
     if (quote.purpose !== "fund_in_return") return quote;
+
+    const signedIn = yield* sessionForQuote(quote).pipe(Effect.either);
+    if (signedIn._tag === "Left") {
+      console.warn(
+        `[fund-in-return] return ${quote.id} left as it is: no session`,
+        signedIn.left.message,
+      );
+      return quote;
+    }
+    const session = signedIn.right;
 
     if (quote.status === "quoted") {
       const untouched = and(
@@ -125,7 +146,11 @@ export function advanceFundInReturn(
       }
       quote = started;
     }
-    return yield* continueCompanyDeposit(quote, sendFromIntents(quote));
+    return yield* continueCompanyDeposit(
+      quote,
+      sendFromIntents(quote),
+      session,
+    );
   });
 }
 
@@ -234,21 +259,33 @@ export function startFundInReturn(input: {
     const amount =
       held > wallet.perTransactionMaxUsdc ? wallet.perTransactionMaxUsdc : held;
 
+    const delivery = yield* quoteDelivery(wallet).pipe(Effect.either);
+    if (delivery._tag === "Left") {
+      console.warn(
+        `[fund-in-return] no session to return ${organizationId}'s ${asset} with`,
+        delivery.left.message,
+      );
+      return null;
+    }
     const oneClick = yield* OneClick;
     const quoted = yield* oneClick
-      .quote({
-        dry: false,
-        swapType: "EXACT_INPUT",
-        originAsset: asset,
-        depositType: "INTENTS",
-        destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
-        amount,
-        recipient: address,
-        refundTo: address,
-        refundType: "INTENTS",
-        deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
-        slippageBps: FUND_IN_SLIPPAGE_BPS,
-      })
+      .quote(
+        {
+          dry: false,
+          swapType: "EXACT_INPUT",
+          originAsset: asset,
+          depositType: "INTENTS",
+          destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+          amount,
+          recipient: address,
+          ...delivery.right.deliverTo,
+          refundTo: address,
+          refundType: "INTENTS",
+          deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
+          slippageBps: FUND_IN_SLIPPAGE_BPS,
+        },
+        delivery.right.session,
+      )
       .pipe(Effect.either);
     if (quoted._tag === "Left") {
       console.warn(
@@ -302,6 +339,7 @@ export function startFundInReturn(input: {
               depositAddress: quote.depositAddress,
               depositType: "INTENTS",
               recipient: address,
+              ...delivery.right.deliverTo,
               refundTo: address,
               refundType: "INTENTS",
               deadline: quote.deadline,

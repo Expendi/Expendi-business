@@ -15,6 +15,7 @@ import type { NearRpc } from "../services/chain/near-rpc.js";
 import type { NearChain } from "../services/chain/near.js";
 import type { EmailSender } from "../services/email/email-sender.js";
 import type { ReceiptExtractor } from "../services/extraction/receipt-extractor.js";
+import type { ConfidentialAccounts } from "../services/intents/confidential-account.js";
 import type { OneClick } from "../services/intents/one-click.js";
 import type { Lithic } from "../services/lithic/lithic-client.js";
 import type { PushSender } from "../services/notification/push-sender.js";
@@ -39,6 +40,7 @@ import { NearRpcLive } from "../services/chain/near-rpc.js";
 import { NearChainLive } from "../services/chain/near.js";
 import { EmailSenderLive } from "../services/email/email-sender.js";
 import { ReceiptExtractorLive } from "../services/extraction/receipt-extractor.js";
+import { ConfidentialAccountsLive } from "../services/intents/confidential-account.js";
 import { OneClickLive } from "../services/intents/one-click.js";
 import { LithicLive } from "../services/lithic/lithic-client.js";
 import { PushSenderLive } from "../services/notification/push-sender.js";
@@ -75,6 +77,7 @@ export type AppDeps =
   | NearRelayer
   | FastNear
   | OneClick
+  | ConfidentialAccounts
   | Paycrest
   | Pretium
   | Lithic
@@ -151,6 +154,16 @@ export function makeAppLayer(
       Layer.mergeAll(external.privyWallets, nearRpc, external.nearChain),
     ),
   );
+  const confidentialAccounts = ConfidentialAccountsLive.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        external.privyWallets,
+        nearRpc,
+        external.nearChain,
+        external.oneClick,
+      ),
+    ),
+  );
   const treasuryPositionReader = Layer.effect(
     TreasuryPositionReader,
     Effect.map(PrivyWallets, (privy) => ({
@@ -180,6 +193,7 @@ export function makeAppLayer(
     nearRelayer,
     external.fastNear.pipe(Layer.provide(external.nearChain)),
     external.oneClick,
+    confidentialAccounts,
     external.paycrest,
     external.pretium,
     external.lithic,

@@ -59,7 +59,13 @@ export const RESOLUTION_LABELS: Record<IntentQuoteResolution, string> = {
  * outcome and a reason, then the evidence and consequences the API found,
  * then a second confirmation. Nothing is ever sent.
  */
-export function ResolveQuoteFlow({ quoteId }: { quoteId: string }) {
+export function ResolveQuoteFlow({
+  quoteId,
+  paidByMessage = false,
+}: {
+  quoteId: string;
+  paidByMessage?: boolean;
+}) {
   const { api } = useStaffAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -119,7 +125,10 @@ export function ResolveQuoteFlow({ quoteId }: { quoteId: string }) {
           confirm.reset();
         }}
       >
-        <QuoteEvidenceSummary evidence={prepared.evidence} />
+        <QuoteEvidenceSummary
+          evidence={prepared.evidence}
+          paidByMessage={paidByMessage}
+        />
       </SecondConfirmation>
     );
   }
@@ -213,8 +222,11 @@ function Transfers({
 /** What 1Click and the chains show of a quote, as the API read it. */
 export function QuoteEvidenceSummary({
   evidence,
+  paidByMessage = false,
 }: {
   evidence: IntentQuoteEvidence;
+  /** Paid out of a confidential account: no chain shows its deposit or refund. */
+  paidByMessage?: boolean;
 }) {
   return (
     <dl className="mt-4 grid grid-cols-1 gap-x-4 gap-y-3 text-sm sm:grid-cols-[12rem_minmax(0,1fr)]">
@@ -227,7 +239,11 @@ export function QuoteEvidenceSummary({
       </dd>
       <dt className="text-muted-foreground">Deposit</dt>
       <dd>
-        <Transfers transfers={evidence.deposits} none="None found on chain" />
+        {paidByMessage ? (
+          "Paid by a signed message, so no chain shows it"
+        ) : (
+          <Transfers transfers={evidence.deposits} none="None found on chain" />
+        )}
       </dd>
       <dt className="text-muted-foreground">Delivered to the recipient</dt>
       <dd>
@@ -248,31 +264,39 @@ export function QuoteEvidenceSummary({
       </dd>
       <dt className="text-muted-foreground">Back to the refund address</dt>
       <dd>
-        <Transfers
-          transfers={evidence.refunds}
-          none="None in the transactions 1Click lists"
-        />
+        {paidByMessage ? (
+          "Back into the company's account, which isn't visible here"
+        ) : (
+          <Transfers
+            transfers={evidence.refunds}
+            none="None in the transactions 1Click lists"
+          />
+        )}
       </dd>
-      <dt className="text-muted-foreground">Company wallet sends</dt>
-      <dd>
-        {evidence.companyWalletSends.length === 0
-          ? "None"
-          : evidence.companyWalletSends.map((send) => (
-              <span key={send.id} className="block">
-                {send.status}, {formatUsdc(send.usdcAmount)}, until block{" "}
-                {send.maxBlockHeight}
-                {send.txHash ? (
-                  <>
-                    {" "}
-                    in{" "}
-                    <span className="font-mono text-xs break-all">
-                      {send.txHash}
-                    </span>
-                  </>
-                ) : null}
-              </span>
-            ))}
-      </dd>
+      {paidByMessage ? null : (
+        <>
+          <dt className="text-muted-foreground">Company wallet sends</dt>
+          <dd>
+            {evidence.companyWalletSends.length === 0
+              ? "None"
+              : evidence.companyWalletSends.map((send) => (
+                  <span key={send.id} className="block">
+                    {send.status}, {formatUsdc(send.usdcAmount)}, until block{" "}
+                    {send.maxBlockHeight}
+                    {send.txHash ? (
+                      <>
+                        {" "}
+                        in{" "}
+                        <span className="font-mono text-xs break-all">
+                          {send.txHash}
+                        </span>
+                      </>
+                    ) : null}
+                  </span>
+                ))}
+          </dd>
+        </>
+      )}
       <dt className="text-muted-foreground">Payouts</dt>
       <dd>
         {evidence.payouts.length === 0

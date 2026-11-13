@@ -12,10 +12,12 @@ import type {
   IntentQuote,
   IntentQuotePurpose,
   IntentQuoteStatus,
+  Wallet,
 } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
 import type { AuditActor } from "../audit/audit-log.js";
-import type { OneClickError } from "./one-click.js";
+import type { ConfidentialSessionError } from "./confidential-account.js";
+import type { OneClickError, OneClickSession } from "./one-click.js";
 import {
   intentQuotes,
   UNSETTLED_INTENT_QUOTE_STATUSES,
@@ -29,6 +31,8 @@ import {
   ServiceUnavailable,
 } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { sessionForQuote } from "./company-session.js";
+import { ConfidentialAccounts } from "./confidential-account.js";
 import {
   ONE_CLICK_FUND_IN_USDC_ASSET_IDS,
   ONE_CLICK_USDC_ASSET_IDS,
@@ -40,7 +44,9 @@ import { refreshQuoteStatus } from "./quote-status.js";
  * Fund-in (CONTEXT.md): a company adds money to its company wallet by
  * sending USDC on another chain to a deposit address NEAR Intents gives for
  * it. Nothing here credits the ledger: the deposit watcher does, when the
- * USDC actually arrives at the company wallet.
+ * USDC actually arrives at the company wallet. For a company that keeps its
+ * USDC in a confidential account the delivery never appears on a chain, so
+ * `quote-credit.ts` credits it when 1Click reports the quote `SUCCESS`.
  *
  * A fund-in that can't be completed is refunded into the company's own
  * NEAR Intents account, never to an address on the sending chain, so
@@ -135,6 +141,50 @@ const quoteUnavailable = new ServiceUnavailable({
   message: "Funding in isn't available right now. Try again in a minute.",
 });
 
+/** How a new quote for a company is delivered, and whom 1Click must hear from. */
+export interface QuoteDelivery {
+  /** The company's session; only a delivery to a confidential account needs one. */
+  readonly session: OneClickSession | undefined;
+  /**
+   * Spread into the quote request and the saved row. Empty for a company
+   * wallet, so those requests and rows are what they were before
+   * confidential accounts existed.
+   */
+  readonly deliverTo: { readonly recipientType?: "CONFIDENTIAL_INTENTS" };
+}
+
+/**
+ * Decided by the company's `balance_home` when the quote is taken, and only
+ * then: the saved quote's own `recipient_type` decides everything after.
+ */
+export function quoteDelivery(
+  wallet: Pick<Wallet, "balanceHome" | "privyWalletId" | "address">,
+): Effect.Effect<
+  QuoteDelivery,
+  ConfidentialSessionError,
+  ConfidentialAccounts
+> {
+  return Effect.gen(function* () {
+    if (wallet.balanceHome !== "confidential_account") {
+      return { session: undefined, deliverTo: {} };
+    }
+    if (wallet.privyWalletId === null || wallet.address === null) {
+      return yield* Effect.dieMessage(
+        "a company with a confidential account has no company wallet to sign in with",
+      );
+    }
+    const accounts = yield* ConfidentialAccounts;
+    const session = yield* accounts.session({
+      privyWalletId: wallet.privyWalletId,
+      accountId: wallet.address,
+    });
+    return {
+      session,
+      deliverTo: { recipientType: "CONFIDENTIAL_INTENTS" as const },
+    };
+  });
+}
+
 /**
  * Takes a firm quote for moving exactly `amount` of USDC from `chain` to the
  * company wallet and saves it. The deposit address is only ever shown from
@@ -149,7 +199,7 @@ export function createFundIn(input: {
 }): Effect.Effect<
   FundInView,
   BadRequest | Conflict | ServiceUnavailable | DatabaseError,
-  DatabaseService | OneClick | AuditLog
+  DatabaseService | OneClick | AuditLog | ConfidentialAccounts
 > {
   const { organizationId, actor } = input;
   return Effect.gen(function* () {
@@ -164,6 +214,8 @@ export function createFundIn(input: {
             chain: wallets.chain,
             status: wallets.status,
             address: wallets.address,
+            balanceHome: wallets.balanceHome,
+            privyWalletId: wallets.privyWalletId,
           })
           .from(wallets)
           .where(eq(wallets.organizationId, organizationId))
@@ -184,19 +236,29 @@ export function createFundIn(input: {
 
     const accountId = wallet.address;
 
+    const delivery = yield* quoteDelivery(wallet).pipe(
+      Effect.catchAll((error) => {
+        console.error(`[fund-in] no session to quote with: ${error.message}`);
+        return Effect.fail(quoteUnavailable);
+      }),
+    );
     const quote = yield* oneClick
-      .quote({
-        dry: false,
-        swapType: "EXACT_INPUT",
-        originAsset: ONE_CLICK_FUND_IN_USDC_ASSET_IDS[input.chain],
-        destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
-        amount: input.amount,
-        recipient: accountId,
-        refundTo: accountId,
-        refundType: "INTENTS",
-        deadline: new Date(Date.now() + FUND_IN_DEADLINE_MS),
-        slippageBps: FUND_IN_SLIPPAGE_BPS,
-      })
+      .quote(
+        {
+          dry: false,
+          swapType: "EXACT_INPUT",
+          originAsset: ONE_CLICK_FUND_IN_USDC_ASSET_IDS[input.chain],
+          destinationAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+          amount: input.amount,
+          recipient: accountId,
+          ...delivery.deliverTo,
+          refundTo: accountId,
+          refundType: "INTENTS",
+          deadline: new Date(Date.now() + FUND_IN_DEADLINE_MS),
+          slippageBps: FUND_IN_SLIPPAGE_BPS,
+        },
+        delivery.session,
+      )
       .pipe(
         Effect.catchTags({
           OneClickRefused: (error) => {
@@ -244,6 +306,7 @@ export function createFundIn(input: {
               minAmountOut: quote.minAmountOut,
               depositAddress: quote.depositAddress,
               recipient: accountId,
+              ...delivery.deliverTo,
               refundTo: accountId,
               refundType: "INTENTS",
               deadline: quote.deadline,
@@ -388,20 +451,39 @@ const FINAL_STATUSES: readonly IntentQuoteStatus[] = [
   "expired",
 ];
 
+/** What `refreshFundIn` needs to know about a quote to ask 1Click about it. */
+export type RefreshableFundIn = Pick<
+  IntentQuote,
+  | "id"
+  | "organizationId"
+  | "depositAddress"
+  | "depositType"
+  | "recipientType"
+  | "refundType"
+>;
+
 /**
  * Asks 1Click about one fund-in and moves it to `depositing`, `succeeded`,
  * `refunded`, `failed` or `expired` accordingly. A fund-in that already
  * settled keeps its status. Returns the row as it now stands.
+ *
+ * A quote that touches a confidential account is asked about with the
+ * company's session, signed in here; if that fails nothing changes and the
+ * next run tries again. Reaching `succeeded` does not credit the ledger:
+ * `creditSettledQuotes` does, for every route to `succeeded`.
  */
 export function refreshFundIn(
-  quote: Pick<IntentQuote, "id" | "organizationId" | "depositAddress">,
+  quote: RefreshableFundIn,
 ): Effect.Effect<
   IntentQuote,
-  OneClickError | DatabaseError,
-  OneClick | DatabaseService
+  OneClickError | ConfidentialSessionError | DatabaseError,
+  OneClick | ConfidentialAccounts | DatabaseService
 > {
   return Effect.gen(function* () {
-    const refreshed = yield* refreshQuoteStatus(quote);
+    const refreshed = yield* refreshQuoteStatus(
+      quote,
+      yield* sessionForQuote(quote),
+    );
     const next = nextStatus(refreshed, new Date());
     if (!OPEN_DEPOSIT_PURPOSES.includes(refreshed.purpose) || next === null) {
       return refreshed;
@@ -457,7 +539,7 @@ export interface FundInRefreshSummary {
 export function refreshOpenFundIns(): Effect.Effect<
   FundInRefreshSummary,
   DatabaseError,
-  DatabaseService | OneClick
+  DatabaseService | OneClick | ConfidentialAccounts
 > {
   return Effect.gen(function* () {
     const { rows: funded } = yield* withScope({}, (tx) =>
@@ -467,10 +549,7 @@ export function refreshOpenFundIns(): Effect.Effect<
         ),
       ),
     );
-    const open: Pick<
-      IntentQuote,
-      "id" | "organizationId" | "depositAddress"
-    >[] = [];
+    const open: RefreshableFundIn[] = [];
     for (const { organization_id: organizationId } of funded) {
       open.push(
         ...(yield* withScope({ organizationId }, (tx) =>
@@ -480,6 +559,9 @@ export function refreshOpenFundIns(): Effect.Effect<
                 id: intentQuotes.id,
                 organizationId: intentQuotes.organizationId,
                 depositAddress: intentQuotes.depositAddress,
+                depositType: intentQuotes.depositType,
+                recipientType: intentQuotes.recipientType,
+                refundType: intentQuotes.refundType,
               })
               .from(intentQuotes)
               .where(

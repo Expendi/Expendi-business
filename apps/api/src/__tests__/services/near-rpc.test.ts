@@ -357,6 +357,45 @@ describe("NearRpc account reads", () => {
     expect(Exit.isFailure(exit)).toBe(true);
   });
 
+  it("reads the NEAR Intents salt as four bytes", async () => {
+    // #given
+    const { rpc, requests } = nodeAnswering(() => viewResult("e110f317"));
+
+    // #when
+    const salt = await Effect.runPromise(rpc.intentsSalt());
+
+    // #then
+    expect(Buffer.from(salt).toString("hex")).toBe("e110f317");
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.params).toMatchObject({
+      request_type: "call_function",
+      account_id: TEST_INTENTS_CONTRACT,
+      method_name: "current_salt",
+      finality: "final",
+    });
+    const args = (requests[0]?.params as { args_base64: string }).args_base64;
+    expect(JSON.parse(Buffer.from(args, "base64").toString("utf8"))).toEqual(
+      {},
+    );
+  });
+
+  it.each([
+    ["too short", "e110f3"],
+    ["too long", "e110f31700"],
+    ["not hex", "e110f31z"],
+    ["uppercase", "E110F317"],
+    ["not a string", 3_792_204_567],
+  ])("fails on a NEAR Intents salt that is %s", async (_name, answer) => {
+    // #given
+    const { rpc } = nodeAnswering(() => viewResult(answer));
+
+    // #when
+    const exit = await Effect.runPromiseExit(rpc.intentsSalt());
+
+    // #then
+    expect(Exit.isFailure(exit)).toBe(true);
+  });
+
   it("reads the latest final block", async () => {
     // #given
     const { rpc, requests } = nodeAnswering(() => ({

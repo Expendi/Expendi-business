@@ -1,7 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import pg from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
+import { z } from "zod";
 
 import type { IntentQuoteResolution } from "@expendi-business/shared";
 import {
@@ -25,6 +34,8 @@ import { createApp } from "../../app.js";
 import { DatabaseService } from "../../db/client.js";
 import {
   companyWalletSends,
+  intentQuotes,
+  payouts,
   walletTransactions,
 } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
@@ -50,6 +61,7 @@ import {
 import {
   ftTransferLog,
   nearOutcome,
+  randomNearAccount,
   randomNearTxHash,
   TEST_USDC_CONTRACT,
 } from "../helpers/near.js";
@@ -146,6 +158,18 @@ const sendsOf = (quote: IntentQuote) =>
       .select()
       .from(companyWalletSends)
       .where(eq(companyWalletSends.sendKey, quoteSendKey(quote.id))),
+  );
+
+/** Changes every quote the company has, as a test's cleanup. */
+const updateQuotesOf = (
+  company: NearPayingCompany,
+  changes: Partial<typeof intentQuotes.$inferInsert>,
+) =>
+  runInScope(db, { organizationId: company.company.organizationId }, (tx) =>
+    tx
+      .update(intentQuotes)
+      .set(changes)
+      .where(eq(intentQuotes.organizationId, company.company.organizationId)),
   );
 
 /** Moves the quote's deadline far enough back that 1Click can no longer settle it unasked. */
@@ -1256,5 +1280,324 @@ describe("resolving a payout a quote holds", () => {
       payout: "needs_review",
       heldBy: hop.id,
     });
+  });
+});
+
+describe("a quote paid out of a confidential account", () => {
+  const statusCalls = () =>
+    oneClick.state.calls.filter(({ call }) => call === "status").length;
+
+  /**
+   * A NEAR payout out of a confidential account whose message 1Click took
+   * and then reported FAILED, so the job put the quote and the payout under
+   * review.
+   */
+  async function paidOutUnderReview(): Promise<{
+    quote: IntentQuote;
+    payout: Payout;
+  }> {
+    const payee = randomNearAccount();
+    near.state.fundWithUsdc(payee, 0n);
+    await allowlistAddress(runtime, paying, payee, "Supplier", "near");
+    const [prepared] = await payClaims(runtime, db, paying, [
+      {
+        subjectType: "bill",
+        subjectId: randomUUID(),
+        idempotencyKey: `bill:${randomUUID()}:1`,
+        recipient: {
+          method: "usdc",
+          chain: "near",
+          address: payee,
+          accountName: "Supplier",
+        },
+        amountUsdc: PAYOUT_USDC,
+      },
+    ]);
+    if (!prepared) throw new Error("no payout");
+    const sent = await quoteOf(prepared);
+    oneClickReports(sent, { status: "FAILED" });
+    await runtime.runPromise(continueDelivery(sent));
+    const quote = await quoteOf(prepared);
+    const payout = await reload(prepared);
+    if (quote.status !== "needs_review" || payout.status !== "needs_review") {
+      throw new Error(`expected review, got ${quote.status}/${payout.status}`);
+    }
+    return { quote, payout };
+  }
+
+  beforeEach(async () => {
+    oneClick.state.costPerQuote = 0n;
+    paying = await createNearPayingCompany(world, db, {
+      balance: OPENING_BALANCE,
+      balanceHome: "confidential_account",
+    });
+    oneClick.state.fundConfidential(paying.accountId, OPENING_BALANCE);
+  });
+
+  afterEach(async () => {
+    oneClick.state.costPerQuote = 4_465n;
+    await updateQuotesOf(paying, { status: "refunded", settledAt: new Date() });
+    await inCompany((tx) =>
+      tx
+        .update(payouts)
+        .set({ status: "failed", failureReason: "The test is over." })
+        .where(inArray(payouts.status, ["funding", "needs_review"])),
+    );
+  });
+
+  it("is shown as the job last saw it, without asking 1Click, and never shows the signed message", async () => {
+    // #given a quote under review
+    const { quote } = await paidOutUnderReview();
+    const saved = await onlyQuote();
+    const asked = statusCalls();
+
+    // #when a viewer reads it and what is shown of it
+    const detail = await get(`/internal/intent-quotes/${quote.id}`);
+    const evidence = await get(`/internal/intent-quotes/${quote.id}/evidence`);
+
+    // #then 1Click wasn't asked, the quote shows how it was paid, and
+    // neither answer carries the signed message
+    const detailText = JSON.stringify(await detail.clone().json());
+    const evidenceText = JSON.stringify(await evidence.clone().json());
+    const shownDetail = staffIntentQuoteDetailSchema.parse(
+      await dataOf(detail),
+    );
+    const shownEvidence = intentQuoteEvidenceSchema.parse(
+      await dataOf(evidence),
+    );
+    const { signature } = z
+      .object({ signature: z.string() })
+      .parse(saved.signedIntent);
+    expect({
+      statuses: [detail.status, evidence.status],
+      asked: statusCalls() - asked,
+      detail: {
+        depositType: shownDetail.depositType,
+        recipientType: shownDetail.recipientType,
+        refundType: shownDetail.refundType,
+        hasHash: shownDetail.intentHash === saved.intentHash,
+        deadline: shownDetail.intentDeadline,
+        submitted: shownDetail.intentSubmittedAt !== null,
+        sendId: shownDetail.companyWalletSendId,
+        depositTxHash: shownDetail.depositTxHash,
+      },
+      evidence: {
+        oneClickStatus: shownEvidence.oneClickStatus,
+        deposits: shownEvidence.deposits,
+        refunds: shownEvidence.refunds,
+        sends: shownEvidence.companyWalletSends,
+      },
+      leaksTheMessage: [detailText, evidenceText].some(
+        (text) => text.includes("signed_intent") || text.includes(signature),
+      ),
+    }).toEqual({
+      statuses: [200, 200],
+      asked: 0,
+      detail: {
+        depositType: "CONFIDENTIAL_INTENTS",
+        recipientType: "DESTINATION_CHAIN",
+        refundType: "CONFIDENTIAL_INTENTS",
+        hasHash: true,
+        deadline: saved.intentDeadline?.toISOString(),
+        submitted: true,
+        sendId: null,
+        depositTxHash: null,
+      },
+      evidence: {
+        oneClickStatus: "FAILED",
+        deposits: [],
+        refunds: [],
+        sends: [],
+      },
+      leaksTheMessage: false,
+    });
+  });
+
+  it("refuses to resolve a quote still under review, saying how it settles, without asking 1Click", async () => {
+    // #given a quote under review
+    const { quote, payout } = await paidOutUnderReview();
+    await pastReviewMargin(quote);
+    const asked = statusCalls();
+
+    // #when staff try to resolve it as delivered
+    const response = await prepare(quote, "delivered");
+
+    // #then it is refused and nothing changed
+    expect({
+      status: response.status,
+      explains: (await messageOf(response)).includes(
+        "settles when the outbound quotes job hears SUCCESS or REFUNDED",
+      ),
+      asked: statusCalls() - asked,
+      payout: (await reload(payout)).status,
+      quote: (await onlyQuote()).status,
+    }).toEqual({
+      status: 409,
+      explains: true,
+      asked: 0,
+      payout: "needs_review",
+      quote: "needs_review",
+    });
+  });
+
+  it("hands the payout back once the job heard SUCCESS late, and the delivery code then debits and pays it once", async () => {
+    // #given the job heard SUCCESS after the quote went to review: the quote
+    // settled and the payout is still held, undebited
+    const { quote, payout } = await paidOutUnderReview();
+    oneClick.state.deliverIntentPayout(quote.depositAddress);
+    await runtime.runPromise(continueDelivery(quote));
+    expect({
+      quote: (await onlyQuote()).status,
+      payout: (await reload(payout)).status,
+      rows: await ledgerOf(payout),
+    }).toEqual({ quote: "succeeded", payout: "needs_review", rows: [] });
+    const before = moneyMoves();
+    const asked = statusCalls();
+
+    // #when staff resolve it as delivered
+    const { prepared, confirmed } = await resolve(quote, "delivered");
+
+    // #then the payout is back in funding, nothing was signed or asked, and
+    // nothing is debited by staff
+    expect({
+      consequences: prepared.consequences[0],
+      payouts: confirmed.payouts,
+      moved: moneyMoves(),
+      asked: statusCalls() - asked,
+      rows: await ledgerOf(payout),
+    }).toEqual({
+      consequences: expect.stringContaining("debits the ledger once") as string,
+      payouts: [{ id: payout.id, status: "funding" }],
+      moved: before,
+      asked: 0,
+      rows: [],
+    });
+
+    // #when the delivery code follows it, twice
+    await runtime.runPromise(continueDelivery(await onlyQuote()));
+    await runtime.runPromise(continueDelivery(await onlyQuote()));
+
+    // #then it is paid, debited exactly once
+    expect({
+      payout: (await reload(payout)).status,
+      rows: await ledgerOf(payout),
+    }).toEqual({
+      payout: "paid",
+      rows: [{ type: "payout", usdcAmount: -PAYOUT_USDC }],
+    });
+  });
+
+  it("can't hand back money 1Click delivered as refunded or never sent", async () => {
+    // #given a quote the job settled as delivered
+    const { quote, payout } = await paidOutUnderReview();
+    oneClick.state.deliverIntentPayout(quote.depositAddress);
+    await runtime.runPromise(continueDelivery(quote));
+
+    // #when staff try the other outcomes
+    const asRefunded = await prepare(quote, "refunded");
+    const asNeverSent = await prepare(quote, "never_deposited");
+
+    // #then both are refused and the payout stays held, undebited
+    expect({
+      statuses: [asRefunded.status, asNeverSent.status],
+      refunded: await messageOf(asRefunded),
+      payout: (await reload(payout)).status,
+      rows: await ledgerOf(payout),
+    }).toEqual({
+      statuses: [409, 409],
+      refunded: "The quote settled as delivered, not refunded.",
+      payout: "needs_review",
+      rows: [],
+    });
+  });
+
+  it("hands a payout back as refunded after a late REFUNDED, and it fails with no ledger row", async () => {
+    // #given the job heard REFUNDED after the quote went to review
+    const { quote, payout } = await paidOutUnderReview();
+    oneClick.state.refundIntentPayout(quote.depositAddress);
+    await runtime.runPromise(continueDelivery(quote));
+
+    // #when staff resolve it as delivered, which is refused, then as refunded
+    const asDelivered = await prepare(quote, "delivered");
+    await resolve(quote, "refunded");
+    await runtime.runPromise(continueDelivery(await onlyQuote()));
+
+    // #then the payout failed, the ledger never moved and was never credited
+    expect({
+      refused: asDelivered.status,
+      payout: (await reload(payout)).status,
+      rows: await ledgerOf(payout),
+      ledger: await ledgerBalance(db, paying.company),
+    }).toEqual({
+      refused: 409,
+      payout: "failed",
+      rows: [],
+      ledger: OPENING_BALANCE,
+    });
+  });
+
+  it("hands a payout back as never sent once the signed message expired unused, and it fails with nothing moved", async () => {
+    // #given a quote under review whose signed message passed its own
+    // deadline with 1Click still waiting for the deposit
+    const { quote, payout } = await paidOutUnderReview();
+    await updateQuote(db, paying.company, quote.id, {
+      intentDeadline: new Date(Date.now() - 10 * 60_000),
+    });
+    oneClickReports(quote, { status: "PENDING_DEPOSIT" });
+    await runtime.runPromise(continueDelivery(await onlyQuote()));
+    expect((await onlyQuote()).status).toBe("failed");
+
+    // #when staff resolve it, as delivered first
+    const asDelivered = await prepare(quote, "delivered");
+    await resolve(quote, "never_deposited");
+    await runtime.runPromise(continueDelivery(await onlyQuote()));
+
+    // #then
+    expect({
+      refused: asDelivered.status,
+      payout: (await reload(payout)).status,
+      rows: await ledgerOf(payout),
+    }).toEqual({ refused: 409, payout: "failed", rows: [] });
+  });
+
+  it("refuses a payout that already has ledger rows, as a correction by hand", async () => {
+    // #given a settled quote whose held payout somehow has a debit
+    const { quote, payout } = await paidOutUnderReview();
+    oneClick.state.deliverIntentPayout(quote.depositAddress);
+    await runtime.runPromise(continueDelivery(quote));
+    await inCompany((tx) =>
+      tx.insert(walletTransactions).values({
+        organizationId: paying.company.organizationId,
+        walletId: paying.wallet.id,
+        type: "payout",
+        chain: "near",
+        usdcAmount: -PAYOUT_USDC,
+        payoutId: payout.id,
+      }),
+    );
+
+    // #when staff resolve it as delivered
+    const response = await prepare(quote, "delivered");
+
+    // #then
+    expect({
+      status: response.status,
+      message: (await messageOf(response)).includes(
+        "ledger correction by hand",
+      ),
+    }).toEqual({ status: 409, message: true });
+  });
+
+  it("lets a viewer read it but not resolve it", async () => {
+    // #given a settled quote with a payout held
+    const { quote } = await paidOutUnderReview();
+    oneClick.state.deliverIntentPayout(quote.depositAddress);
+    await runtime.runPromise(continueDelivery(quote));
+
+    // #when a viewer tries
+    const response = await prepare(quote, "delivered", viewer);
+
+    // #then
+    expect(response.status).toBe(403);
   });
 });

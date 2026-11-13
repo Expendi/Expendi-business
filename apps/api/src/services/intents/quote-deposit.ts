@@ -1,6 +1,8 @@
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { Data, Effect } from "effect";
 
+import type { PayeeChain } from "@expendi-business/shared";
+
 import type { DatabaseService } from "../../db/client.js";
 import type { IntentQuote } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
@@ -12,6 +14,7 @@ import type {
   CompanyWalletSendInput,
   CompanyWalletSendReceipt,
 } from "../wallet/company-wallet-send.js";
+import type { OneClickSession } from "./one-click.js";
 import {
   companyWalletSends,
   intentQuotes,
@@ -30,14 +33,23 @@ import {
   settleCompanyWalletSend,
 } from "../wallet/company-wallet-send.js";
 import { ledgerBalance } from "../wallet/ledger.js";
+import { sessionForQuote } from "./company-session.js";
+import { ConfidentialAccounts } from "./confidential-account.js";
+import { recordedExpendiSurplus } from "./expendi-surplus.js";
+import { ensureFeeCover } from "./fee-cover.js";
 import { ONE_CLICK_USDC_ASSET_IDS, OneClick } from "./one-click.js";
+import { advanceIntentQuote, isIntentPaid } from "./quote-intent.js";
 import {
+  DEPOSIT_MARGIN_MS,
   moveQuote,
   orCurrent,
   quoteById,
   quoteSendKey,
   settleFromOneClick,
 } from "./quote-settle.js";
+import { touchesConfidentialAccount } from "./quote-status.js";
+
+export { recordedExpendiSurplus };
 
 /**
  * Paying a NEAR Intents quote from a company wallet: a Base hop, or a USDC
@@ -61,12 +73,7 @@ import {
 /** How long a quote stays open for its deposit. */
 export const COMPANY_QUOTE_TTL_MS = 10 * 60_000;
 
-/**
- * No deposit is started with less than this left before the deadline: a
- * company wallet send stays valid for about two minutes, and one that lands
- * after the deadline is only refunded.
- */
-export const DEPOSIT_MARGIN_MS = 3 * 60_000;
+export { DEPOSIT_MARGIN_MS };
 
 /**
  * 0.1%. USDC to USDC barely moves, and with `EXACT_OUTPUT` the slippage is
@@ -101,7 +108,8 @@ export class QuoteNotOpened extends Data.TaggedError("QuoteNotOpened")<{
     | "one_click"
     | "one_click_unavailable"
     | "untrusted"
-    | "over_cap";
+    | "over_cap"
+    | "unsupported_route";
   readonly message: string;
 }> {}
 
@@ -110,7 +118,11 @@ export type DepositGate =
   | { readonly kind: "abandon"; readonly reason: string };
 
 export type QuoteDepositDeps =
-  CompanyWalletSendDeps | OneClick | BaseRpc | DatabaseService;
+  | CompanyWalletSendDeps
+  | OneClick
+  | BaseRpc
+  | DatabaseService
+  | ConfidentialAccounts;
 
 /**
  * How the company wallet pays a quote's deposit address: USDC on NEAR for a
@@ -126,17 +138,26 @@ export type CompanyDepositSend = (
 >;
 
 /**
- * Takes a firm `EXACT_OUTPUT` quote that delivers exactly `amountOut` USDC
- * to `recipient`, refunding to the company wallet, and saves it. `link`
- * runs in the same transaction as the insert, so what the quote is for
- * (its payouts) is linked to it or the quote isn't saved at all. The same
- * key returns the quote already saved under it and asks 1Click nothing.
+ * Takes a firm quote that delivers exactly `amountOut` USDC to `recipient`,
+ * refunding to the company wallet, and saves it. `link` runs in the same
+ * transaction as the insert, so what the quote is for (its payouts) is
+ * linked to it or the quote isn't saved at all. The same key returns the
+ * quote already saved under it and asks 1Click nothing.
+ *
+ * It is `EXACT_OUTPUT`, except for a payee on NEAR, whose payout is free:
+ * `EXACT_INPUT` for the same amount, which 1Click delivers whole.
+ *
+ * A company whose USDC is kept in a confidential account (`balance_home`)
+ * pays the quote out of it by a signed message instead of an on-chain
+ * transfer: the quote is taken with the company's session, as paid from and
+ * refunding into the account. A payee on NEAR is paid only that way. For any
+ * other company the request is the one it always was.
  */
 export function openCompanyQuote(input: {
   readonly organizationId: string;
   readonly quoteKey: string;
   readonly purpose: CompanyQuotePurpose;
-  readonly destinationChain: "base" | "solana";
+  readonly destinationChain: PayeeChain;
   readonly recipient: string;
   readonly amountOut: bigint;
   readonly link: (
@@ -146,9 +167,10 @@ export function openCompanyQuote(input: {
 }): Effect.Effect<
   IntentQuote,
   QuoteNotOpened | DatabaseError,
-  OneClick | DatabaseService
+  OneClick | ConfidentialAccounts | DatabaseService
 > {
   const { organizationId } = input;
+  const toNear = input.destinationChain === "near";
   const byKey = withScope({ organizationId }, (tx) =>
     query(() =>
       tx
@@ -191,19 +213,66 @@ export function openCompanyQuote(input: {
       );
     }
 
+    const fromConfidentialAccount =
+      wallet.balanceHome === "confidential_account";
+    if (toNear && !fromConfidentialAccount) {
+      return yield* Effect.fail(
+        new QuoteNotOpened({
+          reason: "unsupported_route",
+          message:
+            "A payee on NEAR is paid from a confidential account only; a company wallet pays one by a direct transfer.",
+        }),
+      );
+    }
+    let session: OneClickSession | undefined;
+    if (fromConfidentialAccount) {
+      if (wallet.privyWalletId === null) {
+        return yield* Effect.fail(
+          new QuoteNotOpened({
+            reason: "no_wallet",
+            message: "The company has no active company wallet on NEAR.",
+          }),
+        );
+      }
+      const accounts = yield* ConfidentialAccounts;
+      const signedIn = yield* accounts
+        .session({
+          privyWalletId: wallet.privyWalletId,
+          accountId: wallet.address,
+        })
+        .pipe(Effect.either);
+      if (signedIn._tag === "Left") {
+        return yield* Effect.fail(
+          new QuoteNotOpened({
+            reason: "one_click_unavailable",
+            message: `The company's confidential account couldn't be reached: ${signedIn.left.message}`,
+          }),
+        );
+      }
+      session = signedIn.right;
+    }
+
+    const swapType = toNear ? "EXACT_INPUT" : "EXACT_OUTPUT";
     const oneClick = yield* OneClick;
     const quoted = yield* oneClick
-      .quote({
-        dry: false,
-        swapType: "EXACT_OUTPUT",
-        originAsset: ONE_CLICK_USDC_ASSET_IDS.near,
-        destinationAsset: ONE_CLICK_USDC_ASSET_IDS[input.destinationChain],
-        amount: input.amountOut,
-        recipient: input.recipient,
-        refundTo: wallet.address,
-        deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
-        slippageBps: STABLECOIN_SLIPPAGE_BPS,
-      })
+      .quote(
+        {
+          dry: false,
+          swapType,
+          originAsset: ONE_CLICK_USDC_ASSET_IDS.near,
+          destinationAsset: ONE_CLICK_USDC_ASSET_IDS[input.destinationChain],
+          amount: input.amountOut,
+          recipient: input.recipient,
+          refundTo: wallet.address,
+          ...(fromConfidentialAccount && {
+            depositType: "CONFIDENTIAL_INTENTS" as const,
+            refundType: "CONFIDENTIAL_INTENTS" as const,
+          }),
+          deadline: new Date(Date.now() + COMPANY_QUOTE_TTL_MS),
+          slippageBps: toNear ? 0 : STABLECOIN_SLIPPAGE_BPS,
+        },
+        session,
+      )
       .pipe(
         Effect.mapError(
           (error) =>
@@ -233,7 +302,8 @@ export function openCompanyQuote(input: {
     if (
       quoted.amountOut !== input.amountOut ||
       quoted.amountIn < quoted.amountOut ||
-      quoted.amountIn - quoted.amountOut > maxQuoteCost(quoted.amountOut)
+      quoted.amountIn - quoted.amountOut > maxQuoteCost(quoted.amountOut) ||
+      (toNear && quoted.amountIn !== quoted.amountOut)
     ) {
       return yield* untrusted(
         `1Click asks ${quoted.amountIn} to deliver ${quoted.amountOut} USDC base units, which is more than a USDC route costs.`,
@@ -258,16 +328,21 @@ export function openCompanyQuote(input: {
               walletId: wallet.id,
               quoteKey: input.quoteKey,
               purpose: input.purpose,
-              swapType: "EXACT_OUTPUT",
+              swapType,
               originAsset: ONE_CLICK_USDC_ASSET_IDS.near,
               destinationAsset:
                 ONE_CLICK_USDC_ASSET_IDS[input.destinationChain],
               amountIn: quoted.amountIn,
               minAmountIn: quoted.minAmountIn,
               amountOut: quoted.amountOut,
+              ...(toNear && { minAmountOut: quoted.minAmountOut }),
               depositAddress: quoted.depositAddress,
               recipient: input.recipient,
               refundTo: wallet.address ?? "",
+              ...(fromConfidentialAccount && {
+                depositType: "CONFIDENTIAL_INTENTS" as const,
+                refundType: "CONFIDENTIAL_INTENTS" as const,
+              }),
               deadline: quoted.deadline,
               quoteResponse: quoted.signedResponse,
             })
@@ -312,30 +387,11 @@ function expendiSurplus(
   return Effect.gen(function* () {
     const recorded = yield* withScope(scope, (tx) =>
       Effect.gen(function* () {
-        const [sums] = yield* query(() =>
-          tx
-            .select({
-              surplus: sql<string>`coalesce(sum(
-                coalesce(${intentQuotes.feeCoverUsdc}, 0) - CASE
-                  WHEN ${intentQuotes.status} = 'succeeded' THEN
-                    least(greatest(coalesce(${intentQuotes.swappedAmountIn}, ${intentQuotes.amountIn}), ${intentQuotes.amountOut}), ${intentQuotes.amountIn}) - ${intentQuotes.amountOut}
-                  WHEN ${intentQuotes.status} = 'refunded' THEN
-                    ${intentQuotes.amountIn} - least(coalesce(${intentQuotes.refundedAmount}, ${intentQuotes.amountIn}), ${intentQuotes.amountIn})
-                  WHEN ${intentQuotes.status} = 'failed' AND ${intentQuotes.companyWalletSendId} IS NULL THEN 0
-                  ELSE ${intentQuotes.amountIn} - ${intentQuotes.amountOut}
-                END), 0)::text`,
-            })
-            .from(intentQuotes)
-            .where(
-              and(
-                eq(intentQuotes.walletId, quote.walletId),
-                ne(intentQuotes.id, quote.id),
-                inArray(intentQuotes.purpose, [...COMPANY_QUOTE_PURPOSES]),
-                sql`${intentQuotes.depositStartedAt} IS NOT NULL`,
-              ),
-            ),
+        const surplus = yield* recordedExpendiSurplus(
+          tx,
+          quote.walletId,
+          quote.id,
         );
-        const surplus = BigInt(sums?.surplus ?? "0");
         if (surplus <= 0n) return null;
 
         const [busyQuote] = yield* query(() =>
@@ -604,6 +660,7 @@ function deposit(
 /** Step 5. 1Click finds a deposit by itself too, so a refusal here only costs time. */
 function submitDeposit(
   quote: IntentQuote,
+  session?: OneClickSession,
 ): Effect.Effect<IntentQuote, DatabaseError, OneClick | DatabaseService> {
   return Effect.gen(function* () {
     if (quote.depositTxHash === null || quote.depositSubmittedAt !== null) {
@@ -611,7 +668,7 @@ function submitDeposit(
     }
     const oneClick = yield* OneClick;
     const told = yield* oneClick
-      .submitDeposit(quote.depositAddress, quote.depositTxHash)
+      .submitDeposit(quote.depositAddress, quote.depositTxHash, session)
       .pipe(Effect.either);
     if (told._tag === "Left") return quote;
     return yield* orCurrent(
@@ -648,14 +705,50 @@ function submitDeposit(
  *   unknown after the deadline;
  * - 1Click `REFUNDED`: `refunded`, the money is back in the company wallet;
  * - 1Click `FAILED`: `needs_review`.
+ *
+ * A quote that touches a confidential account needs the company's `session`
+ * for 1Click to tell us anything about it. It is resolved here when the
+ * caller gave none; if the company can't be signed in, the quote is returned
+ * unchanged, since nothing may start that can't be settled.
+ *
+ * A quote paid out of a confidential account goes to `advanceIntentQuote`,
+ * which signs a message instead of sending on chain. Every other quote goes
+ * down the steps above, untouched.
  */
 export function advanceCompanyQuote<R>(input: {
   readonly quote: IntentQuote;
+  readonly session?: OneClickSession;
   readonly beforeDeposit: (
     quote: IntentQuote,
   ) => Effect.Effect<DepositGate, DatabaseError, R>;
 }): Effect.Effect<IntentQuote, DatabaseError, QuoteDepositDeps | R> {
   return Effect.gen(function* () {
+    let session = input.session;
+    if (session === undefined && touchesConfidentialAccount(input.quote)) {
+      const resolved = yield* sessionForQuote(input.quote).pipe(Effect.either);
+      if (resolved._tag === "Left") {
+        console.warn(
+          `[intents] couldn't sign in to move quote ${input.quote.id}; left as it is`,
+          resolved.left.message,
+        );
+        return yield* quoteById(input.quote.organizationId, input.quote.id);
+      }
+      session = resolved.right;
+    }
+    if (isIntentPaid(input.quote)) {
+      if (session === undefined) {
+        return yield* Effect.dieMessage(
+          `quote ${input.quote.id} is paid from a confidential account but has no session`,
+        );
+      }
+      return yield* advanceIntentQuote({
+        quote: input.quote,
+        session,
+        beforeDeposit: input.beforeDeposit,
+        ensureFeeCover,
+      });
+    }
+
     let quote = yield* quoteById(input.quote.organizationId, input.quote.id);
     const untouched = and(
       eq(intentQuotes.status, "quoted"),
@@ -694,10 +787,12 @@ export function advanceCompanyQuote<R>(input: {
       }
 
       quote = yield* quoteById(quote.organizationId, quote.id);
-      // A move to Treasury is paid for by the company, not Expendi: its
-      // `EXACT_INPUT` quote delivers what is left after 1Click's charge.
+      // Expendi covers only the two purposes that deliver an exact amount.
+      // A move to Treasury is paid for by the company: its `EXACT_INPUT`
+      // quote delivers what is left after 1Click's charge. A move-in has no
+      // charge to cover.
       if (
-        quote.purpose !== "to_treasury" &&
+        (quote.purpose === "base_hop" || quote.purpose === "usdc_payout") &&
         (yield* coverFee(quote)) === "waiting"
       ) {
         return yield* quoteById(quote.organizationId, quote.id);
@@ -717,7 +812,11 @@ export function advanceCompanyQuote<R>(input: {
       quote = started;
     }
 
-    return yield* continueCompanyDeposit(quote, sendUsdcFromCompanyWallet);
+    return yield* continueCompanyDeposit(
+      quote,
+      sendUsdcFromCompanyWallet,
+      session,
+    );
   });
 }
 
@@ -725,11 +824,13 @@ export function advanceCompanyQuote<R>(input: {
  * Steps 4 to 6 for a quote whose deposit has started (`depositing`, or
  * `needs_review` after starting): pays the deposit address with `send` if
  * no send is recorded yet, tells 1Click, and settles the quote from 1Click's
- * status. Anything else comes back unchanged.
+ * status. Anything else comes back unchanged. `session` is the company's,
+ * for a quote that touches a confidential account.
  */
 export function continueCompanyDeposit(
   input: IntentQuote,
   send: CompanyDepositSend,
+  session?: OneClickSession,
 ): Effect.Effect<IntentQuote, DatabaseError, QuoteDepositDeps> {
   return Effect.gen(function* () {
     let quote = input;
@@ -739,12 +840,15 @@ export function continueCompanyDeposit(
     // 1Click's word settles a quote under review too, even one whose
     // deposit we lost track of.
     if (quote.status === "needs_review" && quote.depositStartedAt !== null) {
-      return yield* settleFromOneClick(yield* submitDeposit(quote));
+      return yield* settleFromOneClick(
+        yield* submitDeposit(quote, session),
+        session,
+      );
     }
     if (quote.status !== "depositing" || quote.companyWalletSendId === null) {
       return quote;
     }
-    quote = yield* submitDeposit(quote);
-    return yield* settleFromOneClick(quote);
+    quote = yield* submitDeposit(quote, session);
+    return yield* settleFromOneClick(quote, session);
   });
 }

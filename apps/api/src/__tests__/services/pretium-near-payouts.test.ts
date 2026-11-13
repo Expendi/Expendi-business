@@ -19,6 +19,7 @@ import { PRETIUM_BASE_SETTLEMENT_ADDRESS } from "../../services/pretium/settleme
 import { creditUsdcDeposits } from "../../services/wallet/deposits.js";
 import { mineCompanySends } from "../helpers/base-mining.js";
 import { randomTxHash, transferReceipt } from "../helpers/chain.js";
+import { saveQuote } from "../helpers/money-in.js";
 import {
   createNearPayingCompany,
   deliverHop,
@@ -281,6 +282,120 @@ describe("a Pretium cash-out for a company whose money is on NEAR", () => {
     }).toEqual({
       credits: [{ type: "refund", payoutId: funded.id }],
       status: "failed",
+      ledger: 100n * USDC,
+    });
+  });
+});
+
+describe("a Pretium cash-out for a company whose USDC is in a confidential account", () => {
+  beforeEach(async () => {
+    paying = await createNearPayingCompany(world, db, {
+      balanceHome: "confidential_account",
+    });
+    await mineCompanySends(privy, base.state.receipts, db, paying.company);
+    world.oneClick.state.fundConfidential(paying.accountId, 100n * USDC);
+    await saveQuote(
+      runtime,
+      db,
+      {
+        company: paying.company,
+        walletId: paying.wallet.id,
+        accountId: paying.accountId,
+        transitAddress: paying.transitAddress,
+      },
+      "fee_cover",
+      {
+        amount: 2n * USDC,
+        row: { status: "succeeded", settledAt: new Date() },
+      },
+    );
+  });
+
+  async function waitingForHop(): Promise<{
+    approved: Payout;
+    hop: IntentQuote;
+  }> {
+    const approved = await approvedPayout();
+    const waiting = await runtime.runPromise(
+      fundPayout({
+        organizationId: paying.company.organizationId,
+        payoutId: approved.id,
+      }),
+    );
+    expect({
+      status: waiting.status,
+      sends: transitSends().length,
+      pays: pretium.state.payRequests.length,
+    }).toEqual({ status: "approved", sends: 0, pays: 0 });
+    return { approved, hop: await onlyHop() };
+  }
+
+  it("hops out of the account by a signed message, then pays Pretium from the transit wallet", async () => {
+    // #given a cash-out whose hop was paid out of the account
+    const { approved, hop } = await waitingForHop();
+    expect({
+      depositType: hop.depositType,
+      refundType: hop.refundType,
+      intents: world.oneClick.state.submittedIntents.filter(
+        (intent) => intent.depositAddress === hop.depositAddress,
+      ).length,
+    }).toEqual({
+      depositType: "CONFIDENTIAL_INTENTS",
+      refundType: "CONFIDENTIAL_INTENTS",
+      intents: 1,
+    });
+
+    // #when 1Click delivers the hop to the transit wallet
+    world.oneClick.state.deliverIntentPayout(hop.depositAddress);
+    world.setBaseUsdc(paying.transitAddress, hop.amountOut);
+    await runtime.runPromise(continueBaseHop(hop));
+    await runtime.runPromise(continueBaseHop(hop));
+
+    // #then Pretium is paid once, from the transit wallet, to the pinned
+    // address, and the ledger is debited by that payment alone
+    const funded = await reread(approved);
+    expect({
+      status: funded.status,
+      sends: transitSends().map((send) => ({
+        to: send.to,
+        key: send.idempotencyKey,
+      })),
+      pays: pretium.state.payRequests.length,
+      ledger: await ledgerBalance(db, paying.company),
+    }).toEqual({
+      status: "paying",
+      sends: [
+        {
+          to: PRETIUM_BASE_SETTLEMENT_ADDRESS,
+          key: `payout-${funded.id}`,
+        },
+      ],
+      pays: 1,
+      ledger: 100n * USDC - (funded.amountToTransferUsdc ?? 0n),
+    });
+  });
+
+  it("fails with nothing sent and no ledger row when 1Click refunds the hop", async () => {
+    // #given a hop 1Click refunded into the account
+    const { approved, hop } = await waitingForHop();
+    world.oneClick.state.refundIntentPayout(hop.depositAddress);
+
+    // #when the job runs
+    await runtime.runPromise(continueBaseHop(hop));
+
+    // #then
+    const failed = await reread(approved);
+    expect({
+      status: failed.status,
+      neutral: !/pretium|paycrest/i.test(failed.failureReason ?? ""),
+      sends: transitSends().length,
+      pays: pretium.state.payRequests.length,
+      ledger: await ledgerBalance(db, paying.company),
+    }).toEqual({
+      status: "failed",
+      neutral: true,
+      sends: 0,
+      pays: 0,
       ledger: 100n * USDC,
     });
   });

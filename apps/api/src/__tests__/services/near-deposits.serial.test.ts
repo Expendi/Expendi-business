@@ -1,6 +1,14 @@
 import { eq } from "drizzle-orm";
 import pg from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 
 import type { Database } from "../../db/client.js";
 import type { AppRuntime } from "../../runtime.js";
@@ -14,13 +22,24 @@ import {
 } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 import { runAlerts } from "../../services/alerts/run-alerts.js";
-import { createFundIn } from "../../services/intents/fund-in.js";
+import { sessionForQuote } from "../../services/intents/company-session.js";
+import {
+  createFundIn,
+  refreshOpenFundIns,
+} from "../../services/intents/fund-in.js";
+import { quoteForPayment } from "../../services/invoices/pay-link.js";
 import {
   DEPOSITS_HELD_ALERT_BLOCKS,
   NEAR_INTENTS_ACCOUNT_ID,
   watchNearDeposits,
 } from "../../services/wallet/near-deposits.js";
+import {
+  createDeliveryCompany,
+  settleOpenQuotes,
+} from "../helpers/confidential-delivery.js";
+import { makeFakePrivyWallets } from "../helpers/fakes.js";
 import { makeFakeFastNear } from "../helpers/fast-near.js";
+import { createCustomerAndInvoice } from "../helpers/invoices.js";
 import {
   createFundedCompany,
   ledgerOf,
@@ -44,6 +63,7 @@ import { TEST_DATABASE_URL_MIGRATE } from "../setup/test-database.js";
 const rpc = makeFakeNearRpc();
 const fastNear = makeFakeFastNear();
 const oneClick = makeFakeOneClick();
+const privy = makeFakePrivyWallets();
 let runtime: AppRuntime;
 let db: Database;
 let owner: pg.Pool;
@@ -54,6 +74,7 @@ beforeAll(async () => {
     nearRpc: rpc.layer,
     fastNear: fastNear.layer,
     oneClick: oneClick.layer,
+    privyWallets: privy.layer,
   });
   ({ db } = await runtime.runPromise(DatabaseService));
   owner = new pg.Pool({ connectionString: TEST_DATABASE_URL_MIGRATE, max: 1 });
@@ -221,6 +242,7 @@ describe("watchNearDeposits", () => {
         blockNumber: outcome.blockHeight,
         counterpartyAddress: sender,
         payoutId: null,
+        intentQuoteId: null,
       },
     ]);
   });
@@ -1159,5 +1181,406 @@ describe("watchNearDeposits, for a wallet held at a transfer", () => {
 
     // #then
     expect((await heldAlerts()).map((alert) => alert.open)).toEqual([true]);
+  });
+});
+
+describe("watchNearDeposits, for a company with a confidential account", () => {
+  beforeEach(async () => {
+    funded = await createDeliveryCompany(db, privy);
+  });
+
+  afterEach(async () => {
+    await settleOpenQuotes(db, funded);
+  });
+
+  const privyWalletIdOfCompany = async () => {
+    const [row] = await runInScope(
+      db,
+      { organizationId: funded.company.organizationId },
+      (tx) =>
+        tx
+          .select({ id: wallets.privyWalletId })
+          .from(wallets)
+          .where(eq(wallets.id, funded.walletId)),
+    );
+    return row?.id ?? "";
+  };
+
+  const confidentialFundIn = async () => {
+    const view = await runtime.runPromise(
+      createFundIn({
+        organizationId: funded.company.organizationId,
+        actor: { type: "user", id: funded.company.admin.id },
+        chain: "arbitrum",
+        amount: 40_000_000n,
+      }),
+    );
+    return readQuote(db, funded, view.id);
+  };
+
+  const confidentialPayLink = async () => {
+    const invoice = await createCustomerAndInvoice(db, funded.company, {
+      status: "open",
+    });
+    const quote = await runtime.runPromise(
+      quoteForPayment(invoice.publicId ?? "", "base"),
+    );
+    return readQuote(db, funded, quote.id);
+  };
+
+  const confidentialReturn = () =>
+    saveQuote(runtime, db, funded, "fund_in_return", {
+      confidential: true,
+      row: { status: "quoted" },
+    });
+
+  it("treats a transfer in a transaction a confidential delivery lists as internal: that quote is credited at settlement only", async () => {
+    // #given
+    const fundIn = await confidentialFundIn();
+    const delivery = arrived(NEAR_INTENTS_ACCOUNT_ID, 10_000_000n);
+    oneClick.state.setStatus(fundIn.depositAddress, {
+      status: "SUCCESS",
+      depositedAmount: fundIn.amountIn,
+      amountOut: 10_000_000n,
+      destinationChainTxHashes: [delivery.txHash],
+    });
+    await runtime.runPromise(refreshOpenFundIns());
+
+    // #when
+    await watch();
+
+    // #then
+    expect(await ledger()).toEqual([]);
+  });
+
+  it.each([
+    ["fund-in", confidentialFundIn],
+    ["pay-link quote", confidentialPayLink],
+    ["fund-in return", confidentialReturn],
+  ])(
+    "doesn't hold an unexplained transfer from NEAR Intents behind an open confidential %s",
+    async (_, open) => {
+      // #given
+      const quote = await open();
+      const withdrawal = arrived(NEAR_INTENTS_ACCOUNT_ID, 12_000_000n);
+
+      // #when
+      await watch();
+
+      // #then
+      expect({
+        quote: (await readQuote(db, funded, quote.id)).status,
+        ledger: (await ledger()).map((row) => ({
+          type: row.type,
+          usdcAmount: row.usdcAmount,
+          txHash: row.txHash,
+        })),
+      }).toEqual({
+        quote: expect.stringMatching(/^(quoted|depositing)$/) as string,
+        ledger: [
+          {
+            type: "deposit",
+            usdcAmount: 12_000_000n,
+            txHash: withdrawal.txHash,
+          },
+        ],
+      });
+    },
+  );
+
+  it("holds an unexplained transfer from NEAR Intents behind an unsettled move-in, whose refund would come back", async () => {
+    // #given
+    const moveIn = await saveQuote(runtime, db, funded, "move_in", {
+      row: { status: "depositing", depositStartedAt: new Date() },
+    });
+    arrived(NEAR_INTENTS_ACCOUNT_ID, 12_000_000n);
+
+    // #when
+    const summary = await watch();
+
+    // #then
+    expect({
+      held: summary.held >= 1,
+      ledger: await ledger(),
+      moveIn: (await readQuote(db, funded, moveIn.id)).status,
+    }).toEqual({ held: true, ledger: [], moveIn: "depositing" });
+  });
+
+  it("asks 1Click about an unsettled move-in with the company's session, so a refund it lists is explained", async () => {
+    // #given
+    const moveIn = await saveQuote(runtime, db, funded, "move_in", {
+      row: { status: "depositing", depositStartedAt: new Date() },
+    });
+    const refund = arrived(NEAR_INTENTS_ACCOUNT_ID, 5_000_000n);
+    oneClick.state.setStatus(moveIn.depositAddress, {
+      status: "REFUNDED",
+      nearTxHashes: [refund.txHash],
+    });
+
+    // #when
+    await watch();
+
+    // #then
+    const saved = await readQuote(db, funded, moveIn.id);
+    expect({
+      oneClickStatus: saved.oneClickStatus,
+      nearTxHashes: saved.nearTxHashes,
+      ledger: await ledger(),
+    }).toEqual({
+      oneClickStatus: "REFUNDED",
+      nearTxHashes: [refund.txHash],
+      ledger: [],
+    });
+  });
+
+  it("doesn't hold deposits behind a delivery it can't sign in to ask about, and never tries to", async () => {
+    // #given a confidential return the company has no cached session for
+    const back = await confidentialReturn();
+    const withdrawal = arrived(NEAR_INTENTS_ACCOUNT_ID, 12_000_000n);
+    privy.state.nextNearSignings("refused");
+
+    // #when
+    await watch();
+
+    // #then
+    const attempts = privy.state.nearSigningRequestsFor(
+      await privyWalletIdOfCompany(),
+    );
+    const signIn = await runtime.runPromiseExit(sessionForQuote(back));
+    expect({
+      credited: (await ledger()).map((row) => row.txHash),
+      attempts,
+      signInWouldHaveFailed: signIn._tag,
+    }).toEqual({
+      credited: [withdrawal.txHash],
+      attempts: 0,
+      signInWouldHaveFailed: "Failure",
+    });
+  });
+
+  it("holds deposits behind a move-in it can't sign in to ask about", async () => {
+    // #given
+    await saveQuote(runtime, db, funded, "move_in", {
+      row: { status: "depositing", depositStartedAt: new Date() },
+    });
+    arrived(NEAR_INTENTS_ACCOUNT_ID, 12_000_000n);
+    privy.state.nextNearSignings("refused");
+
+    // #when
+    const summary = await watch();
+
+    // #then
+    expect({
+      held: summary.held >= 1,
+      ledger: await ledger(),
+      attempts: privy.state.nearSigningRequestsFor(
+        await privyWalletIdOfCompany(),
+      ),
+    }).toEqual({ held: true, ledger: [], attempts: 1 });
+  });
+
+  it("treats a transfer from the deposit address of one of the company's move-ins as internal", async () => {
+    // #given a refunded move-in whose refund 1Click didn't list
+    const moveIn = await saveQuote(runtime, db, funded, "move_in", {
+      row: { status: "refunded", settledAt: new Date() },
+    });
+    arrived(moveIn.depositAddress, 5_000_000n);
+
+    // #when
+    const summary = await watch();
+
+    // #then
+    expect({
+      internal: summary.internal >= 1,
+      ledger: await ledger(),
+    }).toEqual({ internal: true, ledger: [] });
+  });
+
+  it("still credits a transfer from a deposit address that is no move-in's", async () => {
+    // #given
+    await saveQuote(runtime, db, funded, "move_in", {
+      row: { status: "refunded", settledAt: new Date() },
+    });
+    const stranger = arrived(randomNearAccount(), 5_000_000n);
+
+    // #when
+    await watch();
+
+    // #then
+    expect((await ledger()).map((row) => row.txHash)).toEqual([
+      stranger.txHash,
+    ]);
+  });
+
+  describe("what is paid out of the confidential account", () => {
+    const FLOWS = [
+      ["depositing", "base_hop"],
+      ["needs_review", "base_hop"],
+      ["depositing", "usdc_payout"],
+      ["needs_review", "usdc_payout"],
+    ] as const;
+
+    it.each(FLOWS)(
+      "doesn't hold a deposit behind a %s %s paid out of it",
+      async (status, purpose) => {
+        // #given 1Click's refund and buffer of this quote go back to the account
+        await saveQuote(runtime, db, funded, purpose, {
+          intentPaid: true,
+          row: { status, depositStartedAt: new Date() },
+        });
+        const stranger = arrived(NEAR_INTENTS_ACCOUNT_ID, 12_000_000n);
+
+        // #when
+        await watch();
+
+        // #then the company wallet is credited, and 1Click isn't asked about the quote
+        expect({
+          read: (await resumeToken()) !== null,
+          credited: (await ledger()).map((row) => row.txHash),
+        }).toEqual({ read: true, credited: [stranger.txHash] });
+      },
+    );
+
+    it("never asks 1Click about it to settle a transfer", async () => {
+      // #given
+      const payout = await saveQuote(runtime, db, funded, "usdc_payout", {
+        intentPaid: true,
+        row: { status: "depositing", depositStartedAt: new Date() },
+      });
+      arrived(NEAR_INTENTS_ACCOUNT_ID, 12_000_000n);
+
+      // #when
+      await watch();
+
+      // #then
+      expect(
+        oneClick.state.calls.filter(
+          (call) =>
+            call.call === "status" &&
+            call.depositAddress === payout.depositAddress,
+        ),
+      ).toEqual([]);
+    });
+
+    it("still holds a deposit behind a hop the company paid by a transfer, whatever its balance home is now", async () => {
+      // #given
+      await saveQuote(runtime, db, funded, "base_hop", {
+        row: { status: "depositing", depositStartedAt: new Date() },
+      });
+      arrived(NEAR_INTENTS_ACCOUNT_ID, 12_000_000n);
+
+      // #when
+      await watch();
+
+      // #then
+      expect({
+        read: (await resumeToken()) !== null,
+        ledger: await ledger(),
+      }).toEqual({ read: false, ledger: [] });
+    });
+
+    it("doesn't hold a deposit behind a fee cover, which refunds to the relayer", async () => {
+      // #given
+      await saveQuote(runtime, db, funded, "fee_cover", {
+        row: { status: "depositing", depositStartedAt: new Date() },
+      });
+      const stranger = arrived(NEAR_INTENTS_ACCOUNT_ID, 12_000_000n);
+
+      // #when
+      await watch();
+
+      // #then
+      expect({
+        read: (await resumeToken()) !== null,
+        credited: (await ledger()).map((row) => row.txHash),
+      }).toEqual({ read: true, credited: [stranger.txHash] });
+    });
+
+    it("treats a transfer a from_treasury quote that delivers into the account lists as internal", async () => {
+      // #given
+      const move = await saveTreasuryMove(db, funded, {
+        direction: "to_wallet",
+        status: "failed",
+        settledAt: new Date(),
+      });
+      const listed = arrived(NEAR_INTENTS_ACCOUNT_ID, 5_000_000n);
+      await saveQuote(runtime, db, funded, "from_treasury", {
+        row: {
+          treasuryMoveId: move.id,
+          recipientType: "CONFIDENTIAL_INTENTS",
+          status: "succeeded",
+          settledAt: new Date(),
+          depositStartedAt: new Date(),
+          destinationChainTxHashes: [listed.txHash],
+        },
+      });
+
+      // #when
+      const summary = await watch();
+
+      // #then it is credited at settlement, never from a transfer
+      expect({
+        internal: summary.internal >= 1,
+        ledger: await ledger(),
+      }).toEqual({ internal: true, ledger: [] });
+    });
+
+    it("treats a transfer a refunded to_treasury quote paid out of the account lists as internal", async () => {
+      // #given
+      const move = await saveTreasuryMove(db, funded, {
+        status: "failed",
+        settledAt: new Date(),
+      });
+      const listed = arrived(NEAR_INTENTS_ACCOUNT_ID, 5_000_000n);
+      await saveQuote(runtime, db, funded, "to_treasury", {
+        intentPaid: true,
+        row: {
+          treasuryMoveId: move.id,
+          status: "refunded",
+          settledAt: new Date(),
+          depositStartedAt: new Date(),
+          nearTxHashes: [listed.txHash],
+        },
+      });
+
+      // #when
+      const summary = await watch();
+
+      // #then
+      expect({
+        internal: summary.internal >= 1,
+        ledger: await ledger(),
+      }).toEqual({ internal: true, ledger: [] });
+    });
+
+    it("waits for no to_treasury quote paid out of the account to settle", async () => {
+      // #given a transfer it lists while it is still open
+      const move = await saveTreasuryMove(db, funded, {
+        status: "failed",
+        settledAt: new Date(),
+      });
+      const listed = arrived(NEAR_INTENTS_ACCOUNT_ID, 5_000_000n);
+      await saveQuote(runtime, db, funded, "to_treasury", {
+        intentPaid: true,
+        row: {
+          treasuryMoveId: move.id,
+          status: "depositing",
+          depositStartedAt: new Date(),
+          nearTxHashes: [listed.txHash],
+        },
+      });
+
+      // #when
+      await watch();
+
+      // #then
+      expect({
+        read: (await resumeToken()) !== null,
+        ledger: await ledger(),
+      }).toEqual({
+        read: true,
+        ledger: [],
+      });
+    });
   });
 });

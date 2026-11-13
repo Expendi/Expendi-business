@@ -185,4 +185,15 @@ describe("a history row's counterparty", () => {
       "From 0x12AB…9F3c",
     ]);
   });
+
+  it("says nothing about a row with no sender and no transaction", () => {
+    // #then
+    expect(
+      describeCounterparty({
+        ...deposit,
+        txHash: null,
+        counterpartyAddress: null,
+      }),
+    ).toBeNull();
+  });
 });

@@ -44,6 +44,12 @@ beforeAll(async () => {
   ({ db } = await runtime.runPromise(DatabaseService));
   app = createApp({ runtime });
   owner = new pg.Pool({ connectionString: TEST_DATABASE_URL_MIGRATE, max: 2 });
+  // The list shows a fixed number of alerts. Other files' tests leave theirs
+  // in this shared database, and enough of them crowd this file's out of
+  // the list, so whatever is already there is dated outside its window.
+  await owner.query(
+    "UPDATE ops_alerts SET resolved_at = now() - interval '30 days' WHERE resolved_at IS NULL OR resolved_at > now() - interval '30 days'",
+  );
   [admin, viewer] = await Promise.all([
     createStaff(owner, { role: "ops_admin" }),
     createStaff(owner, { role: "ops_viewer" }),

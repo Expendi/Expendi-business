@@ -1,5 +1,14 @@
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { Exit } from "effect";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 
 import type { Database } from "../../db/client.js";
 import type { OneClickStatus } from "../../db/schema/index.js";
@@ -12,8 +21,15 @@ import { runInScope } from "../../db/scope.js";
 import {
   createFundIn,
   getFundIn,
+  refreshFundIn,
   refreshOpenFundIns,
 } from "../../services/intents/fund-in.js";
+import { creditSettledQuotes } from "../../services/intents/quote-credit.js";
+import {
+  createDeliveryCompany,
+  settleOpenQuotes,
+} from "../helpers/confidential-delivery.js";
+import { makeFakePrivyWallets } from "../helpers/fakes.js";
 import {
   createFundedCompany,
   ledgerOf,
@@ -25,13 +41,17 @@ import { makeFakeOneClick } from "../helpers/one-click.js";
 import { makeTestRuntime } from "../helpers/runtime.js";
 
 const oneClick = makeFakeOneClick();
+const privy = makeFakePrivyWallets();
 let runtime: AppRuntime;
 let db: Database;
 let funded: FundedCompany;
 let fundIn: FundInView;
 
 beforeAll(async () => {
-  runtime = makeTestRuntime({ oneClick: oneClick.layer });
+  runtime = makeTestRuntime({
+    oneClick: oneClick.layer,
+    privyWallets: privy.layer,
+  });
   ({ db } = await runtime.runPromise(DatabaseService));
 });
 
@@ -298,5 +318,241 @@ describe("refreshOpenFundIns", () => {
       status: saved.status,
       oneClickStatus: saved.oneClickStatus,
     }).toEqual({ status: "depositing", oneClickStatus: null });
+  });
+});
+
+describe("fund-ins for a company that keeps its USDC in a confidential account", () => {
+  let confidential: FundedCompany;
+
+  const startFundIn = (company: FundedCompany) =>
+    runtime.runPromise(
+      createFundIn({
+        organizationId: company.company.organizationId,
+        actor: { type: "user", id: company.company.admin.id },
+        chain: "arbitrum",
+        amount: 40_000_000n,
+      }),
+    );
+
+  const statusCalls = (depositAddress: string) =>
+    oneClick.state.calls.filter(
+      (call) =>
+        call.call === "status" && call.depositAddress === depositAddress,
+    );
+
+  beforeEach(async () => {
+    confidential = await createDeliveryCompany(db, privy);
+  });
+
+  afterEach(async () => {
+    await settleOpenQuotes(db, confidential);
+  });
+
+  it("is quoted with the company's session for delivery to the confidential account, and changes nothing else", async () => {
+    // #given
+    const before = oneClick.state.quoteRequests.length;
+    const callsBefore = oneClick.state.calls.length;
+
+    // #when
+    const view = await startFundIn(confidential);
+
+    // #then
+    const [request] = oneClick.state.quoteRequests.slice(before);
+    const [call] = oneClick.state.calls.slice(callsBefore);
+    const saved = await readQuote(db, confidential, view.id);
+    expect({
+      request: request && {
+        swapType: request.swapType,
+        recipient: request.recipient,
+        recipientType: request.recipientType,
+        refundTo: request.refundTo,
+        refundType: request.refundType,
+        depositType: request.depositType,
+        slippageBps: request.slippageBps,
+      },
+      sessionSent: call?.session !== undefined,
+      saved: {
+        recipient: saved.recipient,
+        recipientType: saved.recipientType,
+        refundTo: saved.refundTo,
+        refundType: saved.refundType,
+        depositType: saved.depositType,
+        status: saved.status,
+      },
+    }).toEqual({
+      request: {
+        swapType: "EXACT_INPUT",
+        recipient: confidential.accountId,
+        recipientType: "CONFIDENTIAL_INTENTS",
+        refundTo: confidential.accountId,
+        refundType: "INTENTS",
+        depositType: undefined,
+        slippageBps: 100,
+      },
+      sessionSent: true,
+      saved: {
+        recipient: confidential.accountId,
+        recipientType: "CONFIDENTIAL_INTENTS",
+        refundTo: confidential.accountId,
+        refundType: "INTENTS",
+        depositType: "ORIGIN_CHAIN",
+        status: "quoted",
+      },
+    });
+  });
+
+  it("asks for a company wallet's quote exactly as before: no recipient type, no session", async () => {
+    // #given
+    const home = await createDeliveryCompany(db, privy, "company_wallet");
+    const before = oneClick.state.quoteRequests.length;
+    const callsBefore = oneClick.state.calls.length;
+
+    // #when
+    const view = await startFundIn(home);
+
+    // #then
+    const [request] = oneClick.state.quoteRequests.slice(before);
+    const [call] = oneClick.state.calls.slice(callsBefore);
+    expect({
+      keys: Object.keys(request ?? {}).sort(),
+      session: call?.session,
+      recipientType: (await readQuote(db, home, view.id)).recipientType,
+      signIns: oneClick.state.signIns.filter(
+        (signer) => signer === home.accountId,
+      ),
+    }).toEqual({
+      keys: [
+        "amount",
+        "deadline",
+        "destinationAsset",
+        "dry",
+        "originAsset",
+        "recipient",
+        "refundTo",
+        "refundType",
+        "slippageBps",
+        "swapType",
+      ],
+      session: undefined,
+      recipientType: "DESTINATION_CHAIN",
+      signIns: [],
+    });
+  });
+
+  it("is asked about with the company's session, and a company wallet's fund-in without one", async () => {
+    // #given
+    const home = await createDeliveryCompany(db, privy, "company_wallet");
+    const delivering = await startFundIn(confidential);
+    const waiting = await startFundIn(home);
+
+    // #when
+    await refresh();
+
+    // #then
+    expect({
+      confidential: statusCalls(delivering.depositAddress).map(
+        (call) => call.session !== undefined,
+      ),
+      companyWallet: statusCalls(waiting.depositAddress).map(
+        (call) => call.session,
+      ),
+    }).toEqual({ confidential: [true], companyWallet: [undefined] });
+  });
+
+  it("settles on 1Click's word, but only the credit step writes the ledger", async () => {
+    // #given
+    const view = await startFundIn(confidential);
+    oneClick.state.deliverConfidential(view.depositAddress, 39_900_000n);
+
+    // #when
+    await refresh();
+    const afterRefresh = await ledgerOf(db, confidential);
+    await runtime.runPromise(creditSettledQuotes());
+
+    // #then
+    expect({
+      status: (await readQuote(db, confidential, view.id)).status,
+      afterRefresh,
+      credited: (await ledgerOf(db, confidential)).map((row) => row.usdcAmount),
+    }).toEqual({
+      status: "succeeded",
+      afterRefresh: [],
+      credited: [39_900_000n],
+    });
+  });
+
+  it("refuses the fund-in, and saves nothing, when the company can't be signed in", async () => {
+    // #given
+    privy.state.nextNearSignings("refused");
+
+    // #when
+    const exit = await runtime.runPromiseExit(
+      createFundIn({
+        organizationId: confidential.company.organizationId,
+        actor: { type: "user", id: confidential.company.admin.id },
+        chain: "arbitrum",
+        amount: 40_000_000n,
+      }),
+    );
+
+    // #then
+    const failure =
+      Exit.isFailure(exit) && exit.cause._tag === "Fail"
+        ? exit.cause.error
+        : null;
+    expect({
+      error: failure?._tag,
+      saved: (
+        await runInScope(
+          db,
+          { organizationId: confidential.company.organizationId },
+          (tx) =>
+            tx
+              .select({ id: intentQuotes.id })
+              .from(intentQuotes)
+              .where(
+                eq(
+                  intentQuotes.organizationId,
+                  confidential.company.organizationId,
+                ),
+              ),
+        )
+      ).length,
+    }).toEqual({ error: "ServiceUnavailable", saved: 0 });
+  });
+
+  it("leaves a fund-in as it was, to try again, when the company can't be signed in to ask about it", async () => {
+    // #given a delivery to a confidential account whose company has no session yet
+    const home = await createDeliveryCompany(db, privy, "company_wallet");
+    const view = await startFundIn(home);
+    await runInScope(
+      db,
+      { organizationId: home.company.organizationId },
+      (tx) =>
+        tx
+          .update(intentQuotes)
+          .set({ recipientType: "CONFIDENTIAL_INTENTS" })
+          .where(eq(intentQuotes.id, view.id)),
+    );
+    oneClick.state.setStatus(view.depositAddress, { status: "SUCCESS" });
+    privy.state.nextNearSignings("refused");
+
+    // #when
+    const failed = await runtime.runPromiseExit(
+      refreshFundIn(await readQuote(db, home, view.id)),
+    );
+    const afterFailure = (await readQuote(db, home, view.id)).status;
+    await runtime.runPromise(refreshFundIn(await readQuote(db, home, view.id)));
+
+    // #then
+    expect({
+      failed: failed._tag,
+      afterFailure,
+      status: (await readQuote(db, home, view.id)).status,
+    }).toEqual({
+      failed: "Failure",
+      afterFailure: "quoted",
+      status: "succeeded",
+    });
   });
 });

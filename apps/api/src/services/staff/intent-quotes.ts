@@ -32,6 +32,7 @@ import { query, withScope } from "../../db/scope.js";
 import { NotFound, ServiceUnavailable } from "../../errors.js";
 import { OneClick } from "../intents/one-click.js";
 import { quoteSendKey } from "../intents/quote-settle.js";
+import { touchesConfidentialAccount } from "../intents/quote-status.js";
 import { searchAuditLog } from "./audit-search.js";
 import {
   chainOfAsset,
@@ -275,6 +276,17 @@ export interface StaffIntentQuoteDetailView extends StaffIntentQuoteSummaryView 
   readonly depositTxHash: string | null;
   readonly companyWalletSendId: string | null;
   readonly depositPrivyTransactionId: string | null;
+  readonly depositType: IntentQuote["depositType"];
+  readonly recipientType: IntentQuote["recipientType"];
+  readonly refundType: IntentQuote["refundType"];
+  /**
+   * What a quote paid out of a confidential account records of its signed
+   * message. The message itself is never read here: it is spendable until
+   * its deadline.
+   */
+  readonly intentHash: string | null;
+  readonly intentDeadline: string | null;
+  readonly intentSubmittedAt: string | null;
   readonly oneClickCheckedAt: string | null;
   readonly nearTxHashes: readonly string[];
   readonly originChainTxHashes: readonly string[];
@@ -317,6 +329,12 @@ export function intentQuoteDetail(
       depositTxHash: quote.depositTxHash,
       companyWalletSendId: quote.companyWalletSendId,
       depositPrivyTransactionId: quote.depositPrivyTransactionId,
+      depositType: quote.depositType,
+      recipientType: quote.recipientType,
+      refundType: quote.refundType,
+      intentHash: quote.intentHash,
+      intentDeadline: iso(quote.intentDeadline),
+      intentSubmittedAt: iso(quote.intentSubmittedAt),
       oneClickCheckedAt: iso(quote.oneClickCheckedAt),
       nearTxHashes: quote.nearTxHashes,
       originChainTxHashes: quote.originChainTxHashes,
@@ -432,11 +450,17 @@ export function intentQuoteEvidence(
   return Effect.gen(function* () {
     const organizationId = yield* quoteOrganization(quoteId);
     const scoped = yield* readScopedQuote(organizationId, quoteId);
-    const oneClick = yield* OneClick;
-    const reported = yield* oneClick
-      .status(scoped.quote.depositAddress)
-      .pipe(Effect.mapError(() => oneClickUnavailable));
-    const quote = withReport(scoped.quote, reported);
+    // 1Click answers about a quote that touches a confidential account only
+    // to the company's own session, which staff code can't open: such a
+    // quote is shown as the job last saved it.
+    const quote = touchesConfidentialAccount(scoped.quote)
+      ? scoped.quote
+      : withReport(
+          scoped.quote,
+          yield* (yield* OneClick)
+            .status(scoped.quote.depositAddress)
+            .pipe(Effect.mapError(() => oneClickUnavailable)),
+        );
     const evidence = yield* gatherQuoteEvidence(quote);
     return quoteEvidenceView(quote, evidence, scoped.payouts);
   });

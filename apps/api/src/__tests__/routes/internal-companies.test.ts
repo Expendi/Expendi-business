@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -18,12 +18,18 @@ import type { PayingCompany } from "../helpers/payouts.js";
 import type { TestStaff } from "../helpers/staff.js";
 import { createApp } from "../../app.js";
 import { DatabaseService } from "../../db/client.js";
-import { expenses, organizations } from "../../db/schema/index.js";
+import { expenses, organizations, wallets } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 import { withStaffReadScope } from "../../services/staff/staff-scope.js";
 import { addCategory } from "../helpers/claims.js";
-import { addMember, createCompany, createUser } from "../helpers/db.js";
+import {
+  addMember,
+  createActiveNearWallet,
+  createCompany,
+  createUser,
+} from "../helpers/db.js";
 import { makeFakePaycrest } from "../helpers/fakes.js";
+import { randomNearAccount } from "../helpers/near.js";
 import {
   claimRequest,
   createPayingCompany,
@@ -240,6 +246,77 @@ describe("GET /internal/companies/:id", () => {
     expect(detail.recentPayouts.map((recent) => recent.id)).toEqual([
       payout?.id,
     ]);
+  });
+
+  it("shows where the company keeps its USDC, and no reading for a company that keeps it in the company wallet", async () => {
+    // #when
+    const detail = companyDetailSchema.parse(
+      await dataOf(
+        await get(`/internal/companies/${paying.company.organizationId}`),
+      ),
+    );
+
+    // #then
+    expect(detail.wallet).toMatchObject({
+      balanceHome: "company_wallet",
+      confidentialUsdc: null,
+      confidentialUsdcReadAt: null,
+    });
+  });
+
+  it("shows the confidential account reading the alert check last saved, without reading it", async () => {
+    // #given
+    const company = await createCompany(db);
+    const wallet = await createActiveNearWallet(
+      db,
+      company,
+      { privyWalletId: `near-${randomUUID()}`, accountId: randomNearAccount() },
+      undefined,
+      "confidential_account",
+    );
+    const readAt = new Date("2026-11-13T09:30:00.000Z");
+    await runInScope(db, { organizationId: company.organizationId }, (tx) =>
+      tx
+        .update(wallets)
+        .set({ confidentialUsdc: 12_500_000n, confidentialUsdcReadAt: readAt })
+        .where(eq(wallets.id, wallet.id)),
+    );
+
+    // #when
+    const detail = companyDetailSchema.parse(
+      await dataOf(await get(`/internal/companies/${company.organizationId}`)),
+    );
+
+    // #then
+    expect(detail.wallet).toMatchObject({
+      balanceHome: "confidential_account",
+      confidentialUsdc: "12500000",
+      confidentialUsdcReadAt: readAt.toISOString(),
+    });
+  });
+
+  it("shows no reading for a confidential company the check hasn't read yet", async () => {
+    // #given
+    const company = await createCompany(db);
+    await createActiveNearWallet(
+      db,
+      company,
+      { privyWalletId: `near-${randomUUID()}`, accountId: randomNearAccount() },
+      undefined,
+      "confidential_account",
+    );
+
+    // #when
+    const detail = companyDetailSchema.parse(
+      await dataOf(await get(`/internal/companies/${company.organizationId}`)),
+    );
+
+    // #then
+    expect(detail.wallet).toMatchObject({
+      balanceHome: "confidential_account",
+      confidentialUsdc: null,
+      confidentialUsdcReadAt: null,
+    });
   });
 
   it("shows nothing of another company", async () => {

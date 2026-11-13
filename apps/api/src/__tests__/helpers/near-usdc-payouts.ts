@@ -1,11 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { asc, eq } from "drizzle-orm";
+import { Layer } from "effect";
 
 import type { Database } from "../../db/client.js";
 import type { CompanyWalletSend, Payout } from "../../db/schema/index.js";
+import type { WalletBalanceHome } from "../../db/schema/wallets.js";
 import type { AppRuntime } from "../../runtime.js";
 import type { UsdcPayoutRequest } from "../../services/payout/payout-service.js";
 import type { TestCompany } from "./db.js";
+import type { makeFakeOneClick } from "./one-click.js";
 import type { PayingCompany } from "./payouts.js";
 import { SoftwarePasskey } from "../../../scripts/lib/software-passkey.js";
 import {
@@ -17,6 +20,10 @@ import {
   finishPasskeyEnrolment,
   startPasskeyEnrolment,
 } from "../../services/approval/passkeys.js";
+import {
+  ConfidentialAccounts,
+  makeConfidentialAccounts,
+} from "../../services/intents/confidential-account.js";
 import { followOnchainPayout } from "../../services/payout/onchain.js";
 import { DELEGATE_TTL_BLOCKS } from "../../services/wallet/company-wallet-send.js";
 import { randomTxHash } from "./chain.js";
@@ -26,6 +33,7 @@ import {
   makeFakeNearRpc,
   nearRelayerOnFakeChain,
   randomNearAccount,
+  TEST_NEAR_CHAIN,
 } from "./near.js";
 import { USDC } from "./payouts.js";
 
@@ -47,6 +55,22 @@ export function makeNearUsdcFakes() {
       nearRpc: chain.layer,
       nearRelayer: relayer.layer,
     },
+    /**
+     * The real `ConfidentialAccounts` over these fakes and the given fake
+     * 1Click, for a test that runs an effect without a runtime. A runtime
+     * from `makeTestRuntime` already has one built the same way from the
+     * layers it was given.
+     */
+    confidentialAccounts: (oneClick: ReturnType<typeof makeFakeOneClick>) =>
+      Layer.succeed(
+        ConfidentialAccounts,
+        makeConfidentialAccounts({
+          rpc: chain.service,
+          oneClick: oneClick.service,
+          privy: { nearSigner: (wallet) => privy.state.nearSigner(wallet) },
+          chain: TEST_NEAR_CHAIN,
+        }),
+      ),
     /**
      * For `makeTestRuntime`'s environment: the relayer's account, which the
      * staff evidence reads from configuration.
@@ -76,6 +100,7 @@ export async function createNearUsdcPayingCompany(
   fakes: NearUsdcFakes,
   balance = 100n * USDC,
   perTransactionMaxUsdc?: bigint,
+  balanceHome?: WalletBalanceHome,
 ): Promise<NearUsdcPayingCompany> {
   const company = await createCompany(db);
   const nearWallet = fakes.privy.state.addNearWallet(company.organizationId);
@@ -85,6 +110,7 @@ export async function createNearUsdcPayingCompany(
     company,
     nearWallet,
     perTransactionMaxUsdc,
+    balanceHome,
   );
   await runInScope(db, { organizationId: company.organizationId }, (tx) =>
     tx.insert(walletTransactions).values({

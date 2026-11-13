@@ -708,6 +708,41 @@
       "when": 1794551839918,
       "tag": "0100_wallets_deposits_judged_through",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1794558256011,
+      "tag": "0101_confidential_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1794561137873,
+      "tag": "0102_confidential_deliveries",
+      "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1794561145658,
+      "tag": "0103_confidential_account_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1794568887151,
+      "tag": "0104_confidential_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1794568895162,
+      "tag": "0105_confidential_credit_from_treasury",
+      "breakpoints": true
     }
   ]
 }

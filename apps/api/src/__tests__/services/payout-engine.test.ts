@@ -15,6 +15,7 @@ import {
   organizations,
   payouts,
   payrollRuns,
+  wallets,
   walletTransactions,
 } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
@@ -194,6 +195,19 @@ async function auditActions(payoutId: string): Promise<string[]> {
     [payoutId],
   );
   return rows.map((row) => row.action);
+}
+
+const moveMoneyTo = (balanceHome: "company_wallet" | "confidential_account") =>
+  runInScope(db, { organizationId: company.organizationId }, (tx) =>
+    tx.update(wallets).set({ balanceHome }).where(eq(wallets.id, wallet.id)),
+  );
+
+async function rejectedApprovals(): Promise<{ reason: string }[]> {
+  const { rows } = await owner.query<{ reason: string }>(
+    "SELECT after->>'reason' AS reason FROM audit_log WHERE organization_id = $1 AND action = 'payout.approval_rejected' ORDER BY occurred_at, id",
+    [company.organizationId],
+  );
+  return rows;
 }
 
 const setCompany = (changes: Partial<typeof organizations.$inferInsert>) =>
@@ -477,6 +491,30 @@ describe("payout engine", () => {
         reason: rejection(exit),
         orders: paycrest.state.created.length,
       }).toEqual({ reason: "paused", orders: 0 });
+    });
+
+    it("pays a payout for a company whose money is in a confidential account", async () => {
+      // #given a company whose money is kept in a confidential account
+      await moveMoneyTo("confidential_account");
+      const [payout] = await prepare(claim());
+      if (!payout) throw new Error("nothing prepared");
+
+      // #when
+      const exit = await pay([payout]);
+
+      // #then nothing is refused: the payout is approved and ordered as for
+      // any other company, and no approval was rejected
+      expect({
+        reason: rejection(exit),
+        orders: paycrest.state.created.length,
+        status: (await payoutRow(payout.id))?.status,
+        rejected: await rejectedApprovals(),
+      }).toEqual({
+        reason: "succeeded",
+        orders: 1,
+        status: "paying",
+        rejected: [],
+      });
     });
 
     it("rejects a payroll run over its cap", async () => {

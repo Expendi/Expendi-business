@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Database } from "../../db/client.js";
 import type { IntentQuote, Payout } from "../../db/schema/index.js";
 import type { KesPayoutRequest } from "../../services/payout/payout-service.js";
+import type { FundedCompany } from "../helpers/money-in.js";
 import type { NearPayingCompany } from "../helpers/near-payouts.js";
 import { DatabaseService } from "../../db/client.js";
 import {
@@ -12,7 +13,7 @@ import {
   payouts,
   payrollRuns,
 } from "../../db/schema/index.js";
-import { runInScope } from "../../db/scope.js";
+import { runInScope, withScope } from "../../db/scope.js";
 import { COMPANY_QUOTE_TTL_MS } from "../../services/intents/quote-deposit.js";
 import { quoteSendKey } from "../../services/intents/quote-settle.js";
 import { approvePayouts } from "../../services/payout/approve.js";
@@ -29,8 +30,9 @@ import {
   retryPayout,
 } from "../../services/payout/payout-service.js";
 import { sendUsdcFromCompanyWallet } from "../../services/wallet/company-wallet-send.js";
+import { availableUsdc } from "../../services/wallet/ledger.js";
 import { randomAddress, TEST_ORIGIN } from "../helpers/fakes.js";
-import { saveTreasuryMove } from "../helpers/money-in.js";
+import { ledgerOf, saveQuote, saveTreasuryMove } from "../helpers/money-in.js";
 import {
   createNearPayingCompany,
   deliverHop,
@@ -1098,5 +1100,390 @@ describe("Paycrest order safety from the transit wallet", () => {
       deadlineAhead:
         hop.deadline.getTime() > Date.now() + COMPANY_QUOTE_TTL_MS / 2,
     }).toEqual({ status: "approved", orders: 0, deadlineAhead: true });
+  });
+});
+
+describe("a cash-out for a company whose USDC is in a confidential account", () => {
+  let funded: FundedCompany;
+
+  async function confidentialCompany(float = 2n * USDC): Promise<void> {
+    paying = await createNearPayingCompany(world, db, {
+      balanceHome: "confidential_account",
+    });
+    oneClick.state.fundConfidential(paying.accountId, 100n * USDC);
+    funded = {
+      company: paying.company,
+      walletId: paying.wallet.id,
+      accountId: paying.accountId,
+      transitAddress: paying.transitAddress,
+    };
+    if (float > 0n) {
+      await saveQuote(runtime, db, funded, "fee_cover", {
+        amount: float,
+        row: { status: "succeeded", settledAt: new Date() },
+      });
+    }
+  }
+
+  const requestOf = (hop: IntentQuote) => {
+    const known = oneClick.state.quotes.get(hop.depositAddress);
+    if (!known) throw new Error("1Click never quoted this hop");
+    return known.request;
+  };
+
+  const intentsFor = (hop: IntentQuote) =>
+    oneClick.state.submittedIntents.filter(
+      (intent) => intent.depositAddress === hop.depositAddress,
+    );
+
+  const available = () =>
+    runtime.runPromise(
+      withScope({ organizationId: paying.company.organizationId }, (tx) =>
+        availableUsdc(tx, paying.wallet.id),
+      ),
+    );
+
+  const sendsOfCompanyWallet = () =>
+    runInScope(db, { organizationId: paying.company.organizationId }, (tx) =>
+      tx.select().from(companyWalletSends),
+    );
+
+  it("hops out of the account with the company's session, paid by a signed message and not by a transfer", async () => {
+    // #given a company whose USDC is in its confidential account
+    await confidentialCompany();
+    const companyUsdcBefore = companyUsdc();
+    const callsBefore = oneClick.state.calls.length;
+
+    // #when its admin approves a cash-out
+    const [payout] = await pay(claimRequest());
+    if (!payout) throw new Error("no payout");
+
+    // #then the hop was quoted to the transit wallet, out of the account and
+    // refunding into it, with the company's session
+    const hop = await onlyHop();
+    const request = requestOf(hop);
+    expect({
+      request: {
+        swapType: request.swapType,
+        recipient: request.recipient,
+        recipientType: request.recipientType,
+        depositType: request.depositType,
+        refundType: request.refundType,
+        refundTo: request.refundTo,
+        amount: request.amount,
+      },
+      row: {
+        swapType: hop.swapType,
+        depositType: hop.depositType,
+        refundType: hop.refundType,
+        amountOut: hop.amountOut,
+      },
+      quotedWithSession: oneClick.state.calls
+        .slice(callsBefore)
+        .some((entry) => entry.call === "quote" && entry.session !== undefined),
+    }).toEqual({
+      request: {
+        swapType: "EXACT_OUTPUT",
+        recipient: paying.transitAddress,
+        recipientType: undefined,
+        depositType: "CONFIDENTIAL_INTENTS",
+        refundType: "CONFIDENTIAL_INTENTS",
+        refundTo: paying.accountId,
+        amount: payout.maxDebitUsdc,
+      },
+      row: {
+        swapType: "EXACT_OUTPUT",
+        depositType: "CONFIDENTIAL_INTENTS",
+        refundType: "CONFIDENTIAL_INTENTS",
+        amountOut: payout.maxDebitUsdc,
+      },
+      quotedWithSession: true,
+    });
+
+    // #then one message for the quote's amount in was submitted, the company
+    // wallet sent nothing on chain, the ledger didn't move, the cash-out
+    // still waits and Paycrest was not asked
+    expect({
+      hop: hop.status,
+      submitted: intentsFor(hop).length,
+      held: oneClick.state.confidentialBalances.get(paying.accountId),
+      companySends: (await sendsOfCompanyWallet()).length,
+      onChain: companyUsdc() - companyUsdcBefore,
+      registered: near.state.registered.has(hop.depositAddress),
+      ledger: await ledgerBalance(db, paying.company),
+      payout: (await reread(payout)).status,
+      orders: ordersFor(payout).length,
+    }).toEqual({
+      hop: "depositing",
+      submitted: 1,
+      held: 100n * USDC - hop.amountIn,
+      companySends: 0,
+      onChain: 0n,
+      registered: false,
+      ledger: 100n * USDC,
+      payout: "approved",
+      orders: 0,
+    });
+  });
+
+  it("funds the cash-out provider from the transit wallet only after the hop succeeded, and once", async () => {
+    // #given a cash-out whose hop is paid and not yet delivered
+    await confidentialCompany();
+    const [payout] = await pay(claimRequest());
+    if (!payout) throw new Error("no payout");
+    const hop = await onlyHop();
+
+    // #when the job runs before 1Click reports anything
+    await resume(hop);
+
+    // #then nothing was ordered or sent
+    expect({
+      orders: ordersFor(payout).length,
+      sends: transitSends().length,
+    }).toEqual({ orders: 0, sends: 0 });
+
+    // #when 1Click delivers the hop, and the job runs three times
+    oneClick.state.deliverIntentPayout(hop.depositAddress);
+    world.setBaseUsdc(paying.transitAddress, hop.amountOut);
+    const settled = await resume(hop);
+    await resume(hop);
+    await resume(hop);
+
+    // #then the provider is paid once from the transit wallet, and the
+    // ledger is debited by that send alone
+    const paid = await reread(payout);
+    expect({
+      hop: settled.status,
+      payout: paid.status,
+      orders: ordersFor(payout).length,
+      sends: transitSends().map((send) => ({
+        amount: send.amount,
+        key: send.idempotencyKey,
+      })),
+      ledger: await ledgerBalance(db, paying.company),
+      submitted: intentsFor(hop).length,
+    }).toEqual({
+      hop: "succeeded",
+      payout: "paying",
+      orders: 1,
+      sends: [
+        {
+          amount: paid.amountToTransferUsdc,
+          key: `payout-${payout.id}`,
+        },
+      ],
+      ledger: 100n * USDC - (paid.amountToTransferUsdc ?? 0n),
+      submitted: 1,
+    });
+  });
+
+  it("fails the cash-out with no ledger row when 1Click refunds the hop", async () => {
+    // #given a paid hop that 1Click refunded into the account
+    await confidentialCompany();
+    const [payout] = await pay(claimRequest());
+    if (!payout) throw new Error("no payout");
+    const hop = await onlyHop();
+    oneClick.state.refundIntentPayout(hop.depositAddress);
+
+    // #when the job runs, twice
+    const settled = await resume(hop);
+    await resume(hop);
+
+    // #then the payout failed, saying where the USDC is, and nothing was
+    // ordered, sent or written to the ledger
+    const failed = await reread(payout);
+    expect({
+      hop: settled.status,
+      payout: failed.status,
+      says: failed.failureReason?.includes("confidential account"),
+      orders: ordersFor(payout).length,
+      sends: transitSends().length,
+      ledger: await ledgerOf(db, funded),
+      held: oneClick.state.confidentialBalances.get(paying.accountId),
+    }).toEqual({
+      hop: "refunded",
+      payout: "failed",
+      says: true,
+      orders: 0,
+      sends: 0,
+      ledger: [expect.objectContaining({ type: "deposit" })],
+      held: 100n * USDC,
+    });
+  });
+
+  it("keeps the cash-out reserving its USDC, and orders nothing, while the hop is in review", async () => {
+    // #given a hop whose outcome 1Click reports as FAILED
+    await confidentialCompany();
+    const [payout] = await pay(claimRequest());
+    if (!payout) throw new Error("no payout");
+    const hop = await onlyHop();
+    const before = await available();
+    oneClick.state.setStatus(hop.depositAddress, { status: "FAILED" });
+
+    // #when the job runs
+    const settled = await resume(hop);
+
+    // #then both wait for a person, the whole maximum is still reserved, and
+    // nothing was ordered
+    expect({
+      hop: settled.status,
+      payout: (await reread(payout)).status,
+      available: await available(),
+      orders: ordersFor(payout).length,
+    }).toEqual({
+      hop: "needs_review",
+      payout: "needs_review",
+      available: before,
+      orders: 0,
+    });
+    expect(before).toBe(100n * USDC - payout.maxDebitUsdc);
+  });
+
+  it("hops once for a payroll run's total, then funds each cash-out from the transit wallet", async () => {
+    // #given a run of three salaries
+    await confidentialCompany();
+    const payrollRunId = randomUUID();
+    await runInScope(
+      db,
+      { organizationId: paying.company.organizationId, role: "admin" },
+      (tx) =>
+        tx.insert(payrollRuns).values({
+          id: payrollRunId,
+          organizationId: paying.company.organizationId,
+          payDate: "2026-11-25",
+          totalKes: 450_000n,
+          capKes: 540_000n,
+        }),
+    );
+    const salary = () =>
+      claimRequest({
+        subjectType: "bill",
+        payrollRunId,
+        idempotencyKey: `salary:${randomUUID()}:1`,
+        amountKesCents: 150_000n,
+      });
+
+    // #when the run is approved
+    const batch = await pay(salary(), salary(), salary());
+
+    // #then one hop out of the account carries the sum, paid by one message
+    const hop = await onlyHop();
+    const total = batch.reduce((sum, payout) => sum + payout.maxDebitUsdc, 0n);
+    expect({
+      amountOut: hop.amountOut,
+      depositType: hop.depositType,
+      linked: batch.map((payout) => payout.baseHopQuoteId),
+      submitted: intentsFor(hop).length,
+    }).toEqual({
+      amountOut: total,
+      depositType: "CONFIDENTIAL_INTENTS",
+      linked: [hop.id, hop.id, hop.id],
+      submitted: 1,
+    });
+
+    // #when the hop delivers
+    oneClick.state.deliverIntentPayout(hop.depositAddress);
+    world.setBaseUsdc(paying.transitAddress, hop.amountOut);
+    await resume(hop);
+
+    // #then each salary was funded once from the transit wallet
+    expect({
+      statuses: (await Promise.all(batch.map(reread))).map(
+        (payout) => payout.status,
+      ),
+      sends: transitSends()
+        .map((send) => send.idempotencyKey)
+        .sort(),
+    }).toEqual({
+      statuses: ["paying", "paying", "paying"],
+      sends: batch.map((payout) => `payout-${payout.id}`).sort(),
+    });
+  });
+
+  it("waits, signing nothing, while the float can't cover what the hop costs beyond what it delivers", async () => {
+    // #given a company with no float
+    await confidentialCompany(0n);
+    const [payout] = await pay(claimRequest());
+    if (!payout) throw new Error("no payout");
+    const hop = await onlyHop();
+
+    // #when the job runs
+    const waiting = await resume(hop);
+
+    // #then the hop is still only quoted, nothing was submitted and the
+    // cash-out waits
+    expect(hop.amountIn).toBeGreaterThan(hop.amountOut);
+    expect({
+      hop: waiting.status,
+      submitted: intentsFor(hop).length,
+      held: oneClick.state.confidentialBalances.get(paying.accountId),
+      payout: (await reread(payout)).status,
+    }).toEqual({
+      hop: "quoted",
+      submitted: 0,
+      held: 100n * USDC,
+      payout: "approved",
+    });
+
+    // #when a fee cover is delivered into the account
+    await saveQuote(runtime, db, funded, "fee_cover", {
+      amount: 2n * USDC,
+      row: { status: "succeeded", settledAt: new Date() },
+    });
+    const going = await resume(hop);
+
+    // #then the hop goes ahead
+    expect({
+      hop: going.status,
+      submitted: intentsFor(hop).length,
+    }).toEqual({ hop: "depositing", submitted: 1 });
+  });
+
+  it("opens the hop exactly as before for a company whose USDC is in its company wallet", async () => {
+    // #given a company keeping its USDC in the company wallet (the default)
+    const callsBefore = oneClick.state.calls.length;
+    const [payout] = await pay(claimRequest());
+    if (!payout) throw new Error("no payout");
+
+    // #when its cash-out is hopped
+    const hop = await onlyHop();
+    const request = requestOf(hop);
+    const quoteCalls = oneClick.state.calls
+      .slice(callsBefore)
+      .filter((entry) => entry.call === "quote");
+
+    // #then 1Click was asked without any confidential field or session, and
+    // the company wallet paid on chain
+    expect({
+      request: {
+        swapType: request.swapType,
+        recipient: request.recipient,
+        refundTo: request.refundTo,
+        amount: request.amount,
+        depositType: request.depositType,
+        refundType: request.refundType,
+        recipientType: request.recipientType,
+        slippageBps: request.slippageBps,
+      },
+      sessions: quoteCalls.map((entry) => entry.session),
+      row: [hop.depositType, hop.refundType, hop.recipientType],
+      intents: intentsFor(hop).length,
+      sends: (await sendsOfCompanyWallet()).length,
+    }).toEqual({
+      request: {
+        swapType: "EXACT_OUTPUT",
+        recipient: paying.transitAddress,
+        refundTo: paying.accountId,
+        amount: payout.maxDebitUsdc,
+        depositType: undefined,
+        refundType: undefined,
+        recipientType: undefined,
+        slippageBps: 10,
+      },
+      sessions: [undefined],
+      row: ["ORIGIN_CHAIN", "ORIGIN_CHAIN", "DESTINATION_CHAIN"],
+      intents: 0,
+      sends: 1,
+    });
   });
 });

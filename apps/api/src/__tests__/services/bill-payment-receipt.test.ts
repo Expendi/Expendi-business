@@ -21,9 +21,14 @@ import {
 } from "../helpers/bills.js";
 import { addCategory } from "../helpers/claims.js";
 import { createActiveWallet, createCompany } from "../helpers/db.js";
+import { insertDeliveredBillPayment } from "../helpers/delivered-payout.js";
 import { makeTestRuntime } from "../helpers/runtime.js";
 
 const NEAR_HASH = "6mKzv7RfQ9cYw2PqL8nXbT3jDe4HsUa1VgCoNiEp5MtY";
+const BASE_HASH = `0x${"ab".repeat(32)}`;
+const SOLANA_SIGNATURE =
+  "5VERv8NMvzbJMEkV8xnrLkEaWRtSz9CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSZkQUW";
+const PAYEE_ADDRESS = `0x${"b".repeat(40)}`;
 
 let runtime: AppRuntime;
 let db: Database;
@@ -160,6 +165,153 @@ describe("getBillPaymentReceiptData", () => {
 
     // #then
     expect(error).toMatchObject({ _tag: "NotFound" });
+  });
+});
+
+describe("a USDC payout delivered through NEAR Intents", () => {
+  it("shows the payee chain's transaction when the company's account left none, and nothing of the company's own", async () => {
+    // #given a confidential account's payout to a payee on Base
+    const billId = await bill();
+    await insertDeliveredBillPayment(db, company, wallet, billId, {
+      chain: "base",
+      address: PAYEE_ADDRESS,
+      deliveryTxHash: BASE_HASH,
+    });
+
+    // #when
+    const data = await receiptOf(billId);
+
+    // #then
+    expect(data).toMatchObject({
+      txHash: null,
+      txChain: null,
+      deliveryTxHash: BASE_HASH,
+      deliveryTxChain: "base",
+    });
+  });
+
+  it("labels it with the payee chain and links a Base transaction to Basescan", async () => {
+    // #given
+    const billId = await bill();
+    await insertDeliveredBillPayment(db, company, wallet, billId, {
+      chain: "base",
+      address: PAYEE_ADDRESS,
+      deliveryTxHash: BASE_HASH,
+    });
+
+    // #when
+    const data = await receiptOf(billId);
+    const texts: string[] = [];
+    const bytes = await renderBillPaymentReceiptPdf(data, {
+      compress: false,
+      onText: (text) => texts.push(text),
+    });
+
+    // #then
+    expect(texts).toEqual(
+      expect.arrayContaining(["Base transaction", BASE_HASH]),
+    );
+    expect(texts).not.toContain("Transaction");
+    expect(bytes.toString("latin1")).toContain(
+      `/URI (https://basescan.org/tx/${BASE_HASH})`,
+    );
+  });
+
+  it("links a NEAR payee's transaction to Nearblocks exactly as given, case included", async () => {
+    // #given
+    const billId = await bill();
+    await insertDeliveredBillPayment(db, company, wallet, billId, {
+      chain: "near",
+      address: "kenya-power.near",
+      deliveryTxHash: NEAR_HASH,
+    });
+
+    // #when
+    const data = await receiptOf(billId);
+    const texts: string[] = [];
+    const bytes = await renderBillPaymentReceiptPdf(data, {
+      compress: false,
+      onText: (text) => texts.push(text),
+    });
+
+    // #then
+    expect(texts).toEqual(
+      expect.arrayContaining(["NEAR transaction", NEAR_HASH]),
+    );
+    expect(bytes.toString("latin1")).toContain(
+      `/URI (https://nearblocks.io/txns/${NEAR_HASH})`,
+    );
+  });
+
+  it("shows a Solana signature labelled and unlinked, as no Solana explorer is known to be right", async () => {
+    // #given
+    const billId = await bill();
+    await insertDeliveredBillPayment(db, company, wallet, billId, {
+      chain: "solana",
+      address: "7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV",
+      deliveryTxHash: SOLANA_SIGNATURE,
+    });
+
+    // #when
+    const data = await receiptOf(billId);
+    const texts: string[] = [];
+    const bytes = await renderBillPaymentReceiptPdf(data, {
+      compress: false,
+      onText: (text) => texts.push(text),
+    });
+
+    // #then
+    expect(texts).toEqual(
+      expect.arrayContaining(["Solana transaction", SOLANA_SIGNATURE]),
+    );
+    expect(bytes.toString("latin1")).not.toContain("/URI");
+  });
+
+  it("keeps showing the company's own NEAR transaction for a payout it sent a deposit for, and no second one", async () => {
+    // #given a company wallet's payout to Base: its deposit hash is on the ledger
+    const billId = await bill();
+    await insertDeliveredBillPayment(db, company, wallet, billId, {
+      chain: "base",
+      address: PAYEE_ADDRESS,
+      deliveryTxHash: BASE_HASH,
+      companySend: NEAR_HASH,
+    });
+
+    // #when
+    const data = await receiptOf(billId);
+    const texts: string[] = [];
+    await renderBillPaymentReceiptPdf(data, {
+      compress: false,
+      onText: (text) => texts.push(text),
+    });
+
+    // #then
+    expect(data).toMatchObject({
+      txHash: NEAR_HASH,
+      txChain: "near",
+      deliveryTxHash: null,
+      deliveryTxChain: null,
+    });
+    expect(texts).toContain("Transaction");
+    expect(texts).not.toContain(BASE_HASH);
+  });
+
+  it("never shows a cash-out's provider reference as a transaction", async () => {
+    // #given a cash-out whose ledger debit carries no hash
+    const billId = await bill();
+    await insertBillPayment(db, company, wallet.id, billId, {
+      txHash: null,
+    });
+
+    // #when
+    const data = await receiptOf(billId);
+
+    // #then
+    expect(data).toMatchObject({
+      deliveryTxHash: null,
+      deliveryTxChain: null,
+      providerReceipts: [{ kind: "mpesa", code: "UKDCW299LW" }],
+    });
   });
 });
 
