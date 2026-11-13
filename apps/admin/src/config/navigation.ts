@@ -7,6 +7,7 @@ import {
   Building2Icon,
   RouteIcon,
   ScrollTextIcon,
+  SettingsIcon,
   SlidersHorizontalIcon,
 } from "lucide-react";
 
@@ -59,6 +60,12 @@ export const navItems: NavItem[] = [
     title: "Zoho Books",
     href: "/zoho-books",
     icon: BookOpenIcon,
+    group: "Administration",
+  },
+  {
+    title: "Settings",
+    href: "/settings",
+    icon: SettingsIcon,
     group: "Administration",
   },
 ];

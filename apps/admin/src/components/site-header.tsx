@@ -8,9 +8,7 @@ import {
   accountInitials,
   AccountMenuItems,
 } from "~/components/shell/account-menu";
-import { LayoutControls } from "~/components/shell/layout-controls";
 import { SearchDialog } from "~/components/shell/search-dialog";
-import { ThemeSwitcher } from "~/components/shell/theme-switcher";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import {
   DropdownMenu,
@@ -23,8 +21,8 @@ import { navItems } from "~/config/navigation";
 
 /**
  * The template's 48px header: the sidebar toggle, the current page and
- * page search on the left; the layout controls, theme and account on the
- * right. It sticks to the top or scrolls away, as the layout controls say.
+ * page search on the left; the account on the right. It sticks to the top
+ * or scrolls away, as Settings > Appearance says.
  */
 export function SiteHeader({
   path,
@@ -56,8 +54,6 @@ export function SiteHeader({
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <LayoutControls />
-          <ThemeSwitcher />
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label={`Account menu for ${account.email}`}
