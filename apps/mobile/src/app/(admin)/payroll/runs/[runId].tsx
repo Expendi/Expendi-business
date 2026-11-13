@@ -19,6 +19,7 @@ import { Screen } from "~/components/screen";
 import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { BillStatusBadge } from "~/features/bills/bill-status";
+import { CashOutReceiptRows } from "~/features/cash-out/cash-out-receipt";
 import { ReviewRow } from "~/features/claims/claim-editor";
 import { formatIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
@@ -308,6 +309,7 @@ function PaymentCard({
       ) : (
         <BillStatusBadge status={payment.status} />
       )}
+      <CashOutReceiptRows receipts={payment.paymentReceipts} />
       {payment.payee.payoutPhoneConfirmed === false ? (
         <Text className="text-sm text-amber-800">
           Hasn’t confirmed their M-Pesa number yet.

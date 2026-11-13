@@ -120,6 +120,13 @@ export function describeApiError(error: unknown): string {
   return "Couldn't reach Expendi Business. Check your connection and try again.";
 }
 
+/** The request field a refusal names in `details.field`, for a form to show it on. */
+export function apiErrorField(error: unknown): string | null {
+  if (!(error instanceof ApiError)) return null;
+  const parsed = z.object({ field: z.string() }).safeParse(error.details);
+  return parsed.success ? parsed.data.field : null;
+}
+
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,

@@ -5,17 +5,27 @@ import type {
 import { useInfiniteQuery } from "@tanstack/react-query";
 
 import type { WalletHistoryResponse } from "@expendi-business/shared";
-import { walletHistoryResponseSchema } from "@expendi-business/shared";
+import {
+  paymentPollInterval,
+  walletHistoryResponseSchema,
+} from "@expendi-business/shared";
 
+import { walletHistoryStatuses } from "~/lib/payment-poll";
 import { queryKeys } from "~/lib/query-keys";
+import { useRefreshWhenPaymentsSettle } from "~/lib/use-payments-settled";
 import { useApi } from "~/providers/api-provider";
 
-/** The wallet's ledger, newest first, a page at a time. */
+type WalletHistoryData = InfiniteData<WalletHistoryResponse, string | null>;
+
+/**
+ * The wallet's ledger, newest first, a page at a time; asked about again
+ * while a payout in it is on its way.
+ */
 export function useWalletHistory(
   organizationId: string,
-): UseInfiniteQueryResult<InfiniteData<WalletHistoryResponse, string | null>> {
+): UseInfiniteQueryResult<WalletHistoryData> {
   const api = useApi();
-  return useInfiniteQuery({
+  const history: UseInfiniteQueryResult<WalletHistoryData> = useInfiniteQuery({
     queryKey: queryKeys.walletHistory(organizationId),
     initialPageParam: null as string | null,
     queryFn: ({ pageParam }) =>
@@ -24,5 +34,13 @@ export function useWalletHistory(
         walletHistoryResponseSchema,
       ),
     getNextPageParam: (page) => page.nextCursor,
+    refetchInterval: (query) =>
+      paymentPollInterval(walletHistoryStatuses(query.state.data)),
   });
+  useRefreshWhenPaymentsSettle(
+    walletHistoryStatuses(history.data),
+    "wallet_history",
+    organizationId,
+  );
+  return history;
 }

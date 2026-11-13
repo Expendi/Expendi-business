@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { paymentReceiptsSchema } from "./cash-out-receipt.js";
 import { payeeChainSchema } from "./payee-chain.js";
 import { walletChainSchema, walletTransactionTypeSchema } from "./wallet.js";
 
@@ -69,6 +70,8 @@ export const walletHistoryPayoutSchema = z.object({
   approvalId: z.uuid().nullable(),
   approvedAt: z.iso.datetime().nullable(),
   paidAt: z.iso.datetime().nullable(),
+  /** A paid cash-out's receipt; always empty for USDC and withdrawals. */
+  paymentReceipts: paymentReceiptsSchema,
   /** KES per USDC the payout was sent at; null until the cash-out has one. */
   rate: z.string().nullable(),
   /** Why it failed, for people to read. */

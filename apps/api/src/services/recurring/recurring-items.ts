@@ -27,6 +27,7 @@ import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { Tenant } from "../../middleware/tenant.js";
 import type { AuditActor } from "../audit/audit-log.js";
+import type { Paycrest } from "../paycrest/paycrest-client.js";
 import {
   bills,
   categories,
@@ -37,6 +38,10 @@ import { query, withScope } from "../../db/scope.js";
 import { BadRequest, Conflict, NotFound } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { nairobiDate } from "../bills/status.js";
+import {
+  activeCashOutLimits,
+  checkCashOutAmount,
+} from "../cash-out/active-limits.js";
 import { createNextRecurringBill, lockOutstandingBills } from "./next-bill.js";
 import { dueOnOrAfter, firstDueOn } from "./schedule.js";
 
@@ -447,7 +452,7 @@ export function createRecurringItem(
   tenant: Tenant,
   fields: CreateRecurringItemFields,
   now: Date = new Date(),
-): Effect.Effect<RecurringItemView, ItemError, ItemDeps> {
+): Effect.Effect<RecurringItemView, ItemError, ItemDeps | Paycrest> {
   const { organizationId } = tenant;
   const today = nairobiDate(now);
   return Effect.gen(function* () {
@@ -460,6 +465,11 @@ export function createRecurringItem(
     };
     const nextDueOn = firstDueOn(schedule);
     if (nextDueOn === null) return yield* Effect.fail(nothingDue);
+    const amountKes = fields.variable ? null : (fields.amountKes ?? null);
+    const limits =
+      amountKes !== null && fields.payVia === "expendi"
+        ? yield* activeCashOutLimits
+        : null;
 
     const itemId = yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
@@ -475,6 +485,7 @@ export function createRecurringItem(
         yield* checkCategory(tx, organizationId, fields.categoryId);
         const currency = currencyForPayeeMethod(payee.method);
         yield* checkCurrency(payee.name, currency, fields);
+        yield* checkCashOutAmount(payee.method, amountKes, limits);
         const values = {
           payeeId: fields.payeeId,
           overviewHeading:
@@ -556,9 +567,13 @@ export function updateRecurringItem(
   tenant: Tenant,
   itemId: string,
   changes: UpdateRecurringItemFields,
-): Effect.Effect<RecurringItemView, ItemError, ItemDeps> {
+): Effect.Effect<RecurringItemView, ItemError, ItemDeps | Paycrest> {
   const { organizationId } = tenant;
   return Effect.gen(function* () {
+    const limits =
+      changes.amountKes !== undefined && changes.amountKes !== null
+        ? yield* activeCashOutLimits
+        : null;
     yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
         const audit = yield* AuditLog;
@@ -585,6 +600,9 @@ export function updateRecurringItem(
                 const payee = yield* payeeOfItem(tx, row);
                 const currency = currencyForPayeeMethod(payee.method);
                 yield* checkCurrency(payee.name, currency, changes);
+                if (row.payVia === "expendi") {
+                  yield* checkCashOutAmount(payee.method, typed, limits);
+                }
                 return amountColumns(currency, typed);
               });
         const { before, after } = diff(row, {

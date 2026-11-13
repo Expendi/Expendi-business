@@ -1,6 +1,7 @@
 "use client";
 
 import type { JSX, Ref } from "react";
+import { cn } from "cn";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -12,10 +13,16 @@ type CopyState = "idle" | "copied" | "failed";
 export function CopyButton({
   value,
   label = "Copy",
+  what,
+  wide = true,
   ref,
 }: {
   value: string;
   label?: string;
+  /** Finishes the button's name for screen readers when `label` is short. */
+  what?: string;
+  /** Fills its column; false sits beside the value it copies. */
+  wide?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }): JSX.Element {
   const [state, setState] = useState<CopyState>("idle");
@@ -38,14 +45,14 @@ export function CopyButton({
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className={cn("flex flex-col gap-1.5", !wide && "items-end")}>
       <Button
         ref={ref}
         type="button"
         variant="outline"
         size="md"
         onClick={copy}
-        className="w-full"
+        className={wide ? "w-full" : undefined}
       >
         {state === "copied" ? (
           <CheckIcon aria-hidden="true" />
@@ -53,6 +60,9 @@ export function CopyButton({
           <CopyIcon aria-hidden="true" />
         )}
         {state === "copied" ? "Copied" : label}
+        {what && state !== "copied" ? (
+          <span className="sr-only"> {what}</span>
+        ) : null}
       </Button>
       <span
         role="status"

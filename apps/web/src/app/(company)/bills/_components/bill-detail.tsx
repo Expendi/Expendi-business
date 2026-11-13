@@ -20,6 +20,7 @@ import {
   SheetActions,
   SheetPosition,
 } from "~/components/data/detail-sheet";
+import { PaymentReceiptItems } from "~/components/data/payment-receipts";
 import { Skel } from "~/components/data/states";
 import { Button } from "~/components/ui/button";
 import { isPayable, unpayableReason } from "~/features/bills/bill-payment";
@@ -153,6 +154,7 @@ export function BillDetailBody({
         {bill.paidOn ? (
           <DetailItem label="Paid on">{formatIsoDate(bill.paidOn)}</DetailItem>
         ) : null}
+        <PaymentReceiptItems receipts={bill.paymentReceipts} />
         {bill.paidFromAccount ? (
           <DetailItem label="Paid from">{bill.paidFromAccount.name}</DetailItem>
         ) : null}

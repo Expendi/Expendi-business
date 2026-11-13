@@ -272,6 +272,7 @@ describe("GET /organizations/:id/wallet/history", () => {
       approvalId: claim.approvalId,
       approvedAt: claim.approvedAt?.toISOString(),
       paidAt: null,
+      paymentReceipts: [],
       rate: claim.rate,
       failureReason: null,
     };

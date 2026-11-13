@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { approvalChallengeSchema, passkeyAssertionSchema } from "./approval.js";
+import { paymentReceiptsSchema } from "./cash-out-receipt.js";
 import { claimPaymentWalletSchema } from "./claim-approval.js";
 import {
   etimsStatusSchema,
@@ -260,6 +261,8 @@ export const floatMovementSchema = z.object({
   recordedBy: z.string(),
   createdAt: z.iso.datetime(),
   paidAt: z.iso.datetime().nullable(),
+  /** The M-Pesa receipt of an issue or top-up, once paid. */
+  paymentReceipts: paymentReceiptsSchema,
   /** The latest payment of an issue or top-up, for admins only. */
   payout: z
     .object({

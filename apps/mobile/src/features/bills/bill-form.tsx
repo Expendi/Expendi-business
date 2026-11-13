@@ -33,10 +33,17 @@ import { useCategories } from "~/features/claims/use-claims";
 import { useReceiptSlots } from "~/features/claims/use-receipt-slots";
 import { KIND_LABELS } from "~/features/payees/payee-display";
 import { usePayees } from "~/features/payees/use-payees";
+import { useCompanyWallet } from "~/features/wallet/use-company-wallet";
 import { describeApiError } from "~/lib/api";
 import { CURRENCY_LABELS, currencyOfPayee } from "./bill-amount";
 import { amountChanged, toCreateRequest, toUpdateRequest } from "./bill-draft";
 import { HEADING_LABELS } from "./bill-status";
+import {
+  amountRefusal,
+  cashOutAmountError,
+  cashOutAmountHint,
+  cashOutLimitsOf,
+} from "./cash-out-amount";
 
 type ErrorField =
   | "payeeId"
@@ -117,6 +124,12 @@ export function BillForm(props: BillFormProps): JSX.Element {
   const [payeeKind, setPayeeKind] = useState<PayeeKind | null>(
     props.bill?.payee.kind ?? null,
   );
+  const [payeeMethod, setPayeeMethod] = useState<PayeeMethod | null>(
+    props.bill?.payee.method ?? null,
+  );
+  const wallet = useCompanyWallet(organizationId);
+  const limits = cashOutLimitsOf(wallet.data);
+  const typedAmount = { ...draft, method: payeeMethod };
 
   function update<K extends keyof BillDraft>(field: K, value: BillDraft[K]) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -128,27 +141,40 @@ export function BillForm(props: BillFormProps): JSX.Element {
     !props.bill.variable &&
     amountChanged(props.bill, draft);
 
+  /** Schema errors first; then, as the API would, the cash-out limits. */
+  function errorsOf(
+    issues: Parameters<typeof fieldErrorsOf>[0] | undefined,
+    amountSent: boolean,
+  ): FieldErrors {
+    const errors = issues ? fieldErrorsOf(issues) : {};
+    const problem = amountSent ? cashOutAmountError(typedAmount, limits) : null;
+    if (problem !== null && errors.amount === undefined) {
+      errors.amount = problem;
+    }
+    return errors;
+  }
+
   function submit(): void {
     if (props.bill === undefined) {
       const request = toCreateRequest(draft, invoices.receiptFileIds);
       const parsed = createBillRequestSchema.safeParse(request);
-      if (!parsed.success) {
-        setFieldErrors(fieldErrorsOf(parsed.error.issues));
-        return;
-      }
-      setFieldErrors({});
-      props.onSubmit(request);
+      const errors = errorsOf(parsed.error?.issues, true);
+      setFieldErrors(errors);
+      if (Object.keys(errors).length === 0) props.onSubmit(request);
       return;
     }
     const request = toUpdateRequest(props.bill, draft);
     const parsed = updateBillRequestSchema.safeParse(request);
-    if (!parsed.success) {
-      setFieldErrors(fieldErrorsOf(parsed.error.issues));
-      return;
-    }
-    setFieldErrors({});
-    props.onSubmit(request);
+    const errors = errorsOf(
+      parsed.error?.issues,
+      request.amountKes !== undefined || request.payeeId !== undefined,
+    );
+    setFieldErrors(errors);
+    if (Object.keys(errors).length === 0) props.onSubmit(request);
   }
+
+  const refusedAmount = amountRefusal(submitError);
+  const amountHint = cashOutAmountHint(typedAmount, limits);
 
   const failedUploads = invoices.slots.some((slot) => slot.status === "failed");
 
@@ -162,6 +188,7 @@ export function BillForm(props: BillFormProps): JSX.Element {
           onChange={(payeeId) => update("payeeId", payeeId)}
           onPicked={(payee) => {
             setPayeeKind(payee.kind);
+            setPayeeMethod(payee.method);
             const currency = currencyOfPayee(payee.method, "kes");
             if (currency !== draft.currency) {
               setDraft((current) => ({ ...current, currency, amount: "" }));
@@ -194,7 +221,10 @@ export function BillForm(props: BillFormProps): JSX.Element {
             This payee is paid in USDC: they receive exactly this many USDC.
           </Text>
         ) : null}
-        <ErrorMessage message={fieldErrors.amount ?? null} />
+        {amountHint ? (
+          <Text className="text-sm text-gray-600">{amountHint}</Text>
+        ) : null}
+        <ErrorMessage message={fieldErrors.amount ?? refusedAmount} />
 
         {needsReason ? (
           <>
@@ -273,7 +303,11 @@ export function BillForm(props: BillFormProps): JSX.Element {
           <ErrorMessage message="Retry or remove the invoice that didn’t upload." />
         ) : null}
         <ErrorMessage
-          message={submitError ? describeApiError(submitError) : null}
+          message={
+            submitError && refusedAmount === null
+              ? describeApiError(submitError)
+              : null
+          }
         />
         <Button
           label={invoices.uploading ? "Uploading invoice…" : submitLabel}

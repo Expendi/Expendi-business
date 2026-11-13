@@ -24,10 +24,13 @@ import {
   categoriesResponseSchema,
   claimDetailSchema,
   claimsPageSchema,
+  paymentPollInterval,
   receiptSmsResponseSchema,
 } from "@expendi-business/shared";
 
+import { claimPagesStatuses, claimStatuses } from "~/lib/payment-poll";
 import { queryKeys } from "~/lib/query-keys";
+import { useRefreshWhenPaymentsSettle } from "~/lib/use-payments-settled";
 import { useApi } from "~/providers/api-provider";
 
 const CATEGORIES_STALE_MS = 5 * 60_000;
@@ -36,12 +39,15 @@ function claimsPath(organizationId: string) {
   return `/organizations/${organizationId}/claims` as const;
 }
 
-/** Newest first; employees get their own claims, admins everyone's. */
+/**
+ * Newest first; employees get their own claims, admins everyone's. Asked
+ * about again while one is being paid.
+ */
 export function useClaimList(
   organizationId: string,
 ): UseInfiniteQueryResult<InfiniteData<ClaimsPage>> {
   const api = useApi();
-  return useInfiniteQuery({
+  const claims = useInfiniteQuery({
     queryKey: queryKeys.claimList(organizationId),
     queryFn: ({ pageParam }) =>
       api.get(
@@ -52,7 +58,15 @@ export function useClaimList(
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
+    refetchInterval: (query) =>
+      paymentPollInterval(claimPagesStatuses(query.state.data)),
   });
+  useRefreshWhenPaymentsSettle(
+    claimPagesStatuses(claims.data),
+    "claims",
+    organizationId,
+  );
+  return claims;
 }
 
 export function useClaim(
@@ -60,11 +74,19 @@ export function useClaim(
   claimId: string,
 ): UseQueryResult<ClaimDetail> {
   const api = useApi();
-  return useQuery({
+  const claim = useQuery({
     queryKey: queryKeys.claim(organizationId, claimId),
     queryFn: () =>
       api.get(`${claimsPath(organizationId)}/${claimId}`, claimDetailSchema),
+    refetchInterval: (query) =>
+      paymentPollInterval(claimStatuses(query.state.data)),
   });
+  useRefreshWhenPaymentsSettle(
+    claimStatuses(claim.data),
+    "claims",
+    organizationId,
+  );
+  return claim;
 }
 
 export function useCategories(

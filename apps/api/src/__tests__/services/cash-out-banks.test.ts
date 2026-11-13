@@ -34,6 +34,14 @@ describe("the cash-out bank catalogue", () => {
     });
   });
 
+  it("names I&M Bank as customers search for it", () => {
+    expect(bankByCode("IMBLKENA")).toEqual({
+      code: "IMBLKENA",
+      name: "I&M Bank",
+      pretiumCode: "542542",
+    });
+  });
+
   it("finds a bank by the code payees store", () => {
     expect([bankByCode("KCBLKENX")?.name, bankByCode("NOPE")]).toEqual([
       "Kenya Commercial Bank",

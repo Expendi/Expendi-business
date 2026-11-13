@@ -23,6 +23,7 @@ import {
   users,
 } from "../../db/schema/index.js";
 import { query } from "../../db/scope.js";
+import { cashOutReceiptOf } from "../payout/receipts.js";
 
 /**
  * What one queued item becomes in Zoho Books (spec §6.17, "What syncs" and
@@ -379,6 +380,8 @@ function paidThroughExpendi(
             .select({
               amountKes: payouts.amountKes,
               provider: payouts.provider,
+              method: payouts.method,
+              status: payouts.status,
               providerReference: payouts.providerReference,
             })
             .from(payouts)
@@ -399,8 +402,7 @@ function paidThroughExpendi(
     }
     // A cash-out's M-Pesa or bank receipt, whichever provider paid it; an
     // on-chain hash wouldn't fit.
-    const reference =
-      payout && payout.provider !== "onchain" ? payout.providerReference : null;
+    const reference = payout ? (cashOutReceiptOf(payout)?.code ?? null) : null;
     return { amountKes, reference };
   });
 }

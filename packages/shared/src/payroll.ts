@@ -6,6 +6,7 @@ import {
   passkeyRequestOptionsSchema,
 } from "./approval.js";
 import { BILL_REASON_MAX_LENGTH, billStatusSchema } from "./bills.js";
+import { paymentReceiptsSchema } from "./cash-out-receipt.js";
 import { kesAmountSchema } from "./claims.js";
 import { payeeKindSchema, payeeMethodSchema } from "./payee.js";
 import { RECURRING_ITEM_STATES } from "./recurring.js";
@@ -221,6 +222,8 @@ export const payrollPaymentSchema = z.object({
   note: z.string().nullable(),
   leftOut: z.object({ reason: z.string(), at: z.iso.datetime() }).nullable(),
   paidOn: z.iso.date().nullable(),
+  /** Its cash-outs' receipts once paid; several when it was split. */
+  paymentReceipts: paymentReceiptsSchema,
 });
 
 export type PayrollPayment = z.infer<typeof payrollPaymentSchema>;
@@ -276,6 +279,8 @@ export const mySalaryPaymentSchema = z.object({
   amountKes: kesCents,
   status: z.enum(MY_SALARY_PAYMENT_STATUSES),
   paidOn: z.iso.date().nullable(),
+  /** Its cash-outs' receipts once paid; several when it was split. */
+  paymentReceipts: paymentReceiptsSchema,
 });
 
 export type MySalaryPayment = z.infer<typeof mySalaryPaymentSchema>;

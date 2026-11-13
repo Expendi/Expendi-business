@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { ExpenseKind } from "./claims.js";
+import { paymentReceiptsSchema } from "./cash-out-receipt.js";
 import {
   etimsStatusSchema,
   EXPENSE_SOURCES,
@@ -143,6 +144,8 @@ export const expenseSchema = z.object({
   selfApproved: z.boolean(),
   approvedAt: z.iso.datetime().nullable(),
   paidAt: z.iso.datetime().nullable(),
+  /** On a claim: the M-Pesa receipt of its payment, once paid. */
+  paymentReceipts: paymentReceiptsSchema,
   /** The float it was spent from, or the float an overspend claim went over. */
   floatId: z.uuid().nullable(),
   /** On float spending: the claim for what didn't fit in the float. */

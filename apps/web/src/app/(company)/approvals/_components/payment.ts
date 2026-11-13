@@ -1,13 +1,20 @@
+import { queryOptions } from "@tanstack/react-query";
+
 import type {
   Claim,
   ClaimApproval,
   ClaimPaymentPreview,
   ClaimPaymentResult,
 } from "@expendi-business/shared";
-import { CLAIM_APPROVAL_MAX_CLAIMS } from "@expendi-business/shared";
+import {
+  CLAIM_APPROVAL_MAX_CLAIMS,
+  CLAIMS_PAGE_MAX_SIZE,
+  paymentPollInterval,
+} from "@expendi-business/shared";
 
 import type { CustomerApi } from "~/lib/customer-api";
 import { describeApprovalError } from "~/lib/approval";
+import { queryKeys } from "~/lib/query-keys";
 
 /**
  * Approve & pay's display logic (spec §6.7, §6.8), as the app has it
@@ -26,6 +33,29 @@ export interface PreparedPayment {
   readonly request: PaymentRequest;
   readonly approval: ClaimApproval;
   readonly preparedAt: number;
+}
+
+/**
+ * Claims approved and on their way, which the queues don't show: asked
+ * about again every few seconds while there are any, so a payment that
+ * fails shows up under Payment failed without a reload.
+ */
+export function payingClaimsQuery(
+  api: Pick<CustomerApi, "listClaims">,
+  organizationId: string,
+) {
+  return queryOptions({
+    queryKey: queryKeys.claimQueue(organizationId, "paying"),
+    queryFn: () =>
+      api.listClaims(organizationId, {
+        status: "paying",
+        limit: CLAIMS_PAGE_MAX_SIZE,
+      }),
+    refetchInterval: (query) =>
+      paymentPollInterval({
+        claims: query.state.data?.claims.map((claim) => claim.status),
+      }),
+  });
 }
 
 /** The API returns the same payouts each time, so preparing again never adds one. */

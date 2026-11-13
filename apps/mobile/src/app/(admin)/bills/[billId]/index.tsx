@@ -25,6 +25,7 @@ import { formatBillAmount, storedAmount } from "~/features/bills/bill-amount";
 import { isPayable, joinBillIds } from "~/features/bills/bill-payment";
 import { BillStatusBadge, HEADING_LABELS } from "~/features/bills/bill-status";
 import { useBill, useCancelBill } from "~/features/bills/use-bills";
+import { CashOutReceiptRows } from "~/features/cash-out/cash-out-receipt";
 import { ReviewRow } from "~/features/claims/claim-editor";
 import { formatIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
@@ -99,6 +100,7 @@ function BillSummary({ bill }: { bill: BillDetail }): JSX.Element {
         </Text>
         <BillStatusBadge status={bill.status} />
       </View>
+      <CashOutReceiptRows receipts={bill.paymentReceipts} copyable />
 
       <View className="gap-4">
         <ReviewRow label="Due" value={formatIsoDate(bill.dueOn)} />

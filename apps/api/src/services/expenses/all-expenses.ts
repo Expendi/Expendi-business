@@ -15,6 +15,7 @@ import {
 import { Effect } from "effect";
 
 import type {
+  CashOutReceipt,
   EtimsStatus,
   ExpenseKind,
   ExpenseListKind,
@@ -44,6 +45,7 @@ import {
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { BadRequest, NotFound } from "../../errors.js";
+import { paymentReceiptsBySubject } from "../payout/receipts.js";
 import { FileStorage } from "../storage/file-storage.js";
 import { storageFailure } from "./receipts.js";
 import { readWarnings } from "./rules.js";
@@ -90,6 +92,7 @@ export interface ExpenseView {
   readonly selfApproved: boolean;
   readonly approvedAt: Date | null;
   readonly paidAt: Date | null;
+  readonly paymentReceipts: readonly CashOutReceipt[];
   readonly floatId: string | null;
   readonly overspendClaimId: string | null;
   readonly bill: {
@@ -230,7 +233,10 @@ const selectExpenses = (
 
 type ExpenseRow = Awaited<ReturnType<typeof selectExpenses>>[number];
 
-function toExpenseView(row: ExpenseRow): ExpenseView {
+function toExpenseView(
+  row: ExpenseRow,
+  paymentReceipts: readonly CashOutReceipt[],
+): ExpenseView {
   return {
     id: row.id,
     kind: row.kind,
@@ -260,6 +266,7 @@ function toExpenseView(row: ExpenseRow): ExpenseView {
     selfApproved: row.selfApproved,
     approvedAt: row.approvedAt,
     paidAt: row.paidAt,
+    paymentReceipts,
     floatId: row.floatId,
     overspendClaimId: row.overspendClaimId,
     bill:
@@ -277,6 +284,19 @@ function toExpenseView(row: ExpenseRow): ExpenseView {
     createdAt: row.createdAt,
   };
 }
+
+/** Only a claim is paid by a payout; other expenses have no receipts. */
+const claimReceipts = (
+  tx: Transaction,
+  organizationId: string,
+  rows: readonly ExpenseRow[],
+) =>
+  paymentReceiptsBySubject(
+    tx,
+    organizationId,
+    "claim",
+    rows.filter((row) => row.kind === "claim").map((row) => row.id),
+  );
 
 /** Payment failed first, then waiting for approval, down to recorded. */
 const STATUS_URGENCY: readonly ExpenseStatus[] = [
@@ -444,26 +464,36 @@ export function listExpenses(
         ? undefined
         : yield* afterCursor(filters.cursor, column, filters.dir);
     const order = filters.dir === "asc" ? asc : desc;
-    const rows = yield* withScope(tenant, (tx) =>
-      query(() =>
-        selectExpenses(
-          tx,
-          and(listedExpenses(tenant), filtersWhere(filters), after),
-          column?.expression,
-        )
-          .orderBy(
-            ...(column === null ? [] : [order(column.expression)]),
-            order(expenses.spentOn),
-            order(expenses.createdAt),
-            order(expenses.id),
+    const { rows, receipts } = yield* withScope(tenant, (tx) =>
+      Effect.gen(function* () {
+        const rows = yield* query(() =>
+          selectExpenses(
+            tx,
+            and(listedExpenses(tenant), filtersWhere(filters), after),
+            column?.expression,
           )
-          .limit(filters.limit + 1),
-      ),
+            .orderBy(
+              ...(column === null ? [] : [order(column.expression)]),
+              order(expenses.spentOn),
+              order(expenses.createdAt),
+              order(expenses.id),
+            )
+            .limit(filters.limit + 1),
+        );
+        const receipts = yield* claimReceipts(
+          tx,
+          tenant.organizationId,
+          rows.slice(0, filters.limit),
+        );
+        return { rows, receipts };
+      }),
     );
     const page = rows.slice(0, filters.limit);
     const last = page.at(-1);
     return {
-      expenses: page.map(toExpenseView),
+      expenses: page.map((row) =>
+        toExpenseView(row, receipts.get(row.id) ?? []),
+      ),
       nextCursor:
         rows.length > filters.limit && last ? encodeCursor(last) : null,
     };
@@ -550,7 +580,7 @@ export function getExpense(
 > {
   return Effect.gen(function* () {
     const storage = yield* FileStorage;
-    const { row, files } = yield* withScope(tenant, (tx) =>
+    const { row, files, paidWith } = yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
         const [row] = yield* query(() =>
           selectExpenses(
@@ -591,7 +621,8 @@ export function getExpense(
             )
             .orderBy(asc(receiptFiles.createdAt), asc(receiptFiles.id)),
         );
-        return { row, files };
+        const paidWith = yield* claimReceipts(tx, tenant.organizationId, [row]);
+        return { row, files, paidWith: paidWith.get(row.id) ?? [] };
       }),
     );
     const receipts = yield* Effect.forEach(
@@ -618,6 +649,6 @@ export function getExpense(
         );
       },
     ).pipe(Effect.mapError(storageFailure));
-    return { ...toExpenseView(row), receipts };
+    return { ...toExpenseView(row, paidWith), receipts };
   });
 }

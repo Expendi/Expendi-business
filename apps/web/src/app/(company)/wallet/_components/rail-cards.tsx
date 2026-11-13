@@ -20,13 +20,13 @@ import type {
 } from "@expendi-business/shared";
 import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
+import { CopyButton } from "~/components/copy-button";
 import { textLinkClass } from "~/components/data/actions";
 import { Skel } from "~/components/data/states";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { usePaidFromAccounts } from "~/features/bills/bills-api";
 import { describeApiError } from "~/lib/api";
-import { CopyButton } from "./copy-button";
 import { GroupedAddress } from "./tx-sheet";
 import { PAID_FROM_KIND_LABELS } from "./wallet-display";
 

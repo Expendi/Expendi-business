@@ -53,6 +53,7 @@ const claimOf = (overrides: Partial<Claim> = {}): Claim => ({
   approvedAt: null,
   selfApproved: false,
   paidAt: null,
+  paymentReceipts: [],
   floatId: null,
   canEdit: false,
   warnings: [

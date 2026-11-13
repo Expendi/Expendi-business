@@ -52,6 +52,7 @@ const expense = (overrides: Partial<Expense>): Expense => ({
   selfApproved: false,
   approvedAt: null,
   paidAt: null,
+  paymentReceipts: [],
   floatId: id(4),
   overspendClaimId: null,
   bill: null,

@@ -11,6 +11,7 @@ import type {
 
 import { Badge } from "~/components/badge";
 import { Text } from "~/components/text";
+import { CashOutReceiptRows } from "~/features/cash-out/cash-out-receipt";
 import { ClaimStatusBadge } from "~/features/claims/claim-status";
 import { formatIsoDate, localIsoDate } from "~/features/claims/dates";
 import {
@@ -213,6 +214,7 @@ export function MovementRow({
         label={PHASE_LABELS[movement.phase]}
         tone={PHASE_TONES[movement.phase]}
       />
+      <CashOutReceiptRows receipts={movement.paymentReceipts} />
       {movement.note ? (
         <Text className="text-sm text-gray-600">{movement.note}</Text>
       ) : null}

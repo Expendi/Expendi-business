@@ -9,6 +9,7 @@ import type { DatabaseError } from "../../errors.js";
 import type { Tenant } from "../../middleware/tenant.js";
 import { bills, payees } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
+import { paymentReceiptsBySubject } from "../payout/receipts.js";
 
 /** `MySalaryPayment` before serialisation turns bigints into strings. */
 export type MySalaryPaymentView = Omit<MySalaryPayment, "amountKes"> & {
@@ -31,45 +32,51 @@ export function listMySalaryPayments(
   tenant: Tenant,
 ): Effect.Effect<MySalaryPaymentView[], DatabaseError, DatabaseService> {
   return withScope(tenant, (tx) =>
-    query(() =>
-      tx
-        .select({
-          id: bills.id,
-          salaryId: bills.recurringItemId,
-          payDate: bills.dueOn,
-          amountKes: bills.amountKes,
-          status: bills.status,
-          paidOn: bills.paidOn,
-        })
-        .from(bills)
-        .innerJoin(payees, eq(payees.id, bills.payeeId))
-        .where(
-          and(
-            eq(bills.organizationId, tenant.organizationId),
-            isNotNull(bills.payrollRunId),
-            eq(payees.membershipId, tenant.membershipId),
-            inArray(bills.status, [...MY_SALARY_PAYMENT_STATUSES]),
-          ),
-        )
-        .orderBy(desc(bills.dueOn), desc(bills.createdAt)),
-    ).pipe(
-      Effect.flatMap((rows) =>
-        Effect.forEach(rows, (row) =>
-          row.amountKes === null || !isMyPaymentStatus(row.status)
-            ? Effect.dieMessage(`salary payment ${row.id} isn't settled`)
-            : Effect.succeed({
-                id: row.id,
-                kind:
-                  row.salaryId === null
-                    ? ("one_off" as const)
-                    : ("salary" as const),
-                payDate: row.payDate,
-                amountKes: row.amountKes,
-                status: row.status,
-                paidOn: row.paidOn,
-              }),
-        ),
-      ),
-    ),
+    Effect.gen(function* () {
+      const rows = yield* query(() =>
+        tx
+          .select({
+            id: bills.id,
+            salaryId: bills.recurringItemId,
+            payDate: bills.dueOn,
+            amountKes: bills.amountKes,
+            status: bills.status,
+            paidOn: bills.paidOn,
+          })
+          .from(bills)
+          .innerJoin(payees, eq(payees.id, bills.payeeId))
+          .where(
+            and(
+              eq(bills.organizationId, tenant.organizationId),
+              isNotNull(bills.payrollRunId),
+              eq(payees.membershipId, tenant.membershipId),
+              inArray(bills.status, [...MY_SALARY_PAYMENT_STATUSES]),
+            ),
+          )
+          .orderBy(desc(bills.dueOn), desc(bills.createdAt)),
+      );
+      const receipts = yield* paymentReceiptsBySubject(
+        tx,
+        tenant.organizationId,
+        "bill",
+        rows.map((row) => row.id),
+      );
+      return yield* Effect.forEach(rows, (row) =>
+        row.amountKes === null || !isMyPaymentStatus(row.status)
+          ? Effect.dieMessage(`salary payment ${row.id} isn't settled`)
+          : Effect.succeed({
+              id: row.id,
+              kind:
+                row.salaryId === null
+                  ? ("one_off" as const)
+                  : ("salary" as const),
+              payDate: row.payDate,
+              amountKes: row.amountKes,
+              status: row.status,
+              paidOn: row.paidOn,
+              paymentReceipts: receipts.get(row.id) ?? [],
+            }),
+      );
+    }),
   );
 }

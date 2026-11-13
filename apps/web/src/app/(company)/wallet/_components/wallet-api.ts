@@ -7,6 +7,7 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 import {
+  infiniteQueryOptions,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -22,6 +23,7 @@ import type {
   FundInRequest,
   FundInStatus,
   PayeeChain,
+  PayoutStatus,
   WalletHistoryItem,
   WalletHistoryResponse,
   WalletResponse,
@@ -34,6 +36,8 @@ import {
   approvalChallengeSchema,
   fundInSchema,
   fundInsResponseSchema,
+  isPaymentInFlight,
+  paymentPollInterval,
   walletHistoryResponseSchema,
   walletResponseSchema,
   walletSetupSchema,
@@ -43,7 +47,9 @@ import {
   withdrawalSchema,
 } from "@expendi-business/shared";
 
+import type { ApiClient } from "~/lib/api";
 import type { ApprovalOutcome } from "~/lib/approval";
+import { useRefreshWhenSettled } from "~/lib/payment-poll";
 import { useApi } from "~/lib/use-api";
 import { usePasskeyApproval } from "~/lib/use-approval";
 import { nairobiDay } from "./wallet-display";
@@ -106,12 +112,28 @@ export function useFinishWalletSetup(
   });
 }
 
-/** Newest first: deposits, payments, refunds and withdrawals. */
-export function useWalletHistory(
-  organizationId: string,
-): UseInfiniteQueryResult<InfiniteData<WalletHistoryResponse>> {
-  const api = useApi();
-  return useInfiniteQuery({
+const payoutStatuses = (
+  history: InfiniteData<WalletHistoryResponse> | undefined,
+): PayoutStatus[] =>
+  (history?.pages ?? [])
+    .flatMap((page) => page.items)
+    .flatMap((item) => (item.payout ? [item.payout.status] : []));
+
+/** How many payouts among the history's loaded rows are on their way. */
+export function payoutsInFlight(
+  history: InfiniteData<WalletHistoryResponse> | undefined,
+): number {
+  return payoutStatuses(history).filter((status) =>
+    isPaymentInFlight({ payouts: [status] }),
+  ).length;
+}
+
+/**
+ * Newest first: deposits, payments, refunds and withdrawals. Asked about
+ * again every few seconds while a payout in it is on its way.
+ */
+export function walletHistoryQuery(api: ApiClient, organizationId: string) {
+  return infiniteQueryOptions({
     queryKey: walletKeys.history(organizationId),
     queryFn: ({ pageParam }) =>
       api.get(
@@ -120,7 +142,27 @@ export function useWalletHistory(
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
+    refetchInterval: (query) =>
+      paymentPollInterval({ payouts: payoutStatuses(query.state.data) }),
   });
+}
+
+/**
+ * The history; when a payout in it settles, the balance and the rest of
+ * the wallet are fetched again.
+ */
+export function useWalletHistory(
+  organizationId: string,
+): UseInfiniteQueryResult<InfiniteData<WalletHistoryResponse>> {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const history = useInfiniteQuery(walletHistoryQuery(api, organizationId));
+  useRefreshWhenSettled(payoutsInFlight(history.data), () =>
+    queryClient.invalidateQueries({
+      queryKey: walletKeys.all(organizationId),
+    }),
+  );
+  return history;
 }
 
 /** The API's largest history page. */

@@ -46,7 +46,17 @@ import {
   toUpdateRequest,
 } from "~/features/bills/bill-draft";
 import { HEADING_LABELS } from "~/features/bills/bill-status";
-import { useCreateBill, useUpdateBill } from "~/features/bills/bills-api";
+import {
+  useCashOutLimits,
+  useCreateBill,
+  useUpdateBill,
+} from "~/features/bills/bills-api";
+import {
+  limitsForPayee,
+  serverFieldIssues,
+  smallestAmountHint,
+  typedAmountProblem,
+} from "~/features/bills/cash-out-limits";
 import { KIND_LABELS, METHOD_LABELS } from "~/features/payees/payee-display";
 import { ACTIVE_PAYEES, usePayees } from "~/features/payees/payees-api";
 import { describeApiError } from "~/lib/api";
@@ -142,6 +152,7 @@ export function BillForm({
   });
   const create = useCreateBill(organizationId);
   const update = useUpdateBill(organizationId, bill?.id ?? "");
+  const cashOutLimits = useCashOutLimits(organizationId);
   const [draft, setDraft] = useState<BillDraft>(() =>
     bill ? draftFromBill(bill) : BLANK_DRAFT,
   );
@@ -176,6 +187,15 @@ export function BillForm({
     );
   }
 
+  const chosenPayee = payees.data?.find((payee) => payee.id === draft.payeeId);
+  const payeeMethod = chosenPayee
+    ? (chosenPayee.details?.method ?? null)
+    : bill?.payee.id === draft.payeeId
+      ? bill.payee.method
+      : null;
+  const amountLimits = limitsForPayee(payeeMethod, cashOutLimits);
+  const amountHint = smallestAmountHint(amountLimits);
+
   const askReason =
     bill !== null && !bill.variable && amountChanged(bill, draft);
   const updateRequest = bill ? toUpdateRequest(bill, draft) : null;
@@ -191,6 +211,19 @@ export function BillForm({
     );
   }
 
+  /** A cash-out amount out of range, judged as the API does: on any new amount or payee. */
+  function amountProblem(amountOrPayeeChanged: boolean): Issues {
+    const problem = amountOrPayeeChanged
+      ? typedAmountProblem(draft.amount, amountLimits)
+      : null;
+    return problem === null ? [] : [{ path: ["amountKes"], message: problem }];
+  }
+
+  function onSaveError(error: Error) {
+    const issues = serverFieldIssues(error, REQUEST_FIELDS);
+    if (issues.length > 0) invalid(issues);
+  }
+
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (bill && updateRequest) {
@@ -199,8 +232,19 @@ export function BillForm({
         invalid(parsed.error.issues);
         return;
       }
+      const outOfRange = amountProblem(
+        updateRequest.amountKes !== undefined ||
+          updateRequest.payeeId !== undefined,
+      );
+      if (outOfRange.length > 0) {
+        invalid(outOfRange);
+        return;
+      }
       setErrors({});
-      update.mutate(updateRequest, { onSuccess: onSaved });
+      update.mutate(updateRequest, {
+        onSuccess: onSaved,
+        onError: onSaveError,
+      });
       return;
     }
     const request = toCreateRequest(
@@ -212,8 +256,13 @@ export function BillForm({
       invalid(parsed.error.issues);
       return;
     }
+    const outOfRange = amountProblem(true);
+    if (outOfRange.length > 0) {
+      invalid(outOfRange);
+      return;
+    }
     setErrors({});
-    create.mutate(request, { onSuccess: onSaved });
+    create.mutate(request, { onSuccess: onSaved, onError: onSaveError });
   }
 
   const payeeChoices = (payees.data ?? []).filter(
@@ -223,6 +272,8 @@ export function BillForm({
   );
   const currency = CURRENCY_LABELS[draft.currency];
   const loadError = payees.error ?? categories.error;
+  const saveErrorOnField =
+    save.isError && serverFieldIssues(save.error, REQUEST_FIELDS).length > 0;
   const invalidProps = (field: BillField) =>
     errors[field] ? { "aria-invalid": true } : {};
 
@@ -308,6 +359,9 @@ export function BillForm({
                 This payee is paid in USDC: the bill pays exactly this many
                 USDC.
               </FieldDescription>
+            ) : null}
+            {amountHint ? (
+              <FieldDescription>{amountHint}</FieldDescription>
             ) : null}
             {errors.amount ? <FieldError>{errors.amount}</FieldError> : null}
           </Field>
@@ -477,7 +531,7 @@ export function BillForm({
             <p>{errors.form}</p>
           </Callout>
         ) : null}
-        {save.isError ? (
+        {save.isError && !saveErrorOnField ? (
           <Callout tone="error">
             <p role="alert">{describeApiError(save.error)}</p>
           </Callout>

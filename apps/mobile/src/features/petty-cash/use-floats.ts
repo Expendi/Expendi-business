@@ -23,13 +23,16 @@ import {
   floatPaymentResultSchema,
   floatSpendingResultSchema,
   floatsResponseSchema,
+  paymentPollInterval,
 } from "@expendi-business/shared";
 
 import type { ApprovalOutcome } from "~/features/approval";
 import type { ApiClient } from "~/lib/api";
 import { describeApprovalError, usePasskeyApproval } from "~/features/approval";
 import { isChallengeFresh, topUpFrom } from "~/features/claims/payment";
+import { floatListStatuses, floatStatuses } from "~/lib/payment-poll";
 import { queryKeys } from "~/lib/query-keys";
+import { useRefreshWhenPaymentsSettle } from "~/lib/use-payments-settled";
 import { useApi } from "~/providers/api-provider";
 import { sameFloatCost } from "./float-display";
 
@@ -41,13 +44,16 @@ import { sameFloatCost } from "./float-display";
 const floatsPath = (organizationId: string) =>
   `/organizations/${organizationId}/floats` as const;
 
-/** Admins get every float; `mine` narrows the list to the caller's own. */
+/**
+ * Admins get every float; `mine` narrows the list to the caller's own.
+ * Asked about again while money is on its way to a holder.
+ */
 export function useFloats(
   organizationId: string,
   { mine }: { mine: boolean },
 ): UseQueryResult<FloatsResponse> {
   const api = useApi();
-  return useQuery({
+  const floats = useQuery({
     queryKey: queryKeys.floatList(organizationId, mine),
     queryFn: () =>
       api.get(
@@ -56,7 +62,15 @@ export function useFloats(
           : floatsPath(organizationId),
         floatsResponseSchema,
       ),
+    refetchInterval: (query) =>
+      paymentPollInterval(floatListStatuses(query.state.data)),
   });
+  useRefreshWhenPaymentsSettle(
+    floatListStatuses(floats.data),
+    "floats",
+    organizationId,
+  );
+  return floats;
 }
 
 export function useFloat(
@@ -64,11 +78,19 @@ export function useFloat(
   floatId: string,
 ): UseQueryResult<FloatDetail> {
   const api = useApi();
-  return useQuery({
+  const float = useQuery({
     queryKey: queryKeys.float(organizationId, floatId),
     queryFn: () =>
       api.get(`${floatsPath(organizationId)}/${floatId}`, floatDetailSchema),
+    refetchInterval: (query) =>
+      paymentPollInterval(floatStatuses(query.state.data)),
   });
+  useRefreshWhenPaymentsSettle(
+    floatStatuses(float.data),
+    "floats",
+    organizationId,
+  );
+  return float;
 }
 
 function invalidateFloats(

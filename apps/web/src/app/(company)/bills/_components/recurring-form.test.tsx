@@ -3,11 +3,19 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import type {
+  ActiveWallet,
+  RecurringItem,
+  WalletResponse,
+} from "@expendi-business/shared";
+
 import { RECURRING_ITEMS } from "~/app/dev/preview/_harness/fixtures/bills";
+import { billKeys } from "~/features/payment-keys";
 import {
   blankDraft,
   draftFromItem,
 } from "~/features/recurring/recurring-draft";
+import { ApiError } from "~/lib/api";
 import { queryKeys } from "~/lib/query-keys";
 import { RecurringForm } from "./recurring-form";
 
@@ -19,8 +27,9 @@ const rent = RECURRING_ITEMS.find(
   (item) => item.payee.name === "Kilimani Properties",
 );
 
-function render(children: ReactNode): string {
+function render(children: ReactNode, wallet?: WalletResponse): string {
   const client = new QueryClient();
+  if (wallet) client.setQueryData(billKeys.kesRate(ORG), wallet);
   client.setQueryData(queryKeys.categories(ORG), [
     {
       id: rent?.category.id,
@@ -120,5 +129,76 @@ describe("the recurring payment form", () => {
         "Set up payment",
       ].filter((part) => !text.includes(part)),
     ).toEqual([]);
+  });
+});
+
+const LIMITS: ActiveWallet = {
+  status: "active",
+  address: "company.near",
+  chain: "near",
+  usdcBalance: "0",
+  kesEquivalent: null,
+  cashOutLimits: { minKesCents: "2000", maxKesCents: "25000000" },
+};
+
+function editing(item: RecurringItem, submitError: unknown = null): string {
+  return render(
+    <RecurringForm
+      organizationId={ORG}
+      item={item}
+      initialDraft={draftFromItem(item)}
+      submitLabel="Save changes"
+      submitting={false}
+      submitError={submitError}
+      footerSlot={null}
+      onSubmit={() => undefined}
+      onCancel={() => undefined}
+    />,
+    LIMITS,
+  );
+}
+
+function itemTo(payee: string): RecurringItem {
+  const found = RECURRING_ITEMS.find((item) => item.payee.name === payee);
+  if (!found) throw new Error(`The samples pay ${payee}.`);
+  return found;
+}
+
+describe("the recurring payment form's smallest amount", () => {
+  it("shows only for a payment through Expendi to a payee paid by cash-out", () => {
+    // #when
+    const shown = [
+      itemTo("Kilimani Properties"),
+      itemTo("Figma"),
+      itemTo("Hotpoint Appliances"),
+      itemTo("CarMax Mechanics"),
+    ].map((item) => editing(item).includes("Smallest amount: KES 20"));
+
+    // #then
+    expect(shown).toEqual([true, false, false, false]);
+  });
+
+  it("puts the API's refusal of the amount on the amount field, not under the form", () => {
+    // #given
+    const refused = new ApiError(
+      400,
+      "BadRequest",
+      "The smallest amount that can be sent is KES 20.",
+      { field: "amountKes" },
+    );
+
+    // #when
+    const html = editing(itemTo("Kilimani Properties"), refused);
+
+    // #then
+    expect({
+      onField:
+        /aria-invalid="true"[^>]*value="48500.00"|value="48500.00"[^>]*aria-invalid="true"/.test(
+          html,
+        ),
+      shown:
+        textOf(html).split("The smallest amount that can be sent is KES 20.")
+          .length - 1,
+    }).toEqual({ onField: true, shown: 1 });
   });
 });

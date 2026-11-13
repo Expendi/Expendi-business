@@ -30,7 +30,7 @@ export function BillFiles({
           aria-hidden="true"
           className="size-6 text-muted-foreground"
         />
-        <p>No receipt attached.</p>
+        <p>No invoice attached.</p>
       </div>
     );
   }

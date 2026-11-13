@@ -52,6 +52,7 @@ const movement = (changes: Partial<FloatMovement> = {}): FloatMovement => ({
   recordedBy: "Ann Admin",
   createdAt: "2026-11-01T08:00:00.000Z",
   paidAt: null,
+  paymentReceipts: [],
   payout: null,
   ...changes,
 });

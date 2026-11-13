@@ -13,7 +13,8 @@ export interface CashOutBank {
 /**
  * Expendi's own list of banks a cash-out can reach, so a payee's bank
  * doesn't depend on any one provider's list. Taken from Paycrest's
- * `GET /v2/institutions/KES` (type "bank"), names as Paycrest gives them.
+ * `GET /v2/institutions/KES` (type "bank"), names as Paycrest gives them
+ * unless customers know the bank by another (I&M Bank).
  * Pretium's codes come from its `POST /v1/banks/KES`, matched to these by
  * SWIFT code; a bank with no confirmed match stays null, since a guessed
  * code would send shillings to the wrong bank.
@@ -69,11 +70,7 @@ export const CASH_OUT_BANKS: readonly CashOutBank[] = [
   { code: "CRBTKENA", name: "Credit Bank Limited", pretiumCode: null },
   { code: "UNAIKEPC", name: "Unaitas Sacco", pretiumCode: null },
   { code: "GUARKENA", name: "Guardian Bank Limited", pretiumCode: null },
-  {
-    code: "IMBLKENA",
-    name: "Investments & Morgage Limited",
-    pretiumCode: "542542",
-  },
+  { code: "IMBLKENA", name: "I&M Bank", pretiumCode: "542542" },
   { code: "SIDNKENA", name: "Sidian Bank", pretiumCode: null },
   { code: "UNAFKENA", name: "United Bank for Africa", pretiumCode: "559900" },
   {

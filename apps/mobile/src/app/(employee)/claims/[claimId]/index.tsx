@@ -9,6 +9,7 @@ import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
 import { Text } from "~/components/text";
+import { CashOutReceiptRows } from "~/features/cash-out/cash-out-receipt";
 import {
   AdminClaimActions,
   ApprovalDetails,
@@ -137,6 +138,7 @@ function ClaimDetails({
       ) : (
         <PaymentNote claim={claim} />
       )}
+      <CashOutReceiptRows receipts={claim.paymentReceipts} copyable />
 
       <View className="gap-4">
         {showSubmitter ? (

@@ -12,6 +12,11 @@ import type {
 } from "@expendi-business/shared";
 
 import type * as DetailSheetModule from "~/components/data/detail-sheet";
+import {
+  pageText,
+  RECEIPT_SAMPLES,
+  showsReceipt,
+} from "~/components/data/payment-receipts.samples";
 import { DashboardProvider } from "~/contexts/dashboard-context";
 import { payrollKeys } from "~/features/payment-keys";
 import {
@@ -144,6 +149,7 @@ function payment(
     note: null,
     leftOut: null,
     paidOn: null,
+    paymentReceipts: [],
     ...overrides,
   };
 }
@@ -594,5 +600,48 @@ describe("payroll display", () => {
       ownNumber: "M-Pesa number",
       personnel: "M-Pesa number ending 4417",
     });
+  });
+});
+
+describe("a paid run's receipts, per person paid", () => {
+  function paidRun(
+    receipts: (typeof RECEIPT_SAMPLES)[number]["receipts"],
+  ): PayrollRunDetail {
+    return {
+      ...PAID,
+      payments: PAID.payments.map((entry) =>
+        entry.payee.id === jane.id
+          ? { ...entry, paymentReceipts: [...receipts] }
+          : entry,
+      ),
+    };
+  }
+
+  it.each(RECEIPT_SAMPLES)(
+    "shows $name under the person it paid",
+    (receipt) => {
+      // #given
+      const detail = paidRun(receipt.receipts);
+
+      // #when
+      const sheet = pageText(
+        sheetOf(render({ url: `runId=${detail.id}`, runs: [detail] })),
+      );
+
+      // #then
+      expect(sheet).toContain(
+        `Jane Wanjiku Salary Changed for this run: Overtime in November KES 46,123.45 Paid ${receipt.reads}`,
+      );
+    },
+  );
+
+  it("shows no receipt for a person not paid", () => {
+    // #when
+    const sheet = pageText(
+      sheetOf(render({ url: `runId=${PAID.id}`, runs: [paidRun([])] })),
+    );
+
+    // #then
+    expect(showsReceipt(sheet)).toBe(false);
   });
 });

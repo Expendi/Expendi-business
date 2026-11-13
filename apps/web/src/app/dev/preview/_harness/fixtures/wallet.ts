@@ -28,6 +28,7 @@ export const ACCOUNTS_WALLET: WalletResponse = {
   chain: "near",
   usdcBalance: "16420800000",
   kesEquivalent: { kesCents: "211828320", rate: KES_RATE },
+  cashOutLimits: { minKesCents: "2000", maxKesCents: "25000000" },
 };
 
 export const ALLOWED_ADDRESSES: WithdrawalAddress[] = [
@@ -139,6 +140,7 @@ function payout(
     approvalId: null,
     approvedAt: null,
     paidAt: null,
+    paymentReceipts: [],
     rate: KES_RATE,
     failureReason: null,
     ...fields,
