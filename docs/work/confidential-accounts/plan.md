@@ -1,6 +1,6 @@
 # Confidential accounts: keeping a company's balance off the public chain
 
-**Status:** decisions accepted 2026-11-13 (Dennis). Phase 1 is built and tested on branch `spike/confidential-intents`, not committed. Phases 2 to 4 are not started.
+**Status:** decisions accepted 2026-11-13 (Dennis). Phase 1 is built, tested and committed on branch `spike/confidential-intents`. Phases 2 to 4 are not started.
 
 **Applies to:** the code on `staging`. Every file path below is on that branch.
 
