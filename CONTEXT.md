@@ -11,8 +11,12 @@ The chain where every company's money sits at rest. It is NEAR.
 _Avoid_: Home chain, primary network, settlement chain
 
 **Company wallet**:
-The one account on the main chain that holds a single company's USDC. Never shared between companies. What it holds is what the company can spend now; Treasury is never part of it.
+The one account on the main chain that holds a single company's USDC. Never shared between companies. What it holds is what the company can spend now, unless the company has a confidential account: then that account holds it and the company wallet holds nothing at rest. Treasury is never part of it.
 _Avoid_: Main wallet, NEAR wallet
+
+**Confidential account**:
+A company's own account on the private ledger NEAR Intents runs, where its USDC sits instead of in the public company wallet. Off by default, turned on per company by Expendi staff. The company wallet signs for it.
+_Avoid_: Private wallet, shielded balance, private account
 
 **Transit wallet**:
 A company's own account on Base that holds nothing at rest. Money passes through it on the way to a cash-out, and refunds return to it.
@@ -27,6 +31,10 @@ _Avoid_: Paymaster, sponsor, fee wallet
 **Fund-in**:
 A company adding money to its company wallet by sending a supported asset from any supported chain.
 _Avoid_: Deposit, on-ramp, bridge in
+
+**Move-in**:
+Moving USDC that sits in a company wallet into the same company's confidential account.
+_Avoid_: Shield, deposit, top-up
 
 **Fund-in return**:
 Sending a fund-in that couldn't be completed from the company's own NEAR Intents account, where it was refunded, back to its company wallet as USDC on NEAR.
