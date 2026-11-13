@@ -123,7 +123,7 @@ describe("a paid cash-out's receipt", () => {
     const page = pageText(details(withReceipts(receipt.receipts)));
 
     // #then
-    expect(page).toContain(`Paid Yesterday, 11:12 ${receipt.reads}`);
+    expect(page).toContain(`Paid Yesterday, 11:12 AM ${receipt.reads}`);
   });
 
   it("shows no receipt row before it's paid", () => {
@@ -309,5 +309,45 @@ describe("a bill payment's category and receipt download", () => {
     expect(
       pages.map((text) => text.includes("hasn't gone through yet")),
     ).toEqual([true, false]);
+  });
+});
+
+describe("a payment's progress", () => {
+  function progress(status: "paid" | "failed"): string {
+    const paid = LEDGER.find(
+      (row) => row.type === "payout" && row.payout?.status === "paid",
+    );
+    if (!paid?.payout) throw new Error("No sample paid payment");
+    const item = { ...paid, payout: { ...paid.payout, status } };
+    const page = renderToStaticMarkup(
+      <TxDetails item={item} items={LEDGER} today="2026-11-06" rate="129" />,
+    );
+    return page.slice(
+      page.indexOf('<ol aria-label="Payment progress"'),
+      page.indexOf("</ol>"),
+    );
+  }
+
+  it("marks every step of a paid payment green", () => {
+    // #when
+    const steps = progress("paid");
+
+    // #then
+    expect({
+      green: steps.split("border-success-700 bg-success-700").length - 1,
+      red: steps.includes("error-700"),
+    }).toEqual({ green: 4, red: false });
+  });
+
+  it("marks the step that failed red and the ones before it green", () => {
+    // #when
+    const steps = progress("failed");
+
+    // #then
+    expect({
+      green: steps.split("border-success-700 bg-success-700").length - 1,
+      red: steps.includes("border-error-700 bg-error-50 text-error-700"),
+      label: steps.includes('text-error-700">Failed'),
+    }).toEqual({ green: 2, red: true, label: true });
   });
 });

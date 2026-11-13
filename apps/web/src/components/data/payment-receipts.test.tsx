@@ -63,6 +63,17 @@ describe("a payment's receipt rows", () => {
     }).toEqual({ row: true, buttons: ["Copy M-Pesa receipt UKDCW299LW"] });
   });
 
+  it("keeps the copy button no taller than the line of its code", () => {
+    // #when
+    const button = /<button[^>]*>/.exec(render([BANK]))?.[0] ?? "";
+
+    // #then
+    expect({
+      small: button.includes('data-size="xs"'),
+      inLine: /class="[^"]*-my-0\.5/.test(button),
+    }).toEqual({ small: true, inLine: true });
+  });
+
   it("calls a bank transfer's code its bank reference", () => {
     // #when
     const html = render([BANK]);

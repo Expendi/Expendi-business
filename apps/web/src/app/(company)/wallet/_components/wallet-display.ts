@@ -21,11 +21,11 @@ const NAIROBI_DAY = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
-const NAIROBI_TIME = new Intl.DateTimeFormat("en-GB", {
+const NAIROBI_TIME = new Intl.DateTimeFormat("en-US", {
   timeZone: "Africa/Nairobi",
-  hour: "2-digit",
+  hour: "numeric",
   minute: "2-digit",
-  hourCycle: "h23",
+  hour12: true,
 });
 
 const MONTHS = [
@@ -64,9 +64,15 @@ export function nairobiDay(at: Date | string): string {
   return `${parts.year ?? ""}-${parts.month ?? ""}-${parts.day ?? ""}`;
 }
 
-/** A moment's Nairobi time, e.g. "09:20". */
+/** A moment's Nairobi time, e.g. "9:20 AM". */
 export function nairobiTime(at: string): string {
-  return NAIROBI_TIME.format(new Date(at));
+  const parts = Object.fromEntries(
+    NAIROBI_TIME.formatToParts(new Date(at)).map((part) => [
+      part.type,
+      part.value,
+    ]),
+  );
+  return `${parts.hour ?? ""}:${parts.minute ?? ""} ${parts.dayPeriod ?? ""}`;
 }
 
 export function addDays(day: string, days: number): string {
@@ -89,13 +95,31 @@ export function dayHeading(day: string, today: string): string {
   return `${weekday} ${dayMonth(day)}`;
 }
 
-/** When a row happened, e.g. "Today, 09:20" or "5 Nov, 16:42". */
+/** "5 Nov", with the year once it isn't this one: "5 Nov 2025". */
+function dayInYear(day: string, today: string): string {
+  const year = day.slice(0, 4);
+  return year === today.slice(0, 4)
+    ? dayMonth(day)
+    : `${dayMonth(day)} ${year}`;
+}
+
+/** When a row happened, e.g. "Today, 9:20 AM" or "5 Nov, 4:42 PM". */
 export function happenedAt(at: string, today: string): string {
   const day = nairobiDay(at);
   const heading = dayHeading(day, today);
   const date =
-    heading === "Today" || heading === "Yesterday" ? heading : dayMonth(day);
+    heading === "Today" || heading === "Yesterday"
+      ? heading
+      : dayInYear(day, today);
   return `${date}, ${nairobiTime(at)}`;
+}
+
+/** A ledger row's time today, and its date too once the day has passed: "9:20 AM", "5 Nov, 4:42 PM". */
+export function movedAt(at: string, today: string): string {
+  const day = nairobiDay(at);
+  return day === today
+    ? nairobiTime(at)
+    : `${dayInYear(day, today)}, ${nairobiTime(at)}`;
 }
 
 /** "+6,000.00" for money in, "−1,441.86" for money out. */

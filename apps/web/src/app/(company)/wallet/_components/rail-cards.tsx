@@ -83,17 +83,22 @@ export function RailRow({
   title,
   detail,
   action,
+  tileClassName = "border-border bg-card text-muted-foreground",
 }: {
   icon?: LucideIcon;
   title: string;
-  detail: string;
+  detail: ReactNode;
   action?: ReactNode;
+  tileClassName?: string;
 }): JSX.Element {
   return (
     <li className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 border-t border-border py-3 first:border-t-0">
       <span
         aria-hidden="true"
-        className="inline-flex size-8 items-center justify-center rounded-control border border-border bg-card text-muted-foreground"
+        className={cn(
+          "inline-flex size-8 items-center justify-center rounded-control border",
+          tileClassName,
+        )}
       >
         <Icon className="size-4" />
       </span>
