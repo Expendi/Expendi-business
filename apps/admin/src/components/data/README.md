@@ -55,8 +55,8 @@ The full prop tables are in `apps/web/src/components/data/README.md`.
 
 `components/app-shell.tsx` is the template's frame (`(staff)/layout.tsx` and
 the preview use it): `ui/sidebar` (`app-sidebar`, `nav-main`, `nav-user`),
-the 48px `site-header` with page search (⌘K / Ctrl+K) and the account menu
-(`components/shell/`). Settings > Appearance
+the 48px `site-header` with page search (⌘K / Ctrl+K), the theme button and
+the account menu (`components/shell/`). Settings > Appearance
 (`(staff)/settings/_components/appearance-settings.tsx`) saves theme,
 colours, font, page width, header and sidebar style in cookies
 (`lib/preferences/`, store in `stores/preferences/`); the root layout reads
