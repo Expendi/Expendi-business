@@ -66,7 +66,7 @@ export async function createFundedCompany(
 
 const QUOTE_ROUTES: Readonly<
   Record<
-    Exclude<IntentQuotePurpose, "fund_in" | "invoice_payment">,
+    Exclude<IntentQuotePurpose, "fund_in" | "invoice_payment" | "move_in">,
     {
       readonly swapType: "EXACT_INPUT" | "EXACT_OUTPUT";
       readonly originAsset: string;
@@ -116,7 +116,10 @@ export async function saveQuote(
   runtime: AppRuntime,
   db: Database,
   funded: FundedCompany,
-  purpose: Exclude<IntentQuotePurpose, "fund_in" | "invoice_payment">,
+  purpose: Exclude<
+    IntentQuotePurpose,
+    "fund_in" | "invoice_payment" | "move_in"
+  >,
   options: {
     readonly amount?: bigint;
     readonly row?: Partial<NewIntentQuote>;

@@ -288,6 +288,7 @@ function readQuote(quote: ListedQuote): QuoteReading {
     case "base_hop":
     case "sweep":
     case "usdc_payout":
+    case "move_in":
       return { kind: "internal" };
   }
 }
@@ -665,6 +666,7 @@ const QUOTE_PURPOSE_NAMES: Readonly<Record<IntentQuotePurpose, string>> = {
   invoice_payment: "invoice payment",
   to_treasury: "move to Treasury",
   from_treasury: "move to wallet",
+  move_in: "move-in",
 };
 
 function holdExplained(reason: HoldReason): string {

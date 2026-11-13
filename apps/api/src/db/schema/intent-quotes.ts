@@ -38,6 +38,8 @@ import { wallets } from "./wallets.js";
  *   its move; a refund of it comes back to the company wallet.
  * - `from_treasury`: the Treasury wallet on Base to the company wallet.
  *   Linked to its move.
+ * - `move_in`: moving a company's USDC from its company wallet into its
+ *   confidential account. Internal, not a ledger entry.
  */
 export const INTENT_QUOTE_PURPOSES = [
   "base_hop",
@@ -48,6 +50,7 @@ export const INTENT_QUOTE_PURPOSES = [
   "invoice_payment",
   "to_treasury",
   "from_treasury",
+  "move_in",
 ] as const;
 export type IntentQuotePurpose = (typeof INTENT_QUOTE_PURPOSES)[number];
 
@@ -89,10 +92,25 @@ export type IntentQuoteSwapType = (typeof INTENT_QUOTE_SWAP_TYPES)[number];
 
 /**
  * Where 1Click takes a deposit or returns a refund: on the asset's own
- * chain, or to an account inside NEAR Intents.
+ * chain, to an account inside NEAR Intents, or to a confidential account
+ * (docs/decisions/confidential-accounts.md).
  */
-export const ONE_CLICK_ACCOUNT_TYPES = ["ORIGIN_CHAIN", "INTENTS"] as const;
+export const ONE_CLICK_ACCOUNT_TYPES = [
+  "ORIGIN_CHAIN",
+  "INTENTS",
+  "CONFIDENTIAL_INTENTS",
+] as const;
 export type OneClickAccountType = (typeof ONE_CLICK_ACCOUNT_TYPES)[number];
+
+/**
+ * Where 1Click delivers: on the destination asset's own chain, or into a
+ * confidential account.
+ */
+export const ONE_CLICK_RECIPIENT_TYPES = [
+  "DESTINATION_CHAIN",
+  "CONFIDENTIAL_INTENTS",
+] as const;
+export type OneClickRecipientType = (typeof ONE_CLICK_RECIPIENT_TYPES)[number];
 
 /** What 1Click's status endpoint reports for a deposit address. */
 export const ONE_CLICK_STATUSES = [
@@ -122,6 +140,10 @@ export const oneClickStatus = pgEnum("one_click_status", ONE_CLICK_STATUSES);
 export const oneClickAccountType = pgEnum(
   "one_click_account_type",
   ONE_CLICK_ACCOUNT_TYPES,
+);
+export const oneClickRecipientType = pgEnum(
+  "one_click_recipient_type",
+  ONE_CLICK_RECIPIENT_TYPES,
 );
 
 /**
@@ -180,6 +202,9 @@ export const intentQuotes = pgTable(
       .default("ORIGIN_CHAIN"),
     /** Who receives the destination asset, on the destination chain. */
     recipient: text("recipient").notNull(),
+    recipientType: oneClickRecipientType("recipient_type")
+      .notNull()
+      .default("DESTINATION_CHAIN"),
     /**
      * Where 1Click returns the origin asset: on the origin chain, or the
      * company's own account inside NEAR Intents when `refundType` is
@@ -240,6 +265,20 @@ export const intentQuotes = pgTable(
      * with the USDC contract.
      */
     depositRegistrationTxHash: text("deposit_registration_tx_hash"),
+    /**
+     * A confidential account's payment: the message the company wallet
+     * signed, exactly as it is submitted to 1Click, saved so a retry submits
+     * the same bytes. Null for a quote paid by an on-chain transfer.
+     */
+    signedIntent: jsonb("signed_intent").$type<unknown>(),
+    /** The hash 1Click returned for the signed intent. */
+    intentHash: text("intent_hash"),
+    /** The deadline inside the signed message. */
+    intentDeadline: timestamp("intent_deadline", { withTimezone: true }),
+    /** When 1Click was given the signed intent. */
+    intentSubmittedAt: timestamp("intent_submitted_at", {
+      withTimezone: true,
+    }),
     /** 1Click's last reported status, and when we last asked. */
     oneClickStatus: oneClickStatus("one_click_status"),
     oneClickCheckedAt: timestamp("one_click_checked_at", {
@@ -380,6 +419,14 @@ export const intentQuotes = pgTable(
     check(
       "intent_quotes_fee_cover_is_for_a_company_send",
       sql`(${table.feeCoverUsdc} IS NULL OR (${table.feeCoverUsdc} > 0 AND ${table.purpose} IN ('base_hop', 'usdc_payout'))) AND (${table.feeCoverTxHash} IS NULL OR ${table.feeCoverUsdc} IS NOT NULL)`,
+    ),
+    check(
+      "intent_quotes_signed_intent_has_deadline",
+      sql`(${table.signedIntent} IS NOT NULL) = (${table.intentDeadline} IS NOT NULL)`,
+    ),
+    check(
+      "intent_quotes_intent_submitted_is_signed",
+      sql`${table.signedIntent} IS NOT NULL OR (${table.intentHash} IS NULL AND ${table.intentSubmittedAt} IS NULL)`,
     ),
     // Nothing was deposited for a quote that expired unused.
     check(

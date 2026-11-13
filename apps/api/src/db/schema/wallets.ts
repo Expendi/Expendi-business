@@ -23,6 +23,17 @@ import { users } from "./users.js";
 
 export const walletChain = pgEnum("wallet_chain", WALLET_CHAINS);
 
+export const WALLET_BALANCE_HOMES = [
+  "company_wallet",
+  "confidential_account",
+] as const;
+export type WalletBalanceHome = (typeof WALLET_BALANCE_HOMES)[number];
+
+export const walletBalanceHome = pgEnum(
+  "wallet_balance_home",
+  WALLET_BALANCE_HOMES,
+);
+
 /**
  * `creating` until the company wallet and its transit wallet both exist and
  * the company wallet's account is usable on chain. Creation resumes from
@@ -54,6 +65,14 @@ export const wallets = pgTable(
       .notNull()
       .$default(() => MAIN_CHAIN),
     status: walletStatus("status").notNull().default("creating"),
+    /**
+     * Where the company's USDC sits at rest. `confidential_account` means
+     * its confidential account in NEAR Intents, and the company wallet holds
+     * nothing at rest (docs/decisions/confidential-accounts.md).
+     */
+    balanceHome: walletBalanceHome("balance_home")
+      .notNull()
+      .default("company_wallet"),
     /**
      * The most USDC one transaction may move, in base units. Privy enforces
      * it on the transit wallet through its policy; on the company wallet,

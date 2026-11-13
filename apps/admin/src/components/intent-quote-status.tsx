@@ -16,6 +16,7 @@ export const INTENT_QUOTE_PURPOSE_LABELS: Record<IntentQuotePurpose, string> = {
   invoice_payment: "Invoice payment",
   to_treasury: "Move to Treasury",
   from_treasury: "Move to wallet",
+  move_in: "Move into confidential account",
 };
 
 const TONES: Partial<Record<IntentQuoteStatus, StatusTone>> = {
