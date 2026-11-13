@@ -156,7 +156,7 @@ describe("a ledger row", () => {
     ]);
   });
 
-  it("gives every settled row a quiet badge", () => {
+  it("gives every settled row the green badge a paid bill has", () => {
     // #when
     const badges = [
       find("Deposit"),
@@ -170,10 +170,10 @@ describe("a ledger row", () => {
 
     // #then
     expect(badges).toEqual([
-      ["Received", "quiet"],
-      ["Received", "quiet"],
-      ["Paid", "quiet"],
-      ["Sent", "quiet"],
+      ["Received", "paid"],
+      ["Received", "paid"],
+      ["Paid", "paid"],
+      ["Sent", "paid"],
     ]);
   });
 
