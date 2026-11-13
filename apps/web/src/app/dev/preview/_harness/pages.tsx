@@ -14,6 +14,7 @@ import { ReportsView } from "~/app/(company)/reports/_components/reports-view";
 import { SettingsView } from "~/app/(company)/settings/_components/settings-view";
 import { TeamView } from "~/app/(company)/team/_components/team-view";
 import { WalletView } from "~/app/(company)/wallet/_components/wallet-view";
+import { TreasuryProgressPreview } from "./treasury-progress-preview";
 import { TreasuryShortPreview } from "./treasury-short";
 
 export interface PagePreview {
@@ -50,6 +51,37 @@ export const PAGE_PREVIEWS: Readonly<Record<string, PagePreview>> = {
   "treasury-off": { path: "/wallet", View: WalletView, treasury: "off" },
   "treasury-on": { path: "/wallet", View: WalletView, treasury: "on" },
   "treasury-move": { path: "/wallet", View: WalletView, treasury: "move" },
+  "treasury-move-way": {
+    path: "/wallet",
+    View: WalletView,
+    treasury: "move-way",
+  },
+  "treasury-move-arriving": {
+    path: "/wallet",
+    View: WalletView,
+    treasury: "move-arriving",
+  },
+  "treasury-move-split": {
+    path: "/wallet",
+    View: WalletView,
+    treasury: "move-split",
+  },
+  "treasury-move-review": {
+    path: "/wallet",
+    View: WalletView,
+    treasury: "move-review",
+  },
+  "treasury-move-out": {
+    path: "/wallet",
+    View: WalletView,
+    treasury: "move-out",
+  },
+  "treasury-move-back": {
+    path: "/wallet",
+    View: WalletView,
+    treasury: "move-back",
+  },
+  "treasury-progress": { path: "/wallet", View: TreasuryProgressPreview },
   "treasury-saved": { path: "/wallet", View: WalletView, treasury: "saved" },
   "treasury-short": {
     path: "/bills",

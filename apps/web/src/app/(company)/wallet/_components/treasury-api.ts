@@ -25,6 +25,7 @@ import type { ApprovalOutcome } from "~/lib/approval";
 import type { PasskeyAssertion } from "~/lib/passkeys";
 import { useApi } from "~/lib/use-api";
 import { usePasskeyApproval } from "~/lib/use-approval";
+import { pollIntervalFor } from "./treasury-display";
 import { walletKeys } from "./wallet-api";
 
 /**
@@ -61,15 +62,13 @@ const OPEN_MOVE_POLL_MS = 10_000;
 
 export function useTreasury(
   organizationId: string,
+  pollMs: number = OPEN_MOVE_POLL_MS,
 ): UseQueryResult<TreasuryStatus> {
   const api = useApi();
   return useQuery({
     queryKey: treasuryKeys.status(organizationId),
     queryFn: () => api.get(treasuryPath(organizationId), treasuryStatusSchema),
-    refetchInterval: (query) =>
-      query.state.data?.status === "on" && query.state.data.openMove
-        ? OPEN_MOVE_POLL_MS
-        : false,
+    refetchInterval: (query) => pollIntervalFor(query.state.data, pollMs),
   });
 }
 

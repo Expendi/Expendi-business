@@ -1,12 +1,14 @@
 "use client";
 
 import type { JSX, ReactNode } from "react";
+import { cn } from "cn";
 import {
   ArrowDownLeftIcon,
   ArrowUpRightIcon,
+  ChevronDownIcon,
   LandmarkIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import type {
   TreasuryMoveDirection,
@@ -30,6 +32,7 @@ import {
   MOVE_HISTORY_TITLES,
   MOVE_STATUS_BADGES,
 } from "./treasury-display";
+import { MoveProgress } from "./treasury-progress";
 import { MoveSheet, RATE_WARNING, TurnOnSheet } from "./treasury-sheets";
 import { splitUsdc } from "./wallet-display";
 
@@ -318,9 +321,13 @@ function TreasuryOn({
           tone={open.status === "needs_review" ? "warn" : "neutral"}
           title={open.statusText}
         >
-          <p className="tabular-nums">
-            {openMoveText(open)}. You can start another move when this one ends.
-          </p>
+          <p className="tabular-nums">{openMoveText(open)}.</p>
+          {open.progress ? (
+            <div className="my-2">
+              <MoveProgress progress={open.progress} compact />
+            </div>
+          ) : null}
+          <p>You can start another move when this one ends.</p>
         </Callout>
       ) : null}
       {canAct ? (
@@ -433,7 +440,15 @@ function moveDetail(move: TreasuryMoveSummary): string {
   return parts.join(" · ");
 }
 
-function MoveRow({ move }: { move: TreasuryMoveSummary }): JSX.Element {
+export function MoveRow({
+  move,
+  defaultExpanded = false,
+}: {
+  move: TreasuryMoveSummary;
+  defaultExpanded?: boolean;
+}): JSX.Element {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const stepsId = useId();
   const badge = MOVE_STATUS_BADGES[move.status];
   const Icon =
     move.direction === "to_treasury" ? ArrowUpRightIcon : ArrowDownLeftIcon;
@@ -443,35 +458,58 @@ function MoveRow({ move }: { move: TreasuryMoveSummary }): JSX.Element {
     shown !== move.requestedUsdc &&
     BigInt(shown) < BigInt(move.requestedUsdc);
   return (
-    <li className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 border-t border-border py-3 first:border-t-0">
-      <span
-        aria-hidden="true"
-        className="inline-flex size-8 items-center justify-center rounded-control border border-border bg-card text-muted-foreground"
-      >
-        <Icon className="size-4" />
-      </span>
-      <div className="min-w-0">
-        <p className="flex flex-wrap items-center gap-2 text-sm leading-5 font-(--w-name) text-foreground">
-          {MOVE_HISTORY_TITLES[move.direction]}
-          {badge ? (
-            <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
-          ) : null}
-        </p>
-        <p className="truncate text-xs leading-4 text-muted-foreground tabular-nums">
-          {moveDetail(move)}
-        </p>
-        {short ? (
-          <p className="text-xs leading-4 text-muted-foreground tabular-nums">
-            {formatUsdc(shown)} of {formatUsdc(move.requestedUsdc)} USDC arrived
-          </p>
-        ) : null}
-      </div>
-      <p className="whitespace-nowrap tabular-nums">
-        {formatUsdc(shown)}{" "}
-        <span className="text-[0.72em] font-(--w-ui) tracking-[0.04em] text-muted-foreground">
-          USDC
+    <li className="border-t border-border py-3 first:border-t-0">
+      <div className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="inline-flex size-8 items-center justify-center rounded-control border border-border bg-card text-muted-foreground"
+        >
+          <Icon className="size-4" />
         </span>
-      </p>
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-center gap-2 text-sm leading-5 font-(--w-name) text-foreground">
+            {MOVE_HISTORY_TITLES[move.direction]}
+            {badge ? (
+              <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+            ) : null}
+          </p>
+          <p className="truncate text-xs leading-4 text-muted-foreground tabular-nums">
+            {moveDetail(move)}
+          </p>
+          {short ? (
+            <p className="text-xs leading-4 text-muted-foreground tabular-nums">
+              {formatUsdc(shown)} of {formatUsdc(move.requestedUsdc)} USDC
+              arrived
+            </p>
+          ) : null}
+          {move.progress ? (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={stepsId}
+              onClick={() => setExpanded(!expanded)}
+              className="mt-0.5 inline-flex items-center gap-1 rounded-[4px] text-xs leading-4 font-(--w-ui) text-accent-foreground hover:underline"
+            >
+              {expanded ? "Hide steps" : "Show steps"}
+              <ChevronDownIcon
+                aria-hidden="true"
+                className={cn("size-3", expanded && "rotate-180")}
+              />
+            </button>
+          ) : null}
+        </div>
+        <p className="whitespace-nowrap tabular-nums">
+          {formatUsdc(shown)}{" "}
+          <span className="text-[0.72em] font-(--w-ui) tracking-[0.04em] text-muted-foreground">
+            USDC
+          </span>
+        </p>
+      </div>
+      {move.progress && expanded ? (
+        <div id={stepsId} className="mt-2 pl-11">
+          <MoveProgress progress={move.progress} showTimes />
+        </div>
+      ) : null}
     </li>
   );
 }

@@ -2,7 +2,12 @@ import type {
   TreasuryMoveDirection,
   TreasuryMoveRequest,
   TreasuryMoveStatus,
+  TreasuryMoveSummary,
   TreasuryOffer,
+  TreasuryOpenMove,
+  TreasuryProgress,
+  TreasuryProgressStep,
+  TreasuryStatus,
 } from "@expendi-business/shared";
 import { MIN_TREASURY_MOVE_USDC } from "@expendi-business/shared";
 
@@ -103,3 +108,129 @@ export const MOVE_STATUS_BADGES: Record<
   failed: { label: "Failed", tone: "failed" },
   needs_review: { label: "Being checked", tone: "waiting" },
 };
+
+export const PROGRESS_STEP_LABELS: Record<TreasuryProgressStep["key"], string> =
+  {
+    leaving_wallet: "Leaving your wallet",
+    on_its_way: "On its way",
+    arriving: "Arriving in Treasury",
+    in_treasury: "In Treasury",
+    leaving_treasury: "Leaving Treasury",
+    in_wallet: "Back in your wallet",
+  };
+
+/** Read out after a step's name, since the mark beside it is only a picture. */
+export const PROGRESS_STATE_WORDS: Record<
+  TreasuryProgressStep["state"],
+  string
+> = {
+  done: "done",
+  current: "in progress",
+  waiting: "waiting",
+  failed: "stopped here",
+};
+
+/** A move still open is asked about this often while someone is watching it. */
+export const WATCHED_MOVE_POLL_MS = 4_000;
+
+/** How often `GET /treasury` is asked again: while a move is open, and never after it ends. */
+export function pollIntervalFor(
+  status: TreasuryStatus | undefined,
+  pollMs: number,
+): number | false {
+  return status?.status === "on" && status.openMove ? pollMs : false;
+}
+
+/**
+ * Whether a move being watched is over. Only an answer read since the watch
+ * began counts: one cached from before the move started also has no open
+ * move, and says nothing about this one.
+ */
+export function moveHasEnded(
+  status: TreasuryStatus | undefined,
+  readAt: number,
+  watchedSince: number,
+  moveId: string,
+): boolean {
+  if (status === undefined || readAt < watchedSince) return false;
+  return status.status !== "on" || status.openMove?.id !== moveId;
+}
+
+export interface MoveOutcome {
+  readonly tone: "success" | "warn" | "error";
+  readonly title: string;
+  readonly text: string;
+  readonly progress: TreasuryProgress | null;
+}
+
+const arrivedText = (move: TreasuryMoveSummary): string => {
+  if (move.direction === "to_treasury") {
+    return `${formatUsdc(move.movedUsdc ?? move.requestedUsdc)} USDC is in Treasury.`;
+  }
+  const shown = move.deliveredUsdc ?? move.movedUsdc ?? move.requestedUsdc;
+  return `${formatUsdc(shown)} USDC is back in your wallet and can be spent.`;
+};
+
+/** What the sheet says once the move is over, from where it stopped. */
+export function endedOutcome(move: TreasuryMoveSummary): MoveOutcome {
+  const progress = move.progress ?? null;
+  switch (move.status) {
+    case "completed":
+      return {
+        tone: "success",
+        title: "Move complete",
+        text: arrivedText(move),
+        progress,
+      };
+    case "returned":
+      return {
+        tone: "warn",
+        title: "Move returned",
+        text: "The move didn't go through. The USDC came back to your wallet.",
+        progress,
+      };
+    case "needs_review":
+      return {
+        tone: "warn",
+        title: "Being checked",
+        text: "Being checked by Expendi.",
+        progress,
+      };
+    case "failed":
+    case "open":
+      return {
+        tone: "error",
+        title: "Move didn't go through",
+        text: "Nothing moved.",
+        progress,
+      };
+  }
+}
+
+/** What the sheet says while the move runs: on its way, or being checked. */
+export function runningOutcome(
+  started: TreasuryMoveSummary,
+  open: TreasuryOpenMove | null,
+): MoveOutcome {
+  const progress = open?.progress ?? null;
+  if (open?.status === "needs_review") {
+    return {
+      tone: "warn",
+      title: "Being checked",
+      text: open.statusText,
+      progress,
+    };
+  }
+  const amount = started.isAll
+    ? "All of Treasury"
+    : `${formatUsdc(started.requestedUsdc)} USDC`;
+  return {
+    tone: "success",
+    title: "Move started",
+    text:
+      started.direction === "to_treasury"
+        ? `${amount} is on its way to Treasury.`
+        : `${amount} is on its way to your wallet. It can be spent once it arrives.`,
+    progress,
+  };
+}

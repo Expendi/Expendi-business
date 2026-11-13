@@ -182,6 +182,14 @@ describe("the Treasury account's figures", () => {
       status: "open",
       statusText: "On its way to Treasury",
       startedAt: move.createdAt.toISOString(),
+      progress: {
+        steps: [
+          { key: "leaving_wallet", state: "current", at: null },
+          { key: "on_its_way", state: "waiting", at: null },
+          { key: "arriving", state: "waiting", at: null },
+          { key: "in_treasury", state: "waiting", at: null },
+        ],
+      },
     });
   });
 

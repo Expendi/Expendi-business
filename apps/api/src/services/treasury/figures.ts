@@ -25,6 +25,7 @@ import { query, withScope } from "../../db/scope.js";
 import { activeKesRateOrNull } from "../cash-out/active-rate.js";
 import { kesCentsFor } from "../paycrest/amounts.js";
 import { PrivyWallets } from "../wallet/privy-wallets.js";
+import { progressOfMoves } from "./progress.js";
 import { earnVaultId } from "./turn-on.js";
 
 /**
@@ -132,8 +133,16 @@ export function openMoveOf(
       )
       .limit(1),
   ).pipe(
-    Effect.map(([move]) => {
-      if (!move) return null;
+    Effect.flatMap(([move]) =>
+      move
+        ? progressOfMoves(tx, [move]).pipe(
+            Effect.map((progress) => [move, progress.get(move.id)] as const),
+          )
+        : Effect.succeed(null),
+    ),
+    Effect.map((found) => {
+      if (!found) return null;
+      const [move, progress] = found;
       const status = move.status === "needs_review" ? "needs_review" : "open";
       return {
         id: move.id,
@@ -143,6 +152,7 @@ export function openMoveOf(
         status,
         statusText: STATUS_TEXT[status][move.direction],
         startedAt: move.createdAt.toISOString(),
+        progress,
       };
     }),
   );

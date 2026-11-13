@@ -51,6 +51,7 @@ import {
 import { isPaused } from "../payout/guards.js";
 import { availableUsdc } from "../wallet/ledger.js";
 import { PrivyWallets } from "../wallet/privy-wallets.js";
+import { progressOfMoves } from "./progress.js";
 import { earnVaultId } from "./turn-on.js";
 
 /**
@@ -487,29 +488,35 @@ export function listTreasuryMoves(
   limit = 100,
 ): Effect.Effect<TreasuryMoveList, DatabaseError, DatabaseService> {
   return withScope(tenant, (tx) =>
-    query(() =>
-      tx
-        .select({
-          move: treasuryMoves,
-          deliveredUsdc: treasuryEarnActions.deliveredUsdc,
-        })
-        .from(treasuryMoves)
-        .leftJoin(
-          treasuryEarnActions,
-          and(
-            eq(treasuryEarnActions.treasuryMoveId, treasuryMoves.id),
-            eq(treasuryEarnActions.kind, "withdraw"),
-          ),
-        )
-        .where(eq(treasuryMoves.organizationId, tenant.organizationId))
-        .orderBy(desc(treasuryMoves.createdAt), desc(treasuryMoves.id))
-        .limit(limit),
-    ),
-  ).pipe(
-    Effect.map((rows) => ({
-      moves: rows.map(({ move, deliveredUsdc }) =>
-        toMoveSummary(move, deliveredUsdc),
-      ),
-    })),
+    Effect.gen(function* () {
+      const rows = yield* query(() =>
+        tx
+          .select({
+            move: treasuryMoves,
+            deliveredUsdc: treasuryEarnActions.deliveredUsdc,
+          })
+          .from(treasuryMoves)
+          .leftJoin(
+            treasuryEarnActions,
+            and(
+              eq(treasuryEarnActions.treasuryMoveId, treasuryMoves.id),
+              eq(treasuryEarnActions.kind, "withdraw"),
+            ),
+          )
+          .where(eq(treasuryMoves.organizationId, tenant.organizationId))
+          .orderBy(desc(treasuryMoves.createdAt), desc(treasuryMoves.id))
+          .limit(limit),
+      );
+      const progress = yield* progressOfMoves(
+        tx,
+        rows.map(({ move }) => move),
+      );
+      return {
+        moves: rows.map(({ move, deliveredUsdc }) => ({
+          ...toMoveSummary(move, deliveredUsdc),
+          progress: progress.get(move.id),
+        })),
+      };
+    }),
   );
 }
