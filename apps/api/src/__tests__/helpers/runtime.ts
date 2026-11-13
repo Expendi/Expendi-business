@@ -1,6 +1,10 @@
 import { ConfigProvider, Effect, Layer } from "effect";
 
-import type { ExternalLayers } from "../../layers/main.js";
+import type {
+  AppDeps,
+  AppLayerError,
+  ExternalLayers,
+} from "../../layers/main.js";
 import type { AppRuntime } from "../../runtime.js";
 import { makeAppLayer } from "../../layers/main.js";
 import { makeRuntime } from "../../runtime.js";
@@ -107,6 +111,14 @@ export function makeTestRuntime(
   overrides: Partial<ExternalLayers> = {},
   env: Readonly<Record<string, string | undefined>> = {},
 ): AppRuntime {
+  return makeRuntime(makeTestLayer(overrides, env));
+}
+
+/** What `makeTestRuntime` runs on, for a test that lays its own layer over it. */
+export function makeTestLayer(
+  overrides: Partial<ExternalLayers> = {},
+  env: Readonly<Record<string, string | undefined>> = {},
+): Layer.Layer<AppDeps, AppLayerError> {
   const layer = makeAppLayer({
     privyAuth: FakePrivyAuth,
     privyWallets: makeFakePrivyWallets().layer,
@@ -135,13 +147,9 @@ export function makeTestRuntime(
       Layer.succeed(PretiumReceiptPolling, { retries: 0, interval: 0 }),
     ),
   );
-  return makeRuntime(
-    Object.keys(env).length === 0
-      ? layer
-      : layer.pipe(
-          Layer.provide(Layer.setConfigProvider(environmentWith(env))),
-        ),
-  );
+  return Object.keys(env).length === 0
+    ? layer
+    : layer.pipe(Layer.provide(Layer.setConfigProvider(environmentWith(env))));
 }
 
 export function bearer(privyUserId: string): { authorization: string } {
