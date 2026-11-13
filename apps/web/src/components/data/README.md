@@ -172,8 +172,8 @@ pure scale helpers are in `~/lib/chart-scale` (`compact`, `niceScale`,
 
 `components/app-shell.tsx` is the template's frame (`(company)/layout.tsx`
 and the preview use it): `ui/sidebar` (`app-sidebar`, `nav-main`,
-`nav-user`), the 48px `site-header` with page search (⌘K / Ctrl+K) and the
-account menu (`components/shell/`). Settings > Appearance
+`nav-user`), the 48px `site-header` with page search (⌘K / Ctrl+K), the
+theme button and the account menu (`components/shell/`). Settings > Appearance
 (`settings/_components/appearance-settings.tsx`) saves theme, colours, font,
 page width, header and sidebar style in cookies (`lib/preferences/`, store
 in `stores/preferences/`); the root layout reads them so the server renders
