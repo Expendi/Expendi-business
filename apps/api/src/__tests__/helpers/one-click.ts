@@ -224,6 +224,11 @@ export function makeFakeOneClick() {
       submitted.push({ depositAddress, txHash });
       return Effect.void;
     },
+
+    authenticate: () => Effect.dieMessage("authenticate is not faked"),
+    balances: () => Effect.dieMessage("balances is not faked"),
+    generateIntent: () => Effect.dieMessage("generateIntent is not faked"),
+    submitIntent: () => Effect.dieMessage("submitIntent is not faked"),
   };
 
   return { layer: Layer.succeed(OneClick, service), state };
