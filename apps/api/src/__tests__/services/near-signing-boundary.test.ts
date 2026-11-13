@@ -19,10 +19,13 @@ function modulesAskingForANearSigner(): string[] {
 }
 
 describe("signing for NEAR wallets", () => {
-  it("is asked for only by the capped company wallet send and the gas relayer", () => {
+  it("is asked for only by the capped company wallet send, the capped intent signer and the gas relayer", () => {
     // Privy checks nothing a NEAR wallet signs, so the API's cap holds only
-    // while every company wallet signature goes through the one function
-    // that checks it (docs/decisions/near-main-chain.md, "The spend cap").
+    // while every company wallet signature goes through a function that
+    // checks it: the one that builds a send
+    // (docs/decisions/near-main-chain.md, "The spend cap") or the one that
+    // signs an intent for a confidential account
+    // (docs/decisions/confidential-accounts.md, "Signing").
 
     // #when
     const modules = modulesAskingForANearSigner();
@@ -30,6 +33,7 @@ describe("signing for NEAR wallets", () => {
     // #then
     expect(modules).toEqual([
       "services/chain/near-relayer.ts",
+      "services/intents/confidential-account.ts",
       "services/wallet/company-wallet-send.ts",
     ]);
   });
