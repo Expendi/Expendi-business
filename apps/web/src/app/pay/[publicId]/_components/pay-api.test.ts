@@ -15,6 +15,15 @@ function respond(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status });
 }
 
+/** The API's envelope, as `runEffect` writes it for every route. */
+function succeed(status: number, data: unknown): Response {
+  return respond(status, { success: true, data });
+}
+
+function refuse(status: number, tag: string, message: string): Response {
+  return respond(status, { success: false, error: { _tag: tag, message } });
+}
+
 describe("the public pay API client", () => {
   const fetchMock = vi.fn<typeof fetch>();
 
@@ -30,7 +39,7 @@ describe("the public pay API client", () => {
   });
 
   it("calls the API root with no credentials and parses a quote", async () => {
-    fetchMock.mockResolvedValue(respond(200, QUOTE));
+    fetchMock.mockResolvedValue(succeed(200, QUOTE));
 
     const result = await fetchQuote("pub/id", QUOTE.id);
 
@@ -49,7 +58,7 @@ describe("the public pay API client", () => {
   });
 
   it("posts the chosen chain as JSON", async () => {
-    fetchMock.mockResolvedValue(respond(201, QUOTE));
+    fetchMock.mockResolvedValue(succeed(201, QUOTE));
 
     await createQuote("abc", "solana");
 
@@ -63,7 +72,7 @@ describe("the public pay API client", () => {
 
   it("returns the API's message for a refused quote", async () => {
     fetchMock.mockResolvedValue(
-      respond(503, { message: "Payments are unavailable right now." }),
+      refuse(503, "ServiceUnavailable", "Payments are unavailable right now."),
     );
 
     expect(await createQuote("abc", "base")).toEqual({
@@ -74,11 +83,12 @@ describe("the public pay API client", () => {
   });
 
   it("reports a 404 for an unknown link", async () => {
-    fetchMock.mockResolvedValue(respond(404, { message: "Not found" }));
+    fetchMock.mockResolvedValue(refuse(404, "NotFound", "Invoice not found."));
 
-    expect(await fetchInvoice("nope")).toMatchObject({
+    expect(await fetchInvoice("nope")).toEqual({
       ok: false,
       status: 404,
+      message: "Invoice not found.",
     });
   });
 
@@ -91,8 +101,14 @@ describe("the public pay API client", () => {
     });
   });
 
+  it("rejects a quote sent without the API's envelope", async () => {
+    fetchMock.mockResolvedValue(respond(200, QUOTE));
+
+    expect(await fetchQuote("abc", QUOTE.id)).toMatchObject({ ok: false });
+  });
+
   it("rejects a response that doesn't match the contract", async () => {
-    fetchMock.mockResolvedValue(respond(200, { number: "INV-1" }));
+    fetchMock.mockResolvedValue(succeed(200, { number: "INV-1" }));
 
     expect(await fetchInvoice("abc")).toMatchObject({ ok: false });
   });

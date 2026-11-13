@@ -3,6 +3,7 @@ import { Cause, Effect } from "effect";
 
 import { FUND_IN_CHAIN_NAMES } from "@expendi-business/shared";
 
+import type { ConfigService } from "../../config.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { AuditActor, AuditLog } from "../audit/audit-log.js";
@@ -14,10 +15,14 @@ import { invoiceReceiptEmail } from "../email/invoice-receipt-email.js";
 import { nairobiToday } from "../expenses/rules.js";
 import { chainOfAsset } from "../intents/fund-in.js";
 import { notify } from "../notification/notify.js";
+import { payUrlFor } from "./invoices.js";
 import { recordInvoicePayment } from "./payment-record.js";
 
 /** What the receipt needs, gathered inside the transaction that records the payment. */
-export type InvoiceReceipt = InvoiceReceiptEmailInput;
+export type InvoiceReceipt = Omit<InvoiceReceiptEmailInput, "pdfUrl"> & {
+  /** The invoice's pay link ID, which the receipt's PDF link is built from. */
+  readonly publicId: string | null;
+};
 
 export interface LinkPayment {
   readonly paymentId: string;
@@ -72,6 +77,7 @@ export function recordLinkPayment(
       tx
         .select({
           number: invoices.number,
+          publicId: invoices.publicId,
           status: invoices.status,
           billTo: invoices.billTo,
           fromParty: invoices.fromParty,
@@ -130,6 +136,7 @@ export function recordLinkPayment(
               chainName: FUND_IN_CHAIN_NAMES[chain],
               paidOn,
               paymentId: recorded.paymentId,
+              publicId: before.publicId,
             },
     };
   });
@@ -142,10 +149,18 @@ export function recordLinkPayment(
  */
 export function sendInvoiceReceipt(
   receipt: InvoiceReceipt,
-): Effect.Effect<void, never, EmailSender> {
+): Effect.Effect<void, never, EmailSender | ConfigService> {
   return Effect.gen(function* () {
     const email = yield* EmailSender;
-    yield* email.send(invoiceReceiptEmail(receipt));
+    const { publicId, ...rest } = receipt;
+    const pdfUrl =
+      publicId === null
+        ? null
+        : yield* payUrlFor(publicId).pipe(
+            Effect.map((payUrl) => `${payUrl}/pdf`),
+            Effect.orElseSucceed(() => null),
+          );
+    yield* email.send(invoiceReceiptEmail({ ...rest, pdfUrl }));
   }).pipe(
     Effect.catchAllCause((cause) =>
       Effect.sync(() =>

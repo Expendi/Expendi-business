@@ -60,7 +60,7 @@ export function CustomerSheet({
           organizationId={organizationId}
           customer={null}
           footerSlot={footerSlot}
-          onSaved={(created) => onOpen(created.id)}
+          onSaved={onClose}
           onCancel={onClose}
         />
       </DetailSheet>

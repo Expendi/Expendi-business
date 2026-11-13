@@ -40,6 +40,8 @@ const INVOICE: PublicInvoice = {
   canPay: true,
 };
 
+const PUBLIC_ID = "TRa-kYDu4L9O1QLCvqcm38Y2Q1ev19Cfgq1YGCWDXfk";
+
 const QUOTE: PublicPayQuote = {
   id: "7f0c6f3e-5c1b-4a52-9d57-0a0e6f6f3a11",
   chain: "base",
@@ -65,6 +67,7 @@ function render(
 ): string {
   return renderToStaticMarkup(
     <PayContent
+      publicId={PUBLIC_ID}
       load={overrides.load ?? { kind: "ready", invoice: INVOICE }}
       pay={overrides.pay ?? { kind: "idle" }}
       paidOnPage={overrides.paidOnPage ?? false}
@@ -135,6 +138,23 @@ describe("the invoice pay page", () => {
       overdue: content.includes("Overdue"),
       tax: content.includes("VAT"),
     }).toEqual({ overdue: true, tax: false });
+  });
+
+  it("links the invoice's PDF for open, paid and void invoices, and not for a bad link", () => {
+    // #when
+    const links = (["open", "paid", "void"] as const).map((status) =>
+      render({ load: withInvoice({ status }) }).includes(
+        `href="/pay/${PUBLIC_ID}/pdf"`,
+      ),
+    );
+    const notFound = render({ load: { kind: "not_found" } });
+
+    // #then
+    expect({
+      links,
+      label: text(render()).includes("Download PDF"),
+      notFound: notFound.includes("/pdf"),
+    }).toEqual({ links: [true, true, true], label: true, notFound: false });
   });
 
   it("hides the pay panel and buttons from print", () => {

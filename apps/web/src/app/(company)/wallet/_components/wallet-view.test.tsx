@@ -159,6 +159,26 @@ describe("Accounts", () => {
     });
   });
 
+  it("shows money in green in the history and leaves money out plain", () => {
+    // #when
+    const html = render();
+    const green = (figure: string) =>
+      new RegExp(`text-success-700[^>]*>${figure}`).test(html);
+
+    // #then
+    expect({
+      deposit: green("\\+6,000\\.00"),
+      refund: green("\\+31\\.78"),
+      payment: green("−1,441\\.86"),
+      monthIn: green("\\+6,031\\.78"),
+    }).toEqual({
+      deposit: true,
+      refund: true,
+      payment: false,
+      monthIn: false,
+    });
+  });
+
   it("shows where to deposit, the allowlist and the paid-from accounts", () => {
     // #when
     const html = render({ role: "accountant" });
