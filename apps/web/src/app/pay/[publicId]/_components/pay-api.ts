@@ -27,7 +27,11 @@ function apiBase(): string | undefined {
   return url ? url.replace(/\/+$/, "") : undefined;
 }
 
-const errorBodySchema = z.object({ message: z.string() });
+/** Every API route answers in `runEffect`'s envelope, these included. */
+const errorBodySchema = z.object({
+  success: z.literal(false),
+  error: z.object({ message: z.string() }),
+});
 
 async function request<T>(
   path: string,
@@ -57,15 +61,17 @@ async function request<T>(
     return {
       ok: false,
       status: response.status,
-      message: error.success ? error.data.message : UNEXPECTED_RESPONSE,
+      message: error.success ? error.data.error.message : UNEXPECTED_RESPONSE,
     };
   }
 
-  const parsed = schema.safeParse(body);
+  const parsed = z
+    .object({ success: z.literal(true), data: schema })
+    .safeParse(body);
   if (!parsed.success) {
     return { ok: false, status: response.status, message: UNEXPECTED_RESPONSE };
   }
-  return { ok: true, data: parsed.data };
+  return { ok: true, data: parsed.data.data };
 }
 
 const segment = encodeURIComponent;
