@@ -539,6 +539,21 @@ Position and rate on `GET /treasury`, the snapshot job, the four alert checks, t
 
 **Depends on:** T1. **Files:** `services/treasury/`, `station/`, `services/alerts/alert-checks.ts`, `services/payments/payment-approval.ts`. **Scope:** M.
 
+**How T5 works** (2026-11-13):
+
+- **Yield** is the live `assets_in_vault`, less every succeeded Earn deposit, plus every succeeded withdrawal (what it delivered). It counts the vault's own calls, not ledger entries, because 1Click's costs and refunds happen outside the vault and aren't yield. It shows no figure while an Earn call is still in flight.
+- **When Privy can't be reached,** `GET /treasury` answers with the latest daily snapshot and `saved: true`. Its `asOf` is when the snapshot was read, at most a day old. With no snapshot yet, the figures are empty rather than an error.
+- **Alert 3** (Privy's record against Expendi's) compares Privy's `total_deposited` and `total_withdrawn`, never `assets_in_vault`. It only compares when the company has no open move and nothing settled in the last 5 minutes, to wait out Privy's lag.
+- **"Wallet is short":** the refusal stays a 409 with the same message for companies without Treasury. With money in Treasury it adds `details.treasuryOffer: { action: "move_to_wallet", shortfallUsdc, inTreasuryUsdc, suggestedUsdc }`.
+- The holdings check reads Privy and Base once per Treasury company every minute.
+
+**What T5 left for T6 and T7:**
+
+- `GET /treasury` gives `valueUsdc`, `yieldUsdc`, `rateBps`, `kesEquivalent`, `openMove` (with a plain `statusText`), `asOf` and `saved`. The move list gives `isAll` and `deliveredUsdc`.
+- Clients act on `treasuryOffer` to show "Move to wallet".
+- The four alert kinds are labelled in the staff app, linking to the company page.
+- Still no staff route for `returnStrandedDeposit`.
+
 ### T6: Mobile and web
 
 The Accounts page listing the company wallet and Treasury, the Treasury account's detail, turning on, both move flows, history lines. The sidebar item keeps its name. Design comes first as mocks in the design system's tokens, then the build.

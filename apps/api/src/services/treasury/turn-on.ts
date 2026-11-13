@@ -96,20 +96,18 @@ const requireReadyWallet = (wallet: Wallet | null) =>
     ? Effect.succeed(wallet)
     : Effect.fail(walletNotReady);
 
-export function getTreasuryStatus(
-  tenant: Tenant,
-): Effect.Effect<TreasuryStatus, DatabaseError, DatabaseService> {
-  return Effect.gen(function* () {
-    const vault = yield* earnVaultId;
-    if (Option.isNone(vault)) return { status: "unavailable" };
-    const wallet = yield* withScope(tenant, (tx) =>
-      readWallet(tx, tenant.organizationId),
-    );
-    return wallet?.treasuryTurnedOnAt && wallet.treasuryAddress
-      ? { status: "on", address: wallet.treasuryAddress }
-      : { status: "off" };
-  });
-}
+/** The figures of a Treasury that was just turned on: nothing has been read yet. */
+const justTurnedOn = (address: string): TreasuryStatus => ({
+  status: "on",
+  address,
+  valueUsdc: null,
+  yieldUsdc: null,
+  rateBps: null,
+  kesEquivalent: null,
+  openMove: null,
+  asOf: null,
+  saved: false,
+});
 
 const saved = <A>(value: A | null, what: string): Effect.Effect<A> =>
   value === null
@@ -378,10 +376,7 @@ export function confirmTurnOnTreasury(
     });
     return yield* Effect.map(
       saved(wallet.treasuryAddress, "address"),
-      (address) => ({
-        status: "on" as const,
-        address,
-      }),
+      justTurnedOn,
     );
   });
 }

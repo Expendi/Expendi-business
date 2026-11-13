@@ -234,6 +234,20 @@ export function makeFakePrivyWallets() {
   const earnByKey = new Map<string, string>();
   const earnOutcomes: EarnOutcome[] = [];
   const vaultAssets = new Map<string, bigint>();
+  /** What Privy's `total_deposited` and `total_withdrawn` say, from Earn calls that succeeded. */
+  const vaultTotals = new Map<
+    string,
+    { deposited: bigint; withdrawn: bigint }
+  >();
+  const totalsOf = (privyWalletId: string) => {
+    const totals = vaultTotals.get(privyWalletId) ?? {
+      deposited: 0n,
+      withdrawn: 0n,
+    };
+    vaultTotals.set(privyWalletId, totals);
+    return totals;
+  };
+  let vaultApyBps: number | null = 519;
   let onEarnDeposit: ((input: EarnCallInput) => void) | null = null;
   /** What the vault pays out for the next withdrawals that succeed; each without one pays in full. */
   const withdrawalFills: bigint[] = [];
@@ -386,11 +400,13 @@ export function makeFakePrivyWallets() {
           action.privyWalletId,
           (vaultAssets.get(action.privyWalletId) ?? 0n) + action.rawAmount,
         );
+        totalsOf(action.privyWalletId).deposited += action.rawAmount;
       }
       if (status === "succeeded" && action.kind === "withdraw" && txHash) {
         const held = vaultAssets.get(action.privyWalletId) ?? 0n;
         const delivered = withdrawalFills.shift() ?? action.rawAmount;
         vaultAssets.set(action.privyWalletId, held - delivered);
+        totalsOf(action.privyWalletId).withdrawn += delivered;
         onWithdrawn?.({
           privyWalletId: action.privyWalletId,
           rawAmount: action.rawAmount,
@@ -410,6 +426,17 @@ export function makeFakePrivyWallets() {
     /** Sets what a wallet's vault position is worth, as yield or a deposit made elsewhere would. */
     setVaultAssets(privyWalletId: string, amount: bigint) {
       vaultAssets.set(privyWalletId, amount);
+    },
+    /** The yearly rate the vault reports after Expendi's share, in basis points. */
+    setVaultApy(bps: number | null) {
+      vaultApyBps = bps;
+    },
+    /** Sets what Privy reports as ever deposited and withdrawn, as a call made outside Expendi would. */
+    setVaultTotals(
+      privyWalletId: string,
+      totals: { readonly deposited: bigint; readonly withdrawn: bigint },
+    ) {
+      vaultTotals.set(privyWalletId, { ...totals });
     },
     /** Forgets queued Earn outcomes and the calls made so far. */
     resetEarn() {
@@ -472,6 +499,8 @@ export function makeFakePrivyWallets() {
       earnByKey.clear();
       earnOutcomes.length = 0;
       vaultAssets.clear();
+      vaultTotals.clear();
+      vaultApyBps = 519;
       withdrawalFills.length = 0;
       onEarnDeposit = null;
       onWithdrawn = null;
@@ -671,8 +700,8 @@ export function makeFakePrivyWallets() {
           return {
             assetsInVault: assets,
             sharesInVault: assets,
-            totalDeposited: assets,
-            totalWithdrawn: 0n,
+            totalDeposited: totalsOf(input.privyWalletId).deposited,
+            totalWithdrawn: totalsOf(input.privyWalletId).withdrawn,
           };
         }),
       ),
@@ -680,7 +709,7 @@ export function makeFakePrivyWallets() {
       maybeFail("vaultDetails").pipe(
         Effect.map(() => ({
           name: "Fake Aave USDC",
-          userApyBps: 519,
+          userApyBps: vaultApyBps,
           availableLiquidityUsd: 15_500_000,
         })),
       ),

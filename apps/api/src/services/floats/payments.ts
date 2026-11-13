@@ -16,6 +16,7 @@ import type { AuditActor } from "../audit/audit-log.js";
 import type { PayoutRejected } from "../payout/payout-errors.js";
 import type { PayoutEngineDeps } from "../payout/payout-service.js";
 import type { PrepareError } from "../payout/prepare.js";
+import type { PrivyWallets } from "../wallet/privy-wallets.js";
 import type { FloatMovementView, FloatSummaryView } from "./views.js";
 import { violatedUniqueConstraint } from "../../db/error.js";
 import {
@@ -39,6 +40,7 @@ import {
   retryPayout,
 } from "../payout/payout-service.js";
 import { requireConfirmedPayoutPhone } from "../phone-verification/payout-phone.js";
+import { withTreasuryOffer } from "../treasury/short-wallet.js";
 import { availableUsdc } from "../wallet/ledger.js";
 import {
   floatNotFound,
@@ -787,24 +789,35 @@ function floatPayoutOfChallenge(
   );
 }
 
-/** "Top up KES X" (spec §6.7 step 4), at the payout's quoted rate. */
+/**
+ * "Top up KES X" (spec §6.7 step 4), at the payout's quoted rate, with the
+ * Treasury offer when the company has money there (`details.treasuryOffer`).
+ */
 function walletTooShort(
   error: PayoutRejected,
   payout: Payout,
-): Effect.Effect<never, PayoutRejected | Conflict> {
+): Effect.Effect<
+  never,
+  PayoutRejected | Conflict,
+  DatabaseService | PrivyWallets
+> {
   if (error.reason !== "insufficient_balance" || !error.shortfallUsdc) {
     return Effect.fail(error);
   }
   const topUpKes = topUpKesFor(error.shortfallUsdc, payout.quotedRate);
-  return Effect.fail(
-    new Conflict({
-      message: `The wallet is too short to pay this. Top up ${formatKesAmount(topUpKes)}, then approve again. Nothing was sent.`,
-      details: {
-        shortfallUsdc: error.shortfallUsdc.toString(),
-        topUpKes: topUpKes.toString(),
-      },
-    }),
-  );
+  const plain = new Conflict({
+    message: `The wallet is too short to pay this. Top up ${formatKesAmount(topUpKes)}, then approve again. Nothing was sent.`,
+    details: {
+      shortfallUsdc: error.shortfallUsdc.toString(),
+      topUpKes: topUpKes.toString(),
+    },
+  });
+  return withTreasuryOffer(
+    payout.organizationId,
+    error.shortfallUsdc,
+    plain,
+    "approve again",
+  ).pipe(Effect.flatMap((refusal) => Effect.fail(refusal)));
 }
 
 export interface FloatPaymentResultView {

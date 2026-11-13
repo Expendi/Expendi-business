@@ -15,6 +15,7 @@ import type { AppRuntime } from "../runtime.js";
 import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
 import { requireAdminOrReader } from "../middleware/tenant.js";
+import { getTreasuryStatus } from "../services/treasury/figures.js";
 import {
   listTreasuryMoves,
   previewTreasuryMove,
@@ -24,7 +25,6 @@ import {
 } from "../services/treasury/moves.js";
 import {
   confirmTurnOnTreasury,
-  getTreasuryStatus,
   startTurnOnTreasuryConfirmation,
 } from "../services/treasury/turn-on.js";
 

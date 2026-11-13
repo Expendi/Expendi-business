@@ -2,9 +2,11 @@ import { Cause, Effect, Exit } from "effect";
 
 import type { DatabaseService } from "../../db/client.js";
 import type { DatabaseError } from "../../errors.js";
+import type { BaseRpc } from "../chain/base-rpc.js";
 import type { EmailSender } from "../email/email-sender.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
 import type { Pretium } from "../pretium/pretium-client.js";
+import type { PrivyWallets } from "../wallet/privy-wallets.js";
 import type { CheckResult } from "./ops-alerts.js";
 import {
   lowBalanceCheck,
@@ -14,6 +16,11 @@ import {
   zohoCheck,
 } from "./alert-checks.js";
 import { applyCheck, notifyOpenAlerts } from "./ops-alerts.js";
+import {
+  treasuryHoldingChecks,
+  treasuryMoveStuckCheck,
+  treasuryPartialFillCheck,
+} from "./treasury-alert-checks.js";
 
 export interface AlertsRun {
   readonly opened: number;
@@ -25,11 +32,9 @@ export interface AlertsRun {
   readonly failedChecks: number;
 }
 
-type Check = Effect.Effect<
-  readonly CheckResult[],
-  DatabaseError,
-  DatabaseService | Paycrest | Pretium
->;
+type CheckDeps = DatabaseService | Paycrest | Pretium | PrivyWallets | BaseRpc;
+
+type Check = Effect.Effect<readonly CheckResult[], DatabaseError, CheckDeps>;
 
 const CHECKS: Readonly<Record<string, Check>> = {
   payouts: payoutChecks(),
@@ -39,6 +44,13 @@ const CHECKS: Readonly<Record<string, Check>> = {
     Effect.map(lowBalanceCheck(), (result) => [result]),
   ),
   zoho: Effect.map(zohoCheck(), (result) => [result]),
+  "treasury moves": Effect.suspend(() =>
+    Effect.map(treasuryMoveStuckCheck(), (result) => [result]),
+  ),
+  "treasury partial fills": Effect.suspend(() =>
+    Effect.map(treasuryPartialFillCheck(), (result) => [result]),
+  ),
+  "treasury holdings": Effect.suspend(() => treasuryHoldingChecks()),
 };
 
 /**
@@ -49,7 +61,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
 export function runAlerts(): Effect.Effect<
   AlertsRun,
   DatabaseError,
-  DatabaseService | Paycrest | Pretium | EmailSender
+  CheckDeps | EmailSender
 > {
   return Effect.gen(function* () {
     let opened = 0;

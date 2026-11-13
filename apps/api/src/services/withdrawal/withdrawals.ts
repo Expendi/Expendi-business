@@ -26,6 +26,7 @@ import {
   preparePayouts,
   requestPayoutApproval,
 } from "../payout/payout-service.js";
+import { withTreasuryOfferOnRejection } from "../treasury/short-wallet.js";
 import { availableUsdc } from "../wallet/ledger.js";
 
 /**
@@ -147,13 +148,23 @@ export function requestWithdrawal(input: {
         }
         const available = yield* availableUsdc(tx, wallet.id);
         if (amountUsdc > available) {
-          return yield* reject(
-            "insufficient_balance",
-            `The wallet has ${fromMicro(available > 0n ? available : 0n)} USDC available to withdraw.`,
+          return yield* Effect.fail(
+            new PayoutRejected({
+              reason: "insufficient_balance",
+              message: `The wallet has ${fromMicro(available > 0n ? available : 0n)} USDC available to withdraw.`,
+              shortfallUsdc: amountUsdc - (available > 0n ? available : 0n),
+            }),
           );
         }
         return listed;
       }),
+    ).pipe(
+      Effect.catchTag("PayoutRejected", (rejection) =>
+        Effect.flatMap(
+          withTreasuryOfferOnRejection(organizationId, rejection, "try again"),
+          Effect.fail,
+        ),
+      ),
     );
 
     const [payout] = yield* preparePayouts({
@@ -251,7 +262,18 @@ export function confirmWithdrawal(input: {
 > {
   return Effect.gen(function* () {
     const withdrawal = yield* withdrawalOfChallenge(input);
-    yield* approveAndPay(input);
+    yield* approveAndPay(input).pipe(
+      Effect.catchTag("PayoutRejected", (rejection) =>
+        Effect.flatMap(
+          withTreasuryOfferOnRejection(
+            input.organizationId,
+            rejection,
+            "try again",
+          ),
+          Effect.fail,
+        ),
+      ),
+    );
     const [current] = yield* withScope(
       { organizationId: input.organizationId },
       (tx) =>

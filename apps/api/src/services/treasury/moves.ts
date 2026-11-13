@@ -25,7 +25,11 @@ import type {
 } from "../approval/passkeys.js";
 import type { OneClick } from "../intents/one-click.js";
 import { violatedUniqueConstraint } from "../../db/error.js";
-import { treasuryMoves, wallets } from "../../db/schema/index.js";
+import {
+  treasuryEarnActions,
+  treasuryMoves,
+  wallets,
+} from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import {
   BadRequest,
@@ -454,15 +458,23 @@ export function startTreasuryMove(
 
 const iso = (date: Date): string => date.toISOString();
 
-/** A move as the API shows it. */
-export function toMoveSummary(move: TreasuryMove): TreasuryMoveSummary {
+/**
+ * A move as the API shows it. `deliveredUsdc` is what a move to the wallet's
+ * withdrawal brought out of the vault, once read.
+ */
+export function toMoveSummary(
+  move: TreasuryMove,
+  deliveredUsdc: bigint | null = null,
+): TreasuryMoveSummary {
   return {
     id: move.id,
     direction: move.direction,
     status: move.status,
     requestedUsdc: move.requestedUsdc.toString(),
+    isAll: move.isAll,
     movedUsdc: move.movedUsdc?.toString() ?? null,
     costUsdc: move.costUsdc?.toString() ?? null,
+    deliveredUsdc: deliveredUsdc?.toString() ?? null,
     failure: move.failure,
     createdAt: iso(move.createdAt),
     settledAt: move.settledAt ? iso(move.settledAt) : null,
@@ -477,11 +489,27 @@ export function listTreasuryMoves(
   return withScope(tenant, (tx) =>
     query(() =>
       tx
-        .select()
+        .select({
+          move: treasuryMoves,
+          deliveredUsdc: treasuryEarnActions.deliveredUsdc,
+        })
         .from(treasuryMoves)
+        .leftJoin(
+          treasuryEarnActions,
+          and(
+            eq(treasuryEarnActions.treasuryMoveId, treasuryMoves.id),
+            eq(treasuryEarnActions.kind, "withdraw"),
+          ),
+        )
         .where(eq(treasuryMoves.organizationId, tenant.organizationId))
         .orderBy(desc(treasuryMoves.createdAt), desc(treasuryMoves.id))
         .limit(limit),
     ),
-  ).pipe(Effect.map((rows) => ({ moves: rows.map(toMoveSummary) })));
+  ).pipe(
+    Effect.map((rows) => ({
+      moves: rows.map(({ move, deliveredUsdc }) =>
+        toMoveSummary(move, deliveredUsdc),
+      ),
+    })),
+  );
 }

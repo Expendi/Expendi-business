@@ -6,15 +6,59 @@ import {
   treasuryMoveStatusSchema,
 } from "./treasury-move.js";
 
+/** USDC amounts are 6-decimal base units, serialised as positive integer strings. */
+const usdcUnits = z.string().regex(/^[1-9]\d{0,18}$/);
+const usdcUnitsOrZero = z.string().regex(/^\d{1,19}$/);
+const usdcSigned = z.string().regex(/^-?\d{1,19}$/);
+
+/** The move that holds the company's one slot, as the Treasury account shows it. */
+export const treasuryOpenMoveSchema = z.object({
+  id: z.uuid(),
+  direction: treasuryMoveDirectionSchema,
+  /** What was asked; for "all", what Treasury held when it was asked. */
+  amountUsdc: usdcUnits,
+  isAll: z.boolean(),
+  status: z.enum(["open", "needs_review"]),
+  /** "On its way to Treasury", "On its way to your wallet" or "Being checked by Expendi". */
+  statusText: z.string(),
+  startedAt: z.iso.datetime(),
+});
+
+export type TreasuryOpenMove = z.infer<typeof treasuryOpenMoveSchema>;
+
 /**
  * `GET /organizations/:id/treasury`. `unavailable` while no Earn vault is
- * configured: clients hide Treasury entirely then. Figures (value, yield,
- * rate) come with the move flow.
+ * configured: clients hide Treasury entirely then.
+ *
+ * When `on`, the figures are what Privy says now. If Privy can't be reached
+ * they are the last saved ones and `saved` is true; `asOf` says when they
+ * were read. With nothing saved yet, `valueUsdc`, `yieldUsdc`, `rateBps` and
+ * `asOf` are null.
  */
 export const treasuryStatusSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("unavailable") }),
   z.object({ status: z.literal("off") }),
-  z.object({ status: z.literal("on"), address: z.string() }),
+  z.object({
+    status: z.literal("on"),
+    address: z.string(),
+    /** What Treasury is worth, yield included. */
+    valueUsdc: usdcUnitsOrZero.nullable(),
+    /**
+     * Value, less what was moved in, plus what was moved out. Null while a
+     * Privy call is in flight (the vault and Expendi's records disagree
+     * for a moment) and when there is no value.
+     */
+    yieldUsdc: usdcSigned.nullable(),
+    /** The vault's yearly rate after Expendi's share, in basis points. */
+    rateBps: z.number().int().nonnegative().nullable(),
+    /** The value in KES at the cash-out rate, as the wallet balance shows it; null without a rate. */
+    kesEquivalent: z
+      .object({ kesCents: z.string().regex(/^\d+$/), rate: z.string() })
+      .nullable(),
+    openMove: treasuryOpenMoveSchema.nullable(),
+    asOf: z.iso.datetime().nullable(),
+    saved: z.boolean(),
+  }),
 ]);
 
 export type TreasuryStatus = z.infer<typeof treasuryStatusSchema>;
@@ -29,11 +73,6 @@ export const turnOnTreasuryRequestSchema = z.object({
 });
 
 export type TurnOnTreasuryRequest = z.input<typeof turnOnTreasuryRequestSchema>;
-
-/** USDC amounts are 6-decimal base units, serialised as positive integer strings. */
-const usdcUnits = z.string().regex(/^[1-9]\d{0,18}$/);
-const usdcUnitsOrZero = z.string().regex(/^\d{1,19}$/);
-const usdcSigned = z.string().regex(/^-?\d{1,19}$/);
 
 /**
  * The least a move may carry, in USDC base units. A move to the wallet may
@@ -92,10 +131,17 @@ export const treasuryMoveSchema = z.object({
   direction: treasuryMoveDirectionSchema,
   status: treasuryMoveStatusSchema,
   requestedUsdc: usdcUnits,
+  /** A move to the wallet of everything Treasury held. */
+  isAll: z.boolean(),
   /** What reached the vault, or the wallet; null until the move settles. */
   movedUsdc: usdcUnitsOrZero.nullable(),
   /** What the move cost; null until it settles. */
   costUsdc: usdcSigned.nullable(),
+  /**
+   * A move to the wallet only: what the withdrawal brought out of the vault,
+   * which can be less than was asked. Null until it is read.
+   */
+  deliveredUsdc: usdcUnitsOrZero.nullable(),
   failure: z.string().nullable(),
   createdAt: z.iso.datetime(),
   settledAt: z.iso.datetime().nullable(),
@@ -108,3 +154,18 @@ export const treasuryMoveListSchema = z.object({
 });
 
 export type TreasuryMoveList = z.infer<typeof treasuryMoveListSchema>;
+
+/**
+ * `details.treasuryOffer` of a refusal for a short wallet when the company
+ * has money in Treasury. Moves nothing: a client that offers "Move to
+ * wallet" starts the move itself, with the admin's passkey.
+ */
+export const treasuryOfferSchema = z.object({
+  action: z.literal("move_to_wallet"),
+  shortfallUsdc: usdcUnits,
+  inTreasuryUsdc: usdcUnits,
+  /** A move amount that covers the shortfall, within the 10 USDC least and what Treasury holds. */
+  suggestedUsdc: usdcUnits,
+});
+
+export type TreasuryOffer = z.infer<typeof treasuryOfferSchema>;

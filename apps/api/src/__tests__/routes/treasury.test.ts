@@ -4,7 +4,10 @@ import { Effect } from "effect";
 import pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { approvalChallengeSchema } from "@expendi-business/shared";
+import {
+  approvalChallengeSchema,
+  treasuryStatusSchema,
+} from "@expendi-business/shared";
 
 import type { App } from "../../app.js";
 import type { Database } from "../../db/client.js";
@@ -203,6 +206,75 @@ describe("GET /organizations/:organizationId/treasury", () => {
   });
 });
 
+describe("GET /organizations/:organizationId/treasury once Treasury is on", () => {
+  it("shows an empty account's figures, in the shared schema, to an admin and an accountant", async () => {
+    // #given
+    const setup = await setUp();
+    await turnOn(setup);
+    const accountant = await createUser(db);
+    await addMember(db, setup.company, accountant, { role: "accountant" });
+
+    // #when
+    const asAdmin = await statusOf(setup.company, setup.company.admin);
+    const asAccountant = await statusOf(setup.company, accountant);
+
+    // #then
+    const row = await walletRow(setup.company);
+    for (const seen of [asAdmin, asAccountant]) {
+      const parsed = treasuryStatusSchema.parse(seen);
+      expect(parsed).toEqual({
+        status: "on",
+        address: row.treasuryAddress,
+        valueUsdc: "0",
+        yieldUsdc: "0",
+        rateBps: 519,
+        kesEquivalent: { kesCents: "0", rate: "128.68" },
+        openMove: null,
+        asOf: expect.any(String) as string,
+        saved: false,
+      });
+    }
+  });
+
+  it("refuses an employee once it is on", async () => {
+    // #given
+    const setup = await setUp();
+    await turnOn(setup);
+    const employee = await createUser(db);
+    await addMember(db, setup.company, employee, { role: "employee" });
+
+    // #when
+    const response = await sendJson(app, treasuryPath(setup.company), employee);
+
+    // #then
+    expect(response.status).toBe(403);
+  });
+
+  it("answers with nothing to show, not an error, when Privy can't be reached", async () => {
+    // #given
+    const setup = await setUp();
+    await turnOn(setup);
+    privy.state.failNext("vaultPosition");
+    privy.state.failNext("vaultDetails");
+
+    // #when
+    const response = await sendJson(
+      app,
+      treasuryPath(setup.company),
+      setup.company.admin,
+    );
+
+    // #then
+    expect({
+      status: response.status,
+      data: await bodyOf(response),
+    }).toMatchObject({
+      status: 200,
+      data: { status: "on", valueUsdc: null, asOf: null, saved: true },
+    });
+  });
+});
+
 describe("turning Treasury on", () => {
   it("creates the wallet under the Treasury policy and shows its address", async () => {
     // #given
@@ -215,7 +287,17 @@ describe("turning Treasury on", () => {
     const row = await walletRow(setup.company);
     expect({ status: response.status, data: await bodyOf(response) }).toEqual({
       status: 200,
-      data: { status: "on", address: row.treasuryAddress },
+      data: {
+        status: "on",
+        address: row.treasuryAddress,
+        valueUsdc: null,
+        yieldUsdc: null,
+        rateBps: null,
+        kesEquivalent: null,
+        openMove: null,
+        asOf: null,
+        saved: false,
+      },
     });
     const [wallet] = treasuryWallets();
     expect(wallet).toMatchObject({
@@ -239,7 +321,7 @@ describe("turning Treasury on", () => {
     });
     expect(row.treasuryTurnedOnAt).toBeInstanceOf(Date);
     expect(row.treasuryTurnedOnBy).toBe(setup.company.admin.id);
-    expect(await statusOf(setup.company, setup.company.admin)).toEqual({
+    expect(await statusOf(setup.company, setup.company.admin)).toMatchObject({
       status: "on",
       address: row.treasuryAddress,
     });

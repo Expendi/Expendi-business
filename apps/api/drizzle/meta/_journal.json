@@ -659,6 +659,27 @@
       "when": 1794532331819,
       "tag": "0093_treasury_access",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1794532886713,
+      "tag": "0094_treasury_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1794532915081,
+      "tag": "0095_treasury_snapshots_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1794532923987,
+      "tag": "0096_treasury_snapshots_access",
+      "breakpoints": true
     }
   ]
 }

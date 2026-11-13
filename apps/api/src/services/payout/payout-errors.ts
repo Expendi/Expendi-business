@@ -29,4 +29,6 @@ export class PayoutRejected extends Data.TaggedError("PayoutRejected")<{
   readonly message: string;
   /** For `insufficient_balance`: how much more USDC the batch needs, in base units. */
   readonly shortfallUsdc?: bigint;
+  /** Extra fields a client can act on, passed through to the client error. */
+  readonly details?: Readonly<Record<string, unknown>>;
 }> {}

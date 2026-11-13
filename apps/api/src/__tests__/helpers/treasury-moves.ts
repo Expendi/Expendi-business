@@ -16,6 +16,7 @@ import {
   walletTransactions,
 } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
+import { advanceTreasuryMove } from "../../services/treasury/advance.js";
 import {
   startMoveConfirmation,
   startTreasuryMove,
@@ -355,4 +356,32 @@ export async function creditDeliveries(
         }),
     );
   }
+}
+
+/**
+ * Runs the `treasury-moves` job over one move until it leaves `open`, with
+ * 1Click delivering what the company wallet and the Treasury wallet send and
+ * the deposit watcher crediting what reaches the company wallet in between.
+ */
+export async function runMoveToEnd(
+  world: NearPayoutWorld,
+  db: Database,
+  company: TreasuryCompany,
+  moveId: string,
+): Promise<TreasuryMove> {
+  const delivered = new Set<string>();
+  const settled = new Set<string>();
+  const credited = new Set<string>();
+  const ref = { organizationId: company.tenant.organizationId, moveId };
+  for (let round = 0; round < 80; round += 1) {
+    await deliverSentParts(world, db, company, delivered);
+    await settleSentReturns(world, db, company, settled);
+    await creditDeliveries(world, db, company, credited);
+    await world.runtime.runPromise(
+      advanceTreasuryMove(ref, { retryDelayMs: 0 }),
+    );
+    const move = await readMove(db, company, moveId);
+    if (move.status !== "open") return move;
+  }
+  throw new Error(`move ${moveId} still open`);
 }
