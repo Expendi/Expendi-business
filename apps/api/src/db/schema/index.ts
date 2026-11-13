@@ -29,6 +29,7 @@ export * from "./recurring-items.js";
 export * from "./report-exports.js";
 export * from "./staff-confirmations.js";
 export * from "./staff-users.js";
+export * from "./treasury-earn-actions.js";
 export * from "./treasury-moves.js";
 export * from "./users.js";
 export * from "./wallet-transactions.js";

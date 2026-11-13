@@ -96,7 +96,12 @@ export type CompanyQuotePurpose = (typeof COMPANY_QUOTE_PURPOSES)[number];
  * its quote failed our checks, or the company has no wallet to pay it from.
  */
 export class QuoteNotOpened extends Data.TaggedError("QuoteNotOpened")<{
-  readonly reason: "no_wallet" | "one_click" | "untrusted" | "over_cap";
+  readonly reason:
+    | "no_wallet"
+    | "one_click"
+    | "one_click_unavailable"
+    | "untrusted"
+    | "over_cap";
   readonly message: string;
 }> {}
 
@@ -689,7 +694,12 @@ export function advanceCompanyQuote<R>(input: {
       }
 
       quote = yield* quoteById(quote.organizationId, quote.id);
-      if ((yield* coverFee(quote)) === "waiting") {
+      // A move to Treasury is paid for by the company, not Expendi: its
+      // `EXACT_INPUT` quote delivers what is left after 1Click's charge.
+      if (
+        quote.purpose !== "to_treasury" &&
+        (yield* coverFee(quote)) === "waiting"
+      ) {
         return yield* quoteById(quote.organizationId, quote.id);
       }
 

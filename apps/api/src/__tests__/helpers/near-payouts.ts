@@ -42,7 +42,9 @@ const USDC = 1_000_000n;
  * needs a hop delivered sets the transit wallet's balance and 1Click's
  * status itself.
  */
-export function makeNearPayoutWorld() {
+export function makeNearPayoutWorld(
+  env: Readonly<Record<string, string | undefined>> = {},
+) {
   const privy = makeFakePrivyWallets();
   const near = makeFakeNearRpc();
   const relayer = nearRelayerOnFakeChain(privy.state, near);
@@ -80,7 +82,7 @@ export function makeNearPayoutWorld() {
       baseRpc: base.layer,
       paycrest: paycrest.layer,
     },
-    { NEAR_RELAYER_ACCOUNT_ID: relayer.accountId },
+    { NEAR_RELAYER_ACCOUNT_ID: relayer.accountId, ...env },
   );
 
   const balanceKey = (address: string) =>

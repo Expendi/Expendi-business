@@ -291,7 +291,9 @@ export type ConfirmationPurpose =
   | "manage_cards"
   | "load_card_balance"
   | "reveal_card"
-  | "turn_on_treasury";
+  | "turn_on_treasury"
+  | "move_to_treasury"
+  | "move_to_wallet";
 
 export function startApproval(input: {
   readonly organizationId: string;

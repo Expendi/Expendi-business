@@ -26,6 +26,7 @@ import { reconcilePaycrestJob } from "./station/reconcile-paycrest.js";
 import { recurringBillsJob } from "./station/recurring-bills.js";
 import { spendingRemindersJob } from "./station/reminders.js";
 import { startStation } from "./station/scheduler.js";
+import { treasuryMovesJob } from "./station/treasury-moves.js";
 import { zohoSyncJob } from "./station/zoho-sync.js";
 
 const runtime = makeRuntime();
@@ -59,6 +60,7 @@ const stopStation = startStation(runtime, [
   fundInReturnsJob,
   outboundQuotesJob,
   sweepTransitWalletsJob,
+  treasuryMovesJob,
 ]);
 
 function shutdown(signal: NodeJS.Signals): void {

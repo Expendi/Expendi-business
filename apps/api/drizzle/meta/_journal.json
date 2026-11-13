@@ -645,6 +645,27 @@
       "when": 1794520709073,
       "tag": "0091_treasury_turn_on_purpose",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1794524092502,
+      "tag": "0092_treasury_move_purposes",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1794524121760,
+      "tag": "0093_treasury_earn_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1794524145857,
+      "tag": "0094_treasury_earn_actions_rls",
+      "breakpoints": true
     }
   ]
 }

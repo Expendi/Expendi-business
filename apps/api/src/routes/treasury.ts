@@ -5,6 +5,8 @@ import { z } from "zod";
 
 import {
   passkeyAssertionSchema,
+  startTreasuryMoveRequestSchema,
+  treasuryMoveRequestSchema,
   turnOnTreasuryRequestSchema,
 } from "@expendi-business/shared";
 
@@ -13,6 +15,13 @@ import type { AppRuntime } from "../runtime.js";
 import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
 import { requireAdminOrReader } from "../middleware/tenant.js";
+import {
+  listTreasuryMoves,
+  previewTreasuryMove,
+  startMoveConfirmation,
+  startTreasuryMove,
+  toMoveSummary,
+} from "../services/treasury/moves.js";
 import {
   confirmTurnOnTreasury,
   getTreasuryStatus,
@@ -27,10 +36,17 @@ const confirmSchema = turnOnTreasuryRequestSchema.extend({
   ),
 });
 
+const startMoveSchema = startTreasuryMoveRequestSchema.extend({
+  response: confirmSchema.shape.response,
+});
+
 /**
  * Mounted at `/organizations/:organizationId/treasury`. Admins and
  * accountants read; only an admin changes anything. Turning on takes two
  * steps: `POST /confirmations` asks for the passkey, `POST /` finishes it.
+ * Moves under `/moves` work the same way: `POST /moves/preview` prices one,
+ * `POST /moves/confirmations` asks for the passkey for that direction and
+ * amount, `POST /moves` starts it.
  */
 export function createTreasuryRoutes(
   runtime: AppRuntime,
@@ -56,5 +72,55 @@ export function createTreasuryRoutes(
           ),
         ),
       ),
+    )
+    .post("/moves/preview", (c) =>
+      runEffect(
+        runtime,
+        c,
+        readBody(c.req.raw, treasuryMoveRequestSchema).pipe(
+          Effect.flatMap(({ direction, amountUsdc }) =>
+            previewTreasuryMove(c.get("tenant"), {
+              direction,
+              amountUsdc: BigInt(amountUsdc),
+            }),
+          ),
+        ),
+      ),
+    )
+    .post("/moves/confirmations", (c) =>
+      runEffect(
+        runtime,
+        c,
+        readBody(c.req.raw, treasuryMoveRequestSchema).pipe(
+          Effect.flatMap(({ direction, amountUsdc }) =>
+            startMoveConfirmation(c.get("tenant"), {
+              direction,
+              amountUsdc: BigInt(amountUsdc),
+            }),
+          ),
+        ),
+        201,
+      ),
+    )
+    .post("/moves", (c) =>
+      runEffect(
+        runtime,
+        c,
+        readBody(c.req.raw, startMoveSchema).pipe(
+          Effect.flatMap(({ direction, amountUsdc, challengeId, response }) =>
+            startTreasuryMove(c.get("tenant"), {
+              direction,
+              amountUsdc: BigInt(amountUsdc),
+              challengeId,
+              response,
+            }),
+          ),
+          Effect.map(toMoveSummary),
+        ),
+        201,
+      ),
+    )
+    .get("/moves", (c) =>
+      runEffect(runtime, c, listTreasuryMoves(c.get("tenant"))),
     );
 }
