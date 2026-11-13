@@ -13,6 +13,7 @@ export * from "./claims.js";
 export * from "./company-spending.js";
 export * from "./etims-qr.js";
 export * from "./expenses.js";
+export * from "./explorer.js";
 export * from "./floats.js";
 export * from "./fund-in.js";
 export * from "./invoices.js";

@@ -4,7 +4,10 @@ import { Effect } from "effect";
 import PDFDocument from "pdfkit";
 
 import type { FundInChain, PublicInvoice } from "@expendi-business/shared";
-import { FUND_IN_CHAIN_NAMES } from "@expendi-business/shared";
+import {
+  FUND_IN_CHAIN_NAMES,
+  nearTransactionUrl,
+} from "@expendi-business/shared";
 
 import type { ConfigService } from "../../config.js";
 import type { DatabaseService } from "../../db/client.js";
@@ -432,17 +435,24 @@ export function renderInvoicePdf(
 
   if (invoice.status === "paid") {
     const { payment } = data;
-    const details: string[] = [];
+    const details: { text: string; link?: string }[] = [];
     if (payment !== null) {
-      details.push(`Paid on ${longDate(payment.paidOn)}`);
+      details.push({ text: `Paid on ${longDate(payment.paidOn)}` });
       if (payment.amountUsdc !== null) {
-        details.push(`Received ${formatUsdc(payment.amountUsdc)} USDC`);
+        details.push({
+          text: `Received ${formatUsdc(payment.amountUsdc)} USDC`,
+        });
       }
       if (payment.chain !== null) {
-        details.push(`Paid from ${FUND_IN_CHAIN_NAMES[payment.chain]}`);
+        details.push({
+          text: `Paid from ${FUND_IN_CHAIN_NAMES[payment.chain]}`,
+        });
       }
       if (payment.txHash !== null) {
-        details.push(`NEAR transaction ${payment.txHash}`);
+        details.push({
+          text: `NEAR transaction ${payment.txHash}`,
+          link: nearTransactionUrl(payment.txHash),
+        });
       }
     }
     y = ensureSpace(y, 30 + details.length * 16);
@@ -453,7 +463,8 @@ export function renderInvoicePdf(
     });
     y += 14;
     for (const detail of details) {
-      y = put(detail, PAGE_MARGIN, y, { color: INK }) + 4;
+      y =
+        put(detail.text, PAGE_MARGIN, y, { color: INK, link: detail.link }) + 4;
     }
   } else if (invoice.status === "open" && data.payUrl !== null) {
     y = ensureSpace(y, 50);

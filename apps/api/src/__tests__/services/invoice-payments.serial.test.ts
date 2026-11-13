@@ -412,6 +412,12 @@ describe("the deposit watcher and an invoice payment quote's delivery", () => {
       idempotencyKey: `invoice-payment-${payment?.id}-receipt`,
       mentions: true,
     });
+    const [deposit] = await ledgerOf(db, funded);
+    const transactionUrl = `https://nearblocks.io/txns/${deposit?.txHash ?? ""}`;
+    expect(receipt?.text).toContain(`Transaction: ${transactionUrl}`);
+    expect(receipt?.html).toContain(
+      `<a href="${transactionUrl}">View the transaction on NEAR</a>`,
+    );
     expect(receipt?.text).toContain(
       `Download receipt (PDF): ${DASHBOARD_ORIGIN}/pay/${invoice.publicId}/pdf`,
     );
