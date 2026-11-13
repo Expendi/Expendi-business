@@ -1,7 +1,17 @@
 "use client";
 
-import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  QueryClient,
+  UseMutationResult,
+  UseQueryResult,
+} from "@tanstack/react-query";
+import {
+  matchQuery,
+  queryOptions,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import type {
   ApprovalChallenge,
@@ -60,14 +70,71 @@ const treasuryPath = (organizationId: string) =>
 /** A move in flight is asked about again at this pace. */
 const OPEN_MOVE_POLL_MS = 10_000;
 
+const hasOpenMove = (status: TreasuryStatus | undefined): boolean =>
+  status?.status === "on" && status.openMove !== null;
+
+export function treasuryStatusQuery(api: ApiClient, organizationId: string) {
+  return queryOptions({
+    queryKey: treasuryKeys.status(organizationId),
+    queryFn: () => api.get(treasuryPath(organizationId), treasuryStatusSchema),
+    refetchInterval: (query) =>
+      hasOpenMove(query.state.data) ? OPEN_MOVE_POLL_MS : false,
+  });
+}
+
+/**
+ * The API moves the wallet's ledger partway through a move and Treasury's
+ * value at another point, so while a move is open the wallet is asked about
+ * with every Treasury answer, and once it ends everything is asked again
+ * once. Otherwise the page shows the same money in both accounts.
+ */
+export function followTreasuryMoves(
+  queryClient: QueryClient,
+  organizationId: string,
+): () => void {
+  const statusKey = treasuryKeys.status(organizationId);
+  let moveWasOpen = hasOpenMove(
+    queryClient.getQueryData<TreasuryStatus>(statusKey),
+  );
+  return queryClient.getQueryCache().subscribe((event) => {
+    const { query } = event;
+    if (
+      event.type !== "updated" ||
+      event.action.type !== "success" ||
+      !matchQuery({ queryKey: statusKey, exact: true }, query)
+    ) {
+      return;
+    }
+    const moveIsOpen = hasOpenMove(query.state.data as TreasuryStatus);
+    if (moveIsOpen) {
+      void queryClient.invalidateQueries({
+        queryKey: walletKeys.summary(organizationId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: walletKeys.history(organizationId),
+      });
+    } else if (moveWasOpen) {
+      void queryClient.invalidateQueries({
+        queryKey: walletKeys.all(organizationId),
+      });
+    }
+    moveWasOpen = moveIsOpen;
+  });
+}
+
 export function useTreasury(
   organizationId: string,
   pollMs: number = OPEN_MOVE_POLL_MS,
 ): UseQueryResult<TreasuryStatus> {
   const api = useApi();
+  const queryClient = useQueryClient();
+  useEffect(
+    () => followTreasuryMoves(queryClient, organizationId),
+    [queryClient, organizationId],
+  );
+  // The move sheet's stepper asks more often than the page does.
   return useQuery({
-    queryKey: treasuryKeys.status(organizationId),
-    queryFn: () => api.get(treasuryPath(organizationId), treasuryStatusSchema),
+    ...treasuryStatusQuery(api, organizationId),
     refetchInterval: (query) => pollIntervalFor(query.state.data, pollMs),
   });
 }
