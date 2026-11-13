@@ -1,6 +1,6 @@
 # Confidential accounts: keeping a company's balance off the public chain
 
-**Status:** decisions accepted 2026-11-13 (Dennis). Phase 1 is built, tested and committed on branch `spike/confidential-intents`. Phases 2 and 3 are built and tested against fakes on the same branch, not committed. Phase 4's receipts, exports, wallet history, withdrawals, app rendering, staff pages and docs are built on the same branch, not committed. The live QA (task 14) is not done: nothing has run on staging, and it waits on a release to staging. Designs and the decisions taken while building: `phase-2-design.md` and `phase-3-4-design.md`. The runbook is `docs/runbooks/confidential-accounts.md`; the live QA plan is `qa-plan.md`; the decision record is `docs/decisions/confidential-accounts.md`.
+**Status:** decisions accepted 2026-11-13 (Dennis). Phase 1 is built, tested and committed on branch `spike/confidential-intents`. Phases 2 and 3 are built and tested against fakes on the same branch, and committed. Phase 4's receipts, exports, wallet history, withdrawals, app rendering, staff pages and docs are built on the same branch, and committed. The live QA (task 14) is not done: nothing has run on staging, and it waits on a release to staging. Designs and the decisions taken while building: `phase-2-design.md` and `phase-3-4-design.md`. The runbook is `docs/runbooks/confidential-accounts.md`; the live QA plan is `qa-plan.md`; the decision record is `docs/decisions/confidential-accounts.md`.
 
 **Applies to:** the code on `staging`. Every file path below is on that branch.
 
@@ -71,20 +71,20 @@ These extend `near-main-chain.md`. They go into a decision record before any cod
 
 Phase 1 left two things for later phases. The check `intent_quotes_intents_side_matches_purpose` rejects a refund into a confidential account for a USDC payout, a Base hop and a move to Treasury, so phases 2 and 3 loosen it in their own migration. And `services/intents/confidential-account.ts` is now a third module allowed to ask Privy for a NEAR signer (`near-signing-boundary.test.ts`).
 
-### Phase 2: money in. Built 2026-11-13, tested against fakes, not committed (`phase-2-design.md`)
+### Phase 2: money in. Built 2026-11-13, tested against fakes (`phase-2-design.md`)
 
 5. **Move-in job.** Company wallet to confidential account through `openCompanyQuote` / `advanceCompanyQuote` with purpose `move_in`, in amounts under the spend cap. Runs when staff turn the feature on and whenever the company wallet holds USDC.
 6. **Fund-in and pay link** (`services/intents/fund-in.ts`, `services/invoices/pay-link.ts`): deliver to the confidential account, and credit the ledger when the quote settles rather than from the deposit watcher. The fund-in return (`services/intents/fund-in-return.ts`) delivers there too.
 7. **Reconcile and balance read.** Add the confidential account to the reconcile and to staff's view of a company. Alert when the ledger and 1Click disagree.
 
-### Phase 3: money out. Built 2026-11-13, tested against fakes, not committed (`phase-3-4-design.md`)
+### Phase 3: money out. Built 2026-11-13, tested against fakes (`phase-3-4-design.md`)
 
 8. **The deposit step** (`services/intents/quote-deposit.ts`): for a confidential company, `advanceCompanyQuote` generates, checks, signs, saves and submits a message instead of registering a deposit address and sending USDC. Fee cover has to reach the confidential account, not the company wallet: decide between a relayer move-in per hop and an Expendi float (open question 4).
 9. **USDC payouts** (`services/payout/onchain.ts`, `services/payout/delivery.ts`): every payee chain goes through a quote, including NEAR, which is a direct transfer today.
 10. **Base hop and sweep** (`services/payout/base-hop.ts`, `services/intents/sweep.ts`): hop out of the confidential account with `EXACT_OUTPUT`; sweep back into it. The sweep already leaves anything under 1 USDC in the transit wallet (`SWEEP_DUST_USDC`), well above 1Click's 0.15 USDC minimum, so nothing changed there.
 11. **Treasury** (`services/intents/treasury-quote.ts`): Move to Treasury starts from the confidential account; Move to wallet ends in it.
 
-### Phase 4: what people see. Tasks 12 and 13 built 2026-11-13, not committed; task 14 not done (`phase-3-4-design.md`, D1 to D3)
+### Phase 4: what people see. Tasks 12 and 13 built 2026-11-13; task 14 not done (`phase-3-4-design.md`, D1 to D3)
 
 12. **Receipts and exports.** Built 2026-11-13: the bill payment receipt, wallet history, withdrawals and the CSV export show the payee chain's transaction for a payment out of a confidential account, named by its chain, and no NEAR link; the invoice PDF shows the payer's own-chain transaction, unlinked; web, mobile and admin render a row with no transaction. Not built: the Base delivery hash in the Treasury export, and a transaction line in the mobile history list.
 13. **Docs.** Written 2026-11-13: `docs/decisions/confidential-accounts.md`, the term **Fee float** in `CONTEXT.md`, and the runbook `docs/runbooks/confidential-accounts.md` (turning on and off, the alert, a quote in review, the fee float, 1Click down).
