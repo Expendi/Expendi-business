@@ -194,7 +194,7 @@ export interface PayoutBadge {
   readonly tone: StatusTone;
 }
 
-/** The app's payout wording; paid needs no badge on a row. */
+/** The app's payout wording. */
 export const PAYOUT_STATUS: Record<PayoutStatus, PayoutBadge> = {
   awaiting_approval: { label: "Waiting for approval", tone: "waiting" },
   approved: { label: "Approved", tone: "moving" },
@@ -206,12 +206,21 @@ export const PAYOUT_STATUS: Record<PayoutStatus, PayoutBadge> = {
   needs_review: { label: "Being checked", tone: "waiting" },
 };
 
-/** The badge a row shows: payments and withdrawals still moving or failed. */
+/**
+ * The badge a row shows: tinted while a payment or withdrawal is moving or
+ * has failed, quiet once the money has settled.
+ */
 export function rowBadge(item: WalletHistoryItem): PayoutBadge | null {
-  if (item.type !== "payout" && item.type !== "withdrawal") return null;
+  if (item.type !== "payout" && item.type !== "withdrawal") {
+    return { label: "Received", tone: "quiet" };
+  }
   const status = item.payout?.status;
-  if (!status || status === "paid") return null;
-  return PAYOUT_STATUS[status];
+  if (!status) return null;
+  if (status !== "paid") return PAYOUT_STATUS[status];
+  return {
+    label: item.type === "withdrawal" ? "Sent" : "Paid",
+    tone: "quiet",
+  };
 }
 
 export type HistoryFilter = "all" | "in" | "out";

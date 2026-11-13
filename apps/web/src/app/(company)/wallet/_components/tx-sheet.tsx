@@ -78,7 +78,7 @@ export function TxSheet({
         item ? (
           <div className="mt-1 flex flex-col items-start gap-1">
             <p className="text-2xl leading-8 font-(--w-heading) tracking-[-0.02em]">
-              <SignedUsdc amount={item.usdcAmount} />
+              <SignedUsdc amount={item.usdcAmount} tint />
             </p>
             {isPayment && status ? (
               <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
