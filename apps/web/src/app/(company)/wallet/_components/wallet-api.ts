@@ -8,6 +8,7 @@ import type {
 } from "@tanstack/react-query";
 import {
   infiniteQueryOptions,
+  queryOptions,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -86,14 +87,18 @@ const walletPath = (organizationId: string) =>
 const addressesPath = (organizationId: string) =>
   `/organizations/${organizationId}/withdrawal-addresses` as const;
 
+export function companyWalletQuery(api: ApiClient, organizationId: string) {
+  return queryOptions({
+    queryKey: walletKeys.summary(organizationId),
+    queryFn: () => api.get(walletPath(organizationId), walletResponseSchema),
+  });
+}
+
 export function useCompanyWallet(
   organizationId: string,
 ): UseQueryResult<WalletResponse> {
   const api = useApi();
-  return useQuery({
-    queryKey: walletKeys.summary(organizationId),
-    queryFn: () => api.get(walletPath(organizationId), walletResponseSchema),
-  });
+  return useQuery(companyWalletQuery(api, organizationId));
 }
 
 /** Resumes a wallet whose setup stopped at sign-up; safe to repeat. */
