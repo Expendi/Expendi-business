@@ -5,6 +5,9 @@ import type {
   TreasuryMoveRequest,
   TreasuryMoveSummary,
   TreasuryOffer,
+  TreasuryOpenMove,
+  TreasuryProgress,
+  TreasuryProgressStep,
   TreasuryStatus,
   WalletHistoryItem,
   WalletHistoryResponse,
@@ -21,7 +24,74 @@ import { LEDGER } from "./wallet";
  * Accounts page can show. `/dev/preview/treasury-<scenario>` opens one.
  */
 export type TreasuryScenario =
-  "unavailable" | "off" | "on" | "move" | "saved" | "short";
+  | "unavailable"
+  | "off"
+  | "on"
+  | "move"
+  | "move-way"
+  | "move-arriving"
+  | "move-split"
+  | "move-review"
+  | "move-out"
+  | "move-back"
+  | "saved"
+  | "short";
+
+type StepKey = TreasuryProgressStep["key"];
+
+export const IN_STEPS: readonly StepKey[] = [
+  "leaving_wallet",
+  "on_its_way",
+  "arriving",
+  "in_treasury",
+];
+export const OUT_STEPS: readonly StepKey[] = [
+  "leaving_treasury",
+  "on_its_way",
+  "in_wallet",
+];
+
+const MINUTE_MS = 60_000;
+
+/**
+ * A move's steps with the one at `at` current (or failed, when the move
+ * stopped there): the ones before it are done, two minutes apart from `from`.
+ */
+export function progressAt(
+  keys: readonly StepKey[],
+  at: number,
+  options: {
+    readonly from?: string;
+    readonly stopped?: boolean;
+    readonly part?: number;
+    readonly parts?: number;
+    readonly finished?: boolean;
+  } = {},
+): TreasuryProgress {
+  const from = Date.parse(options.from ?? "2026-11-06T06:21:00.000Z");
+  const finished = options.finished ?? false;
+  return {
+    steps: keys.map((key, index) => {
+      const done = finished || index < at;
+      const state: TreasuryProgressStep["state"] = done
+        ? "done"
+        : index > at
+          ? "waiting"
+          : options.stopped
+            ? "failed"
+            : "current";
+      return {
+        key,
+        state,
+        at: done
+          ? new Date(from + (index + 1) * 2 * MINUTE_MS).toISOString()
+          : null,
+      };
+    }),
+    ...(options.part !== undefined && { part: options.part }),
+    ...(options.parts !== undefined && { parts: options.parts }),
+  };
+}
 
 const ON: Extract<TreasuryStatus, { status: "on" }> = {
   status: "on",
@@ -35,6 +105,47 @@ const ON: Extract<TreasuryStatus, { status: "on" }> = {
   saved: false,
 };
 
+const OPEN_IN: TreasuryOpenMove = {
+  id: sampleId(951),
+  direction: "to_treasury",
+  amountUsdc: "1000000000",
+  isAll: false,
+  status: "open",
+  statusText: "On its way to Treasury",
+  startedAt: "2026-11-06T06:21:00.000Z",
+  progress: progressAt(IN_STEPS, 0),
+};
+
+const OPEN_OUT: TreasuryOpenMove = {
+  ...OPEN_IN,
+  direction: "to_wallet",
+  statusText: "On its way to your wallet",
+  progress: progressAt(OUT_STEPS, 0),
+};
+
+/** Each state a move in flight can be in, for the card's callout and the sheet. */
+export const OPEN_MOVES: Record<
+  Extract<TreasuryScenario, `move${string}`>,
+  TreasuryOpenMove
+> = {
+  move: OPEN_IN,
+  "move-way": { ...OPEN_IN, progress: progressAt(IN_STEPS, 1) },
+  "move-arriving": { ...OPEN_IN, progress: progressAt(IN_STEPS, 2) },
+  "move-split": {
+    ...OPEN_IN,
+    amountUsdc: "70000000000",
+    progress: progressAt(IN_STEPS, 1, { part: 2, parts: 3 }),
+  },
+  "move-review": {
+    ...OPEN_IN,
+    status: "needs_review",
+    statusText: "Being checked by Expendi",
+    progress: progressAt(IN_STEPS, 2, { stopped: true }),
+  },
+  "move-out": OPEN_OUT,
+  "move-back": { ...OPEN_OUT, progress: progressAt(OUT_STEPS, 1) },
+};
+
 export const TREASURY_STATUSES: Record<
   Exclude<TreasuryScenario, "short">,
   TreasuryStatus
@@ -42,18 +153,13 @@ export const TREASURY_STATUSES: Record<
   unavailable: { status: "unavailable" },
   off: { status: "off", rateBps: 519 },
   on: ON,
-  move: {
-    ...ON,
-    openMove: {
-      id: sampleId(951),
-      direction: "to_treasury",
-      amountUsdc: "1000000000",
-      isAll: false,
-      status: "open",
-      statusText: "On its way to Treasury",
-      startedAt: "2026-11-06T06:21:00.000Z",
-    },
-  },
+  move: { ...ON, openMove: OPEN_MOVES.move },
+  "move-way": { ...ON, openMove: OPEN_MOVES["move-way"] },
+  "move-arriving": { ...ON, openMove: OPEN_MOVES["move-arriving"] },
+  "move-split": { ...ON, openMove: OPEN_MOVES["move-split"] },
+  "move-review": { ...ON, openMove: OPEN_MOVES["move-review"] },
+  "move-out": { ...ON, openMove: OPEN_MOVES["move-out"] },
+  "move-back": { ...ON, openMove: OPEN_MOVES["move-back"] },
   saved: {
     ...ON,
     asOf: "2026-11-05T21:00:11.000Z",
@@ -61,19 +167,23 @@ export const TREASURY_STATUSES: Record<
   },
 };
 
-const OPEN_MOVE: TreasuryMoveSummary = {
-  id: sampleId(951),
-  direction: "to_treasury",
-  status: "open",
-  requestedUsdc: "1000000000",
-  isAll: false,
+/** The history's row for a move in flight. */
+export const openMoveSummary = (
+  open: TreasuryOpenMove,
+): TreasuryMoveSummary => ({
+  id: open.id,
+  direction: open.direction,
+  status: open.status,
+  requestedUsdc: open.amountUsdc,
+  isAll: open.isAll,
   movedUsdc: null,
   costUsdc: null,
   deliveredUsdc: null,
   failure: null,
-  createdAt: "2026-11-06T06:21:00.000Z",
+  createdAt: open.startedAt,
   settledAt: null,
-};
+  ...(open.progress && { progress: open.progress }),
+});
 
 export const TREASURY_MOVES: TreasuryMoveSummary[] = [
   {
@@ -88,6 +198,10 @@ export const TREASURY_MOVES: TreasuryMoveSummary[] = [
     failure: null,
     createdAt: "2026-11-02T07:10:00.000Z",
     settledAt: "2026-11-02T07:16:00.000Z",
+    progress: progressAt(OUT_STEPS, 0, {
+      from: "2026-11-02T07:10:00.000Z",
+      finished: true,
+    }),
   },
   {
     id: sampleId(953),
@@ -101,6 +215,10 @@ export const TREASURY_MOVES: TreasuryMoveSummary[] = [
     failure: null,
     createdAt: "2026-10-28T11:42:00.000Z",
     settledAt: "2026-10-28T11:55:00.000Z",
+    progress: progressAt(IN_STEPS, 1, {
+      from: "2026-10-28T11:42:00.000Z",
+      stopped: true,
+    }),
   },
   {
     id: sampleId(954),
@@ -114,6 +232,10 @@ export const TREASURY_MOVES: TreasuryMoveSummary[] = [
     failure: null,
     createdAt: "2026-10-20T08:05:00.000Z",
     settledAt: "2026-10-20T08:12:00.000Z",
+    progress: progressAt(IN_STEPS, 0, {
+      from: "2026-10-20T08:05:00.000Z",
+      finished: true,
+    }),
   },
   {
     id: sampleId(955),
@@ -127,6 +249,10 @@ export const TREASURY_MOVES: TreasuryMoveSummary[] = [
     failure: null,
     createdAt: "2026-09-15T09:30:00.000Z",
     settledAt: "2026-09-15T09:36:00.000Z",
+    progress: progressAt(OUT_STEPS, 0, {
+      from: "2026-09-15T09:30:00.000Z",
+      finished: true,
+    }),
   },
 ];
 
@@ -212,7 +338,7 @@ export function seedTreasury(
   client.setQueryData(treasuryKeys.status(org), status);
   if (status.status === "on") {
     client.setQueryData(treasuryKeys.moves(org), [
-      ...(status.openMove ? [OPEN_MOVE] : []),
+      ...(status.openMove ? [openMoveSummary(status.openMove)] : []),
       ...TREASURY_MOVES,
     ]);
     client.setQueryData(walletKeys.history(org), withTreasuryRows());

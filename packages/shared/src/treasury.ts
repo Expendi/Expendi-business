@@ -11,6 +11,43 @@ const usdcUnits = z.string().regex(/^[1-9]\d{0,18}$/);
 const usdcUnitsOrZero = z.string().regex(/^\d{1,19}$/);
 const usdcSigned = z.string().regex(/^-?\d{1,19}$/);
 
+export const TREASURY_PROGRESS_STEP_KEYS = [
+  "leaving_wallet",
+  "on_its_way",
+  "arriving",
+  "in_treasury",
+  "leaving_treasury",
+  "in_wallet",
+] as const;
+
+/**
+ * - `done`: the step finished, at `at`.
+ * - `current`: the move is on this step now.
+ * - `waiting`: an earlier step hasn't finished.
+ * - `failed`: the move stopped here (returned, failed or under review).
+ */
+export const treasuryProgressStepSchema = z.object({
+  key: z.enum(TREASURY_PROGRESS_STEP_KEYS),
+  state: z.enum(["done", "current", "waiting", "failed"]),
+  /** When the step completed; null until it has. */
+  at: z.iso.datetime().nullable(),
+});
+
+export type TreasuryProgressStep = z.infer<typeof treasuryProgressStepSchema>;
+
+/**
+ * Where a move's money is: the steps of its direction in order. A split move
+ * shows the part it is on, with `part` of `parts`. Optional so a client that
+ * is newer than the API still parses what it gets.
+ */
+export const treasuryProgressSchema = z.object({
+  steps: z.array(treasuryProgressStepSchema),
+  part: z.number().int().positive().optional(),
+  parts: z.number().int().positive().optional(),
+});
+
+export type TreasuryProgress = z.infer<typeof treasuryProgressSchema>;
+
 /** The move that holds the company's one slot, as the Treasury account shows it. */
 export const treasuryOpenMoveSchema = z.object({
   id: z.uuid(),
@@ -22,6 +59,7 @@ export const treasuryOpenMoveSchema = z.object({
   /** "On its way to Treasury", "On its way to your wallet" or "Being checked by Expendi". */
   statusText: z.string(),
   startedAt: z.iso.datetime(),
+  progress: treasuryProgressSchema.optional(),
 });
 
 export type TreasuryOpenMove = z.infer<typeof treasuryOpenMoveSchema>;
@@ -149,6 +187,7 @@ export const treasuryMoveSchema = z.object({
   failure: z.string().nullable(),
   createdAt: z.iso.datetime(),
   settledAt: z.iso.datetime().nullable(),
+  progress: treasuryProgressSchema.optional(),
 });
 
 export type TreasuryMoveSummary = z.infer<typeof treasuryMoveSchema>;

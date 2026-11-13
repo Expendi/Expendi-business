@@ -35,6 +35,7 @@ import type { ApprovalOutcome } from "~/lib/approval";
 import type { PasskeyAssertion } from "~/lib/passkeys";
 import { useApi } from "~/lib/use-api";
 import { usePasskeyApproval } from "~/lib/use-approval";
+import { pollIntervalFor } from "./treasury-display";
 import { walletKeys } from "./wallet-api";
 
 /**
@@ -123,6 +124,7 @@ export function followTreasuryMoves(
 
 export function useTreasury(
   organizationId: string,
+  pollMs: number = OPEN_MOVE_POLL_MS,
 ): UseQueryResult<TreasuryStatus> {
   const api = useApi();
   const queryClient = useQueryClient();
@@ -130,7 +132,11 @@ export function useTreasury(
     () => followTreasuryMoves(queryClient, organizationId),
     [queryClient, organizationId],
   );
-  return useQuery(treasuryStatusQuery(api, organizationId));
+  // The move sheet's stepper asks more often than the page does.
+  return useQuery({
+    ...treasuryStatusQuery(api, organizationId),
+    refetchInterval: (query) => pollIntervalFor(query.state.data, pollMs),
+  });
 }
 
 export function useTreasuryMoves(

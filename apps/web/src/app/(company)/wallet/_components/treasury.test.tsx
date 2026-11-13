@@ -234,7 +234,8 @@ describe("the Treasury account", () => {
       turnOn: page.includes("Turn on"),
       moves:
         page.includes("Move to Treasury") && !page.includes("Move to wallet"),
-      buttons: html.includes("<button"),
+      // The history's "Show steps" toggles only read; nothing else is a button.
+      buttons: /<button(?![^>]*aria-controls)/.test(html),
     }).toEqual({
       figures: true,
       history: true,

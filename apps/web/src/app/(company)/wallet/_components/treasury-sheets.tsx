@@ -2,7 +2,12 @@
 
 import type { FormEvent, JSX, ReactNode } from "react";
 import { cn } from "cn";
-import { CheckIcon, CircleAlertIcon, KeyRoundIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CircleAlertIcon,
+  KeyRoundIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 import type {
@@ -11,7 +16,7 @@ import type {
   TreasuryMoveSummary,
 } from "@expendi-business/shared";
 
-import type { MovePrefill } from "./treasury-display";
+import type { MoveOutcome, MovePrefill } from "./treasury-display";
 import {
   Callout,
   DetailItem,
@@ -29,14 +34,21 @@ import { passkeyGate } from "./passkey-gate";
 import {
   useMovePreview,
   useStartTreasuryMove,
+  useTreasury,
+  useTreasuryMoves,
   useTurnOnTreasury,
 } from "./treasury-api";
 import {
+  endedOutcome,
   formatDuration,
   formatRate,
   MOVE_TITLES,
+  moveHasEnded,
   parseMoveAmount,
+  runningOutcome,
+  WATCHED_MOVE_POLL_MS,
 } from "./treasury-display";
+import { MoveProgress } from "./treasury-progress";
 
 /** Typed amounts are asked about once the admin pauses. */
 const PREVIEW_DELAY_MS = 350;
@@ -84,8 +96,12 @@ export function TurnOnSheet({
   if (done) {
     body = (
       <MoveResult
-        title="Treasury is on"
-        text="No money has moved. Use Move to Treasury when you have USDC you don't need for payments."
+        outcome={{
+          tone: "success",
+          title: "Treasury is on",
+          text: "No money has moved. Use Move to Treasury when you have USDC you don't need for payments.",
+          progress: null,
+        }}
       />
     );
     footer = (
@@ -243,16 +259,7 @@ export function MoveSheet({
   let body: ReactNode;
   let footer: ReactNode = null;
   if (result) {
-    body = (
-      <MoveResult
-        title="Move started"
-        text={
-          direction === "to_treasury"
-            ? `${formatUsdc(result.requestedUsdc)} USDC is on its way to Treasury. Treasury shows its progress and the move appears in the history.`
-            : `${result.isAll ? "All of Treasury" : `${formatUsdc(result.requestedUsdc)} USDC`} is on its way to your wallet. It can be spent once it arrives.`
-        }
-      />
-    );
+    body = <MoveStarted organizationId={organizationId} started={result} />;
     footer = (
       <SheetActions kind="primary">
         <Button onClick={onClose}>Done</Button>
@@ -487,13 +494,14 @@ export function MovePreviewPanel({
   );
 }
 
-function MoveResult({
-  title,
-  text,
-}: {
-  title: string;
-  text: string;
-}): JSX.Element {
+const RESULT_TONES = {
+  success: { Icon: CheckIcon, classes: "bg-success-50 text-success-700" },
+  warn: { Icon: TriangleAlertIcon, classes: "bg-warn-50 text-warn-700" },
+  error: { Icon: CircleAlertIcon, classes: "bg-error-50 text-error-700" },
+} as const;
+
+export function MoveResult({ outcome }: { outcome: MoveOutcome }): JSX.Element {
+  const { Icon, classes } = RESULT_TONES[outcome.tone];
   return (
     <div
       role="status"
@@ -501,12 +509,57 @@ function MoveResult({
     >
       <span
         aria-hidden="true"
-        className="flex size-12 items-center justify-center rounded-full bg-success-50 text-success-700"
+        className={cn(
+          "flex size-12 items-center justify-center rounded-full",
+          classes,
+        )}
       >
-        <CheckIcon className="size-6" />
+        <Icon className="size-6" />
       </span>
-      <p className="text-lg leading-[26px] font-(--w-title)">{title}</p>
-      <p className="max-w-[34ch] text-muted-foreground">{text}</p>
+      <p className="text-lg leading-[26px] font-(--w-title)">{outcome.title}</p>
+      <p className="max-w-[34ch] text-muted-foreground">{outcome.text}</p>
+      {outcome.progress ? (
+        <div className="mt-3 w-full max-w-sm text-left">
+          <MoveProgress progress={outcome.progress} showTimes />
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * The sheet after a move starts: the live steps while it runs, refreshed
+ * every few seconds, and where it ended up once it stops. The account is
+ * only asked again while a move is open, so the refreshing stops by itself.
+ */
+function MoveStarted({
+  organizationId,
+  started,
+}: {
+  organizationId: string;
+  started: TreasuryMoveSummary;
+}): JSX.Element {
+  const [watchedSince] = useState(() => Date.now());
+  const status = useTreasury(organizationId, WATCHED_MOVE_POLL_MS);
+  const ended = moveHasEnded(
+    status.data,
+    status.dataUpdatedAt,
+    watchedSince,
+    started.id,
+  );
+  const history = useTreasuryMoves(organizationId, ended);
+  const final = ended
+    ? history.data?.find((move) => move.id === started.id)
+    : undefined;
+  // A history read before the move ended still lists it as open.
+  const settled = final && !(history.isFetching && final.status === "open");
+  const open =
+    status.data?.status === "on" && status.data.openMove?.id === started.id
+      ? status.data.openMove
+      : null;
+  return (
+    <MoveResult
+      outcome={settled ? endedOutcome(final) : runningOutcome(started, open)}
+    />
   );
 }
