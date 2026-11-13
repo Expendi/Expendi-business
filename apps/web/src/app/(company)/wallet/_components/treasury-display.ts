@@ -109,6 +109,77 @@ export const MOVE_STATUS_BADGES: Record<
   needs_review: { label: "Being checked", tone: "waiting" },
 };
 
+/** The history shows this many moves at a time, so it never fills the screen. */
+export const MOVES_PER_PAGE = 5;
+
+export interface MovesPage {
+  readonly rows: readonly TreasuryMoveSummary[];
+  readonly page: number;
+  readonly pageCount: number;
+}
+
+/**
+ * The moves on one page, newest first. A page past the end reads as the last
+ * one, since the list can shrink or grow while it is being looked at.
+ */
+export function pageOfMoves(
+  moves: readonly TreasuryMoveSummary[],
+  requested: number,
+): MovesPage {
+  const pageCount = Math.max(1, Math.ceil(moves.length / MOVES_PER_PAGE));
+  const page = Math.min(Math.max(0, requested), pageCount - 1);
+  const first = page * MOVES_PER_PAGE;
+  return {
+    rows: moves.slice(first, first + MOVES_PER_PAGE),
+    page,
+    pageCount,
+  };
+}
+
+/**
+ * What a move put where it was going, or what was asked while that isn't
+ * known. A returned or failed move put nothing anywhere: its badge says so,
+ * and the amount asked for is what the admin recognises.
+ */
+export function moveAmountShown(move: TreasuryMoveSummary): string {
+  if (move.status === "returned" || move.status === "failed") {
+    return move.requestedUsdc;
+  }
+  if (move.direction === "to_wallet") {
+    return move.deliveredUsdc ?? move.movedUsdc ?? move.requestedUsdc;
+  }
+  return move.movedUsdc ?? move.requestedUsdc;
+}
+
+export interface MoveFact {
+  readonly label: string;
+  readonly value: string;
+}
+
+/**
+ * What a history row keeps folded away: what was asked when less arrived
+ * than the row's amount or it was all of Treasury, and what the move cost.
+ * Empty when the amount on the row already says everything.
+ */
+export function moveFacts(move: TreasuryMoveSummary): readonly MoveFact[] {
+  const short =
+    move.status === "completed" &&
+    BigInt(moveAmountShown(move)) < BigInt(move.requestedUsdc);
+  const facts: MoveFact[] = [];
+  if (move.isAll) {
+    facts.push({ label: "Asked for", value: "All of Treasury" });
+  } else if (short) {
+    facts.push({
+      label: "Asked for",
+      value: `${formatUsdc(move.requestedUsdc)} USDC`,
+    });
+  }
+  if (move.costUsdc !== null && BigInt(move.costUsdc) > 0n) {
+    facts.push({ label: "Cost", value: `${formatUsdc(move.costUsdc)} USDC` });
+  }
+  return facts;
+}
+
 export const PROGRESS_STEP_LABELS: Record<TreasuryProgressStep["key"], string> =
   {
     leaving_wallet: "Leaving your wallet",

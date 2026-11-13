@@ -35,7 +35,8 @@ export type TreasuryScenario =
   | "move-out"
   | "move-back"
   | "saved"
-  | "short";
+  | "short"
+  | "history";
 
 type StepKey = TreasuryProgressStep["key"];
 
@@ -165,6 +166,7 @@ export const TREASURY_STATUSES: Record<
     asOf: "2026-11-05T21:00:11.000Z",
     saved: true,
   },
+  history: ON,
 };
 
 /** The history's row for a move in flight. */
@@ -256,6 +258,44 @@ export const TREASURY_MOVES: TreasuryMoveSummary[] = [
   },
 ];
 
+const OLDER_MOVES_ASKED = [
+  "1840000000",
+  "730500000",
+  "2600000000",
+  "415250000",
+  "3100000000",
+  "960000000",
+  "1275800000",
+  "500000000",
+] as const;
+
+/** Eight earlier moves, a week apart, so the history runs to three pages. */
+export const OLDER_TREASURY_MOVES: TreasuryMoveSummary[] =
+  OLDER_MOVES_ASKED.map((requestedUsdc, index) => {
+    const toWallet = index % 3 === 1;
+    const costUsdc = String(380000 + index * 30000);
+    const createdAt = new Date(
+      Date.parse("2026-09-08T08:40:00.000Z") - index * 7 * 24 * 60 * MINUTE_MS,
+    ).toISOString();
+    return {
+      id: sampleId(960 + index),
+      direction: toWallet ? "to_wallet" : "to_treasury",
+      status: "completed",
+      requestedUsdc,
+      isAll: false,
+      movedUsdc: String(BigInt(requestedUsdc) - BigInt(costUsdc)),
+      costUsdc,
+      deliveredUsdc: toWallet ? requestedUsdc : null,
+      failure: null,
+      createdAt,
+      settledAt: new Date(Date.parse(createdAt) + 6 * MINUTE_MS).toISOString(),
+      progress: progressAt(toWallet ? OUT_STEPS : IN_STEPS, 0, {
+        from: createdAt,
+        finished: true,
+      }),
+    };
+  });
+
 /** Moves to and from Treasury as the wallet history lists them. */
 const TREASURY_LEDGER_ROWS: WalletHistoryItem[] = [
   {
@@ -340,6 +380,7 @@ export function seedTreasury(
     client.setQueryData(treasuryKeys.moves(org), [
       ...(status.openMove ? [openMoveSummary(status.openMove)] : []),
       ...TREASURY_MOVES,
+      ...(scenario === "history" ? OLDER_TREASURY_MOVES : []),
     ]);
     client.setQueryData(walletKeys.history(org), withTreasuryRows());
   }

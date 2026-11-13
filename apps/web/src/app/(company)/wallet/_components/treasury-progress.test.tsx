@@ -190,34 +190,48 @@ describe("the steps where a move shows", () => {
   const [done] = TREASURY_MOVES;
   if (!done) throw new Error("no sample move");
 
-  it("keeps a history row's steps folded until asked", () => {
+  it("keeps a history row to its title, date and amount until asked", () => {
     // #when
     const html = renderToStaticMarkup(<MoveRow move={done} />);
 
     // #then
     expect(html).toContain('aria-expanded="false"');
-    expect(text(html)).toContain("Show steps");
+    expect(text(html)).toContain("Moved to wallet 2 Nov 2026, 10:10 1,000.00");
+    expect(text(html)).not.toContain("Cost");
     expect(html).not.toContain("Move progress");
   });
 
-  it("unfolds a history row to its steps with their times", () => {
+  it("unfolds a history row to its cost and its steps with their times", () => {
     // #when
     const html = renderToStaticMarkup(<MoveRow move={done} defaultExpanded />);
 
     // #then
     expect(html).toContain('aria-expanded="true"');
-    expect(text(html)).toContain("Hide steps");
+    expect(text(html)).toContain("Cost 0.46 USDC");
     expect(states(html)).toEqual(["done", "done", "done"]);
     expect(html.match(/<time /g)).toHaveLength(3);
   });
 
-  it("offers no steps for a move the API sent none for", () => {
+  it("unfolds to the cost alone for a move the API sent no steps for", () => {
     // #when
     const { progress: _progress, ...bare } = done;
-    const html = renderToStaticMarkup(<MoveRow move={bare} />);
+    const html = renderToStaticMarkup(<MoveRow move={bare} defaultExpanded />);
 
     // #then
-    expect(text(html)).not.toContain("Show steps");
+    expect(text(html)).toContain("Cost 0.46 USDC");
+    expect(html).not.toContain("Move progress");
+  });
+
+  it("is not a button when a move has nothing more to say", () => {
+    // #when
+    const { progress: _progress, ...bare } = done;
+    const html = renderToStaticMarkup(
+      <MoveRow move={{ ...bare, costUsdc: null }} />,
+    );
+
+    // #then
+    expect(html).not.toContain("<button");
+    expect(text(html)).toContain("Moved to wallet");
   });
 
   it("shows the steps on the move sheet with the move's words above them", () => {
