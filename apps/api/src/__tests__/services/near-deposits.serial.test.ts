@@ -64,6 +64,9 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
+  await owner.query(
+    "UPDATE ops_alerts SET resolved_at = now() WHERE kind = 'deposits_held' AND resolved_at IS NULL",
+  );
   await Promise.all([runtime.dispose(), owner.end()]);
 });
 
