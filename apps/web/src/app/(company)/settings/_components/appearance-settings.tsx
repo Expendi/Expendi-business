@@ -1,7 +1,7 @@
 "use client";
 
-import type { JSX } from "react";
-import { Settings2Icon } from "lucide-react";
+import type { JSX, ReactNode } from "react";
+import { MonitorIcon, RotateCcwIcon } from "lucide-react";
 import { useId } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -10,11 +10,6 @@ import type {
   PreferenceValueMap,
 } from "~/lib/preferences/preferences-config";
 import { Button } from "~/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "~/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -37,6 +32,7 @@ import {
   THEME_PRESET_OPTIONS,
 } from "~/lib/preferences/theme";
 import { usePreferencesStore } from "~/stores/preferences/preferences-provider";
+import { PanelFoot, SettingsPanel } from "./settings-panel";
 
 interface Option {
   readonly label: string;
@@ -52,6 +48,25 @@ function useSetter<K extends PreferenceKey>(key: K): (value: string) => void {
   };
 }
 
+function PreferenceRow({
+  labelId,
+  label,
+  children,
+}: {
+  labelId: string;
+  label: string;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <div className="grid grid-cols-[180px_minmax(0,1fr)] items-center gap-x-4 gap-y-1.5 px-5 py-3 @max-[520px]/panel:grid-cols-[minmax(0,1fr)] @max-[520px]/panel:px-4">
+      <span id={labelId} className="text-muted-foreground">
+        {label}
+      </span>
+      <div className="w-full max-w-sm">{children}</div>
+    </div>
+  );
+}
+
 function ToggleRow<K extends PreferenceKey>({
   label,
   preference,
@@ -65,14 +80,10 @@ function ToggleRow<K extends PreferenceKey>({
   const value = usePreferencesStore((state) => state.values[preference]);
   const set = useSetter(preference);
   return (
-    <div className="grid gap-1.5">
-      <span id={id} className="text-xs font-medium">
-        {label}
-      </span>
+    <PreferenceRow labelId={id} label={label}>
       <ToggleGroup
         type="single"
         variant="outline"
-        size="sm"
         spacing={0}
         value={value}
         onValueChange={(next) => {
@@ -85,13 +96,13 @@ function ToggleRow<K extends PreferenceKey>({
           <ToggleGroupItem
             key={option.value}
             value={option.value}
-            className="flex-1 text-xs"
+            className="flex-1"
           >
             {option.label}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
-    </div>
+    </PreferenceRow>
   );
 }
 
@@ -110,16 +121,9 @@ function SelectRow<K extends PreferenceKey>({
   const value = usePreferencesStore((state) => state.values[preference]);
   const set = useSetter(preference);
   return (
-    <div className="grid gap-1.5">
-      <span id={id} className="text-xs font-medium">
-        {label}
-      </span>
+    <PreferenceRow labelId={id} label={label}>
       <Select value={value} onValueChange={set}>
-        <SelectTrigger
-          size="sm"
-          className="w-full text-xs"
-          aria-labelledby={id}
-        >
+        <SelectTrigger className="w-full" aria-labelledby={id}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -127,11 +131,7 @@ function SelectRow<K extends PreferenceKey>({
             {options.map((option) => {
               const color = swatch?.(option.value);
               return (
-                <SelectItem
-                  key={option.value}
-                  value={option.value}
-                  className="text-xs"
-                >
+                <SelectItem key={option.value} value={option.value}>
                   {color ? (
                     <span
                       aria-hidden="true"
@@ -146,15 +146,16 @@ function SelectRow<K extends PreferenceKey>({
           </SelectGroup>
         </SelectContent>
       </Select>
-    </div>
+    </PreferenceRow>
   );
 }
 
 /**
- * The template's preferences popover: theme, look, font, and how the
- * sidebar, header and page width behave. Each choice is saved in a cookie.
+ * How the dashboard looks for the person signed in: theme, colours, font,
+ * and how the sidebar, header and page width behave. Each choice is saved
+ * in a cookie, so accountants change theirs as freely as admins.
  */
-export function LayoutControls(): JSX.Element {
+export function AppearanceSettings(): JSX.Element {
   const { resolvedThemeMode, resetPreferences } = usePreferencesStore(
     useShallow((state) => ({
       resolvedThemeMode: state.resolvedThemeMode,
@@ -162,72 +163,57 @@ export function LayoutControls(): JSX.Element {
     })),
   );
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="size-8"
-          aria-label="Layout and theme"
-          title="Layout and theme"
-        >
-          <Settings2Icon aria-hidden="true" />
+    <SettingsPanel
+      id="appearance"
+      title="Appearance"
+      sub="The theme, colours and font you see, and how the sidebar, header and page width behave."
+      actions={
+        <Button variant="outline" size="md" onClick={resetPreferences}>
+          <RotateCcwIcon aria-hidden="true" />
+          Restore defaults
         </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-72">
-        <div className="grid gap-4">
-          <div className="grid gap-1">
-            <p className="text-sm leading-none font-medium">Layout and theme</p>
-            <p className="text-xs text-muted-foreground">
-              Saved in this browser.
-            </p>
-          </div>
-          <SelectRow
-            label="Colours"
-            preference="theme_preset"
-            options={THEME_PRESET_OPTIONS}
-            swatch={(value) =>
-              THEME_PRESET_OPTIONS.find((preset) => preset.value === value)
-                ?.primary[resolvedThemeMode]
-            }
-          />
-          <SelectRow label="Font" preference="font" options={FONT_OPTIONS} />
-          <ToggleRow
-            label="Theme"
-            preference="theme_mode"
-            options={THEME_MODE_OPTIONS}
-          />
-          <ToggleRow
-            label="Page width"
-            preference="content_layout"
-            options={CONTENT_LAYOUT_OPTIONS}
-          />
-          <ToggleRow
-            label="Header"
-            preference="navbar_style"
-            options={NAVBAR_STYLE_OPTIONS}
-          />
-          <ToggleRow
-            label="Sidebar style"
-            preference="sidebar_variant"
-            options={SIDEBAR_VARIANT_OPTIONS}
-          />
-          <ToggleRow
-            label="Collapsed sidebar"
-            preference="sidebar_collapsible"
-            options={SIDEBAR_COLLAPSIBLE_OPTIONS}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full text-xs"
-            onClick={resetPreferences}
-          >
-            Restore defaults
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
+      }
+    >
+      <div className="divide-y divide-border border-t border-border">
+        <ToggleRow
+          label="Theme"
+          preference="theme_mode"
+          options={THEME_MODE_OPTIONS}
+        />
+        <SelectRow
+          label="Colours"
+          preference="theme_preset"
+          options={THEME_PRESET_OPTIONS}
+          swatch={(value) =>
+            THEME_PRESET_OPTIONS.find((preset) => preset.value === value)
+              ?.primary[resolvedThemeMode]
+          }
+        />
+        <SelectRow label="Font" preference="font" options={FONT_OPTIONS} />
+        <ToggleRow
+          label="Page width"
+          preference="content_layout"
+          options={CONTENT_LAYOUT_OPTIONS}
+        />
+        <ToggleRow
+          label="Header"
+          preference="navbar_style"
+          options={NAVBAR_STYLE_OPTIONS}
+        />
+        <ToggleRow
+          label="Sidebar style"
+          preference="sidebar_variant"
+          options={SIDEBAR_VARIANT_OPTIONS}
+        />
+        <ToggleRow
+          label="Collapsed sidebar"
+          preference="sidebar_collapsible"
+          options={SIDEBAR_COLLAPSIBLE_OPTIONS}
+        />
+      </div>
+      <PanelFoot icon={MonitorIcon}>
+        Saved in this browser. Nobody else&apos;s view changes.
+      </PanelFoot>
+    </SettingsPanel>
   );
 }

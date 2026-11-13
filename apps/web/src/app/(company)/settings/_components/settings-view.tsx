@@ -8,6 +8,7 @@ import {
   KeyRoundIcon,
   LandmarkIcon,
   LockIcon,
+  PaletteIcon,
   TagIcon,
   TriangleAlertIcon,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import { ROLE_LABELS } from "~/config/roles";
 import { useDashboard } from "~/contexts/dashboard-context";
 import { describeApiError } from "~/lib/api";
 import { useApprovalPasskeyStatus } from "~/lib/use-approval";
+import { AppearanceSettings } from "./appearance-settings";
 import { ApprovalPasskeySettings } from "./approval-passkey-settings";
 import { CategorySettings } from "./category-settings";
 import { PaidFromAccounts } from "./paid-from-accounts";
@@ -36,7 +38,7 @@ import { ZohoSettings } from "./zoho-settings";
 type SettingsParam = "section" | "category" | "account";
 
 export type SectionId =
-  "company" | "passkey" | "categories" | "accounts" | "zoho";
+  "company" | "passkey" | "categories" | "accounts" | "zoho" | "appearance";
 
 interface Section {
   readonly id: SectionId;
@@ -56,14 +58,16 @@ export const SECTIONS: readonly Section[] = [
   { id: "categories", label: "Categories", icon: TagIcon },
   { id: "accounts", label: "Paid-from accounts", icon: LandmarkIcon },
   { id: "zoho", label: "Zoho Books", icon: BookOpenIcon },
+  { id: "appearance", label: "Appearance", icon: PaletteIcon },
 ];
 
 /**
  * Settings (spec §6.14, §6.17, §6.23): the company's details, the admin's
  * approval passkey, the categories people pick, the accounts company
- * spending is paid from, and the Zoho Books connection. A section list
- * beside the panels jumps between them; every change opens in the side
- * sheet. Accountants read everything but the passkey.
+ * spending is paid from, the Zoho Books connection, and how the dashboard
+ * looks in this browser. A section list beside the panels jumps between
+ * them; every company change opens in the side sheet. Accountants read
+ * everything but the passkey, and set their own appearance.
  */
 export function SettingsView(): JSX.Element {
   const { company, canAct } = useDashboard();
@@ -140,6 +144,7 @@ function CompanySettings({
               }
             />
             <ZohoSettings organizationId={organizationId} />
+            <AppearanceSettings />
           </div>
         </div>
       </div>
