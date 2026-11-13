@@ -140,6 +140,7 @@ function payout(
     approvalId: null,
     approvedAt: null,
     paidAt: null,
+    categoryName: null,
     paymentReceipts: [],
     rate: KES_RATE,
     failureReason: null,
@@ -169,6 +170,7 @@ function row(
 
 const ZUKU = payout(7, {
   recipientName: "Zuku",
+  categoryName: "Airtime & internet",
   recipientDetail: "Paybill 320320, account 118-2219",
   amountKesCents: "410000",
   status: "failed",
@@ -185,6 +187,7 @@ function salary(n: number, name: string, kes: number, amount: number) {
       amountKesCents: String(kes * 100),
       status: "paid",
       payrollRunId: PAYROLL_RUN,
+      categoryName: "Salaries",
       approvalId: PAYROLL_BATCH,
       approvedAt: at("2026-10-28", "09:52"),
       paidAt: at("2026-10-28", "10:03"),
@@ -199,6 +202,7 @@ export const LEDGER: WalletHistoryItem[] = [
       recipientName: "Twiga Foods",
       recipientDetail: "Paybill 222111, account TF-0091",
       amountKesCents: "18600000",
+      categoryName: "Suppliers",
       status: "paying",
       approvalId: BATCH,
       approvedAt: at("2026-11-06", "09:18"),
@@ -234,6 +238,7 @@ export const LEDGER: WalletHistoryItem[] = [
   row(5, "payout", `-${usdc(110.47)}`, at("2026-11-04", "14:03"), {
     payout: payout(5, {
       recipientName: "Kenya Power",
+      categoryName: "Rent & utilities",
       recipientDetail: "Paybill 888880, account 54012339",
       amountKesCents: "1425000",
       status: "paid",
@@ -263,6 +268,7 @@ export const LEDGER: WalletHistoryItem[] = [
   row(9, "payout", `-${usdc(500)}`, at("2026-11-01", "09:00"), {
     payout: payout(9, {
       recipientName: "Jubilee Health",
+      categoryName: "Insurance",
       recipientDetail: "Paybill 511000, account JH-77812",
       amountKesCents: "6450000",
       status: "paid",
@@ -282,6 +288,7 @@ export const LEDGER: WalletHistoryItem[] = [
     payout: payout(16, {
       method: "bank",
       recipientName: "Bidco Kenya",
+      categoryName: "Suppliers",
       recipientDetail: "Equity Bank account ending 2210",
       amountKesCents: "12000000",
       status: "paid",
@@ -297,6 +304,7 @@ export const LEDGER: WalletHistoryItem[] = [
   row(18, "payout", `-${usdc(375.97)}`, at("2026-10-15", "08:30"), {
     payout: payout(18, {
       recipientName: "Kilimani Properties",
+      categoryName: "Rent & utilities",
       recipientDetail: "Paybill 522522, account KP-1182",
       amountKesCents: "4850000",
       status: "paid",
@@ -309,6 +317,7 @@ export const LEDGER: WalletHistoryItem[] = [
       recipientName: "Twiga Foods",
       recipientDetail: "Paybill 222111, account TF-0091",
       amountKesCents: "9800000",
+      categoryName: "Suppliers",
       status: "paid",
       approvedAt: at("2026-10-10", "13:02"),
       paidAt: at("2026-10-10", "13:08"),

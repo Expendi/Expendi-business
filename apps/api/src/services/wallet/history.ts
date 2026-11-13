@@ -11,8 +11,15 @@ import type {
 import type { DatabaseService } from "../../db/client.js";
 import type { Payout } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
+import type { Tenant } from "../../middleware/tenant.js";
 import type { PayoutRecipient } from "../paycrest/recipient.js";
-import { payouts, wallets, walletTransactions } from "../../db/schema/index.js";
+import {
+  bills,
+  categories,
+  payouts,
+  wallets,
+  walletTransactions,
+} from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { cashOutReceiptsOf } from "../payout/receipts.js";
 
@@ -37,6 +44,7 @@ export interface WalletHistoryPayout {
   readonly approvalId: string | null;
   readonly approvedAt: Date | null;
   readonly paidAt: Date | null;
+  readonly categoryName: string | null;
   readonly paymentReceipts: readonly CashOutReceipt[];
   readonly rate: string | null;
   readonly failureReason: string | null;
@@ -78,13 +86,14 @@ export function describeRecipient(recipient: PayoutRecipient): string {
 }
 
 export function walletHistory(input: {
-  readonly organizationId: string;
+  readonly tenant: Tenant;
   /** A ledger row's ID: only rows older than it are returned. */
   readonly before: string | null;
   readonly limit: number;
 }): Effect.Effect<WalletHistoryPage, DatabaseError, DatabaseService> {
-  const { organizationId, before, limit } = input;
-  return withScope({ organizationId }, (tx) =>
+  const { tenant, before, limit } = input;
+  const { organizationId } = tenant;
+  return withScope(tenant, (tx) =>
     Effect.gen(function* () {
       const [wallet] = yield* query(() =>
         tx
@@ -99,9 +108,28 @@ export function walletHistory(input: {
         : undefined;
       const rows = yield* query(() =>
         tx
-          .select({ entry: walletTransactions, payout: payouts })
+          .select({
+            entry: walletTransactions,
+            payout: payouts,
+            categoryName: categories.name,
+          })
           .from(walletTransactions)
           .leftJoin(payouts, eq(payouts.id, walletTransactions.payoutId))
+          .leftJoin(
+            bills,
+            and(
+              eq(payouts.subjectType, "bill"),
+              eq(bills.id, payouts.subjectId),
+              eq(bills.organizationId, organizationId),
+            ),
+          )
+          .leftJoin(
+            categories,
+            and(
+              eq(categories.id, bills.categoryId),
+              eq(categories.organizationId, organizationId),
+            ),
+          )
           .where(
             and(eq(walletTransactions.walletId, wallet.id), olderThanCursor),
           )
@@ -115,7 +143,7 @@ export function walletHistory(input: {
       const page = rows.slice(0, limit);
       const last = page.at(-1);
       return {
-        items: page.map(({ entry, payout }) => ({
+        items: page.map(({ entry, payout, categoryName }) => ({
           id: entry.id,
           type: entry.type,
           usdcAmount: entry.usdcAmount,
@@ -140,6 +168,7 @@ export function walletHistory(input: {
             approvalId: payout.approvalId,
             approvedAt: payout.approvedAt,
             paidAt: payout.paidAt,
+            categoryName,
             paymentReceipts: cashOutReceiptsOf([payout]),
             rate: payout.rate,
             failureReason: payout.failureReason,

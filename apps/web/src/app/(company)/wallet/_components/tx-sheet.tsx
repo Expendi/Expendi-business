@@ -9,6 +9,7 @@ import type { WalletHistoryItem } from "@expendi-business/shared";
 import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
 import type { SheetStepper } from "~/components/data/detail-sheet";
+import type { ReceiptDownload } from "~/features/bills/receipt-download";
 import {
   DetailItem,
   DetailList,
@@ -19,6 +20,7 @@ import {
 import { PaymentReceiptItems } from "~/components/data/payment-receipts";
 import { StatusBadge } from "~/components/data/status-badge";
 import { Button } from "~/components/ui/button";
+import { ReceiptDownloadAction } from "~/features/bills/receipt-download";
 import { addressGroups, shortAddress } from "~/features/chain-display";
 import { formatKes } from "~/lib/money";
 import { approxKes, SignedUsdc } from "./balance-card";
@@ -54,6 +56,7 @@ export function TxSheet({
   items,
   today,
   rate,
+  receiptDownload,
   stepper,
   onClose,
 }: {
@@ -62,6 +65,8 @@ export function TxSheet({
   items: readonly WalletHistoryItem[];
   today: string;
   rate: string | null;
+  /** Offers a paid bill's receipt; left out where nothing can be downloaded. */
+  receiptDownload?: ReceiptDownload;
   stepper: SheetStepper;
   onClose: () => void;
 }): JSX.Element {
@@ -98,7 +103,13 @@ export function TxSheet({
       }
     >
       {item ? (
-        <TxDetails item={item} items={items} today={today} rate={rate} />
+        <TxDetails
+          item={item}
+          items={items}
+          today={today}
+          rate={rate}
+          receiptDownload={receiptDownload}
+        />
       ) : null}
     </DetailSheet>
   );
@@ -170,11 +181,13 @@ export function TxDetails({
   items,
   today,
   rate,
+  receiptDownload,
 }: {
   item: WalletHistoryItem;
   items: readonly WalletHistoryItem[];
   today: string;
   rate: string | null;
+  receiptDownload?: ReceiptDownload;
 }): JSX.Element {
   const payout = item.payout;
   const when = happenedAt(item.createdAt, today);
@@ -264,6 +277,8 @@ export function TxDetails({
     case "payment":
     case "salary": {
       const alongside = approvedAlongside(item, items);
+      const isBillPayment =
+        txKind(item) === "payment" && payout?.subjectType === "bill";
       return (
         <>
           <PaymentSteps item={item} />
@@ -298,6 +313,9 @@ export function TxDetails({
             {payoutPurpose(item) ? (
               <DetailItem label="For">{payoutPurpose(item)}</DetailItem>
             ) : null}
+            {isBillPayment && payout.categoryName ? (
+              <DetailItem label="Category">{payout.categoryName}</DetailItem>
+            ) : null}
             {payout?.approvedAt ? (
               <DetailItem label="Approved">
                 {happenedAt(payout.approvedAt, today)}
@@ -320,6 +338,12 @@ export function TxDetails({
             ) : null}
             {transaction}
           </DetailList>
+          {isBillPayment && payout.status === "paid" && receiptDownload ? (
+            <ReceiptDownloadAction
+              billId={payout.subjectId}
+              download={receiptDownload}
+            />
+          ) : null}
         </>
       );
     }

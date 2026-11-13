@@ -180,13 +180,13 @@ export function createWalletRoutes(
     .use(requireAdminOrReader())
     .get("/", (c) => runEffect(runtime, c, getCompanyWallet(c.get("tenant"))))
     .get("/history", (c) => {
-      const organizationId = c.get("tenant").organizationId;
+      const tenant = c.get("tenant");
       return runEffect(
         runtime,
         c,
         parseQuery(historyQuerySchema, c.req.query()).pipe(
           Effect.flatMap(({ before, limit }) =>
-            walletHistory({ organizationId, before: before ?? null, limit }),
+            walletHistory({ tenant, before: before ?? null, limit }),
           ),
         ),
       );

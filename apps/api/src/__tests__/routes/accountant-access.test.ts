@@ -16,7 +16,11 @@ import { users, walletTransactions } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 import { isReadRequest } from "../../middleware/tenant.js";
 import { draftDuePayroll } from "../../services/payroll/drafts.js";
-import { insertBill, insertPayee } from "../helpers/bills.js";
+import {
+  insertBill,
+  insertBillPayment,
+  insertPayee,
+} from "../helpers/bills.js";
 import { randomTxHash } from "../helpers/chain.js";
 import {
   addCategory,
@@ -233,6 +237,14 @@ async function seedBooks(): Promise<Books> {
     payeeId,
     categoryId: officeId,
   });
+  await insertBillPayment(
+    db,
+    company,
+    wallet.id,
+    billId,
+    {},
+    { recordDebit: false },
+  );
   const invoice = await createCustomerAndInvoice(db, company);
   const claimId = await submitClaim(company, amina.user, officeId);
   const spendingId = await recordCompanySpending(company, officeId);

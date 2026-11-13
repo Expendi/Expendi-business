@@ -10,6 +10,7 @@ import {
   UNPAID_BILL_STATUSES,
 } from "@expendi-business/shared";
 
+import type { ReceiptDownload } from "~/features/bills/receipt-download";
 import { TextLinkButton, textLinkClass } from "~/components/data/actions";
 import {
   Callout,
@@ -29,6 +30,7 @@ import {
   BillStatusBadge,
   headingLabel,
 } from "~/features/bills/bill-status";
+import { ReceiptDownloadAction } from "~/features/bills/receipt-download";
 import { METHOD_LABELS } from "~/features/payees/payee-display";
 import { formatIsoDate, formatNairobiDate } from "~/lib/dates";
 import { BillFiles } from "./bill-files";
@@ -80,6 +82,7 @@ export function BillDetailBody({
   bill,
   error,
   errorAction,
+  receiptDownload,
   onSeeRecurring,
 }: {
   bill: BillDetail;
@@ -87,6 +90,8 @@ export function BillDetailBody({
   error: string | null;
   /** Beside the error, e.g. the offer to move Treasury money to the wallet. */
   errorAction?: ReactNode;
+  /** Offers the receipt of a bill paid through Expendi; left out where nothing can be downloaded. */
+  receiptDownload?: ReceiptDownload;
   onSeeRecurring: (itemId: string) => void;
 }): JSX.Element {
   const reason = unpayableReason(bill);
@@ -177,6 +182,11 @@ export function BillDetailBody({
           </DetailItem>
         ) : null}
       </DetailList>
+      {bill.payout?.status === "paid" &&
+      bill.payrollRunId === null &&
+      receiptDownload ? (
+        <ReceiptDownloadAction billId={bill.id} download={receiptDownload} />
+      ) : null}
       {bill.notes ? (
         <p className="whitespace-pre-wrap text-secondary-foreground">
           {bill.notes}

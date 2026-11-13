@@ -18,7 +18,13 @@ import {
   confirmWithdrawal,
   requestWithdrawal,
 } from "../../services/withdrawal/withdrawals.js";
+import {
+  insertBill,
+  insertBillPayment,
+  insertPayee,
+} from "../helpers/bills.js";
 import { randomTxHash } from "../helpers/chain.js";
+import { addCategory } from "../helpers/claims.js";
 import { addMember, createUser } from "../helpers/db.js";
 import {
   makeFakePaycrest,
@@ -272,6 +278,7 @@ describe("GET /organizations/:id/wallet/history", () => {
       approvalId: claim.approvalId,
       approvedAt: claim.approvedAt?.toISOString(),
       paidAt: null,
+      categoryName: null,
       paymentReceipts: [],
       rate: claim.rate,
       failureReason: null,
@@ -279,6 +286,35 @@ describe("GET /organizations/:id/wallet/history", () => {
     expect(page.items.slice(1, 3).map((item) => item.payout)).toEqual([
       expected,
       expected,
+    ]);
+  });
+
+  it("carries the category of the bill a payout pays, and null for a claim", async () => {
+    // #given
+    const [claim] = await payClaims(runtime, db, paying, [claimRequest()]);
+    if (!claim) throw new Error("no claim payout");
+    const categoryId = await addCategory(db, paying.company, "Utilities");
+    const payeeId = await insertPayee(db, paying.company);
+    const billId = await insertBill(db, paying.company, {
+      payeeId,
+      categoryId,
+      status: "due",
+    });
+    await insertBillPayment(db, paying.company, paying.wallet.id, billId);
+
+    // #when
+    const page = await historyPage();
+
+    // #then
+    const payoutRows = page.items.filter((item) => item.type === "payout");
+    expect(
+      payoutRows.map((item) => [
+        item.payout?.subjectType,
+        item.payout?.categoryName,
+      ]),
+    ).toEqual([
+      ["bill", "Utilities"],
+      ["claim", null],
     ]);
   });
 

@@ -1,4 +1,3 @@
-import { fileURLToPath } from "node:url";
 import { and, asc, eq } from "drizzle-orm";
 import { Effect } from "effect";
 import PDFDocument from "pdfkit";
@@ -12,6 +11,7 @@ import {
 import type { ConfigService } from "../../config.js";
 import type { DatabaseService } from "../../db/client.js";
 import type { DatabaseError, NotFound } from "../../errors.js";
+import type { RenderOptions } from "./pdf-style.js";
 import {
   intentQuotes,
   invoicePayments,
@@ -23,37 +23,26 @@ import { formatUsdc } from "../email/invoice-receipt-email.js";
 import { chainOfAsset } from "../intents/fund-in.js";
 import { payUrlFor } from "./invoices.js";
 import { getPublicInvoice } from "./pay-link.js";
+import {
+  BOTTOM,
+  BRAND_MARK,
+  CONTENT_WIDTH,
+  CORAL,
+  FONT_REGULAR,
+  FONT_SEMIBOLD,
+  INK,
+  MUTED,
+  PAGE_MARGIN,
+  PAGE_WIDTH,
+  PAID_GREEN,
+  RULE,
+} from "./pdf-style.js";
 import { findInvoiceByPublicId } from "./public-lookup.js";
 
 /**
  * The invoice as a PDF, for `GET /pay/:publicId/pdf`. The page is the
  * pay page's invoice with the paper extras: who paid it, how, and the link.
  */
-
-const FONT_REGULAR = fileURLToPath(
-  new URL("../../../assets/fonts/Outfit_400Regular.ttf", import.meta.url),
-);
-const FONT_SEMIBOLD = fileURLToPath(
-  new URL("../../../assets/fonts/Outfit_600SemiBold.ttf", import.meta.url),
-);
-/** The dashboard's brand mark (`apps/web/public/expendi-mark.png`). */
-const BRAND_MARK = fileURLToPath(
-  new URL("../../../assets/brand/expendi-mark.png", import.meta.url),
-);
-
-/** `--color-brand-600` in apps/web's tokens. */
-const CORAL = "#f0613e";
-/** `--color-success-700`, the dashboard's paid colour. */
-const PAID_GREEN = "#067647";
-const INK = "#101828";
-const MUTED = "#667085";
-const RULE = "#e4e7ec";
-
-const PAGE_MARGIN = 48;
-const PAGE_WIDTH = 595.28;
-const PAGE_HEIGHT = 841.89;
-const CONTENT_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
-const BOTTOM = PAGE_HEIGHT - PAGE_MARGIN;
 
 export interface InvoicePdfPayment {
   /** The Nairobi day the money arrived, `YYYY-MM-DD`. */
@@ -71,13 +60,6 @@ export interface InvoicePdfData {
   readonly payUrl: string | null;
   /** Set when the invoice is paid and a payment explains it. */
   readonly payment: InvoicePdfPayment | null;
-}
-
-export interface RenderOptions {
-  /** Called with every string drawn, so tests can assert on content. */
-  readonly onText?: (text: string) => void;
-  /** Off in tests, which read the stream's bytes. */
-  readonly compress?: boolean;
 }
 
 /** The payment that settled the invoice: the earliest recorded. */
