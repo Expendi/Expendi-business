@@ -177,6 +177,27 @@ describe("an invoice's side sheet", () => {
     });
   });
 
+  it("links a sent invoice's PDF, open, paid or void, and a draft has none", () => {
+    // #when
+    const linked = ["INV-0004", "INV-0002", "INV-0000", "INV-0005"].map(
+      (number) =>
+        /href="\/pay\/sample-pay-link-\d+\/pdf"/.test(
+          render("admin", `invoice=${idOf(number)}`),
+        ),
+    );
+
+    // #then
+    expect(linked).toEqual([true, true, true, false]);
+  });
+
+  it("gives an accountant the PDF link too", () => {
+    // #when
+    const text = sheetOf(render("accountant", `invoice=${idOf("INV-0001")}`));
+
+    // #then
+    expect(text).toContain("Download PDF");
+  });
+
   it("offers a draft Send, Edit and Delete, and no pay link", () => {
     // #when
     const text = sheetOf(render("admin", `invoice=${idOf("INV-0005")}`));

@@ -1,7 +1,7 @@
 "use client";
 
 import type { JSX } from "react";
-import { PrinterIcon } from "lucide-react";
+import { DownloadIcon, PrinterIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import type { FundInChain, PublicInvoice } from "@expendi-business/shared";
@@ -31,6 +31,7 @@ function toLoadState(result: PayApiResult<PublicInvoice>): LoadState {
 
 /** What the page shows for a given load and payment state. */
 export function PayContent({
+  publicId,
   load,
   pay,
   paidOnPage,
@@ -38,6 +39,7 @@ export function PayContent({
   onRetry,
   onPrint,
 }: {
+  publicId: string;
   load: LoadState;
   pay: PayState;
   paidOnPage: boolean;
@@ -49,6 +51,7 @@ export function PayContent({
     <main className="min-h-dvh bg-gray-50 px-4 py-6 sm:py-10 print:bg-white print:p-0">
       <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4">
         <Body
+          publicId={publicId}
           load={load}
           pay={pay}
           paidOnPage={paidOnPage}
@@ -62,6 +65,7 @@ export function PayContent({
 }
 
 function Body({
+  publicId,
   load,
   pay,
   paidOnPage,
@@ -126,7 +130,13 @@ function Body({
           now. Contact them to pay.
         </p>
       ) : null}
-      <div className="flex justify-center print:hidden">
+      <div className="flex flex-wrap justify-center gap-2 print:hidden">
+        <Button asChild variant="ghost">
+          <a href={`/pay/${publicId}/pdf`}>
+            <DownloadIcon aria-hidden="true" />
+            Download PDF
+          </a>
+        </Button>
         <Button variant="ghost" onClick={onPrint}>
           <PrinterIcon aria-hidden="true" />
           Print or save as PDF
@@ -200,6 +210,7 @@ export function PayPage({ publicId }: { publicId: string }): JSX.Element {
 
   return (
     <PayContent
+      publicId={publicId}
       load={load}
       pay={pay}
       paidOnPage={paidOnPage}
