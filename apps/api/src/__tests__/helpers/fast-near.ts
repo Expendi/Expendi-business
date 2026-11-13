@@ -21,6 +21,7 @@ export function makeFakeFastNear() {
     readonly resumeToken: string | null;
   }[] = [];
   let failures = 0;
+  let tokenOnShortPage = true;
 
   const state = {
     /** Every page request, in order. */
@@ -28,6 +29,17 @@ export function makeFakeFastNear() {
     /** The next `times` page requests fail. */
     failNext(times = 1) {
       failures = times;
+    },
+    /**
+     * The real API gives no resume token for a final page that isn't full;
+     * with `false` the fake does the same.
+     */
+    tokenOnShortPage(given: boolean) {
+      tokenOnShortPage = given;
+    },
+    /** The transactions listed for `accountId`, oldest first. */
+    listedTransactions(accountId: string): string[] {
+      return (rows.get(accountId) ?? []).map((row) => row.transactionId);
     },
     /** Lists a row exactly as given, true or not. */
     report(accountId: string, row: FastNearTransfer) {
@@ -66,7 +78,10 @@ export function makeFakeFastNear() {
       const transfers = (rows.get(accountId) ?? []).slice(start, start + limit);
       return Effect.succeed({
         transfers,
-        resumeToken: String(start + transfers.length),
+        resumeToken:
+          tokenOnShortPage || transfers.length === limit
+            ? String(start + transfers.length)
+            : null,
       });
     },
   };

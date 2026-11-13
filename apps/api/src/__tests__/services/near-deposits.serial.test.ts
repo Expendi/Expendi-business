@@ -60,6 +60,8 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  fastNear.state.tokenOnShortPage(true);
+  rpc.state.outcomeLookups.length = 0;
   funded = await createFundedCompany(db);
 });
 
@@ -97,6 +99,15 @@ function arrived(from: string, amount: bigint): NearTransactionOutcome {
 }
 
 const watch = () => runtime.runPromise(watchNearDeposits());
+
+/**
+ * The RPC lookups made for the company wallet's own transfers: every run
+ * also reads the wallets earlier tests left behind.
+ */
+const lookupsForWallet = () => {
+  const listed = new Set(fastNear.state.listedTransactions(funded.accountId));
+  return rpc.state.outcomeLookups.filter((hash) => listed.has(hash));
+};
 
 const ledger = () => ledgerOf(db, funded);
 
@@ -264,6 +275,134 @@ describe("watchNearDeposits", () => {
       alreadyCredited: run.alreadyCredited,
       token: await resumeToken(),
     }).toEqual({ credited: 0, alreadyCredited: 0, token: "1" });
+  });
+
+  describe("when the indexer gives no resume token for the final page", () => {
+    beforeEach(() => fastNear.state.tokenOnShortPage(false));
+
+    it("doesn't confirm a transfer it already judged again on the next run", async () => {
+      // #given
+      arrived(randomNearAccount(), 5_000_000n);
+      arrived(FAKE_RELAYER_ACCOUNT, 1_000_000n);
+      await watch();
+      rpc.state.outcomeLookups.length = 0;
+
+      // #when
+      const run = await watch();
+
+      // #then
+      expect({
+        lookedUp: lookupsForWallet(),
+        credited: run.credited,
+        rows: (await ledger()).length,
+      }).toEqual({ lookedUp: [], credited: 0, rows: 1 });
+    });
+
+    it("confirms only the transfers that arrived since", async () => {
+      // #given
+      arrived(randomNearAccount(), 5_000_000n);
+      arrived(FAKE_RELAYER_ACCOUNT, 1_000_000n);
+      await watch();
+      const later = arrived(randomNearAccount(), 2_000_000n);
+      rpc.state.outcomeLookups.length = 0;
+
+      // #when
+      const run = await watch();
+
+      // #then
+      expect({
+        lookedUp: lookupsForWallet(),
+        credited: run.credited,
+        rows: (await ledger()).length,
+      }).toEqual({ lookedUp: [later.txHash], credited: 1, rows: 2 });
+    });
+
+    it("skips a transfer the RPC called unconfirmed, not just credited ones", async () => {
+      // #given
+      const sender = randomNearAccount();
+      const outcome = usdcSent(sender, 1_000_000n);
+      fastNear.state.report(funded.accountId, {
+        blockHeight: outcome.blockHeight,
+        transactionId: outcome.txHash,
+        receiptId: outcome.receipts[0]?.receiptId ?? "",
+        logIndex: 0,
+        signerId: sender,
+        otherAccountId: sender,
+        amount: 900_000_000n,
+      });
+      await watch();
+      rpc.state.outcomeLookups.length = 0;
+
+      // #when
+      await watch();
+
+      // #then
+      expect(lookupsForWallet()).toEqual([]);
+    });
+
+    it("looks again at a transfer that was held, and at none judged before it", async () => {
+      // #given
+      const judged = arrived(randomNearAccount(), 5_000_000n);
+      const pending = notYetFinal(7_000_000n);
+      const firstRun = await watch();
+      rpc.state.outcomeLookups.length = 0;
+
+      // #when
+      const secondRun = await watch();
+
+      // #then
+      expect({
+        held: [firstRun.held, secondRun.held],
+        lookedUp: lookupsForWallet(),
+      }).toEqual({ held: [1, 1], lookedUp: [pending.txHash] });
+      expect(lookupsForWallet()).not.toContain(judged.txHash);
+
+      // Leaves no held wallet behind for the tests after it.
+      rpc.state.outcomes.set(pending.txHash, pending);
+      await watch();
+    });
+
+    it("credits a held transfer once it is final, and nothing twice", async () => {
+      // #given
+      arrived(randomNearAccount(), 5_000_000n);
+      const pending = notYetFinal(7_000_000n);
+      await watch();
+      rpc.state.outcomes.set(pending.txHash, pending);
+
+      // #when
+      const run = await watch();
+
+      // #then
+      expect({ credited: run.credited, rows: (await ledger()).length }).toEqual(
+        { credited: 1, rows: 2 },
+      );
+    });
+
+    it("carries on from the token once the page fills and the indexer gives one", async () => {
+      // #given
+      for (let i = 0; i < 3; i += 1) arrived(FAKE_RELAYER_ACCOUNT, 1n);
+      await watch();
+      for (let i = 0; i < 96; i += 1) arrived(FAKE_RELAYER_ACCOUNT, 1n);
+      const last = arrived(randomNearAccount(), 4_000_000n);
+      rpc.state.outcomeLookups.length = 0;
+
+      // #when
+      const filling = await watch();
+      const afterwards = await watch();
+
+      // #then
+      expect({
+        lookedUp: lookupsForWallet().length,
+        credited: [filling.credited, afterwards.credited],
+        token: await resumeToken(),
+        rows: (await ledger()).map((row) => row.txHash),
+      }).toEqual({
+        lookedUp: 97,
+        credited: [1, 0],
+        token: "100",
+        rows: [last.txHash],
+      });
+    });
   });
 
   it("doesn't credit an ft_transfer event another contract logged", async () => {

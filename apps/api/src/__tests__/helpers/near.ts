@@ -165,6 +165,8 @@ export function makeFakeNearRpc(
   const withheld = new Map<string, NearTransactionOutcome>();
   /** The hash of every transaction handed to the node, in order. */
   const broadcasts: string[] = [];
+  /** The hash of every transaction outcome looked up, in order. */
+  const outcomeLookups: string[] = [];
   const broadcastModes: BroadcastMode[] = [];
   const failures = new Map<RpcCall, number>();
 
@@ -174,6 +176,7 @@ export function makeFakeNearRpc(
     balances,
     outcomes,
     broadcasts,
+    outcomeLookups,
     height: 150_000_000n,
     /** Whether the receiver of the next `ft_transfer_call`s keeps the USDC. */
     transferCallReceiverKeeps: true,
@@ -410,7 +413,10 @@ export function makeFakeNearRpc(
   const service: NearRpcShape = {
     transactionOutcome: (txHash) =>
       maybeFail("transactionOutcome").pipe(
-        Effect.map(() => outcomes.get(txHash) ?? null),
+        Effect.map(() => {
+          outcomeLookups.push(txHash);
+          return outcomes.get(txHash) ?? null;
+        }),
       ),
     accountExists: (accountId) =>
       maybeFail("accountExists").pipe(

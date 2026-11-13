@@ -72,6 +72,29 @@ export class NearRpc extends Context.Tag("NearRpc")<NearRpc, NearRpcShape>() {}
 
 const RPC_TIMEOUT_MS = 10_000;
 
+/** The node answered, but not with a success status. */
+class HttpStatusError extends Error {
+  constructor(readonly status: number) {
+    super(`HTTP ${status}`);
+  }
+}
+
+/**
+ * What went wrong with a request, for the error message. Only the status or
+ * a fixed phrase: the cause of a failed fetch can name the URL, which usually
+ * carries a provider API key.
+ */
+function transportFailure(cause: unknown): string {
+  if (cause instanceof HttpStatusError) return `HTTP ${cause.status}`;
+  if (cause instanceof Error && cause.name === "TimeoutError") {
+    return "timed out";
+  }
+  if (cause instanceof SyntaxError || cause instanceof z.ZodError) {
+    return "unreadable response";
+  }
+  return "network error";
+}
+
 const rpcResponseSchema = z.object({
   result: z.unknown().optional(),
   error: z
@@ -157,12 +180,15 @@ export function makeNearRpc(
           signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
         });
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          throw new HttpStatusError(response.status);
         }
         return rpcResponseSchema.parse(await response.json());
       },
       catch: (cause) =>
-        new NearRpcError({ message: `NEAR RPC ${method} failed`, cause }),
+        new NearRpcError({
+          message: `NEAR RPC ${method} failed: ${transportFailure(cause)}`,
+          cause,
+        }),
     }).pipe(
       Effect.map((body): RpcReply =>
         body.error
