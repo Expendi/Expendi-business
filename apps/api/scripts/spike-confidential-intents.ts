@@ -8,6 +8,11 @@
  *                  confidential balances and history, and takes dry quotes:
  *                  a Base hop at each confidentiality level, and each leg
  *                  the other steps use.
+ * --step probe     Moves nothing. Answers what Phase 2's design left open:
+ *                  the quotes a fund-in and a fund-in return need, the
+ *                  smallest move-in, whether a status needs the session
+ *                  (--deposit-address is a settled quote's), and whether a
+ *                  second sign-in ends the first.
  * --step intent    Moves nothing. Takes a real quote for each kind of payment
  *                  out of the confidential account and prints the message
  *                  1Click would have the company wallet sign, unsigned.
@@ -61,7 +66,14 @@ import {
 } from "../src/services/intents/one-click.js";
 import { PrivyWallets } from "../src/services/wallet/privy-wallets.js";
 
-const STEPS = ["check", "intent", "move-in", "pay", "move-out"] as const;
+const STEPS = [
+  "check",
+  "probe",
+  "intent",
+  "move-in",
+  "pay",
+  "move-out",
+] as const;
 const CONFIDENTIALITY_LEVELS = ["public", "basic", "advanced"] as const;
 const SETTLED = new Set(["SUCCESS", "REFUNDED", "FAILED"]);
 const MAX_SPIKE_USDC = 5_000_000n;
@@ -79,6 +91,8 @@ const { values } = parseArgs({
     usdc: { type: "string", default: "1" },
     pay: { type: "string", default: "0.3" },
     "base-recipient": { type: "string" },
+    "deposit-address": { type: "string" },
+    "exact-out": { type: "boolean", default: false },
   },
 });
 
@@ -250,7 +264,13 @@ try {
         const [row] = yield* withScope({ organizationId }, (tx) =>
           query(() =>
             tx
-              .select()
+              .select({
+                address: wallets.address,
+                privyWalletId: wallets.privyWalletId,
+                transitAddress: wallets.transitAddress,
+                chain: wallets.chain,
+                status: wallets.status,
+              })
               .from(wallets)
               .where(eq(wallets.organizationId, organizationId)),
           ),
@@ -514,6 +534,7 @@ try {
     session: string,
     input: Pick<
       QuoteInput,
+      | "swapType"
       | "destinationAsset"
       | "amount"
       | "slippageBps"
@@ -706,6 +727,105 @@ try {
     });
   }
 
+  if (step === "probe") {
+    console.log("Dry quotes Phase 2 needs");
+    await dryQuote("fund-in from Base, refund into NEAR Intents", session, {
+      originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+      destinationAsset: nearUsdc,
+      amount: spikeAmount(values.usdc),
+      slippageBps: 100,
+      depositType: "ORIGIN_CHAIN",
+      recipientType: "CONFIDENTIAL_INTENTS",
+      refundType: "INTENTS",
+      recipient: companyAccount,
+      refundTo: companyAccount,
+    });
+    await dryQuote("fund-in return, paid from NEAR Intents", session, {
+      originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+      destinationAsset: nearUsdc,
+      amount: spikeAmount(values.usdc),
+      slippageBps: 100,
+      depositType: "INTENTS",
+      recipientType: "CONFIDENTIAL_INTENTS",
+      refundType: "INTENTS",
+      recipient: companyAccount,
+      refundTo: companyAccount,
+    });
+    for (const usdc of ["0.01", "0.05", "0.15"]) {
+      await dryQuote(`move-in of ${usdc} USDC`, session, {
+        originAsset: nearUsdc,
+        destinationAsset: nearUsdc,
+        amount: toBaseUnits(usdc),
+        slippageBps: 0,
+        depositType: "ORIGIN_CHAIN",
+        recipientType: "CONFIDENTIAL_INTENTS",
+        refundType: "ORIGIN_CHAIN",
+        recipient: companyAccount,
+        refundTo: companyAccount,
+      });
+    }
+
+    console.log("Dry quotes Phase 3 needs");
+    await dryQuote("payout to Solana", session, {
+      originAsset: nearUsdc,
+      destinationAsset: ONE_CLICK_USDC_ASSET_IDS.solana,
+      amount: spikeAmount(values.usdc),
+      slippageBps: 100,
+      depositType: "CONFIDENTIAL_INTENTS",
+      recipientType: "DESTINATION_CHAIN",
+      refundType: "CONFIDENTIAL_INTENTS",
+      recipient: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+      refundTo: companyAccount,
+    });
+    await dryQuote("one confidential account to another", session, {
+      originAsset: nearUsdc,
+      destinationAsset: nearUsdc,
+      amount: spikeAmount(values.usdc),
+      slippageBps: 0,
+      depositType: "CONFIDENTIAL_INTENTS",
+      recipientType: "CONFIDENTIAL_INTENTS",
+      refundType: "CONFIDENTIAL_INTENTS",
+      recipient: relayer.accountId,
+      refundTo: companyAccount,
+    });
+    await dryQuote(
+      "Move to wallet: Base into the confidential account",
+      session,
+      {
+        originAsset: ONE_CLICK_USDC_ASSET_IDS.base,
+        destinationAsset: nearUsdc,
+        amount: spikeAmount(values.usdc),
+        slippageBps: 100,
+        depositType: "ORIGIN_CHAIN",
+        recipientType: "CONFIDENTIAL_INTENTS",
+        refundType: "ORIGIN_CHAIN",
+        recipient: companyAccount,
+        refundTo: wallet.transitAddress ?? companyAccount,
+      },
+    );
+
+    const settled = values["deposit-address"];
+    if (settled) {
+      const path = `/v0/status?depositAddress=${encodeURIComponent(settled)}`;
+      const without = await oneClick("GET", path);
+      const withSession = await oneClick("GET", path, { session });
+      console.log("Status of a settled confidential quote", {
+        withoutSession: `${String(without.status)} ${brief(without.body).slice(0, 120)}`,
+        withSession: `${String(withSession.status)} ${brief(withSession.body).slice(0, 120)}`,
+      });
+    }
+
+    const second = await signIn();
+    const first = await oneClick("GET", "/v0/account/balances", { session });
+    const latest = await oneClick("GET", "/v0/account/balances", {
+      session: second,
+    });
+    console.log("Balances after a second sign-in", {
+      firstSession: first.status,
+      secondSession: latest.status,
+    });
+  }
+
   if (step === "intent") {
     const baseRecipient = values["base-recipient"] ?? wallet.transitAddress;
     if (!baseRecipient) {
@@ -851,6 +971,7 @@ try {
     }
     await showBalances("Before", session);
     await payFromConfidentialAccount("pay", session, {
+      swapType: values["exact-out"] ? "EXACT_OUTPUT" : "EXACT_INPUT",
       destinationAsset: ONE_CLICK_USDC_ASSET_IDS.base,
       amount: spikeAmount(values.pay),
       slippageBps: 100,
