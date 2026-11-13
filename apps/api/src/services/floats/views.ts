@@ -4,6 +4,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { Effect } from "effect";
 
 import type {
+  CashOutReceipt,
   EtimsStatus,
   ExpenseStatus,
   ExpenseWarning,
@@ -32,6 +33,7 @@ import {
 import { query, withScope } from "../../db/scope.js";
 import { NotFound } from "../../errors.js";
 import { readWarnings } from "../expenses/rules.js";
+import { paymentReceiptsBySubject } from "../payout/receipts.js";
 
 /**
  * Reading floats (spec §6.22). A float's balance is never stored: every read
@@ -76,6 +78,7 @@ export interface FloatMovementView {
   readonly recordedBy: string;
   readonly createdAt: Date;
   readonly paidAt: Date | null;
+  readonly paymentReceipts: readonly CashOutReceipt[];
   readonly payout: {
     readonly id: string;
     readonly status: Payout["status"];
@@ -300,7 +303,11 @@ const selectMovements = (tx: Transaction, where: SQL | undefined) =>
 
 type MovementRow = Awaited<ReturnType<typeof selectMovements>>[number];
 
-function toMovement(tenant: Tenant, row: MovementRow): FloatMovementView {
+function toMovement(
+  tenant: Tenant,
+  row: MovementRow,
+  paymentReceipts: readonly CashOutReceipt[],
+): FloatMovementView {
   return {
     id: row.id,
     type: row.type,
@@ -311,6 +318,7 @@ function toMovement(tenant: Tenant, row: MovementRow): FloatMovementView {
     recordedBy: row.recordedBy,
     createdAt: row.createdAt,
     paidAt: row.paidAt,
+    paymentReceipts,
     payout:
       readsWholeCompany(tenant.role) && row.payoutId && row.payoutStatus
         ? {
@@ -329,16 +337,26 @@ export function readMovement(
   floatId: string,
   movementId: string,
 ): Effect.Effect<FloatMovementView | null, DatabaseError> {
-  return query(() =>
-    selectMovements(
-      tx,
-      and(
-        eq(floatMovements.organizationId, tenant.organizationId),
-        eq(floatMovements.floatId, floatId),
-        eq(floatMovements.id, movementId),
+  return Effect.gen(function* () {
+    const [row] = yield* query(() =>
+      selectMovements(
+        tx,
+        and(
+          eq(floatMovements.organizationId, tenant.organizationId),
+          eq(floatMovements.floatId, floatId),
+          eq(floatMovements.id, movementId),
+        ),
       ),
-    ),
-  ).pipe(Effect.map(([row]) => (row ? toMovement(tenant, row) : null)));
+    );
+    if (!row) return null;
+    const receipts = yield* paymentReceiptsBySubject(
+      tx,
+      tenant.organizationId,
+      "float",
+      [row.id],
+    );
+    return toMovement(tenant, row, receipts.get(row.id) ?? []);
+  });
 }
 
 const overspendClaim = alias(expenses, "overspend_claim");
@@ -470,9 +488,17 @@ export function readFloatDetail(
         )
         .orderBy(desc(expenses.spentOn), desc(expenses.createdAt)),
     );
+    const receipts = yield* paymentReceiptsBySubject(
+      tx,
+      tenant.organizationId,
+      "float",
+      movements.map((row) => row.id),
+    );
     return {
       ...summary,
-      movements: movements.map((row) => toMovement(tenant, row)),
+      movements: movements.map((row) =>
+        toMovement(tenant, row, receipts.get(row.id) ?? []),
+      ),
       spending: spending.map((row) => toSpending(tenant, row)),
       overspendClaims: claims,
     };

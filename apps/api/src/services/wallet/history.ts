@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { Effect } from "effect";
 
 import type {
+  CashOutReceipt,
   PayeeChain,
   WalletChain,
   WalletTransactionType,
@@ -13,6 +14,7 @@ import type { DatabaseError } from "../../errors.js";
 import type { PayoutRecipient } from "../paycrest/recipient.js";
 import { payouts, wallets, walletTransactions } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
+import { cashOutReceiptsOf } from "../payout/receipts.js";
 
 /**
  * The wallet's history (spec §6.9): its ledger, newest first, with the
@@ -35,6 +37,7 @@ export interface WalletHistoryPayout {
   readonly approvalId: string | null;
   readonly approvedAt: Date | null;
   readonly paidAt: Date | null;
+  readonly paymentReceipts: readonly CashOutReceipt[];
   readonly rate: string | null;
   readonly failureReason: string | null;
 }
@@ -137,6 +140,7 @@ export function walletHistory(input: {
             approvalId: payout.approvalId,
             approvedAt: payout.approvedAt,
             paidAt: payout.paidAt,
+            paymentReceipts: cashOutReceiptsOf([payout]),
             rate: payout.rate,
             failureReason: payout.failureReason,
           },

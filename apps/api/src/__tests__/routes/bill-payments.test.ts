@@ -964,6 +964,29 @@ describe("the bill follows its payout (spec §6.20)", () => {
     ]);
   });
 
+  it("shows customers the M-Pesa receipt Paycrest reported", async () => {
+    // #given a bill paid to a Till through Paycrest
+    const billId = await bill(await tillPayee());
+    const [payout] = await pay([billId]);
+    const order = paycrest.state.orders.get(payout?.providerOrderId ?? "");
+    if (!payout || !order) throw new Error("no order for payout");
+    paycrest.state.orders.set(order.id, {
+      ...order,
+      status: "settled",
+      paymentReference: "UKDCW299LW",
+    });
+
+    // #when Paycrest's webhook says it settled
+    await deliverWebhook(payout);
+
+    // #then
+    const response = await sendJson(app, `${billsPath()}/${billId}`, admin());
+    expect(billDetailSchema.parse(await dataOf(response))).toMatchObject({
+      status: "paid",
+      paymentReceipts: [{ kind: "mpesa", code: "UKDCW299LW" }],
+    });
+  });
+
   it("is paid when its Pretium cash-out is, recording Pretium's receipt", async () => {
     // #given a bill whose cash-out went through Pretium
     const billId = await bill(await tillPayee());

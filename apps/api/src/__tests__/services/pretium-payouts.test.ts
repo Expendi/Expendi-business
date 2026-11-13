@@ -21,6 +21,7 @@ import type { PayingCompany } from "../helpers/payouts.js";
 import { DatabaseService } from "../../db/client.js";
 import { organizations, walletTransactions } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
+import { getBill } from "../../services/bills/bills.js";
 import { usdcCovering } from "../../services/paycrest/amounts.js";
 import { fundPayout } from "../../services/payout/fund.js";
 import { preparePayouts } from "../../services/payout/payout-service.js";
@@ -33,7 +34,9 @@ import { PRETIUM_BASE_SETTLEMENT_ADDRESS } from "../../services/pretium/settleme
 import { refetchPayout } from "../../services/staff/payouts.js";
 import { creditUsdcDeposits } from "../../services/wallet/deposits.js";
 import { mineCompanySends } from "../helpers/base-mining.js";
+import { insertBill, insertPayee } from "../helpers/bills.js";
 import { randomTxHash, transferReceipt } from "../helpers/chain.js";
+import { addCategory } from "../helpers/claims.js";
 import {
   makeFakeBaseRpc,
   makeFakePretium,
@@ -1279,6 +1282,72 @@ describe("tracking a Pretium cash-out", () => {
       },
       sends: 1,
       pays: 1,
+    });
+  });
+});
+
+describe("the receipt customers see for a Pretium cash-out", () => {
+  it("is the M-Pesa receipt Pretium reported, on the bill it paid", async () => {
+    // #given a bill whose cash-out Pretium is paying
+    const { company } = paying;
+    const billId = await insertBill(db, company, {
+      payeeId: await insertPayee(db, company, {
+        method: "mpesa_till",
+        tillNumber: "123456",
+        accountName: "Kenya Power",
+        detailsChangedAt: new Date("2026-01-01T00:00:00Z"),
+      }),
+      categoryId: await addCategory(db, company, "Utilities"),
+    });
+    const [prepared] = await runtime.runPromise(
+      preparePayouts({
+        organizationId: company.organizationId,
+        actor: { type: "user", id: company.admin.id },
+        requests: [
+          claimRequest({
+            subjectType: "bill",
+            subjectId: billId,
+            idempotencyKey: `bill:${billId}:1`,
+          }),
+        ],
+      }),
+    );
+    if (!prepared) throw new Error("nothing prepared");
+    await updatePayout(db, company, prepared.id, {
+      provider: "pretium",
+      status: "approved",
+      approvalId: randomUUID(),
+      approvedBy: company.admin.id,
+      approvedAt: new Date(),
+    });
+    const funded = await fund(await reread(prepared));
+    pretium.state.settle(
+      funded.providerOrderId ?? "",
+      "COMPLETE",
+      "UKDCW299LW",
+    );
+
+    // #when Pretium reports it paid
+    await sync(funded);
+
+    // #then
+    const bill = await runtime.runPromise(
+      getBill(
+        {
+          organizationId: company.organizationId,
+          userId: company.admin.id,
+          membershipId: company.adminMembershipId,
+          role: "admin",
+        },
+        billId,
+      ),
+    );
+    expect({
+      status: (await reread(funded)).status,
+      paymentReceipts: bill.paymentReceipts,
+    }).toEqual({
+      status: "paid",
+      paymentReceipts: [{ kind: "mpesa", code: "UKDCW299LW" }],
     });
   });
 });

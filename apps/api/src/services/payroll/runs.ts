@@ -3,6 +3,7 @@ import { Effect } from "effect";
 
 import type {
   BillStatus,
+  CashOutReceipt,
   PayeeKind,
   PayeeMethod,
   PayrollPaymentKind,
@@ -28,6 +29,7 @@ import { query, withScope } from "../../db/scope.js";
 import { BadRequest, Conflict, NotFound } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { nairobiDate, scheduledStatus } from "../bills/status.js";
+import { paymentReceiptsBySubject } from "../payout/receipts.js";
 import { refreshRunTotal } from "./drafts.js";
 import {
   checkCategory,
@@ -71,6 +73,7 @@ export interface PayrollPaymentView {
   readonly note: string | null;
   readonly leftOut: { readonly reason: string; readonly at: Date } | null;
   readonly paidOn: string | null;
+  readonly paymentReceipts: readonly CashOutReceipt[];
 }
 
 export interface PayrollRunView {
@@ -205,7 +208,10 @@ interface SelectedPayment {
   readonly categoryName: string;
 }
 
-function toPaymentView(row: SelectedPayment): PayrollPaymentView {
+function toPaymentView(
+  row: SelectedPayment,
+  paymentReceipts: readonly CashOutReceipt[],
+): PayrollPaymentView {
   const { bill } = row;
   if (bill.amountKes === null) {
     throw new Error(`payroll bill ${bill.id} has no amount`);
@@ -235,6 +241,7 @@ function toPaymentView(row: SelectedPayment): PayrollPaymentView {
         ? { reason: bill.cancelledReason, at: bill.cancelledAt }
         : null,
     paidOn: bill.paidOn,
+    paymentReceipts,
   };
 }
 
@@ -279,7 +286,18 @@ function readRun(
           asc(bills.id),
         ),
     );
-    return { ...toRunView(run), payments: payments.map(toPaymentView) };
+    const receipts = yield* paymentReceiptsBySubject(
+      tx,
+      organizationId,
+      "bill",
+      payments.map((row) => row.bill.id),
+    );
+    return {
+      ...toRunView(run),
+      payments: payments.map((row) =>
+        toPaymentView(row, receipts.get(row.bill.id) ?? []),
+      ),
+    };
   });
 }
 

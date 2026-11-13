@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { cashOutAmountLimitsSchema } from "./cash-out-limits.js";
+
 /**
  * The chain a company wallet is on. NEAR is the main chain and what every
  * new wallet gets; `base` remains for wallets made before the move
@@ -58,6 +60,12 @@ export const activeWalletSchema = z.object({
   kesEquivalent: z
     .object({ kesCents: z.string().regex(/^\d+$/), rate: z.string() })
     .nullable(),
+  /**
+   * The smallest and largest amount one cash-out can send right now, for a
+   * KES bill's form to state. Always sent; optional only for clients built
+   * before it.
+   */
+  cashOutLimits: cashOutAmountLimitsSchema.optional(),
 });
 
 export type ActiveWallet = z.infer<typeof activeWalletSchema>;

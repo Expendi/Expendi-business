@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { OverviewHeading } from "./claims.js";
 import type { PayeeKind, PayeeMethod } from "./payee.js";
+import { paymentReceiptsSchema } from "./cash-out-receipt.js";
 import {
   kesAmountSchema,
   OVERVIEW_HEADINGS,
@@ -430,6 +431,11 @@ export const billSchema = z.object({
   cancelledAt: z.iso.datetime().nullable(),
   cancelledBy: billPersonSchema.nullable(),
   payoutId: z.uuid().nullable(),
+  /**
+   * Its cash-outs' receipts once paid through Expendi; a split salary has
+   * several.
+   */
+  paymentReceipts: paymentReceiptsSchema,
   fileCount: z.number().int().nonnegative(),
   /**
    * The recurring payment that created it, enough to describe its schedule

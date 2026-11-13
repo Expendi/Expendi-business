@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { paymentReceiptsSchema } from "./cash-out-receipt.js";
 import { ETIMS_QR_MAX_BYTES, etimsQrByteLength } from "./etims-qr.js";
 import { parseKesToCents } from "./kes-amount.js";
 import { KRA_PIN_PATTERN } from "./organization.js";
@@ -408,6 +409,8 @@ export const claimSchema = z.object({
   /** The claimant approved it themselves (spec §4); flagged in the audit log and the export. */
   selfApproved: z.boolean(),
   paidAt: z.iso.datetime().nullable(),
+  /** The M-Pesa receipt of its payment, once paid. */
+  paymentReceipts: paymentReceiptsSchema,
   /** The caller's own claim, still `submitted` or `rejected`. */
   canEdit: z.boolean(),
   /** For admins only; always empty for anyone else. */

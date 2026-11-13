@@ -2,9 +2,13 @@ import { Data } from "effect";
 
 import { describeDbError } from "./db/error.js";
 
-/** Client-facing failures: their message is safe to return in a response. */
+/**
+ * Client-facing failures: their message is safe to return in a response.
+ * `details` goes to the client too, e.g. which field a form shows it on.
+ */
 export class BadRequest extends Data.TaggedError("BadRequest")<{
   readonly message: string;
+  readonly details?: Readonly<Record<string, unknown>>;
 }> {
   readonly status = 400;
 }

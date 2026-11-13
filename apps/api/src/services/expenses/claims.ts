@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Effect } from "effect";
 
 import type {
+  CashOutReceipt,
   EtimsStatus,
   ExpenseStatus,
   ExpenseWarning,
@@ -35,6 +36,7 @@ import { query, withScope } from "../../db/scope.js";
 import { BadRequest, Conflict, Forbidden, NotFound } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { notify } from "../notification/notify.js";
+import { paymentReceiptsBySubject } from "../payout/receipts.js";
 import { FileStorage } from "../storage/file-storage.js";
 import { resolveEtims } from "./etims.js";
 import { extractionsOf } from "./extraction.js";
@@ -83,6 +85,7 @@ export interface ClaimView {
   readonly approvedAt: Date | null;
   readonly selfApproved: boolean;
   readonly paidAt: Date | null;
+  readonly paymentReceipts: readonly CashOutReceipt[];
   readonly canEdit: boolean;
   /** Admins only (spec §6.5). */
   readonly warnings: readonly ExpenseWarning[];
@@ -266,7 +269,11 @@ const selectClaims = (tx: Transaction, where: SQL | undefined) =>
 
 type ClaimRow = Awaited<ReturnType<typeof selectClaims>>[number];
 
-function toClaimView(tenant: Tenant, row: ClaimRow): ClaimView {
+function toClaimView(
+  tenant: Tenant,
+  row: ClaimRow,
+  paymentReceipts: readonly CashOutReceipt[],
+): ClaimView {
   return {
     id: row.id,
     status: row.status,
@@ -291,6 +298,7 @@ function toClaimView(tenant: Tenant, row: ClaimRow): ClaimView {
     approvedAt: row.approvedAt,
     selfApproved: row.selfApproved,
     paidAt: row.paidAt,
+    paymentReceipts,
     canEdit: row.membershipId === tenant.membershipId && isEditable(row.status),
     warnings: readsWholeCompany(tenant.role) ? readWarnings(row.warnings) : [],
     receiptCount: row.receiptCount,
@@ -330,28 +338,39 @@ export function listClaims(
   return Effect.gen(function* () {
     const after =
       options.cursor === undefined ? null : yield* decodeCursor(options.cursor);
-    const rows = yield* withScope(tenant, (tx) =>
-      query(() =>
-        selectClaims(
+    const { rows, receipts } = yield* withScope(tenant, (tx) =>
+      Effect.gen(function* () {
+        const rows = yield* query(() =>
+          selectClaims(
+            tx,
+            and(
+              visibleClaims(tenant),
+              options.status === undefined
+                ? undefined
+                : eq(expenses.status, options.status),
+              after === null
+                ? undefined
+                : sql`(${expenses.createdAt}, ${expenses.id}) < (${after.at}::timestamptz, ${after.id}::uuid)`,
+            ),
+          )
+            .orderBy(desc(expenses.createdAt), desc(expenses.id))
+            .limit(options.limit + 1),
+        );
+        const receipts = yield* paymentReceiptsBySubject(
           tx,
-          and(
-            visibleClaims(tenant),
-            options.status === undefined
-              ? undefined
-              : eq(expenses.status, options.status),
-            after === null
-              ? undefined
-              : sql`(${expenses.createdAt}, ${expenses.id}) < (${after.at}::timestamptz, ${after.id}::uuid)`,
-          ),
-        )
-          .orderBy(desc(expenses.createdAt), desc(expenses.id))
-          .limit(options.limit + 1),
-      ),
+          tenant.organizationId,
+          "claim",
+          rows.slice(0, options.limit).map((row) => row.id),
+        );
+        return { rows, receipts };
+      }),
     );
     const page = rows.slice(0, options.limit);
     const last = page.at(-1);
     return {
-      claims: page.map((row) => toClaimView(tenant, row)),
+      claims: page.map((row) =>
+        toClaimView(tenant, row, receipts.get(row.id) ?? []),
+      ),
       nextCursor:
         rows.length > options.limit && last ? encodeCursor(last) : null,
     };
@@ -406,7 +425,7 @@ export function getClaim(
 > {
   return Effect.gen(function* () {
     const storage = yield* FileStorage;
-    const { row, files, payout } = yield* withScope(tenant, (tx) =>
+    const { row, files, payout, paidWith } = yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
         const [row] = yield* query(() =>
           selectClaims(
@@ -447,7 +466,18 @@ export function getClaim(
             )
             .orderBy(asc(receiptFiles.createdAt), asc(receiptFiles.id)),
         );
-        return { row, files, payout: payout ?? null };
+        const paidWith = yield* paymentReceiptsBySubject(
+          tx,
+          tenant.organizationId,
+          "claim",
+          [row.id],
+        );
+        return {
+          row,
+          files,
+          payout: payout ?? null,
+          paidWith: paidWith.get(row.id) ?? [],
+        };
       }),
     );
     const receipts = yield* Effect.forEach(
@@ -472,7 +502,7 @@ export function getClaim(
         );
       },
     ).pipe(Effect.mapError(storageFailure));
-    return { ...toClaimView(tenant, row), receipts, payout };
+    return { ...toClaimView(tenant, row, paidWith), receipts, payout };
   });
 }
 

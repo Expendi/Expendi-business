@@ -21,6 +21,7 @@ import type {
   BillMethodFilter,
   BillSource,
   BillStatus,
+  CashOutReceipt,
   CreateBillFields,
   MarkBillPaidOutsideFields,
   OverviewHeading,
@@ -69,9 +70,14 @@ import {
   ServiceUnavailable,
 } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
+import {
+  activeCashOutLimits,
+  checkCashOutAmount,
+} from "../cash-out/active-limits.js";
 import { activeKesRate } from "../cash-out/active-rate.js";
 import { recordBillSpending } from "../expenses/company.js";
 import { kesCentsFor } from "../paycrest/amounts.js";
+import { paymentReceiptsBySubject } from "../payout/receipts.js";
 import { onRecurringBillSettled } from "../recurring/next-bill.js";
 import { recurringItemState } from "../recurring/recurring-items.js";
 import { enqueuePaidBill } from "../zoho/enqueue.js";
@@ -133,6 +139,7 @@ export interface BillView {
   readonly cancelledAt: Date | null;
   readonly cancelledBy: BillPersonView | null;
   readonly payoutId: string | null;
+  readonly paymentReceipts: readonly CashOutReceipt[];
   readonly fileCount: number;
   readonly recurring: {
     readonly id: string;
@@ -301,7 +308,10 @@ function person(
   return userId === null || email === null ? null : { userId, name, email };
 }
 
-function toBillView(row: SelectedBill): BillView {
+function toBillView(
+  row: SelectedBill,
+  paymentReceipts: readonly CashOutReceipt[],
+): BillView {
   const { bill } = row;
   return {
     id: bill.id,
@@ -341,6 +351,7 @@ function toBillView(row: SelectedBill): BillView {
       row.cancelledByEmail,
     ),
     payoutId: bill.payoutId,
+    paymentReceipts,
     fileCount: row.fileCount,
     recurring:
       bill.recurringItemId === null ||
@@ -420,22 +431,35 @@ export function listBills(
   filters: BillFilters,
 ): Effect.Effect<BillView[], DatabaseError, DatabaseService> {
   return withScope(tenant, (tx) =>
-    query(() =>
-      selectBills(
+    Effect.gen(function* () {
+      const rows = yield* query(() =>
+        selectBills(
+          tx,
+          and(
+            eq(bills.organizationId, tenant.organizationId),
+            filters.view === undefined
+              ? undefined
+              : withStatus(BILL_LIST_VIEW_STATUSES[filters.view]),
+            filters.status === undefined
+              ? undefined
+              : withStatus(filters.status),
+            filters.excludePayroll ? isNull(bills.payrollRunId) : undefined,
+            filtersWhere(filters),
+          ),
+        )
+          .orderBy(asc(bills.dueOn), asc(bills.createdAt), asc(bills.id))
+          .limit(filters.limit),
+      );
+      const receipts = yield* paymentReceiptsBySubject(
         tx,
-        and(
-          eq(bills.organizationId, tenant.organizationId),
-          filters.view === undefined
-            ? undefined
-            : withStatus(BILL_LIST_VIEW_STATUSES[filters.view]),
-          filters.status === undefined ? undefined : withStatus(filters.status),
-          filters.excludePayroll ? isNull(bills.payrollRunId) : undefined,
-          filtersWhere(filters),
-        ),
-      )
-        .orderBy(asc(bills.dueOn), asc(bills.createdAt), asc(bills.id))
-        .limit(filters.limit),
-    ).pipe(Effect.map((rows) => rows.map(toBillView))),
+        tenant.organizationId,
+        "bill",
+        rows.map((row) => row.bill.id),
+      );
+      return rows.map((row) =>
+        toBillView(row, receipts.get(row.bill.id) ?? []),
+      );
+    }),
   );
 }
 
@@ -522,7 +546,7 @@ export function getBill(
   DatabaseService | FileStorage
 > {
   return Effect.gen(function* () {
-    const { row, files, payout } = yield* withScope(tenant, (tx) =>
+    const { row, files, payout, receipts } = yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
         const [row] = yield* query(() =>
           selectBills(
@@ -554,11 +578,22 @@ export function getBill(
                   ),
               );
         const files = yield* readBillFiles(tx, tenant.organizationId, billId);
-        return { row, files, payout: payout ?? null };
+        const receipts = yield* paymentReceiptsBySubject(
+          tx,
+          tenant.organizationId,
+          "bill",
+          [billId],
+        );
+        return {
+          row,
+          files,
+          payout: payout ?? null,
+          receipts: receipts.get(billId) ?? [],
+        };
       }),
     );
     return {
-      ...toBillView(row),
+      ...toBillView(row, receipts),
       files: yield* billFileLinks(files),
       payout,
     };
@@ -755,10 +790,14 @@ export function createBill(
   tenant: Tenant,
   fields: CreateBillFields,
   now: Date = new Date(),
-): Effect.Effect<BillDetailView, BillError, BillDeps> {
+): Effect.Effect<BillDetailView, BillError, BillDeps | Paycrest> {
   const { organizationId } = tenant;
   return Effect.gen(function* () {
     yield* checkAttachableBillFiles(tenant, fields.invoiceFileIds, null);
+    const limits =
+      fields.amountKes !== undefined && fields.amountKes !== null
+        ? yield* activeCashOutLimits
+        : null;
     const billId = yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
         const audit = yield* AuditLog;
@@ -767,6 +806,7 @@ export function createBill(
         const currency = currencyForPayeeMethod(payee.method);
         const typed = typedAmount(fields);
         yield* checkCurrency(payee, currency, typed);
+        yield* checkCashOutAmount(payee.method, typed?.value ?? null, limits);
         const values = {
           payeeId: fields.payeeId,
           overviewHeading:
@@ -856,9 +896,14 @@ export function updateBill(
   billId: string,
   changes: UpdateBillFields,
   now: Date = new Date(),
-): Effect.Effect<BillDetailView, BillError, BillDeps> {
+): Effect.Effect<BillDetailView, BillError, BillDeps | Paycrest> {
   const { organizationId } = tenant;
   return Effect.gen(function* () {
+    const limits =
+      (changes.amountKes !== undefined && changes.amountKes !== null) ||
+      changes.payeeId !== undefined
+        ? yield* activeCashOutLimits
+        : null;
     yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
         const audit = yield* AuditLog;
@@ -905,6 +950,9 @@ export function updateBill(
               message: "Only give a reason when you change the amount.",
             }),
           );
+        }
+        if (amountChanged || payeeChanged) {
+          yield* checkCashOutAmount(payee.method, amounts.amountKes, limits);
         }
         if (
           changes.categoryId !== undefined &&

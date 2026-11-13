@@ -99,6 +99,7 @@ describe("GET /organizations/:organizationId/wallet", () => {
           chain: "base",
           usdcBalance: "12500000",
           kesEquivalent: { kesCents: "160850", rate: "128.68" },
+          cashOutLimits: { minKesCents: "6500", maxKesCents: "30000000" },
         },
       },
     });

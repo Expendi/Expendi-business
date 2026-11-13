@@ -21,6 +21,7 @@ import { BadRequest, NotFound } from "../errors.js";
 import { readBody } from "../http/body.js";
 import { runEffect } from "../http/respond.js";
 import { requireAdminOrReader } from "../middleware/tenant.js";
+import { activeCashOutLimits } from "../services/cash-out/active-limits.js";
 import { activeKesRateOrNull } from "../services/cash-out/active-rate.js";
 import {
   createFundIn,
@@ -67,6 +68,10 @@ type CompanyWallet =
         readonly kesCents: bigint;
         readonly rate: string;
       } | null;
+      readonly cashOutLimits: {
+        readonly minKesCents: bigint | null;
+        readonly maxKesCents: bigint;
+      };
     };
 
 /**
@@ -124,11 +129,18 @@ function getCompanyWallet(
       > =>
         wallet === null
           ? Effect.succeed({ status: "creating" })
-          : Effect.map(kesEquivalent(wallet.usdcBalance), (kes) => ({
-              status: "active",
-              ...wallet,
-              kesEquivalent: kes,
-            })),
+          : Effect.map(
+              Effect.all(
+                [kesEquivalent(wallet.usdcBalance), activeCashOutLimits],
+                { concurrency: "unbounded" },
+              ),
+              ([kes, cashOutLimits]) => ({
+                status: "active",
+                ...wallet,
+                kesEquivalent: kes,
+                cashOutLimits,
+              }),
+            ),
     ),
   );
 }

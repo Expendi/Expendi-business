@@ -751,6 +751,7 @@ describe("GET /organizations/:id/me/salary-payments", () => {
         amountKes: "6000000",
         status: "paid",
         paidOn: "2026-11-28",
+        paymentReceipts: [],
       },
     ]);
   });

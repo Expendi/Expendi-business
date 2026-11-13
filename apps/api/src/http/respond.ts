@@ -6,7 +6,7 @@ import { Cause, Effect, Exit, Option } from "effect";
 import type { ClientError } from "../errors.js";
 import type { AppDeps } from "../layers/main.js";
 import type { AppRuntime } from "../runtime.js";
-import { Conflict, isClientError } from "../errors.js";
+import { BadRequest, Conflict, isClientError } from "../errors.js";
 import { RequestMeta, requestMetaFrom } from "./request-meta.js";
 
 /**
@@ -29,7 +29,10 @@ export function jsonResponse(
 }
 
 export function clientErrorResponse(c: Context, error: ClientError): Response {
-  const details = error instanceof Conflict ? error.details : undefined;
+  const details =
+    error instanceof Conflict || error instanceof BadRequest
+      ? error.details
+      : undefined;
   return jsonResponse(
     c,
     {
