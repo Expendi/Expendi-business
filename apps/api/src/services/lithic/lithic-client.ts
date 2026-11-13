@@ -55,6 +55,8 @@ const transactionSchema = z.looseObject({
   created: z.string(),
   amounts: z.object({ hold: signedAmount, settlement: signedAmount }),
   merchant: z.looseObject({
+    /** Lithic's ID for the merchant, which outlives a changed descriptor. */
+    acceptor_id: z.string().nullish(),
     descriptor: z.string(),
     mcc: z.string(),
     city: z.string().nullish(),

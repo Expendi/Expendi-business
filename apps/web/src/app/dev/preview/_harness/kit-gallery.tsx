@@ -115,6 +115,7 @@ const STATUS: Record<BillStatus, { label: string; tone: StatusTone }> = {
   paid: { label: "Paid", tone: "paid" },
   payout_failed: { label: "Payment failed", tone: "failed" },
   paid_outside: { label: "Paid outside Expendi", tone: "paid" },
+  paid_by_card: { label: "Paid by card", tone: "paid" },
   cancelled: { label: "Cancelled", tone: "rejected" },
 };
 
@@ -135,7 +136,8 @@ const URGENCY: Record<BillStatus, number> = {
   paying: 4,
   paid: 5,
   paid_outside: 6,
-  cancelled: 7,
+  paid_by_card: 7,
+  cancelled: 8,
 };
 
 type View = "open" | "paying";

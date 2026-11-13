@@ -76,7 +76,8 @@ function insertUnlessOutstanding(
  * Locks the item's bill still owed, if any. Anything that locks a recurring
  * item and then writes its bills takes this first: settling a bill locks
  * the bill and then the item, and the same order everywhere means no
- * deadlock.
+ * deadlock. A path that also locks a card's merchants takes them before
+ * this (`cards/merchants.ts`).
  */
 export function lockOutstandingBills(
   tx: Transaction,

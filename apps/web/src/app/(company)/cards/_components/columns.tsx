@@ -1,5 +1,7 @@
 import type { JSX } from "react";
+import { cn } from "cn";
 import { ReceiptTextIcon, TriangleAlertIcon, Undo2Icon } from "lucide-react";
+import Link from "next/link";
 
 import type {
   CardLoad,
@@ -9,7 +11,7 @@ import type {
 
 import type { CardSortKey } from "./cards-display";
 import type { DataTableColumnDef } from "~/components/data/data-table";
-import { personName } from "~/app/(company)/expenses/_components/expense-labels";
+import { textLinkClass } from "~/components/data/actions";
 import { EntityMark, Mini, RowMeta, RowTitle } from "~/components/data/cells";
 import { DataTableColumnHeader } from "~/components/data/data-table";
 import { AmountStack, Money } from "~/components/data/money";
@@ -17,11 +19,16 @@ import { StatusBadge } from "~/components/data/status-badge";
 import { formatNairobiDate } from "~/lib/dates";
 import { formatKes } from "~/lib/money";
 import {
+  asksForReceipt,
   CARD_SORT_FIRST,
   CARD_STATE,
   cardLabel,
   CHANGED_AFTER_EXPENSE_NOTE,
+  holderName,
   maskedLastFour,
+  matchedPaymentOf,
+  NEEDS_ANSWER,
+  needsAnswer,
   PURCHASE_STATUS,
   purchaseAmount,
   REFUND_NOTE,
@@ -73,15 +80,15 @@ export function cardColumns({
     },
     {
       id: "holder",
-      accessorFn: (card) => personName(card.holder),
+      accessorFn: (card) => holderName(card.holder),
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Holder" />
       ),
       cell: ({ row }) => {
-        const holder = personName(row.original.holder);
+        const holder = holderName(row.original.holder);
         return (
           <span className="flex items-center gap-2.5 whitespace-nowrap">
-            <EntityMark name={holder} kind="person" />
+            <HolderMark holder={row.original.holder} />
             {holder}
           </span>
         );
@@ -181,6 +188,57 @@ export function loadColumns(): DataTableColumnDef<CardLoad>[] {
   ];
 }
 
+/** A person's initials, or the company's mark on a company-held card. */
+export function HolderMark({
+  holder,
+}: {
+  holder: ExpendiCard["holder"];
+}): JSX.Element {
+  return holder === null ? (
+    <EntityMark name={holderName(holder)} />
+  ) : (
+    <EntityMark name={holderName(holder)} kind="person" />
+  );
+}
+
+/** "Pays Vercel", linking to the bill once the purchase has paid it. */
+export function PaysPayment({
+  purchase,
+}: {
+  purchase: CardPurchase;
+}): JSX.Element | null {
+  const matched = matchedPaymentOf(purchase);
+  if (!matched) return null;
+  const label = `Pays ${matched.payeeName}`;
+  return matched.billId ? (
+    <Link
+      href={`/bills?billId=${matched.billId}`}
+      className={cn("text-xs leading-4 whitespace-nowrap", textLinkClass)}
+    >
+      {label}
+    </Link>
+  ) : (
+    <span className="text-xs leading-4 whitespace-nowrap">{label}</span>
+  );
+}
+
+/** The purchase's status, then "Needs an answer" while an admin hasn't said what it is. */
+export function PurchaseStatus({
+  purchase,
+}: {
+  purchase: CardPurchase;
+}): JSX.Element {
+  const status = PURCHASE_STATUS[purchase.status];
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+      {needsAnswer(purchase) ? (
+        <StatusBadge tone="waiting">{NEEDS_ANSWER}</StatusBadge>
+      ) : null}
+    </span>
+  );
+}
+
 export function PurchaseFlags({
   purchase,
 }: {
@@ -188,7 +246,7 @@ export function PurchaseFlags({
 }): JSX.Element {
   return (
     <>
-      {purchase.needsReceipt ? (
+      {asksForReceipt(purchase) ? (
         <Mini icon={ReceiptTextIcon} label="Needs a receipt" warn>
           Needs receipt
         </Mini>
@@ -238,10 +296,10 @@ export function purchaseColumns({
       header: "Holder and card",
       cell: ({ row }) => {
         const purchase = row.original;
-        const holder = personName(purchase.holder);
+        const holder = holderName(purchase.holder);
         return (
           <span className="flex items-start gap-2.5">
-            <EntityMark name={holder} kind="person" />
+            <HolderMark holder={purchase.holder} />
             <span className="min-w-0">
               <span className="block whitespace-nowrap text-foreground">
                 {holder}
@@ -269,6 +327,7 @@ export function purchaseColumns({
             </RowTitle>
             <RowMeta text={refund ? REFUND_META : purchase.category.name}>
               {refund ? <Mini icon={Undo2Icon} label={REFUND_NOTE} /> : null}
+              <PaysPayment purchase={purchase} />
               <PurchaseFlags purchase={purchase} />
             </RowMeta>
           </>
@@ -288,10 +347,7 @@ export function purchaseColumns({
     {
       id: "status",
       header: "Status",
-      cell: ({ row }) => {
-        const status = PURCHASE_STATUS[row.original.status];
-        return <StatusBadge tone={status.tone}>{status.label}</StatusBadge>;
-      },
+      cell: ({ row }) => <PurchaseStatus purchase={row.original} />,
       meta: { label: "Status" },
       enableSorting: false,
     },

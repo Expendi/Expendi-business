@@ -72,9 +72,11 @@ function card() {
     state: "open",
     monthlyLimitUsdCents: "50000",
     spentThisMonthUsdCents: "12050",
+    companyHeld: false,
     holder,
     yours: true,
     defaultCategory: { id: CATEGORY, name: "Software" },
+    recurringPayments: [],
     issuedAt: "2026-11-01T08:00:00.000Z",
     closedAt: null,
   };
@@ -86,9 +88,12 @@ function purchase(id: string): CardPurchase {
     kind: "purchase",
     status: "pending",
     card: { id: CARD, nickname: "Marketing subscriptions", lastFour: "1234" },
+    companyHeld: false,
     holder,
     yours: true,
     merchant: "ACME SOFTWARE",
+    merchantKey: null,
+    match: null,
     mcc: "5734",
     holdUsdCents: "1000",
     settledUsdCents: "0",
@@ -125,6 +130,30 @@ describe("the cardholder's lists", () => {
     // #then
     expect(calls).toEqual([{ method: "GET", path: `${cardsPath}?mine=true` }]);
     expect(result.cards[0]?.lastFour).toBe("1234");
+  });
+
+  it("still reads a company-held card, with no cardholder, should one ever arrive", async () => {
+    // #given
+    const companyHeld = {
+      ...card(),
+      companyHeld: true,
+      holder: null,
+      yours: false,
+      recurringPayments: [
+        { id: PURCHASE, payeeName: "Vercel", state: "active" },
+      ],
+    };
+    const { api } = fakeApi({ cards: [companyHeld] });
+
+    // #when
+    const result = await listMyCards(api, ORG);
+
+    // #then
+    expect(result.cards[0]).toMatchObject({
+      companyHeld: true,
+      holder: null,
+      yours: false,
+    });
   });
 
   it("filters purchases by card, and pages with an encoded cursor", async () => {

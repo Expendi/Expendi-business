@@ -165,8 +165,9 @@ function readExpenses(
 
 /**
  * A USD bill is valued at what its payouts cost in KES once paid, or at the
- * company spending row once marked paid outside (spec §6.19). A split
- * salary is one row for the person, with every part's reference.
+ * company spending row once marked paid outside (spec §6.19). A bill paid by
+ * card is valued at its spending row, and nobody approved it. A split salary
+ * is one row for the person, with every part's reference.
  */
 function readPaidBills(
   tx: Transaction,
@@ -181,6 +182,7 @@ function readPaidBills(
         CASE WHEN b.payroll_run_id IS NULL THEN pe.name ELSE '' END AS merchant,
         c.name AS category,
         (CASE
+          WHEN b.status = 'paid_by_card' THEN s.amount_kes
           WHEN b.currency = 'kes' THEN b.amount_kes
           WHEN b.status = 'paid_outside' THEN s.amount_kes
           ELSE paid.amount_kes
@@ -210,7 +212,7 @@ function readPaidBills(
         WHERE p.subject_type = 'bill' AND p.subject_id = b.id AND p.status = 'paid'
       ) paid ON true
       WHERE b.organization_id = ${organizationId}
-        AND b.status IN ('paid', 'paid_outside')
+        AND b.status IN ('paid', 'paid_outside', 'paid_by_card')
         AND b.paid_on >= ${month.start}::date AND b.paid_on < ${month.end}::date
     `),
   );

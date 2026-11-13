@@ -12,6 +12,7 @@ import {
   storedAmount,
   toTyped,
 } from "./bill-amount";
+import { automaticCard } from "./bill-card";
 
 /** The bill form as typed; the API parses the amount into integer units. */
 export interface BillDraft {
@@ -36,10 +37,14 @@ export const blankToNull = (value: string): string | null =>
 /**
  * The bill as its form starts. The amount is in the payee's currency as it
  * is now: if their method changed between KES and USDC since, it's blank,
- * to be entered again in theirs.
+ * to be entered again in theirs. A company-held card's bill keeps its own
+ * currency, since the card, not the payee's method, decides it.
  */
 export function draftFromBill(bill: Bill): BillDraft {
-  const currency = currencyOfPayee(bill.payee.method, bill.currency);
+  const currency =
+    automaticCard(bill) === null
+      ? currencyOfPayee(bill.payee.method, bill.currency)
+      : bill.currency;
   const stored = currency === bill.currency ? storedAmount(bill) : null;
   return {
     payeeId: bill.payee.id,

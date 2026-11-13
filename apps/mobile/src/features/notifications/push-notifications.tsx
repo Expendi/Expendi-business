@@ -31,7 +31,7 @@ const warn = (what: string) => (error: unknown) => {
 /**
  * Push for the signed-in person (spec §6.10): registers this phone once
  * they've reached the app (asking first, once, if the system hasn't yet),
- * unregisters it on sign-out, and opens the claim or card a tapped
+ * unregisters it on sign-out, and opens the claim, card or bill a tapped
  * notification is about, in its company.
  */
 export function PushNotifications(): JSX.Element {

@@ -52,6 +52,7 @@ const PAYMENT_STATUS_LABELS: Record<BillStatus, Badge> = {
   paid: { label: "Paid", tone: "paid" },
   payout_failed: { label: "Payment failed", tone: "failed" },
   paid_outside: { label: "Paid outside Expendi", tone: "paid" },
+  paid_by_card: { label: "Paid by card", tone: "paid" },
   cancelled: { label: "Cancelled", tone: "rejected" },
 };
 

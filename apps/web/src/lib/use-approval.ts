@@ -1,6 +1,10 @@
 "use client";
 
-import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
+import type {
+  MutationKey,
+  UseMutationResult,
+  UseQueryResult,
+} from "@tanstack/react-query";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import type {
@@ -36,9 +40,12 @@ export function usePasskeyApproval<
 >(
   steps: PasskeyApprovalSteps<TVariables, TChallenge, TResult> & {
     readonly onApproved?: (result: TResult) => Promise<unknown>;
+    /** For `useIsMutating` elsewhere on the page. */
+    readonly mutationKey?: MutationKey;
   },
 ): UseMutationResult<ApprovalOutcome<TResult>, Error, TVariables> {
   return useMutation({
+    mutationKey: steps.mutationKey,
     mutationFn: (variables) => approveWithPasskey(steps, variables),
     onSuccess: async (outcome) => {
       if (outcome.status === "approved") {

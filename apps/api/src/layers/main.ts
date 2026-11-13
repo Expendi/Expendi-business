@@ -8,6 +8,7 @@ import type { AlchemyWebhook } from "../services/alchemy/alchemy-webhook.js";
 import type { ApprovalSettings } from "../services/approval/passkeys.js";
 import type { AuditLog } from "../services/audit/audit-log.js";
 import type { PrivyAuth } from "../services/auth/privy-auth.js";
+import type { LithicSimulator } from "../services/card-simulations/lithic-simulator.js";
 import type { BaseRpc } from "../services/chain/base-rpc.js";
 import type { FastNear } from "../services/chain/fast-near.js";
 import type { NearRelayer } from "../services/chain/near-relayer.js";
@@ -32,6 +33,7 @@ import { AlchemyWebhookLive } from "../services/alchemy/alchemy-webhook.js";
 import { ApprovalSettingsLive } from "../services/approval/passkeys.js";
 import { AuditLogLive } from "../services/audit/audit-log.js";
 import { PrivyAuthLive } from "../services/auth/privy-auth.js";
+import { LithicSimulatorLive } from "../services/card-simulations/lithic-simulator.js";
 import { BaseRpcLive } from "../services/chain/base-rpc.js";
 import { FastNearLive } from "../services/chain/fast-near.js";
 import { NearRelayerLive } from "../services/chain/near-relayer.js";
@@ -78,6 +80,7 @@ export type AppDeps =
   | Paycrest
   | Pretium
   | Lithic
+  | LithicSimulator
   | ApprovalSettings
   | EmailSender
   | OtpProvider
@@ -110,6 +113,8 @@ export interface ExternalLayers {
   readonly paycrest: Layer.Layer<Paycrest, AppLayerError>;
   readonly pretium: Layer.Layer<Pretium, AppLayerError>;
   readonly lithic: Layer.Layer<Lithic, AppLayerError>;
+  /** Sandbox only: the pretend merchant (spec §6.25). */
+  readonly lithicSimulator: Layer.Layer<LithicSimulator, AppLayerError>;
   readonly approvalSettings: Layer.Layer<ApprovalSettings, AppLayerError>;
   readonly emailSender: Layer.Layer<EmailSender, AppLayerError>;
   readonly otpProvider: Layer.Layer<OtpProvider, AppLayerError>;
@@ -133,6 +138,7 @@ export const LiveExternalLayers: ExternalLayers = {
   paycrest: PaycrestLive,
   pretium: PretiumLive,
   lithic: LithicLive,
+  lithicSimulator: LithicSimulatorLive,
   approvalSettings: ApprovalSettingsLive,
   emailSender: EmailSenderLive,
   otpProvider: OtpProviderLive,
@@ -183,6 +189,7 @@ export function makeAppLayer(
     external.paycrest,
     external.pretium,
     external.lithic,
+    external.lithicSimulator,
     external.approvalSettings,
     external.emailSender,
     external.otpProvider,

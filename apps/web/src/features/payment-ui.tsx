@@ -3,7 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { JSX, ReactNode } from "react";
 import { InfoIcon, KeyRoundIcon } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import type { PayeeChangeHold } from "@expendi-business/shared";
 
@@ -261,3 +261,82 @@ export function FieldRow({ children }: { children: ReactNode }): JSX.Element {
  * accountant, `checking` while the status loads.
  */
 export type PasskeyState = "none" | "checking" | "ready" | "missing";
+
+const CHOICE_RADIO =
+  "m-0 mt-px inline-grid size-[18px] flex-none cursor-pointer appearance-none place-content-center rounded-full border border-gray-500 bg-card transition-[border-color] duration-150 before:size-2 before:scale-0 before:rounded-full before:bg-brand-700 before:transition-transform before:duration-[120ms] before:ease-out-expo before:content-[''] checked:border-brand-700 checked:before:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--focus-ring) disabled:cursor-not-allowed disabled:border-input motion-reduce:transition-none motion-reduce:before:transition-none";
+
+/**
+ * One choice of several, wherever the dashboard offers them (a member's
+ * role, who holds a card, which card pays): a radio, its title (with an
+ * optional badge) and a line under it.
+ */
+export function ChoiceOption({
+  id,
+  name,
+  value,
+  checked,
+  disabled = false,
+  title,
+  badge,
+  description,
+  onChoose,
+}: {
+  id?: string;
+  name: string;
+  value: string;
+  checked: boolean;
+  disabled?: boolean;
+  title: ReactNode;
+  badge?: ReactNode;
+  description?: ReactNode;
+  onChoose: () => void;
+}): JSX.Element {
+  const fallbackId = useId();
+  const inputId = id ?? fallbackId;
+  return (
+    <label
+      htmlFor={inputId}
+      className="flex cursor-pointer items-start gap-3 rounded-control border border-input bg-card px-3.5 py-3 transition-colors duration-150 hover:border-gray-400 has-[:checked]:border-brand-700 has-[:checked]:bg-brand-50 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
+    >
+      <input
+        id={inputId}
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        disabled={disabled}
+        onChange={onChoose}
+        className={CHOICE_RADIO}
+      />
+      <span className="min-w-0">
+        <span className="flex flex-wrap items-center gap-2 text-sm font-(--w-ui) text-foreground">
+          {title}
+          {badge}
+        </span>
+        {description ? (
+          <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">
+            {description}
+          </span>
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
+/** A labelled group of `ChoiceOption`s. */
+export function ChoiceGroup({
+  legend,
+  children,
+}: {
+  legend: ReactNode;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
+      <legend className="mb-1.5 p-0 text-xs leading-4 font-(--w-ui) text-muted-foreground">
+        {legend}
+      </legend>
+      {children}
+    </fieldset>
+  );
+}

@@ -17,6 +17,8 @@ export const queryKeys = {
   company: (companyId: string) => ["internal", "company", companyId] as const,
   companyTreasury: (companyId: string) =>
     ["internal", "company", companyId, "treasury"] as const,
+  companyCardSimulations: (companyId: string) =>
+    ["internal", "company", companyId, "card-simulations"] as const,
   payoutQueue: (query: PayoutQueueQuery) =>
     ["internal", "payouts", query] as const,
   payout: (payoutId: string) => ["internal", "payout", payoutId] as const,

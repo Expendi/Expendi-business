@@ -10,6 +10,7 @@ import type { SubjectHooks } from "../payout/subjects.js";
 import type { BillAmount } from "./payable.js";
 import {
   bills,
+  cards,
   payees,
   payouts,
   payrollRuns,
@@ -102,10 +103,12 @@ function lockBillOf(tx: Transaction, payout: Payout) {
         bill: bills,
         payee: { name: payees.name, kind: payees.kind, method: payees.method },
         recurringPayVia: recurringItems.payVia,
+        cardLastFour: cards.lastFour,
       })
       .from(bills)
       .innerJoin(payees, eq(payees.id, bills.payeeId))
       .leftJoin(recurringItems, eq(recurringItems.id, bills.recurringItemId))
+      .leftJoin(cards, eq(cards.id, recurringItems.cardId))
       .where(
         and(
           eq(bills.id, payout.subjectId),
@@ -285,7 +288,10 @@ function approveBill(
         recurringItem:
           found.recurringPayVia === null
             ? null
-            : { payVia: found.recurringPayVia },
+            : {
+                payVia: found.recurringPayVia,
+                cardLastFour: found.cardLastFour,
+              },
       }).pipe(
         Effect.catchTag("BillNotPayable", (error) =>
           refuse(`${error.message} Nothing was sent.`),

@@ -1,6 +1,10 @@
 "use client";
 
-import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
+import type {
+  QueryClient,
+  UseMutationResult,
+  UseQueryResult,
+} from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type {
@@ -14,6 +18,7 @@ import {
 } from "@expendi-business/shared";
 
 import { billKeys, recurringKeys } from "~/features/payment-keys";
+import { queryKeys } from "~/lib/query-keys";
 import { useApi } from "~/lib/use-api";
 
 /** The recurring payment routes the app uses (T36): admins act, accountants read. */
@@ -61,16 +66,28 @@ export function useRecurringItem(
   });
 }
 
-/** Changes to a recurring payment can create bills, so both refresh. */
+/**
+ * Changes to a recurring payment can create bills, so both refresh, and so
+ * do the cards: a card's recurring payments drive its freeze warning and
+ * the answer to a new merchant's purchase.
+ */
+export function refreshAfterRecurringChange(
+  queryClient: QueryClient,
+  organizationId: string,
+): Promise<unknown> {
+  return Promise.all(
+    [
+      recurringKeys.all(organizationId),
+      billKeys.all(organizationId),
+      queryKeys.cardList(organizationId),
+      queryKeys.companyHeldCards(organizationId),
+    ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+  );
+}
+
 function useInvalidateRecurring(organizationId: string) {
   const queryClient = useQueryClient();
-  return () =>
-    Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: recurringKeys.all(organizationId),
-      }),
-      queryClient.invalidateQueries({ queryKey: billKeys.all(organizationId) }),
-    ]);
+  return () => refreshAfterRecurringChange(queryClient, organizationId);
 }
 
 export function useCreateRecurringItem(

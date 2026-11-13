@@ -1,4 +1,15 @@
-import type { CashObligation, FloatSummary } from "@expendi-business/shared";
+import type {
+  CashObligation,
+  FloatSummary,
+  SpendingOverview,
+} from "@expendi-business/shared";
+import {
+  cashCardBillsLine,
+  formatUsdCents,
+  obligationAmount as obligationAmountInKes,
+} from "@expendi-business/shared";
+
+import { maskedCardNumber } from "../cards/card-display";
 
 /** The cash check and the 30-day list on the admin's home screen (spec §6.24). */
 
@@ -7,9 +18,57 @@ export {
   cashHeadline,
   cashOutsideLine,
   obligationAction,
-  obligationAmount,
   overviewKes as kes,
 } from "@expendi-business/shared";
+
+export interface CashCardLine {
+  readonly text: string;
+  readonly short: boolean;
+}
+
+/**
+ * The bills company-held cards pay before the cash check's date, against
+ * the Card balance they're paid from rather than the wallet. Null when no
+ * card pays anything in that time. The Card balance is loaded only on the
+ * web dashboard, so a shortfall says where.
+ */
+export function cashCardLine(
+  cash: SpendingOverview["cash"],
+): CashCardLine | null {
+  const text = cashCardBillsLine(cash);
+  if (text === null) return null;
+  return cash.cardBills?.short
+    ? {
+        text: `${text}. Load the Card balance on the web dashboard.`,
+        short: true,
+      }
+    : { text, short: false };
+}
+
+/**
+ * How a due payment gets paid. The API sends a company-held card's as
+ * `outside` for apps built before cards, so the card decides first.
+ */
+export function obligationPaidBy(
+  row: Pick<CashObligation, "payVia" | "card">,
+): string {
+  if (row.card) {
+    return `Automatic · card ${maskedCardNumber(row.card.lastFour)}`;
+  }
+  return row.payVia === "outside" ? "Paid outside Expendi" : "Through Expendi";
+}
+
+/**
+ * A company-held card is charged whatever the payee charges, in USD from
+ * the Card balance, so its amount is the USD estimate the Card balance is
+ * checked against, never the KES the cash check values it at.
+ */
+export function obligationAmount(row: CashObligation): string {
+  if (!row.card) return obligationAmountInKes(row);
+  return row.amountUsdCents == null
+    ? "No estimate"
+    : `About ${formatUsdCents(BigInt(row.amountUsdCents))}`;
+}
 
 export type ObligationTarget =
   | { readonly screen: "bill"; readonly billId: string }

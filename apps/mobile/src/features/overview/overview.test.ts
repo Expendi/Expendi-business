@@ -7,11 +7,13 @@ import type {
 } from "@expendi-business/shared";
 
 import {
+  cashCardLine,
   cashFootnote,
   cashHeadline,
   cashOutsideLine,
   obligationAction,
   obligationAmount,
+  obligationPaidBy,
   obligationTarget,
   openFloatLeft,
   shiftMonth,
@@ -58,6 +60,25 @@ function obligation(overrides: Partial<CashObligation> = {}): CashObligation {
   };
 }
 
+/**
+ * A bill a company-held card pays, as the API sends it: `outside` for apps
+ * built before cards, its USD 20.00 estimate in US cents and in KES at
+ * today's rate.
+ */
+function cardObligation(
+  overrides: Partial<CashObligation> = {},
+): CashObligation {
+  return obligation({
+    name: "Vercel",
+    amountKes: "257360",
+    payVia: "outside",
+    heading: "subscriptions",
+    card: { id: "card-1", nickname: "Software", lastFour: "1234" },
+    amountUsdCents: "2000",
+    ...overrides,
+  });
+}
+
 describe("cash check", () => {
   it("says Covered, Short by the shortfall, or that it needs the rate", () => {
     // #when
@@ -94,6 +115,78 @@ describe("cash check", () => {
 
     // #then
     expect(lines).toEqual([null, "Also due outside Expendi: KES 3,000.00"]);
+  });
+
+  it("sets the bills company-held cards pay against the Card balance, only when there are some", () => {
+    // #when
+    const lines = [
+      cashCardLine(cash()),
+      cashCardLine(cash({ cardBills: null })),
+      cashCardLine(
+        cash({
+          cardBills: {
+            dueUsdCents: "4500",
+            availableUsdCents: "12000",
+            short: false,
+          },
+        }),
+      ),
+    ];
+
+    // #then
+    expect(lines).toEqual([
+      null,
+      null,
+      {
+        text: "Due by company-held card: USD 45.00 of USD 120.00 on the Card balance",
+        short: false,
+      },
+    ]);
+  });
+
+  it("says when the Card balance won't cover them, overspent included, and where to load it", () => {
+    // #when
+    const line = cashCardLine(
+      cash({
+        cardBills: {
+          dueUsdCents: "4500",
+          availableUsdCents: "-250",
+          short: true,
+        },
+      }),
+    );
+
+    // #then
+    expect(line).toEqual({
+      text: "Card balance short: USD 45.00 due by company-held card, USD 0.00 left on it. Load the Card balance on the web dashboard.",
+      short: true,
+    });
+  });
+
+  it("leaves a bill a company-held card pays out of what's due through or outside Expendi", () => {
+    // #given
+    const withCardBill = cash({
+      totalKes: "0",
+      outsideKes: "0",
+      obligations: [cardObligation()],
+      cardBills: {
+        dueUsdCents: "2000",
+        availableUsdCents: "5000",
+        short: false,
+      },
+    });
+
+    // #then
+    expect({
+      footnote: cashFootnote(withCardBill),
+      outside: cashOutsideLine(withCardBill),
+      card: cashCardLine(withCardBill)?.text,
+    }).toEqual({
+      footnote:
+        "KES 0.00 to pay through Expendi by 2026-12-02, overdue included. Cash-out fees and bills paid outside Expendi aren't counted.",
+      outside: null,
+      card: "Due by company-held card: USD 20.00 of USD 50.00 on the Card balance",
+    });
   });
 });
 
@@ -136,6 +229,64 @@ describe("what's due next", () => {
       obligationAmount(obligation({ amountKes: null, needsAmount: true })),
       obligationAmount(obligation({ amountKes: null })),
     ]).toEqual(["KES 4,500.00", "Amount not entered", "Amount unknown"]);
+  });
+
+  it("says how each is paid, a company-held card's as automatic with its last four", () => {
+    // #then
+    expect([
+      obligationPaidBy(obligation()),
+      obligationPaidBy(obligation({ payVia: "outside" })),
+      obligationPaidBy(cardObligation()),
+      obligationPaidBy(
+        cardObligation({ kind: "forecast", status: "forecast" }),
+      ),
+    ]).toEqual([
+      "Through Expendi",
+      "Paid outside Expendi",
+      "Automatic · card •••• 1234",
+      "Automatic · card •••• 1234",
+    ]);
+  });
+
+  it("reads a company-held card's amount as its USD estimate, never as a KES amount to pay", () => {
+    // #then
+    expect([
+      obligationAmount(cardObligation()),
+      obligationAmount(cardObligation({ amountKes: null })),
+      obligationAmount(
+        cardObligation({ kind: "forecast", status: "forecast" }),
+      ),
+    ]).toEqual(["About USD 20.00", "About USD 20.00", "About USD 20.00"]);
+  });
+
+  it("says a company-held card's payment has no estimate, whether or not there's a rate", () => {
+    // #then
+    expect([
+      obligationAmount(
+        cardObligation({ amountUsdCents: null, amountKes: null }),
+      ),
+      obligationAmount(
+        cardObligation({ amountUsdCents: undefined, amountKes: null }),
+      ),
+    ]).toEqual(["No estimate", "No estimate"]);
+  });
+
+  it("offers View on a company-held card's bill, never Mark paid, and opens the bill", () => {
+    // #given
+    const row = cardObligation();
+
+    // #then
+    expect({
+      action: obligationAction(row),
+      forecast: obligationAction(
+        cardObligation({ kind: "forecast", status: "forecast" }),
+      ),
+      target: obligationTarget(row),
+    }).toEqual({
+      action: "View",
+      forecast: "View",
+      target: { screen: "bill", billId: ID },
+    });
   });
 });
 

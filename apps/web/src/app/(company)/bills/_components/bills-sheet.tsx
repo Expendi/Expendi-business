@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import type {
   Bill,
   BillDetail,
+  ExpendiCard,
   PayeeChangeHold,
   RecurringItem,
 } from "@expendi-business/shared";
@@ -16,7 +17,7 @@ import type { SheetStepper } from "~/components/data/detail-sheet";
 import type { BillPaymentRequest } from "~/features/bills/bill-payment";
 import type { PreparedBillPayment } from "~/features/bills/bills-api";
 import { TreasuryOfferButton } from "~/app/(company)/wallet/_components/treasury-offer";
-import { DetailSheet } from "~/components/data/detail-sheet";
+import { Callout, DetailSheet } from "~/components/data/detail-sheet";
 import { ErrorState } from "~/components/data/states";
 import { nairobiIsoDate } from "~/features/bills/bill-dates";
 import { useBill } from "~/features/bills/bills-api";
@@ -50,6 +51,7 @@ import {
   CancelBillForm,
   MarkPaidOutsideForm,
 } from "./bill-settle-forms";
+import { issuedCardNote } from "./recurring-card-field";
 import { RecurringForm } from "./recurring-form";
 import {
   BackToRecurring,
@@ -73,6 +75,8 @@ export type LocalSheet =
     }
   | { readonly kind: "recurring-new" }
   | { readonly kind: "recurring-edit"; readonly itemId: string }
+  /** Just saved to be paid by a company-held card: the card goes in at the merchant next. */
+  | { readonly kind: "recurring-card-next"; readonly itemId: string }
   | {
       readonly kind: "recurring-confirm";
       readonly itemId: string;
@@ -153,9 +157,9 @@ export function BillsSheet({
   recurring,
   local,
   payment,
-  onNavigate,
-  onLocal,
-  onClose,
+  onNavigate: navigate,
+  onLocal: setLocal,
+  onClose: close,
   onBillCreated,
 }: {
   organizationId: string;
@@ -175,7 +179,30 @@ export function BillsSheet({
   onBillCreated: (bill: BillDetail) => void;
 }): JSX.Element {
   const [footerSlot, setFooterSlot] = useState<HTMLDivElement | null>(null);
+  /** Said where a cancelled recurring payment form leaves the admin, until they move on. */
+  const [notice, setNotice] = useState<string | null>(null);
   const receiptDownload = useReceiptDownload(organizationId);
+
+  function onNavigate(link: SheetLink, next?: LocalSheet) {
+    setNotice(null);
+    navigate(link, next);
+  }
+
+  function onLocal(next: LocalSheet) {
+    setNotice(null);
+    setLocal(next);
+  }
+
+  function onClose() {
+    setNotice(null);
+    close();
+  }
+
+  /** A card issued from the cancelled form stays issued, so the admin hears where it went. */
+  function cancelRecurringForm(issued: ExpendiCard | null, leave: () => void) {
+    leave();
+    if (issued) setNotice(issuedCardNote(issued));
+  }
   const detail = useBill(organizationId, billId ?? "", {
     enabled: billId !== null,
   });
@@ -260,7 +287,9 @@ export function BillsSheet({
     return {
       eyebrow: bill ? billEyebrow(bill) : "Bill",
       title: bill?.payee.name ?? "Bill",
-      headerExtra: bill ? <BillSheetHeader bill={bill} rate={rate} /> : null,
+      headerExtra: bill ? (
+        <BillSheetHeader bill={loaded ?? bill} rate={rate} />
+      ) : null,
       stepper: {
         index,
         total: ids.length,
@@ -351,7 +380,14 @@ export function BillsSheet({
             organizationId={organizationId}
             item={found}
             footerSlot={footerSlot}
-            onDone={toDetail}
+            onSaved={(saved) =>
+              onLocal(
+                movedToCard(found, saved)
+                  ? { kind: "recurring-card-next", itemId: found.id }
+                  : NO_LOCAL_SHEET,
+              )
+            }
+            onCancel={(issued) => cancelRecurringForm(issued, toDetail)}
           />
         ),
         footerSlot: true,
@@ -394,7 +430,12 @@ export function BillsSheet({
       stepKey: found.id,
       body: (
         <RecurringDetailBody
+          organizationId={organizationId}
           item={found}
+          canAct={canAct}
+          cardNextStep={
+            local.kind === "recurring-card-next" && local.itemId === found.id
+          }
           onOpenBill={(nextBillId) =>
             onNavigate({
               recurring: null,
@@ -432,9 +473,18 @@ export function BillsSheet({
             organizationId={organizationId}
             footerSlot={footerSlot}
             onCreated={(created) =>
-              onNavigate({ recurring: created.id }, NO_LOCAL_SHEET)
+              onNavigate(
+                { recurring: created.id },
+                created.payVia === "card"
+                  ? { kind: "recurring-card-next", itemId: created.id }
+                  : NO_LOCAL_SHEET,
+              )
             }
-            onCancel={() => onNavigate({ recurring: "all" })}
+            onCancel={(issued) =>
+              cancelRecurringForm(issued, () =>
+                onNavigate({ recurring: "all" }),
+              )
+            }
           />
         ),
         footerSlot: true,
@@ -541,6 +591,16 @@ export function BillsSheet({
         )
       }
     >
+      {notice ? (
+        <div
+          role="status"
+          className={parts?.flush ? "px-6 pt-5 max-[600px]:px-4" : undefined}
+        >
+          <Callout tone="neutral">
+            <p>{notice}</p>
+          </Callout>
+        </div>
+      ) : null}
       {parts?.body}
     </DetailSheet>
   );
@@ -555,7 +615,7 @@ function CreateRecurring({
   organizationId: string;
   footerSlot: HTMLElement | null;
   onCreated: (item: RecurringItem) => void;
-  onCancel: () => void;
+  onCancel: (issued: ExpendiCard | null) => void;
 }): JSX.Element {
   const create = useCreateRecurringItem(organizationId);
   const [today] = useState(() => nairobiIsoDate(new Date()));
@@ -573,16 +633,26 @@ function CreateRecurring({
   );
 }
 
+/** A payment now paid by a company-held card it wasn't paid by before. */
+function movedToCard(before: RecurringItem, after: RecurringItem): boolean {
+  return (
+    after.payVia === "card" &&
+    (before.payVia !== "card" || before.card?.id !== after.card?.id)
+  );
+}
+
 function EditRecurring({
   organizationId,
   item,
   footerSlot,
-  onDone,
+  onSaved,
+  onCancel,
 }: {
   organizationId: string;
   item: RecurringItem;
   footerSlot: HTMLElement | null;
-  onDone: () => void;
+  onSaved: (saved: RecurringItem) => void;
+  onCancel: (issued: ExpendiCard | null) => void;
 }): JSX.Element {
   const update = useUpdateRecurringItem(organizationId, item.id);
   return (
@@ -594,8 +664,8 @@ function EditRecurring({
       submitting={update.isPending}
       submitError={update.isError ? update.error : null}
       footerSlot={footerSlot}
-      onSubmit={(request) => update.mutate(request, { onSuccess: onDone })}
-      onCancel={onDone}
+      onSubmit={(request) => update.mutate(request, { onSuccess: onSaved })}
+      onCancel={onCancel}
     />
   );
 }

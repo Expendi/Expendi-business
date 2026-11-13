@@ -10,6 +10,130 @@ const ORGANIZATION_ID = "5b0f6a52-3d8e-4c1a-9f7e-2a4b6c8d0e1f";
 const CLAIM_ID = "8c2d4e6f-1a3b-4c5d-8e7f-9a0b1c2d3e4f";
 const CARD_ID = "7d1e3f5a-2b4c-4d6e-9f80-1a2b3c4d5e6f";
 const PURCHASE_ID = "6e0f2a4b-3c5d-4e7f-8a91-2b3c4d5e6f70";
+const BILL_ID = "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d";
+
+describe("notificationTarget for a company-held card", () => {
+  it.each(["card_bill_declined", "card_purchase_over_estimate"])(
+    "opens the bill for %s, not the cardholder's purchase",
+    (type) => {
+      // #when
+      const target = notificationTarget({
+        type,
+        organizationId: ORGANIZATION_ID,
+        billId: BILL_ID,
+        cardId: CARD_ID,
+        purchaseId: PURCHASE_ID,
+      });
+
+      // #then
+      expect(target).toEqual({
+        kind: "bill",
+        organizationId: ORGANIZATION_ID,
+        billId: BILL_ID,
+      });
+    },
+  );
+
+  it.each(["card_bill_declined", "card_purchase_over_estimate"])(
+    "opens the bills for %s when it names no bill",
+    (type) => {
+      // #when
+      const target = notificationTarget({
+        type,
+        organizationId: ORGANIZATION_ID,
+        cardId: CARD_ID,
+        purchaseId: PURCHASE_ID,
+      });
+
+      // #then
+      expect(target).toEqual({
+        kind: "bills",
+        organizationId: ORGANIZATION_ID,
+      });
+    },
+  );
+
+  it("opens the bills for a purchase to answer on the web dashboard", () => {
+    // #when
+    const target = notificationTarget({
+      type: "card_purchase_needs_review",
+      organizationId: ORGANIZATION_ID,
+      cardId: CARD_ID,
+      purchaseId: PURCHASE_ID,
+    });
+
+    // #then
+    expect(target).toEqual({ kind: "bills", organizationId: ORGANIZATION_ID });
+  });
+
+  it("opens the overview's cash check when the Card balance is short", () => {
+    // #when
+    const target = notificationTarget({
+      type: "card_balance_short",
+      organizationId: ORGANIZATION_ID,
+    });
+
+    // #then
+    expect(target).toEqual({
+      kind: "overview",
+      organizationId: ORGANIZATION_ID,
+    });
+  });
+
+  it.each([
+    [
+      "a card type this version doesn't know",
+      {
+        type: "card_something_new",
+        organizationId: ORGANIZATION_ID,
+        billId: BILL_ID,
+      },
+    ],
+    [
+      "a bill ID that isn't one",
+      {
+        type: "card_bill_declined",
+        organizationId: ORGANIZATION_ID,
+        billId: "../x",
+      },
+    ],
+    ["no company", { type: "card_balance_short" }],
+  ])("ignores %s", (_label, data) => {
+    // #then
+    expect(notificationTarget(data)).toBeNull();
+  });
+
+  it("opens the bill, the bills and the overview, refreshing what they show", () => {
+    // #given
+    const bill = {
+      kind: "bill",
+      organizationId: ORGANIZATION_ID,
+      billId: BILL_ID,
+    } as const;
+    const bills = { kind: "bills", organizationId: ORGANIZATION_ID } as const;
+    const overview = {
+      kind: "overview",
+      organizationId: ORGANIZATION_ID,
+    } as const;
+
+    // #then
+    expect({
+      hrefs: [bill, bills, overview].map(notificationHref),
+      keys: [bill, bills, overview].map(notificationQueryKey),
+    }).toEqual({
+      hrefs: [
+        { pathname: "/bills/[billId]", params: { billId: BILL_ID } },
+        "/bills",
+        "/",
+      ],
+      keys: [
+        ["organizations", ORGANIZATION_ID, "bills"],
+        ["organizations", ORGANIZATION_ID, "bills"],
+        ["organizations", ORGANIZATION_ID, "overview"],
+      ],
+    });
+  });
+});
 
 describe("notificationTarget", () => {
   it.each([

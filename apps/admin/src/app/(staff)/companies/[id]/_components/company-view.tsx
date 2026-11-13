@@ -19,6 +19,7 @@ import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
 import { formatKesCents, formatNairobiTime, formatUsdc } from "~/lib/format";
 import { queryKeys } from "~/lib/query-keys";
+import { CardSimulationsSection } from "./card-simulations-section";
 import { memberColumns } from "./columns";
 import { TreasurySection } from "./treasury-section";
 
@@ -148,6 +149,8 @@ export function CompanyView({ companyId }: { companyId: string }) {
       </Card>
 
       <TreasurySection companyId={company.id} canAct={canAct} />
+
+      <CardSimulationsSection companyId={company.id} canAct={canAct} />
 
       <Card className="mt-6 gap-0 overflow-hidden py-0">
         <CardHeader className="border-b py-4">

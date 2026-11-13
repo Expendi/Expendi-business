@@ -37,15 +37,18 @@ import { useFloats } from "~/features/petty-cash/use-floats";
 import { describeApiError } from "~/lib/api";
 import { formatUsdc } from "~/lib/money";
 import { overviewPersonStatuses } from "~/lib/payment-poll";
+import { queryKeys } from "~/lib/query-keys";
 import { useApi } from "~/providers/api-provider";
 import { colors } from "~/theme/colors";
 import {
+  cashCardLine,
   cashFootnote,
   cashHeadline,
   cashOutsideLine,
   kes,
   obligationAction,
   obligationAmount,
+  obligationPaidBy,
   obligationTarget,
   openFloatLeft,
   shiftMonth,
@@ -69,7 +72,7 @@ export function AdminHomeContent({
   const [month, setMonth] = useState("");
   const [personId, setPersonId] = useState<string | null>(null);
   const overview = useQuery({
-    queryKey: ["organizations", organizationId, "overview", month],
+    queryKey: queryKeys.overviewMonth(organizationId, month),
     queryFn: () =>
       api.get(
         `/organizations/${organizationId}/overview${month ? `?month=${month}` : ""}`,
@@ -106,6 +109,7 @@ export function AdminHomeContent({
     );
   const data = overview.data;
   const outsideLine = cashOutsideLine(data.cash);
+  const cardLine = cashCardLine(data.cash);
   function openObligation(row: CashObligation) {
     const target = obligationTarget(row);
     switch (target.screen) {
@@ -176,6 +180,17 @@ export function AdminHomeContent({
           </Text>
         </View>
         {outsideLine === null ? null : <Note>{outsideLine}</Note>}
+        {cardLine === null ? null : cardLine.short ? (
+          <Text
+            selectable
+            accessibilityRole="alert"
+            className="text-sm leading-5 text-amber-800"
+          >
+            {cardLine.text}
+          </Text>
+        ) : (
+          <Note>{cardLine.text}</Note>
+        )}
         <Note>{cashFootnote(data.cash)}</Note>
       </View>
       <Section title="Spending overview">
@@ -296,10 +311,7 @@ export function AdminHomeContent({
                 {row.kind === "forecast"
                   ? "not billed yet"
                   : row.status.replaceAll("_", " ")}{" "}
-                ·{" "}
-                {row.payVia === "outside"
-                  ? "Paid outside Expendi"
-                  : "Through Expendi"}
+                · {obligationPaidBy(row)}
               </Note>
               <Button
                 label={obligationAction(row)}

@@ -1,3 +1,4 @@
+import type { PgTableExtraConfigValue } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -17,6 +18,7 @@ import {
 
 import { BILL_STATUSES } from "@expendi-business/shared";
 
+import { cardPurchases } from "./cards.js";
 import { categories } from "./categories.js";
 import { timestamps } from "./columns.js";
 import { billCurrency } from "./currency.js";
@@ -41,6 +43,8 @@ export const billStatus = pgEnum("bill_status", BILL_STATUSES);
  *   and can't be paid or marked paid before then.
  * - `paid_on` is the Kenyan calendar day the money went out; `paid_at` is
  *   when Expendi recorded it.
+ * - `paid_by_card`: a Card purchase on a company-held card paid it, with
+ *   no payout and nobody marking it.
  */
 export const bills = pgTable(
   "bills",
@@ -82,9 +86,16 @@ export const bills = pgTable(
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     /** The latest payout paying it through Expendi (T37). */
     payoutId: uuid("payout_id"),
+    /** The Card purchase that paid it, exactly when `paid_by_card`. */
+    cardPurchaseId: uuid("card_purchase_id"),
+    /** The company-held card last declined a Card purchase meant for it. */
+    cardDeclinedAt: timestamp("card_declined_at", { withTimezone: true }),
+    cardDeclineReason: text("card_decline_reason"),
     ...timestamps,
   },
-  (table) => [
+  // Typed, so TypeScript needn't infer `bills` through card_purchases and
+  // expenses, which both reference it back.
+  (table): PgTableExtraConfigValue[] => [
     foreignKey({
       name: "bills_payee_organization_fk",
       columns: [table.payeeId, table.organizationId],
@@ -110,6 +121,11 @@ export const bills = pgTable(
       columns: [table.payoutId, table.organizationId],
       foreignColumns: [payouts.id, payouts.organizationId],
     }),
+    foreignKey({
+      name: "bills_card_purchase_organization_fk",
+      columns: [table.cardPurchaseId, table.organizationId],
+      foreignColumns: [cardPurchases.id, cardPurchases.organizationId],
+    }),
     // Target of receipt_files' composite foreign key.
     unique("bills_id_organization_id_unique").on(
       table.id,
@@ -118,6 +134,9 @@ export const bills = pgTable(
     uniqueIndex("bills_payout_id_unique")
       .on(table.payoutId)
       .where(sql`${table.payoutId} IS NOT NULL`),
+    uniqueIndex("bills_card_purchase_id_unique")
+      .on(table.cardPurchaseId)
+      .where(sql`${table.cardPurchaseId} IS NOT NULL`),
     index("bills_organization_due_on_idx").on(
       table.organizationId,
       table.dueOn,
@@ -125,7 +144,7 @@ export const bills = pgTable(
     index("bills_payee_id_idx").on(table.payeeId),
     // A recurring payment has at most one bill still owed (spec §10): one
     // unpaid, or being paid. Its next bill can only be created once that one
-    // is paid, paid outside or cancelled. OUTSTANDING_BILL_STATUSES in shared.
+    // is paid (by any means) or cancelled. OUTSTANDING_BILL_STATUSES in shared.
     // Salaries are left out: their unit is the payroll run, so a person's
     // pay for one month never waits on the month before, e.g. a failed
     // payout still being retried.
@@ -174,13 +193,19 @@ export const bills = pgTable(
       "bills_fixed_has_amount",
       sql`${table.variable} OR ${table.amountKes} IS NOT NULL OR ${table.amountUsdc} IS NOT NULL`,
     ),
+    // `::text` here and below: this runs in the transaction that adds
+    // 'paid_by_card' to the enum.
     check(
       "bills_settled_has_amount",
-      sql`${table.status} NOT IN ('paying', 'paid', 'paid_outside') OR ${table.amountKes} IS NOT NULL OR ${table.amountUsdc} IS NOT NULL`,
+      sql`${table.status}::text NOT IN ('paying', 'paid', 'paid_outside', 'paid_by_card') OR ${table.amountKes} IS NOT NULL OR ${table.amountUsdc} IS NOT NULL`,
     ),
     check(
       "bills_paid_has_dates",
-      sql`(${table.status} IN ('paid', 'paid_outside')) = (${table.paidOn} IS NOT NULL) AND (${table.status} IN ('paid', 'paid_outside')) = (${table.paidAt} IS NOT NULL)`,
+      sql`(${table.status}::text IN ('paid', 'paid_outside', 'paid_by_card')) = (${table.paidOn} IS NOT NULL) AND (${table.status}::text IN ('paid', 'paid_outside', 'paid_by_card')) = (${table.paidAt} IS NOT NULL)`,
+    ),
+    check(
+      "bills_paid_by_card_has_purchase",
+      sql`(${table.status}::text = 'paid_by_card') = (${table.cardPurchaseId} IS NOT NULL)`,
     ),
     check(
       "bills_paid_outside_recorded",

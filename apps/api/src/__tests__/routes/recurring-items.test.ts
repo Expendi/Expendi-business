@@ -21,7 +21,7 @@ import type { TestCompany, TestUser } from "../helpers/db.js";
 import type { IsolationFixture } from "../helpers/isolation.js";
 import { createApp } from "../../app.js";
 import { DatabaseService } from "../../db/client.js";
-import { payees } from "../../db/schema/index.js";
+import { bills, payees } from "../../db/schema/index.js";
 import { runInScope } from "../../db/scope.js";
 import { assertBillPayable } from "../../services/bills/payable.js";
 import { nairobiDate } from "../../services/bills/status.js";
@@ -1101,5 +1101,75 @@ describe("company isolation", () => {
         ...(method === "GET" ? {} : { body: JSON.stringify({}) }),
       },
     }));
+  });
+});
+
+describe("switching how a recurring payment is paid", () => {
+  const tillPayee = () =>
+    insertPayee(db, company, {
+      name: "Kenya Power",
+      method: "mpesa_till",
+      tillNumber: "123456",
+      accountName: "Kenya Power",
+      detailsChangedAt: new Date("2026-01-01T00:00:00Z"),
+    });
+
+  async function variableOutsideBill() {
+    const item = await createItem({
+      payeeId: await tillPayee(),
+      payVia: "outside",
+      variable: true,
+      amountKes: null,
+    });
+    return { item, billId: nextBillOf(item).id };
+  }
+
+  it("keeps a variable bill variable, with the amount entered on it", async () => {
+    // #given
+    const { item, billId } = await variableOutsideBill();
+    const entered = await send("PATCH", billsPath(billId), {
+      amountKes: "3,000",
+    });
+    expect(entered.status, await entered.clone().text()).toBe(200);
+
+    // #when
+    const switched = await send("PATCH", `${base()}/${item.id}`, {
+      payVia: "expendi",
+    });
+
+    // #then
+    expect(switched.status, await switched.clone().text()).toBe(200);
+    expect(await readBill(db, company, billId)).toMatchObject({
+      variable: true,
+      amountKes: 300_000n,
+    });
+  });
+
+  it("refuses to pay through Expendi a bill whose own amount one cash-out can't send", async () => {
+    // #given a bill entered under a larger limit than today's
+    const { item, billId } = await variableOutsideBill();
+    await runInScope(
+      db,
+      { organizationId: company.organizationId, role: "admin" },
+      (tx) =>
+        tx
+          .update(bills)
+          .set({ amountKes: 40_000_000n })
+          .where(eq(bills.id, billId)),
+    );
+
+    // #when
+    const switched = await send("PATCH", `${base()}/${item.id}`, {
+      payVia: "expendi",
+    });
+
+    // #then
+    expect(switched.status).toBe(400);
+    const { error } = (await switched.json()) as {
+      error: { message: string; details?: { field?: string } };
+    };
+    expect(error.message).toMatch(/^A single payment can send at most /);
+    expect(error.details?.field).toBe("amountKes");
+    expect((await getItem(item.id)).payVia).toBe("outside");
   });
 });

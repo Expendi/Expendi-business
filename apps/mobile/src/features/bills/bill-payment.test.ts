@@ -115,6 +115,41 @@ describe("isPayable", () => {
     // #then
     expect(isPayable(usd)).toBe(true);
   });
+
+  it("leaves a bill a company-held card pays out of Pay and Pay all, declined or not", () => {
+    // #given
+    const card = {
+      id: "44444444-4444-4444-8444-444444444444",
+      nickname: "Software",
+      lastFour: "1234",
+    };
+    const automatic = bill({
+      id: "00000000-0000-4000-8000-00000000000a",
+      card,
+    });
+    const declined = bill({
+      id: "00000000-0000-4000-8000-00000000000b",
+      card,
+      status: "overdue",
+      cardDeclinedAt: "2026-11-12T08:00:00.000Z",
+      cardDeclineReason: "The Card balance is too low.",
+    });
+    const ordinary = bill({ id: "00000000-0000-4000-8000-00000000000c" });
+    const open = [automatic, declined, ordinary];
+
+    // #then
+    expect({
+      automatic: isPayable(automatic),
+      declined: isPayable(declined),
+      selectable: open.filter(isPayable).map(({ id }) => id),
+      payAllOffered: [automatic, declined].some(isPayable),
+    }).toEqual({
+      automatic: false,
+      declined: false,
+      selectable: [ordinary.id],
+      payAllOffered: false,
+    });
+  });
 });
 
 describe("Pay all's selection", () => {

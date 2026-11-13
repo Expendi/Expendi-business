@@ -5,14 +5,24 @@ import type {
   ExpendiCard,
   MembersResponse,
 } from "@expendi-business/shared";
+import { reviewCardPurchaseRequestSchema } from "@expendi-business/shared";
 
 import {
+  answerRequest,
+  answerSavedText,
+  asksForReceipt,
+  canAddReceipt,
+  canAnswer,
   canWaiveReceipt,
   eligibleCardholders,
   formatUsd,
   hasPurchaseFilter,
+  holderName,
   limitChangeOf,
   maskedLastFour,
+  matchedPaymentOf,
+  needsAnswer,
+  paymentsDeclinedWhenFrozen,
   purchaseAmount,
   readPurchaseFilters,
   sortCards,
@@ -27,9 +37,12 @@ const purchase = (overrides: Partial<CardPurchase>): CardPurchase => ({
   kind: "purchase",
   status: "settled",
   card: { id: id(2), nickname: "Ads", lastFour: "0001" },
+  companyHeld: false,
   holder: { membershipId: id(3), name: "Jane", email: "jane@example.com" },
   yours: false,
   merchant: "Canva",
+  merchantKey: null,
+  match: null,
   mcc: "5734",
   holdUsdCents: "0",
   settledUsdCents: "4500",
@@ -53,9 +66,11 @@ const card = (overrides: Partial<ExpendiCard>): ExpendiCard => ({
   state: "open",
   monthlyLimitUsdCents: "50000",
   spentThisMonthUsdCents: "1000",
+  companyHeld: false,
   holder: { membershipId: id(3), name: "Jane", email: "jane@example.com" },
   yours: false,
   defaultCategory: { id: id(5), name: "Software" },
+  recurringPayments: [],
   issuedAt: "2026-10-21T08:30:00.000Z",
   closedAt: null,
   ...overrides,
@@ -206,15 +221,32 @@ describe("readPurchaseFilters", () => {
       readPurchaseFilters((name) => values[name] ?? null);
 
     expect({
-      good: read({ card: id(1), status: "declined", receipt: "true" }),
-      bad: read({ status: "lost", receipt: "maybe" }),
+      good: read({
+        card: id(1),
+        status: "declined",
+        receipt: "true",
+        review: "true",
+      }),
+      bad: read({ status: "lost", receipt: "maybe", review: "false" }),
       none: hasPurchaseFilter(read({})),
       some: hasPurchaseFilter(read({ receipt: "false" })),
+      review: hasPurchaseFilter(read({ review: "true" })),
     }).toEqual({
-      good: { cardId: id(1), status: "declined", needsReceipt: "true" },
-      bad: { cardId: null, status: null, needsReceipt: null },
+      good: {
+        cardId: id(1),
+        status: "declined",
+        needsReceipt: "true",
+        needsReview: "true",
+      },
+      bad: {
+        cardId: null,
+        status: null,
+        needsReceipt: null,
+        needsReview: null,
+      },
       none: false,
       some: true,
+      review: true,
     });
   });
 });
@@ -222,5 +254,200 @@ describe("readPurchaseFilters", () => {
 describe("maskedLastFour", () => {
   it("never shows more than the last four digits", () => {
     expect(maskedLastFour("0001")).toBe("•••• 0001");
+  });
+});
+
+describe("answerRequest", () => {
+  const recurringItemId = id(30);
+
+  it("sends the recurring payment only with link, as the API takes it", () => {
+    // #then
+    expect(
+      (["link", "one_off", "not_recognised"] as const).map((decision) =>
+        reviewCardPurchaseRequestSchema.parse(
+          answerRequest(decision, recurringItemId),
+        ),
+      ),
+    ).toEqual([
+      { decision: "link", recurringItemId },
+      { decision: "one_off" },
+      { decision: "not_recognised" },
+    ]);
+  });
+
+  it("asks for an answer, and for the payment a link pays", () => {
+    // #when
+    const issues = [answerRequest(null, ""), answerRequest("link", "")].map(
+      (request) =>
+        reviewCardPurchaseRequestSchema
+          .safeParse(request)
+          .error?.issues.map((issue) => issue.message),
+    );
+
+    // #then
+    expect(issues).toEqual([
+      [
+        "Say whether it's one of the card's recurring payments, a one-off, or not recognised.",
+      ],
+      ["Pick the recurring payment it pays."],
+    ]);
+  });
+});
+
+describe("company-held card purchases", () => {
+  const matched = purchase({
+    companyHeld: true,
+    holder: null,
+    needsReceipt: true,
+    expenseId: id(9),
+    match: {
+      state: "matched",
+      recurringItemId: id(30),
+      billId: id(31),
+      payeeName: "Vercel",
+    },
+  });
+
+  it("asks no receipt of a purchase that pays a bill", () => {
+    // #then
+    expect({
+      matched: [asksForReceipt(matched), canWaiveReceipt(matched)],
+      oneOff: asksForReceipt({
+        ...matched,
+        match: {
+          state: "one_off",
+          recurringItemId: null,
+          billId: null,
+          payeeName: null,
+        },
+      }),
+      paid: matchedPaymentOf(matched),
+    }).toEqual({
+      matched: [false, false],
+      oneOff: true,
+      paid: { payeeName: "Vercel", billId: id(31) },
+    });
+  });
+
+  it("is answered for once, and a one-off can still change", () => {
+    // #given
+    const withMatch = (state: "needs_review" | "one_off" | "not_recognised") =>
+      purchase({
+        companyHeld: true,
+        holder: null,
+        match: { state, recurringItemId: null, billId: null, payeeName: null },
+      });
+
+    // #then
+    expect({
+      needsReview: [
+        needsAnswer(withMatch("needs_review")),
+        canAnswer(withMatch("needs_review")),
+      ],
+      oneOff: canAnswer(withMatch("one_off")),
+      notRecognised: canAnswer(withMatch("not_recognised")),
+      matched: canAnswer(matched),
+    }).toEqual({
+      needsReview: [true, true],
+      oneOff: true,
+      notRecognised: false,
+      matched: false,
+    });
+  });
+
+  it("names the recurring payments a frozen card declines: those not paused", () => {
+    // #given
+    const companyCard = card({
+      companyHeld: true,
+      holder: null,
+      recurringPayments: [
+        { id: id(30), payeeName: "Vercel", state: "active" },
+        { id: id(32), payeeName: "Notion", state: "paused" },
+      ],
+    });
+
+    // #then
+    expect(
+      paymentsDeclinedWhenFrozen(companyCard).map(
+        (payment) => payment.payeeName,
+      ),
+    ).toEqual(["Vercel"]);
+  });
+
+  it("calls a company-held card's holder Company-held", () => {
+    // #then
+    expect(holderName(null)).toBe("Company-held");
+  });
+
+  it("lets an admin add the receipt for a company-held card's one-off purchase, from the hold on", () => {
+    // #given
+    const oneOff = purchase({
+      companyHeld: true,
+      holder: null,
+      match: {
+        state: "one_off",
+        recurringItemId: null,
+        billId: null,
+        payeeName: null,
+      },
+    });
+
+    // #then
+    expect({
+      settled: canAddReceipt(oneOff),
+      pending: canAddReceipt({ ...oneOff, status: "pending", expenseId: null }),
+      declined: canAddReceipt({ ...oneOff, status: "declined" }),
+      refund: canAddReceipt({ ...oneOff, kind: "refund" }),
+      hasOne: canAddReceipt({ ...oneOff, needsReceipt: false }),
+      paysBill: canAddReceipt(matched),
+      personsCard: canAddReceipt(purchase({})),
+    }).toEqual({
+      settled: true,
+      pending: true,
+      declined: false,
+      refund: false,
+      hasOne: false,
+      paysBill: false,
+      personsCard: false,
+    });
+  });
+});
+
+describe("answerSavedText", () => {
+  const waiting = purchase({
+    companyHeld: true,
+    holder: null,
+    merchant: "VERCEL INC.",
+    card: { id: id(2), nickname: "Software", lastFour: "0004" },
+  });
+  const savedAs = (
+    state: "matched" | "one_off" | "not_recognised",
+    payeeName: string | null = null,
+  ): CardPurchase => ({
+    ...waiting,
+    match: { state, recurringItemId: null, billId: null, payeeName },
+  });
+  const link = { decision: "link", recurringItemId: id(30) } as const;
+
+  it("says what the API did with the answer, not what was asked", () => {
+    // #then
+    expect({
+      linked: answerSavedText(link, savedAs("matched", "Vercel"), "Vercel"),
+      keptInBooks: answerSavedText(link, savedAs("one_off"), "Vercel"),
+      oneOff: answerSavedText({ decision: "one_off" }, savedAs("one_off"), ""),
+      notRecognised: answerSavedText(
+        { decision: "not_recognised" },
+        savedAs("not_recognised"),
+        "",
+      ),
+    }).toEqual({
+      linked:
+        "Saved. It pays Vercel’s bill, and later purchases from VERCEL INC. match on their own.",
+      keptInBooks:
+        "Vercel’s later purchases will pay its bills. This one stays a Card expense because it’s already in your books.",
+      oneOff:
+        "Saved as a one-off purchase. It stays a Card expense and needs a receipt.",
+      notRecognised: "Saved. VERCEL INC. is declined on Software from now on.",
+    });
   });
 });

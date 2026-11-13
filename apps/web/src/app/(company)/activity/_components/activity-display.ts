@@ -314,6 +314,7 @@ const STATUS_LABELS: Readonly<
     paid: ["Paid", "paid"],
     payout_failed: ["Payment failed", "failed"],
     paid_outside: ["Paid outside Expendi", "paid"],
+    paid_by_card: ["Paid by card", "paid"],
     cancelled: ["Cancelled", "rejected"],
   },
   expense: {

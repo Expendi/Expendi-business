@@ -891,6 +891,8 @@ export function fakeLithicTransaction(fields: {
   readonly hold?: number;
   readonly settlement?: number;
   readonly merchant?: string;
+  /** Lithic's merchant ID; left out, as an older transaction may be. */
+  readonly acceptorId?: string;
   readonly mcc?: string;
   readonly events?: readonly string[];
   readonly detailedResults?: readonly string[];
@@ -907,6 +909,9 @@ export function fakeLithicTransaction(fields: {
       settlement: { amount: fields.settlement ?? 0 },
     },
     merchant: {
+      ...(fields.acceptorId !== undefined && {
+        acceptor_id: fields.acceptorId,
+      }),
       descriptor: fields.merchant ?? "ACME SOFTWARE",
       mcc: fields.mcc ?? "5734",
       city: "NAIROBI",
@@ -1009,7 +1014,9 @@ export function makeFakeLithic() {
         }
         sequence += 1;
         const card: FakeLithicCard = {
-          token: `card-${sequence}`,
+          // Unique across test files, which share one database and its
+          // unique card tokens.
+          token: `card-${sequence}-${randomBytes(6).toString("hex")}`,
           lastFour: String(1000 + sequence).slice(-4),
           accountToken,
           memo,

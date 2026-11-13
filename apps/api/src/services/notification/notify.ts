@@ -63,6 +63,10 @@ function compose(
     case "card_purchase_declined":
     case "card_refund_received":
     case "card_balance_low":
+    case "card_purchase_needs_review":
+    case "card_bill_declined":
+    case "card_purchase_over_estimate":
+    case "card_balance_short":
       return cardNotifications(tx, event);
     case "invoice_paid":
       return invoiceNotifications(tx, event);

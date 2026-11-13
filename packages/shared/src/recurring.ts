@@ -10,6 +10,7 @@ import {
   UNPAID_BILL_STATUSES,
   usdAmountSchema,
 } from "./bills.js";
+import { cardStateSchema } from "./cards.js";
 import { kesAmountSchema } from "./claims.js";
 import { payeeKindSchema, payeeMethodSchema } from "./payee.js";
 import {
@@ -28,14 +29,21 @@ export type {
 } from "./recurring-schedule.js";
 
 /**
- * Paid through Expendi, or outside it (e.g. a card-only subscription),
- * where the admin marks each bill paid.
+ * Paid through Expendi; outside it, where the admin marks each bill paid;
+ * or by a company-held card, whose Card purchases pay the bills (e.g. a
+ * card-only subscription).
  */
-export const RECURRING_PAY_VIA = ["expendi", "outside"] as const;
+export const RECURRING_PAY_VIA = ["expendi", "outside", "card"] as const;
 export const recurringPayViaSchema = z.enum(RECURRING_PAY_VIA, {
-  error: "Pick through Expendi or outside Expendi.",
+  error: "Pick through Expendi, outside Expendi or by company-held card.",
 });
 export type RecurringPayVia = z.infer<typeof recurringPayViaSchema>;
+
+const pickCard = "Pick the company-held card that pays it.";
+const cardOnlyWhenPaidByCard =
+  "Only a payment by company-held card has a card.";
+const estimateInUsd =
+  "A payment by company-held card is estimated in USD. Enter the amount in USD.";
 
 /**
  * Where a recurring payment sits in the overview. Salaries are recurring
@@ -177,6 +185,8 @@ const reminderDaysSchema = z
  * for weekly, the day of the month otherwise. Quarterly and yearly count
  * from `startsOn`'s month. The heading defaults from the payee. The amount
  * is in USD (`amountUsd`) when the payee is paid in USDC (spec §6.19).
+ * Paid by a company-held card (`cardId`), the amount is a USD estimate, or
+ * none when it's variable.
  */
 export const createRecurringItemRequestSchema = z
   .object({
@@ -189,11 +199,29 @@ export const createRecurringItemRequestSchema = z
     startsOn: isoDate("Enter the start date as YYYY-MM-DD."),
     endsOn: isoDate("Enter the end date as YYYY-MM-DD.").nullish(),
     payVia: recurringPayViaSchema.default("expendi"),
+    cardId: z.uuid({ error: pickCard }).nullish(),
     reminderDays: reminderDaysSchema.default(REMINDER_DAYS_DEFAULT),
     overviewHeading: billHeadingSchema.optional(),
     categoryId: z.uuid({ error: "Pick a category." }),
   })
   .superRefine((item, ctx) => {
+    if (item.payVia === "card" && item.cardId == null) {
+      ctx.addIssue({ code: "custom", message: pickCard, path: ["cardId"] });
+    }
+    if (item.payVia !== "card" && item.cardId != null) {
+      ctx.addIssue({
+        code: "custom",
+        message: cardOnlyWhenPaidByCard,
+        path: ["cardId"],
+      });
+    }
+    if (item.payVia === "card" && item.amountKes != null) {
+      ctx.addIssue({
+        code: "custom",
+        message: estimateInUsd,
+        path: ["amountKes"],
+      });
+    }
     const hasAmount = item.amountKes != null || item.amountUsd != null;
     if (item.amountKes != null && item.amountUsd != null) {
       ctx.addIssue({
@@ -246,7 +274,9 @@ export type CreateRecurringItemFields = z.output<
  * Changes for the bills still to come; the current bill keeps its amount
  * unless it's changed on the bill. A field left out is unchanged. A null
  * amount makes the payment variable; a null end date removes it. The
- * amount goes in `amountUsd` when the payee is paid in USDC.
+ * amount goes in `amountUsd` when the payee is paid in USDC, or when it's
+ * paid by a company-held card. `payVia` switches how it's paid, e.g. from
+ * outside Expendi to a company-held card, or to another card.
  */
 export const updateRecurringItemRequestSchema = z
   .object({
@@ -256,14 +286,35 @@ export const updateRecurringItemRequestSchema = z
     overviewHeading: billHeadingSchema.optional(),
     reminderDays: reminderDaysSchema.optional(),
     endsOn: isoDate("Enter the end date as YYYY-MM-DD.").nullable().optional(),
+    payVia: recurringPayViaSchema.optional(),
+    cardId: z.uuid({ error: pickCard }).optional(),
   })
-  .refine(
-    (item) => item.amountKes === undefined || item.amountUsd === undefined,
-    {
-      message: "Enter the amount in KES or in USD, not both.",
-      path: ["amountUsd"],
-    },
-  );
+  .superRefine((item, ctx) => {
+    if (item.amountKes !== undefined && item.amountUsd !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Enter the amount in KES or in USD, not both.",
+        path: ["amountUsd"],
+      });
+    }
+    if (item.payVia === "card" && item.cardId === undefined) {
+      ctx.addIssue({ code: "custom", message: pickCard, path: ["cardId"] });
+    }
+    if (item.payVia !== "card" && item.cardId !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: cardOnlyWhenPaidByCard,
+        path: ["cardId"],
+      });
+    }
+    if (item.payVia === "card" && item.amountKes != null) {
+      ctx.addIssue({
+        code: "custom",
+        message: estimateInUsd,
+        path: ["amountKes"],
+      });
+    }
+  });
 
 export type UpdateRecurringItemRequest = z.input<
   typeof updateRecurringItemRequestSchema
@@ -296,6 +347,18 @@ export const recurringItemSchema = z.object({
   startsOn: z.iso.date(),
   endsOn: z.iso.date().nullable(),
   payVia: recurringPayViaSchema,
+  /**
+   * The company-held card that pays it, exactly when `payVia` is `card`.
+   * Always sent; optional only for clients built before it.
+   */
+  card: z
+    .object({
+      id: z.uuid(),
+      nickname: z.string(),
+      lastFour: z.string(),
+      state: cardStateSchema,
+    })
+    .nullish(),
   reminderDays: z.int(),
   /** False while paused. */
   active: z.boolean(),
@@ -318,6 +381,12 @@ export const recurringItemSchema = z.object({
       currency: billCurrencySchema.optional(),
       amountKes: z.string().regex(/^\d+$/).nullable(),
       amountUsdc: z.string().regex(/^\d+$/).nullable(),
+      /**
+       * When the company-held card last declined a Card purchase meant for
+       * it; null when it hasn't. Its reason is on the bill. Always sent;
+       * optional only for clients built before it.
+       */
+      cardDeclinedAt: z.iso.datetime().nullish(),
     })
     .nullable(),
   createdAt: z.iso.datetime(),

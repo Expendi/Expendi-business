@@ -109,10 +109,10 @@ describe("the Bills list's order", () => {
       "Zuku",
       "Securex Guards",
       "Kilimani Properties",
+      "Notion",
       "Figma",
       "Safaricom",
       "KRA",
-      "Nairobi Water",
     ]);
   });
 
@@ -152,6 +152,7 @@ describe("the Bills list's order", () => {
       "Kenya Power",
       "Google Workspace",
       "Jubilee Health",
+      "Vercel",
       "Canva",
       "Kilimani Properties",
       "Nairobi Water",

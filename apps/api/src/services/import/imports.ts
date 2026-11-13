@@ -384,6 +384,10 @@ function actionFor(
       "The next due date must match scheduleDay (clamped at month end).",
     );
   const payVia = salary ? "expendi" : (optionalValue(row.payVia) ?? "expendi");
+  if (payVia === "card")
+    throw new Error(
+      "A payment by company-held card can't be imported. Set it up in Expendi and pick its card.",
+    );
   if (payVia !== "expendi" && payVia !== "outside")
     throw new Error("payVia must be expendi or outside.");
   return {

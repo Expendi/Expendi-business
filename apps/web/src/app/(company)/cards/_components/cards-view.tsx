@@ -8,6 +8,7 @@ import {
   CreditCardIcon,
   FlaskConicalIcon,
   HourglassIcon,
+  MessageCircleQuestionIcon,
   PlusIcon,
   ReceiptTextIcon,
   WalletIcon,
@@ -31,6 +32,7 @@ import type { FilterOption } from "~/components/data/filter-chip";
 import type { KindTab } from "~/components/data/kind-tabs";
 import type { StatTone } from "~/components/data/stat-cards";
 import type { PasskeyState } from "~/features/payment-ui";
+import type { CardPurchaseFilters } from "~/lib/query-keys";
 import { Banner, Banners } from "~/components/data/banner";
 import { FilterChip } from "~/components/data/filter-chip";
 import { KindTabs } from "~/components/data/kind-tabs";
@@ -52,12 +54,18 @@ import { useDashboard } from "~/contexts/dashboard-context";
 import { describeApiError } from "~/lib/api";
 import { useApprovalPasskeyStatus } from "~/lib/use-approval";
 import { CardSheet } from "./card-sheet";
-import { useCardLoads, useCardProgram, useCards } from "./cards-api";
+import {
+  useCardLoads,
+  useCardProgram,
+  useCardPurchases,
+  useCards,
+} from "./cards-api";
 import {
   cardLabel,
   formatUsd,
   hasPurchaseFilter,
   isBelowZero,
+  NEEDS_ANSWER,
   PURCHASE_STATUS,
   readPurchaseFilters,
   sortCards,
@@ -72,7 +80,8 @@ import { Usd } from "./usd";
 
 type CardProgramOn = Extract<CardProgram, { status: "on" }>;
 type CardsTab = "cards" | "purchases" | "loads";
-type Param = "tab" | "id" | "purchase" | "card" | "status" | "receipt";
+type Param =
+  "tab" | "id" | "purchase" | "card" | "status" | "receipt" | "review";
 type OpenSheet = "load" | "issue" | null;
 
 const TITLE = "Cards";
@@ -91,6 +100,17 @@ const RECEIPT_OPTIONS: readonly FilterOption[] = [
   { value: "true", label: "Needs a receipt" },
   { value: "false", label: "Has a receipt or waiver" },
 ];
+
+const ANSWER_OPTIONS: readonly FilterOption[] = [
+  { value: "true", label: NEEDS_ANSWER, tone: "waiting" },
+];
+
+const NEEDS_ANSWER_FILTERS: CardPurchaseFilters = {
+  cardId: null,
+  status: null,
+  needsReceipt: null,
+  needsReview: "true",
+};
 
 /**
  * Expendi cards (spec §6.25): the Card balance, the cards, their purchases
@@ -226,7 +246,19 @@ function ProgramOn({
   }
 
   function clearFilters() {
-    setParams({ card: null, status: null, receipt: null });
+    setParams({ card: null, status: null, receipt: null, review: null });
+  }
+
+  function showNeedingAnswer() {
+    setParams({
+      tab: "purchases",
+      id: null,
+      purchase: null,
+      card: null,
+      status: null,
+      receipt: null,
+      review: "true",
+    });
   }
 
   const tabs: readonly KindTab<CardsTab>[] = [
@@ -309,6 +341,13 @@ function ProgramOn({
             Cards start declining when it runs out.
           </Banner>
         ) : null}
+        {tab === "purchases" && filters.needsReview ? null : (
+          <NeedsAnswerBanner
+            organizationId={organizationId}
+            canAct={canAct}
+            onShow={showNeedingAnswer}
+          />
+        )}
       </Banners>
 
       <BalanceSummary balance={program.balance} low={program.lowBalance} />
@@ -363,6 +402,16 @@ function ProgramOn({
                     setParams({ receipt: value, purchase: null })
                   }
                   anyLabel="Any receipt state"
+                />
+                <FilterChip
+                  label="Answer"
+                  icon={MessageCircleQuestionIcon}
+                  options={ANSWER_OPTIONS}
+                  value={filters.needsReview}
+                  onChange={(value) =>
+                    setParams({ review: value, purchase: null })
+                  }
+                  anyLabel="Any purchase"
                 />
               </>
             ) : null
@@ -475,6 +524,47 @@ function ProgramOn({
         />
       ) : null}
     </section>
+  );
+}
+
+/**
+ * Purchases on company-held cards from merchants they hadn't seen, which
+ * wait for an admin to say what they are (spec §6.25).
+ */
+function NeedsAnswerBanner({
+  organizationId,
+  canAct,
+  onShow,
+}: {
+  organizationId: string;
+  canAct: boolean;
+  onShow: () => void;
+}): JSX.Element | null {
+  const waiting = useCardPurchases(organizationId, NEEDS_ANSWER_FILTERS);
+  const [first] = waiting.data?.pages ?? [];
+  const count = first?.purchases.length ?? 0;
+  if (count === 0 || !first) return null;
+  const counted = first.nextCursor
+    ? `${String(count)}+ purchases need an answer`
+    : count === 1
+      ? "A purchase needs an answer"
+      : `${String(count)} purchases need an answer`;
+  return (
+    <Banner
+      tone="warn"
+      role="status"
+      icon={MessageCircleQuestionIcon}
+      title={counted}
+      actions={
+        <Button variant="outline" size="md" onClick={onShow}>
+          {canAct ? "Answer" : "See them"}
+        </Button>
+      }
+    >
+      A company-held card was charged by a merchant it hadn&apos;t seen. Say
+      whether it&apos;s one of the card&apos;s recurring payments, a one-off, or
+      not recognised.
+    </Banner>
   );
 }
 

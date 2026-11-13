@@ -7,8 +7,7 @@ import type { ExpendiCard } from "@expendi-business/shared";
 
 import type { CardSortKey } from "./cards-display";
 import type { SortState } from "~/components/data/data-table";
-import { personName } from "~/app/(company)/expenses/_components/expense-labels";
-import { EntityMark, PhoneCard } from "~/components/data/cells";
+import { PhoneCard } from "~/components/data/cells";
 import {
   DataTable,
   sortFromTable,
@@ -17,8 +16,13 @@ import {
 } from "~/components/data/data-table";
 import { AmountStack } from "~/components/data/money";
 import { StatusBadge } from "~/components/data/status-badge";
-import { CARD_STATE, formatUsd, maskedLastFour } from "./cards-display";
-import { CARD_SORT_KEYS, cardColumns } from "./columns";
+import {
+  CARD_STATE,
+  formatUsd,
+  holderName,
+  maskedLastFour,
+} from "./cards-display";
+import { CARD_SORT_KEYS, cardColumns, HolderMark } from "./columns";
 import { Usd } from "./usd";
 import { useStableOpen } from "./use-stable-open";
 
@@ -61,11 +65,11 @@ export function CardsTable({
       renderPhoneCard={(row) => {
         const card = row.original;
         const state = CARD_STATE[card.state];
-        const holder = personName(card.holder);
+        const holder = holderName(card.holder);
         return (
           <PhoneCard
             key={row.id}
-            mark={<EntityMark name={holder} kind="person" />}
+            mark={<HolderMark holder={card.holder} />}
             title={card.nickname}
             sub={`${maskedLastFour(card.lastFour)} · ${holder}`}
             flags={<StatusBadge tone={state.tone}>{state.label}</StatusBadge>}

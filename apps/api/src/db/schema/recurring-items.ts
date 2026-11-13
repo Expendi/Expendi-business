@@ -21,6 +21,7 @@ import {
   REMINDER_DAYS_MAX,
 } from "@expendi-business/shared";
 
+import { cards } from "./cards.js";
 import { categories } from "./categories.js";
 import { timestamps } from "./columns.js";
 import { billCurrency } from "./currency.js";
@@ -48,6 +49,8 @@ export const recurringPayVia = pgEnum("recurring_pay_via", RECURRING_PAY_VIA);
  *   (T38), not by the recurring-bills job: monthly on the pay day, a fixed
  *   net pay, paid through Expendi. `next_due_on` is the next pay date not
  *   yet in a payroll run.
+ * - Paid by a company-held card (`pay_via = 'card'`), its amount is a USD
+ *   estimate, or none, and the card's Card purchases pay its bills.
  */
 export const recurringItems = pgTable(
   "recurring_items",
@@ -70,6 +73,8 @@ export const recurringItems = pgTable(
     startsOn: date("starts_on", { mode: "string" }).notNull(),
     endsOn: date("ends_on", { mode: "string" }),
     payVia: recurringPayVia("pay_via").notNull().default("expendi"),
+    /** The company-held card that pays it, exactly when `pay_via` is `card`. */
+    cardId: uuid("card_id"),
     reminderDays: integer("reminder_days")
       .notNull()
       .default(REMINDER_DAYS_DEFAULT),
@@ -88,6 +93,11 @@ export const recurringItems = pgTable(
       columns: [table.categoryId, table.organizationId],
       foreignColumns: [categories.id, categories.organizationId],
     }),
+    foreignKey({
+      name: "recurring_items_card_organization_fk",
+      columns: [table.cardId, table.organizationId],
+      foreignColumns: [cards.id, cards.organizationId],
+    }),
     // Target of bills' composite foreign key.
     unique("recurring_items_id_organization_id_unique").on(
       table.id,
@@ -95,6 +105,9 @@ export const recurringItems = pgTable(
     ),
     index("recurring_items_organization_id_idx").on(table.organizationId),
     index("recurring_items_payee_id_idx").on(table.payeeId),
+    index("recurring_items_card_id_idx")
+      .on(table.cardId)
+      .where(sql`${table.cardId} IS NOT NULL`),
     // What the daily recurring-bills job scans.
     index("recurring_items_scheduled_idx")
       .on(table.nextDueOn)
@@ -136,6 +149,16 @@ export const recurringItems = pgTable(
     check(
       "recurring_items_salary_shape",
       sql`${table.overviewHeading} <> 'salaries' OR (${table.amountKes} IS NOT NULL AND ${table.currency} = 'kes' AND ${table.schedule} = 'monthly' AND ${table.payVia} = 'expendi')`,
+    ),
+    // `::text`: this runs in the transaction that adds 'card' to the enum.
+    check(
+      "recurring_items_card_pays_by_card",
+      sql`(${table.payVia}::text = 'card') = (${table.cardId} IS NOT NULL)`,
+    ),
+    // Its estimate and its bills are in USD, the card's currency.
+    check(
+      "recurring_items_card_in_usd",
+      sql`${table.payVia}::text <> 'card' OR ${table.currency} = 'usd'`,
     ),
     check(
       "recurring_items_next_due_in_schedule",

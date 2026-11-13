@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { formatUsdCents } from "./cards.js";
 import { OVERVIEW_HEADINGS } from "./claims.js";
 import { formatKesAmount } from "./kes-amount.js";
 import { RECURRING_SCHEDULES } from "./recurring.js";
@@ -51,9 +52,24 @@ export const cashObligationSchema = z.object({
   dueOn: z.string(),
   amountKes: units.nullable(),
   status: z.string(),
+  /** `outside` for a company-held card's too, which `card` then names. */
   payVia: z.enum(["expendi", "outside"]),
   needsAmount: z.boolean(),
   heading: z.enum(OVERVIEW_HEADINGS),
+  /**
+   * The company-held card that pays it automatically, from the Card balance
+   * rather than the wallet. Always sent; optional only for clients built
+   * before it.
+   */
+  card: z
+    .object({ id: z.string(), nickname: z.string(), lastFour: z.string() })
+    .nullish(),
+  /**
+   * A card-paid row's estimate in US cents, rounded up: about what the Card
+   * purchase will take. Null without an estimate, and on a row no card
+   * pays. Always sent; optional only for clients built before it.
+   */
+  amountUsdCents: z.string().regex(/^\d+$/).nullish(),
 });
 export const cashProjectionSchema = z.object({
   today: z.string(),
@@ -61,6 +77,17 @@ export const cashProjectionSchema = z.object({
   totalKes: units,
   unknownAmounts: z.number().int().nonnegative(),
   obligations: z.array(cashObligationSchema),
+});
+/**
+ * Bills paid by company-held cards that fall due in the cash check's
+ * window, against the Card balance, in US cents. Bills and forecasts
+ * without an estimate don't add to `dueUsdCents`.
+ */
+export const cashCardBillsSchema = z.object({
+  dueUsdCents: z.string().regex(/^\d+$/),
+  /** Negative when card spending ran past what was loaded. */
+  availableUsdCents: units,
+  short: z.boolean(),
 });
 const breakdown = z.object({
   id: z.string(),
@@ -107,6 +134,12 @@ export const spendingOverviewSchema = z.object({
     status: z.enum(["covered", "short", "unknown"]),
     shortKes: units.nullable(),
     outsideKes: units,
+    /**
+     * Null when no card-paid bill or recurring payment falls due in the
+     * window, or company-held cards are off. Always sent; optional only for
+     * clients built before it.
+     */
+    cardBills: cashCardBillsSchema.nullish(),
   }),
   people: z.array(z.object({ id: z.string(), name: z.string() })),
 });
@@ -139,6 +172,7 @@ export type OverviewPerson = z.infer<typeof overviewPersonSchema>;
 export type OverviewPayment = z.infer<typeof overviewPaymentSchema>;
 export type CashObligation = z.infer<typeof cashObligationSchema>;
 export type CashProjection = z.infer<typeof cashProjectionSchema>;
+export type CashCardBills = z.infer<typeof cashCardBillsSchema>;
 
 /**
  * How the app and the web dashboard word the overview's figures (spec
@@ -180,9 +214,30 @@ export function cashOutsideLine(cash: SpendingOverview["cash"]): string | null {
     : `Also due outside Expendi: ${overviewKes(cash.outsideKes)}`;
 }
 
-/** What an admin can do with a payment that's due; a forecast can only be viewed. */
+/**
+ * Null when no card-paid bill falls due in the window, so the line is left
+ * out, e.g. "Due by company-held card: USD 40.00 of USD 120.00 on the Card
+ * balance".
+ */
+export function cashCardBillsLine(
+  cash: SpendingOverview["cash"],
+): string | null {
+  const cardBills = cash.cardBills;
+  if (cardBills == null) return null;
+  const due = formatUsdCents(BigInt(cardBills.dueUsdCents));
+  const availableCents = BigInt(cardBills.availableUsdCents);
+  const available = formatUsdCents(availableCents < 0n ? 0n : availableCents);
+  return cardBills.short
+    ? `Card balance short: ${due} due by company-held card, ${available} left on it`
+    : `Due by company-held card: ${due} of ${available} on the Card balance`;
+}
+
+/**
+ * What an admin can do with a payment that's due; a forecast can only be
+ * viewed, and a company-held card pays its own.
+ */
 export function obligationAction(row: CashObligation): string {
-  if (row.kind === "forecast") return "View";
+  if (row.kind === "forecast" || row.card != null) return "View";
   if (row.needsAmount) return "Enter amount";
   return row.payVia === "outside" ? "Mark paid" : "Pay";
 }

@@ -1,7 +1,13 @@
 "use client";
 
 import type { JSX, ReactNode } from "react";
-import { BanIcon, KeyRoundIcon, PencilIcon, RotateCcwIcon } from "lucide-react";
+import {
+  BanIcon,
+  CreditCardIcon,
+  KeyRoundIcon,
+  PencilIcon,
+  RotateCcwIcon,
+} from "lucide-react";
 import Link from "next/link";
 
 import type { Bill, BillDetail, BillStatus } from "@expendi-business/shared";
@@ -24,15 +30,24 @@ import {
 import { PaymentReceiptItems } from "~/components/data/payment-receipts";
 import { Skel } from "~/components/data/states";
 import { Button } from "~/components/ui/button";
-import { isPayable, unpayableReason } from "~/features/bills/bill-payment";
+import {
+  automaticCardOf,
+  cardWontPayReason,
+  isPayable,
+  lastCardBillNote,
+  unpayableReason,
+} from "~/features/bills/bill-payment";
 import {
   BillAmount,
   BillStatusBadge,
+  CardBillBadge,
   headingLabel,
+  lastFourOf,
 } from "~/features/bills/bill-status";
 import { ReceiptDownloadAction } from "~/features/bills/receipt-download";
 import { METHOD_LABELS } from "~/features/payees/payee-display";
 import { formatIsoDate, formatNairobiDate } from "~/lib/dates";
+import { formatNairobiDateTime } from "~/lib/nairobi-time";
 import { BillFiles } from "./bill-files";
 
 export type BillAction = "edit" | "paid_outside" | "cancel" | "invoice";
@@ -58,16 +73,113 @@ export function BillSheetHeader({
   bill,
   rate,
 }: {
-  bill: Bill;
+  /** The list's row until the detail loads with what paying it came to in KES. */
+  bill: Bill & Partial<Pick<BillDetail, "paidAmountKes">>;
   rate: string | null;
 }): JSX.Element {
+  const estimate = automaticCardOf(bill) !== null && !needsAmount(bill);
   return (
     <>
+      {estimate ? (
+        <p className="mt-0.5 text-xs leading-4 font-(--w-ui) text-muted-foreground">
+          Estimate
+        </p>
+      ) : null}
       <div className="mt-0.5 text-2xl leading-8 font-(--w-heading) tracking-[-0.02em]">
         <BillAmount bill={bill} rate={rate} size="sheet" />
       </div>
-      <BillStatusBadge status={bill.status} className="mt-2" />
+      <span className="mt-2 flex flex-wrap items-center gap-1">
+        <BillStatusBadge status={bill.status} />
+        <CardBillBadge bill={bill} />
+      </span>
     </>
+  );
+}
+
+/**
+ * A bill a company-held card is to pay: when it's paid, why the card
+ * declined it and what to do, or why the card won't pay it at all.
+ */
+function AutomaticCardCallout({ bill }: { bill: Bill }): JSX.Element | null {
+  const card = automaticCardOf(bill);
+  if (card === null) return null;
+  const cardName = `${card.nickname} (${lastFourOf(card)})`;
+  const wontPay = cardWontPayReason(bill);
+  if (wontPay) {
+    return (
+      <Callout tone="warn" icon={CreditCardIcon} title="Not paid automatically">
+        <p>{wontPay} The bill stays owed.</p>
+      </Callout>
+    );
+  }
+  if (bill.cardDeclinedAt) {
+    return (
+      <Callout
+        tone="error"
+        title="Card declined"
+        action={
+          <Link href={`/cards?id=${card.id}`} className={textLinkClass}>
+            Go to Cards
+          </Link>
+        }
+      >
+        {bill.cardDeclineReason ? <p>{bill.cardDeclineReason}</p> : null}
+        <p>
+          {cardName} declined {bill.payee.name}&apos;s Card purchase on{" "}
+          {formatNairobiDateTime(bill.cardDeclinedAt)}. The bill stays owed.
+          Load the Card balance, raise the card&apos;s limit or unfreeze it so
+          the next Card purchase goes through.
+        </p>
+      </Callout>
+    );
+  }
+  const lastBill = lastCardBillNote(bill);
+  return (
+    <Callout tone="neutral" icon={CreditCardIcon} title="Paid automatically">
+      <p>
+        {lastBill ? `${lastBill} ` : null}
+        It&apos;s paid when {bill.payee.name} charges {cardName}. Nobody has to
+        pay it.{" "}
+        {needsAmount(bill)
+          ? "The bill takes the amount the card is charged."
+          : "The amount is an estimate: the bill takes what the card is charged."}
+      </p>
+    </Callout>
+  );
+}
+
+/** "Paid by: card •••• 1234" once a Card purchase paid it, with the way to that purchase. */
+function PaidByItem({ bill }: { bill: BillDetail }): JSX.Element {
+  if (bill.status === "paid_by_card" && bill.card) {
+    return (
+      <DetailItem
+        label="Paid by"
+        sub={
+          bill.cardPurchaseId ? (
+            <Link
+              href={`/cards?tab=purchases&purchase=${bill.cardPurchaseId}`}
+              className={textLinkClass}
+            >
+              See the Card purchase
+            </Link>
+          ) : null
+        }
+      >
+        Card {lastFourOf(bill.card)}, {bill.card.nickname}
+      </DetailItem>
+    );
+  }
+  if (bill.card) {
+    return (
+      <DetailItem label="Paid by">
+        Company-held card, {bill.card.nickname} {lastFourOf(bill.card)}
+      </DetailItem>
+    );
+  }
+  return (
+    <DetailItem label="Paid by">
+      {bill.payee.method ? METHOD_LABELS[bill.payee.method] : "Not set"}
+    </DetailItem>
   );
 }
 
@@ -113,6 +225,7 @@ export function BillDetailBody({
           {failure ? <p>{failure}</p> : null}
         </Callout>
       ) : null}
+      <AutomaticCardCallout bill={bill} />
       {reason ? (
         <Callout tone="warn">
           <p>{reason}</p>
@@ -146,9 +259,7 @@ export function BillDetailBody({
             )}
           </DetailItem>
         ) : null}
-        <DetailItem label="Paid by">
-          {bill.payee.method ? METHOD_LABELS[bill.payee.method] : "Not set"}
-        </DetailItem>
+        <PaidByItem bill={bill} />
         <DetailItem label="Overview heading">
           {headingLabel(bill.overviewHeading)}
         </DetailItem>
@@ -271,10 +382,23 @@ export function BillDetailFooter({
       </>
     );
   }
+  if (bill.status === "paid_by_card") {
+    return (
+      <>
+        <SheetActions kind="secondary">
+          <Button variant="ghost" size="md" onClick={() => onAction("invoice")}>
+            Add invoice
+          </Button>
+        </SheetActions>
+        {position}
+      </>
+    );
+  }
   if (!isUnpaid(bill.status)) return position;
 
   const payable = isPayable(bill);
   const retry = bill.status === "payout_failed";
+  const automatic = automaticCardOf(bill) !== null;
   return (
     <>
       <SheetActions kind="primary">
@@ -300,7 +424,7 @@ export function BillDetailFooter({
           onClick={() => onAction("edit")}
         >
           <PencilIcon aria-hidden="true" />
-          {needsAmount(bill) ? "Enter the amount" : "Edit bill"}
+          {needsAmount(bill) && !automatic ? "Enter the amount" : "Edit bill"}
         </Button>
       </SheetActions>
       <SheetActions kind="secondary">

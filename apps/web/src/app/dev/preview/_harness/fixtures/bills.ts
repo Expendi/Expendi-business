@@ -12,6 +12,7 @@ import type {
   PayeeMethod,
   RecurringItem,
   RecurringItemState,
+  RecurringPayVia,
   RecurringSchedule,
   WalletResponse,
 } from "@expendi-business/shared";
@@ -26,6 +27,7 @@ import { settledOn } from "~/features/bills/bill-list";
 import { billKeys, recurringKeys } from "~/features/payment-keys";
 import { recurringListKey } from "~/features/recurring/recurring-api";
 import { totalsByCurrency } from "~/lib/money";
+import { CARD_BILL_PURCHASE_ID, SUBSCRIPTIONS_CARD } from "./cards";
 import { KES_RATE, ORGANIZATION_ID, sampleId, VIEWER } from "./company";
 
 /** The payees of docs/mocks/bills.html. */
@@ -45,6 +47,8 @@ const PAYEES = {
   hp: payee(113, "Hotpoint Appliances", "supplier", "outside"),
   cm: payee(114, "CarMax Mechanics", "supplier", null),
   cv: payee(115, "Canva", "vendor", "usdc"),
+  vc: payee(116, "Vercel", "vendor", "outside"),
+  nt: payee(117, "Notion", "vendor", null),
 } as const;
 
 const CATEGORIES = {
@@ -72,7 +76,8 @@ interface SampleRecurring {
   endsOn?: string;
   reminderDays: number;
   state?: RecurringItemState;
-  payVia?: "expendi" | "outside";
+  /** `card`: paid by the company-held card `SUBSCRIPTIONS_CARD`, the amount a USD estimate. */
+  payVia?: RecurringPayVia;
   /** The due date after the bill still owed; null once it has ended. */
   nextDueOn: string | null;
 }
@@ -255,6 +260,32 @@ const RECURRING_SAMPLES = {
     payVia: "outside",
     nextDueOn: null,
   },
+  vercel: {
+    n: 315,
+    payee: "vc",
+    category: "software",
+    heading: "subscriptions",
+    amount: 20,
+    schedule: "monthly",
+    scheduleDay: 20,
+    startsOn: "2026-09-20",
+    reminderDays: 0,
+    payVia: "card",
+    nextDueOn: "2026-12-20",
+  },
+  notion: {
+    n: 316,
+    payee: "nt",
+    category: "software",
+    heading: "subscriptions",
+    amount: null,
+    schedule: "monthly",
+    scheduleDay: 4,
+    startsOn: "2026-06-04",
+    reminderDays: 0,
+    payVia: "card",
+    nextDueOn: "2026-12-04",
+  },
 } as const satisfies Record<string, SampleRecurring>;
 
 type RecurringKey = keyof typeof RECURRING_SAMPLES;
@@ -284,7 +315,13 @@ interface SampleBill {
   dueOn: string;
   /** Whole shillings, or whole dollars for a USD bill; null still to enter. */
   kes?: number | null;
-  usd?: number;
+  usd?: number | null;
+  /** Paid by the company-held card `SUBSCRIPTIONS_CARD`, so in USD. */
+  card?: {
+    readonly declinedAt?: string;
+    readonly declineReason?: string;
+    readonly purchaseId?: string;
+  };
   heading: "transactions" | "subscriptions";
   category: keyof typeof CATEGORIES;
   reference?: string;
@@ -293,6 +330,8 @@ interface SampleBill {
   notes?: string;
   files?: readonly Paper[];
   paidOn?: string;
+  /** What paying it came to, in whole shillings; the detail carries it. */
+  paidKes?: number;
   /** The cash-out's receipt once it's paid through Expendi. */
   receipts?: readonly CashOutReceipt[];
   paidFrom?: string;
@@ -310,7 +349,7 @@ const PAID_THROUGH_EXPENDI: readonly BillStatus[] = [
 ];
 
 function bill(sample: SampleBill): Bill {
-  const usd = sample.usd !== undefined;
+  const usd = sample.usd !== undefined || sample.card !== undefined;
   const person = {
     userId: VIEWER.userId,
     name: VIEWER.name,
@@ -331,7 +370,10 @@ function bill(sample: SampleBill): Bill {
       usd || sample.kes === null || sample.kes === undefined
         ? null
         : String(sample.kes * 100),
-    amountUsdc: usd ? String((sample.usd ?? 0) * 1_000_000) : null,
+    amountUsdc:
+      sample.usd === undefined || sample.usd === null
+        ? null
+        : String(Math.round(sample.usd * 1_000_000)),
     reference: sample.reference ?? null,
     notes: sample.notes ?? null,
     dueOn: sample.dueOn,
@@ -364,6 +406,10 @@ function bill(sample: SampleBill): Bill {
     paidFromAccount: sample.paidFrom
       ? { id: sampleId(sample.n + 6000), name: sample.paidFrom }
       : null,
+    card: sample.card ? SUBSCRIPTIONS_CARD : null,
+    cardDeclinedAt: sample.card?.declinedAt ?? null,
+    cardDeclineReason: sample.card?.declineReason ?? null,
+    cardPurchaseId: sample.card?.purchaseId ?? null,
     createdAt: "2026-10-20T09:00:00.000Z",
     updatedAt: "2026-10-20T09:00:00.000Z",
   };
@@ -582,6 +628,32 @@ const OPEN_SAMPLES: readonly SampleBill[] = [
     reference: "JH-77812-DEC",
     recurring: "health",
   },
+  {
+    n: 15,
+    payee: "vc",
+    usd: 20,
+    card: {},
+    dueOn: "2026-11-20",
+    status: "upcoming",
+    heading: "subscriptions",
+    category: "software",
+    recurring: "vercel",
+  },
+  {
+    n: 16,
+    payee: "nt",
+    usd: null,
+    card: {
+      declinedAt: "2026-11-04T06:00:00.000Z",
+      declineReason: "It's over the card's monthly limit.",
+    },
+    dueOn: "2026-11-04",
+    status: "overdue",
+    heading: "subscriptions",
+    category: "software",
+    recurring: "notion",
+    variable: true,
+  },
 ];
 
 const SETTLED_SAMPLES: readonly SampleBill[] = [
@@ -724,6 +796,19 @@ const SETTLED_SAMPLES: readonly SampleBill[] = [
       },
     ],
   },
+  {
+    n: 30,
+    payee: "vc",
+    usd: 19.8,
+    card: { purchaseId: CARD_BILL_PURCHASE_ID },
+    dueOn: "2026-10-20",
+    status: "paid_by_card",
+    paidOn: "2026-10-20",
+    paidKes: 2554,
+    heading: "subscriptions",
+    category: "software",
+    recurring: "vercel",
+  },
 ];
 
 /** Still to pay and being paid: the To pay and Being paid tabs. */
@@ -806,6 +891,8 @@ function detailOf(sample: SampleBill, row: Bill): BillDetail {
                   : "paying",
             failureReason: sample.failure ?? null,
           },
+    paidAmountKes:
+      sample.paidKes === undefined ? null : String(sample.paidKes * 100),
   };
 }
 
@@ -821,7 +908,8 @@ function recurringItem(sample: SampleRecurring): RecurringItem {
   const owed = OPEN_BILLS.find(
     (one) => one.recurringItemId === id && OUTSTANDING.includes(one.status),
   );
-  const usd = PAYEES[sample.payee].method === "usdc";
+  const byCard = sample.payVia === "card";
+  const usd = byCard || PAYEES[sample.payee].method === "usdc";
   const amount = sample.amount;
   return {
     id,
@@ -838,6 +926,7 @@ function recurringItem(sample: SampleRecurring): RecurringItem {
     startsOn: sample.startsOn,
     endsOn: sample.endsOn ?? null,
     payVia: sample.payVia ?? "expendi",
+    card: byCard ? { ...SUBSCRIPTIONS_CARD, state: "open" } : null,
     reminderDays: sample.reminderDays,
     active: (sample.state ?? "active") === "active",
     nextDueOn: sample.nextDueOn,
@@ -849,6 +938,7 @@ function recurringItem(sample: SampleRecurring): RecurringItem {
           currency: owed.currency,
           amountKes: owed.amountKes,
           amountUsdc: owed.amountUsdc,
+          cardDeclinedAt: owed.cardDeclinedAt ?? null,
         }
       : null,
     createdAt: "2026-01-02T09:00:00.000Z",
@@ -904,6 +994,13 @@ export function listSampleBills(params: QueryParams): Bill[] {
   ).sort((a, b) => a.dueOn.localeCompare(b.dueOn));
 }
 
+/** As the API counts "without an amount": a company-held card's bill takes what it's charged. */
+function paidByCard(one: Bill): boolean {
+  return RECURRING_ITEMS.some(
+    (item) => item.id === one.recurringItemId && item.payVia === "card",
+  );
+}
+
 /** `GET …/bills/summary`: the tabs follow the filters, the rest is company-wide. */
 export function summarizeSampleBills(params: QueryParams): BillsSummary {
   const count = (view: BillListView) =>
@@ -920,7 +1017,8 @@ export function summarizeSampleBills(params: QueryParams): BillsSummary {
     toPay: {
       ...totals(toPay),
       withoutAmount: toPay.filter(
-        (one) => one.amountKes === null && one.amountUsdc === null,
+        (one) =>
+          one.amountKes === null && one.amountUsdc === null && !paidByCard(one),
       ).length,
     },
     overdue: totals(withStatus("overdue")),

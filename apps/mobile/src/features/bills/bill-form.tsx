@@ -36,6 +36,7 @@ import { usePayees } from "~/features/payees/use-payees";
 import { useCompanyWallet } from "~/features/wallet/use-company-wallet";
 import { describeApiError } from "~/lib/api";
 import { CURRENCY_LABELS, currencyOfPayee } from "./bill-amount";
+import { automaticCard, companyHeldCardName } from "./bill-card";
 import { amountChanged, toCreateRequest, toUpdateRequest } from "./bill-draft";
 import { HEADING_LABELS } from "./bill-status";
 import {
@@ -129,7 +130,12 @@ export function BillForm(props: BillFormProps): JSX.Element {
   );
   const wallet = useCompanyWallet(organizationId);
   const limits = cashOutLimitsOf(wallet.data);
-  const typedAmount = { ...draft, method: payeeMethod };
+  const card = props.bill ? automaticCard(props.bill) : null;
+  /** A company-held card's bill is never a cash-out, so those limits don't apply. */
+  const typedAmount = {
+    ...draft,
+    method: card === null ? payeeMethod : null,
+  };
 
   function update<K extends keyof BillDraft>(field: K, value: BillDraft[K]) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -190,7 +196,7 @@ export function BillForm(props: BillFormProps): JSX.Element {
             setPayeeKind(payee.kind);
             setPayeeMethod(payee.method);
             const currency = currencyOfPayee(payee.method, "kes");
-            if (currency !== draft.currency) {
+            if (card === null && currency !== draft.currency) {
               setDraft((current) => ({ ...current, currency, amount: "" }));
             }
           }}
@@ -207,16 +213,23 @@ export function BillForm(props: BillFormProps): JSX.Element {
         )}
         <TextField
           label={
-            draft.variable
-              ? `Amount (${CURRENCY_LABELS[draft.currency]}, if you know it)`
-              : `Amount (${CURRENCY_LABELS[draft.currency]})`
+            card
+              ? `Estimate (${CURRENCY_LABELS[draft.currency]})`
+              : draft.variable
+                ? `Amount (${CURRENCY_LABELS[draft.currency]}, if you know it)`
+                : `Amount (${CURRENCY_LABELS[draft.currency]})`
           }
           value={draft.amount}
           onChangeText={(value) => update("amount", value)}
           placeholder={draft.currency === "usd" ? "120.00" : "15,000.00"}
           keyboardType="decimal-pad"
         />
-        {draft.currency === "usd" ? (
+        {card ? (
+          <Text className="text-sm text-gray-600">
+            Paid by {companyHeldCardName(card)}. The bill takes the Card
+            purchase’s actual amount.
+          </Text>
+        ) : draft.currency === "usd" ? (
           <Text className="text-sm text-gray-600">
             This payee is paid in USDC: they receive exactly this many USDC.
           </Text>

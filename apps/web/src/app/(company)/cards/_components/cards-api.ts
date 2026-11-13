@@ -2,6 +2,8 @@
 
 import type {
   InfiniteData,
+  QueryClient,
+  QueryKey,
   UseInfiniteQueryResult,
   UseMutationResult,
   UseQueryResult,
@@ -15,6 +17,7 @@ import {
 } from "@tanstack/react-query";
 
 import type {
+  AttachCardReceiptRequest,
   CardActionRequest,
   CardActionResult,
   CardConfirmation,
@@ -25,6 +28,7 @@ import type {
   CardPurchaseList,
   ExpendiCard,
   LowerCardLimitRequest,
+  ReviewCardPurchaseRequest,
   TurnOnCardsFields,
   WaiveCardReceiptRequest,
 } from "@expendi-business/shared";
@@ -42,6 +46,8 @@ import {
 import type { ApiClient } from "~/lib/api";
 import type { ApprovalOutcome, PasskeyApprovalSteps } from "~/lib/approval";
 import type { CardPurchaseFilters } from "~/lib/query-keys";
+import { billKeys, recurringKeys } from "~/features/payment-keys";
+import { ApiError } from "~/lib/api";
 import { queryKeys } from "~/lib/query-keys";
 import { useApi } from "~/lib/use-api";
 import { usePasskeyApproval } from "~/lib/use-approval";
@@ -76,6 +82,38 @@ export function useCards(organizationId: string): UseQueryResult<CardList> {
   });
 }
 
+/** The cards that can pay recurring payments; fetched only while `enabled`. */
+export function useCompanyHeldCards(
+  organizationId: string,
+  { enabled = true }: { enabled?: boolean } = {},
+): UseQueryResult<CardList> {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.companyHeldCards(organizationId),
+    queryFn: () =>
+      api.get(`${cardsPath(organizationId)}?companyHeld=true`, cardListSchema),
+    enabled,
+  });
+}
+
+/** One purchase, for a link to one that isn't on the list's loaded pages. */
+export function useCardPurchase(
+  organizationId: string,
+  purchaseId: string,
+  { enabled = true }: { enabled?: boolean } = {},
+): UseQueryResult<CardPurchase> {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.cardPurchase(organizationId, purchaseId),
+    queryFn: () =>
+      api.get(
+        `${cardsPath(organizationId)}/purchases/${purchaseId}`,
+        cardPurchaseSchema,
+      ),
+    enabled,
+  });
+}
+
 export function useCardLoads(
   organizationId: string,
 ): UseQueryResult<CardLoadList> {
@@ -98,6 +136,7 @@ export function purchasesQuery(
   if (filters.cardId) params.set("cardId", filters.cardId);
   if (filters.status) params.set("status", filters.status);
   if (filters.needsReceipt) params.set("needsReceipt", filters.needsReceipt);
+  if (filters.needsReview) params.set("needsReview", filters.needsReview);
   if (cursor) params.set("cursor", cursor);
   return params.toString();
 }
@@ -174,6 +213,24 @@ export function cardActionSteps(
   };
 }
 
+/**
+ * A card's state and its recurring payments go together: a frozen or
+ * closed card declines its payments' bills, and a new one can be picked to
+ * pay them, so bills and recurring payments refresh with the cards.
+ */
+export function refreshAfterCardChange(
+  queryClient: QueryClient,
+  organizationId: string,
+): Promise<unknown> {
+  return Promise.all(
+    [
+      queryKeys.cards(organizationId),
+      recurringKeys.all(organizationId),
+      billKeys.all(organizationId),
+    ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+  );
+}
+
 /** Issue, raise a limit, unfreeze, or a Card load: each with the admin's passkey. */
 export function useCardAction(
   organizationId: string,
@@ -186,10 +243,28 @@ export function useCardAction(
   const queryClient = useQueryClient();
   return usePasskeyApproval({
     ...cardActionSteps(api, organizationId),
-    onApproved: () =>
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.cards(organizationId),
-      }),
+    onApproved: () => refreshAfterCardChange(queryClient, organizationId),
+  });
+}
+
+/** While it's pending, the recurring payment form around it can't be saved or left. */
+export const issueCompanyCardKey = (organizationId: string) =>
+  [...queryKeys.cards(organizationId), "issue-company-card"] as const;
+
+/** A company-held card issued from the recurring payment form, with the admin's passkey. */
+export function useIssueCompanyCard(
+  organizationId: string,
+): UseMutationResult<
+  ApprovalOutcome<CardActionResult>,
+  Error,
+  CardActionRequest
+> {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return usePasskeyApproval({
+    ...cardActionSteps(api, organizationId),
+    mutationKey: issueCompanyCardKey(organizationId),
+    onApproved: () => refreshAfterCardChange(queryClient, organizationId),
   });
 }
 
@@ -201,10 +276,7 @@ function useCardWrite<TVariables>(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (variables) => write(api, variables),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.cards(organizationId),
-      }),
+    onSuccess: () => refreshAfterCardChange(queryClient, organizationId),
   });
 }
 
@@ -253,6 +325,126 @@ export function useLowerCardLimit(
   );
 }
 
+/** Where the browser opens a card's number, until `expiresAt`. */
+export interface RevealSession {
+  readonly url: string;
+  readonly expiresAt: string;
+}
+
+/**
+ * Passkey, then the address of the page that shows the number. The session
+ * goes straight to `onSession` and the mutation resolves to nothing, so it
+ * never sits in the mutation cache.
+ */
+export function cardRevealSteps(
+  api: ApiClient,
+  organizationId: string,
+  onSession: (session: RevealSession) => void,
+): PasskeyApprovalSteps<string, BoundCardConfirmation, void> {
+  const steps = cardActionSteps(api, organizationId);
+  return {
+    request: (cardId) => steps.request({ type: "reveal_card", cardId }),
+    confirm: async (challenge, assertion) => {
+      const result = await steps.confirm(challenge, assertion);
+      if (result.type !== "reveal_card") {
+        throw new ApiError(
+          200,
+          "InvalidResponse",
+          "The server sent a response this version of Expendi Business can't read.",
+        );
+      }
+      onSession({ url: result.revealUrl, expiresAt: result.expiresAt });
+    },
+  };
+}
+
+/** Any admin can see a company-held card's number with a fresh passkey. */
+export function useCardReveal(
+  organizationId: string,
+  onSession: (session: RevealSession) => void,
+): UseMutationResult<ApprovalOutcome<void>, Error, string> {
+  const api = useApi();
+  return usePasskeyApproval(cardRevealSteps(api, organizationId, onSession));
+}
+
+/** `POST …/cards/purchases/:purchaseId/review`: an admin's answer about a new merchant. */
+export function reviewCardPurchase(
+  api: ApiClient,
+  organizationId: string,
+  purchaseId: string,
+  review: ReviewCardPurchaseRequest,
+): Promise<CardPurchase> {
+  return api.post(
+    `${cardsPath(organizationId)}/purchases/${purchaseId}/review`,
+    review,
+    cardPurchaseSchema,
+  );
+}
+
+export interface ReviewPurchaseVariables {
+  readonly purchaseId: string;
+  readonly review: ReviewCardPurchaseRequest;
+}
+
+/**
+ * The saved purchase goes into its own query before the lists refetch, so
+ * its open sheet stays when a filter ("Needs an answer", "Needs a receipt")
+ * now leaves it out of the list it was opened from.
+ */
+function keepSavedPurchase(
+  queryClient: QueryClient,
+  organizationId: string,
+  purchase: CardPurchase,
+  refresh: readonly QueryKey[],
+): Promise<unknown> {
+  queryClient.setQueryData(
+    queryKeys.cardPurchase(organizationId, purchase.id),
+    purchase,
+  );
+  return Promise.all(
+    [queryKeys.cards(organizationId), ...refresh].map((queryKey) =>
+      queryClient.invalidateQueries({ queryKey }),
+    ),
+  );
+}
+
+/** Linking a purchase can pay a bill and record a merchant, so bills and recurring payments refresh too. */
+export function afterPurchaseAnswered(
+  queryClient: QueryClient,
+  organizationId: string,
+  purchase: CardPurchase,
+): Promise<unknown> {
+  return keepSavedPurchase(queryClient, organizationId, purchase, [
+    queryKeys.expenses(organizationId),
+    billKeys.all(organizationId),
+    recurringKeys.all(organizationId),
+  ]);
+}
+
+/** A receipt or its waiver completes the Card expense. */
+export function afterPurchaseReceipt(
+  queryClient: QueryClient,
+  organizationId: string,
+  purchase: CardPurchase,
+): Promise<unknown> {
+  return keepSavedPurchase(queryClient, organizationId, purchase, [
+    queryKeys.expenses(organizationId),
+  ]);
+}
+
+export function useReviewCardPurchase(
+  organizationId: string,
+): UseMutationResult<CardPurchase, Error, ReviewPurchaseVariables> {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ purchaseId, review }) =>
+      reviewCardPurchase(api, organizationId, purchaseId, review),
+    onSuccess: (purchase) =>
+      afterPurchaseAnswered(queryClient, organizationId, purchase),
+  });
+}
+
 export interface WaiveReceiptVariables extends WaiveCardReceiptRequest {
   readonly purchaseId: string;
 }
@@ -270,14 +462,37 @@ export function useWaiveCardReceipt(
         request,
         cardPurchaseSchema,
       ),
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.cards(organizationId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.expenses(organizationId),
-        }),
-      ]),
+    onSuccess: (purchase) =>
+      afterPurchaseReceipt(queryClient, organizationId, purchase),
+  });
+}
+
+export interface AttachReceiptVariables extends AttachCardReceiptRequest {
+  readonly purchaseId: string;
+}
+
+/** `POST …/cards/purchases/:purchaseId/receipts`: an admin adds a company-held card purchase's receipt. */
+export function attachCardReceipt(
+  api: ApiClient,
+  organizationId: string,
+  { purchaseId, ...request }: AttachReceiptVariables,
+): Promise<CardPurchase> {
+  return api.post(
+    `${cardsPath(organizationId)}/purchases/${purchaseId}/receipts`,
+    request,
+    cardPurchaseSchema,
+  );
+}
+
+export function useAttachCardReceipt(
+  organizationId: string,
+): UseMutationResult<CardPurchase, Error, AttachReceiptVariables> {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (variables) =>
+      attachCardReceipt(api, organizationId, variables),
+    onSuccess: (purchase) =>
+      afterPurchaseReceipt(queryClient, organizationId, purchase),
   });
 }

@@ -9,6 +9,7 @@ import {
 } from "~/app/dev/preview/_harness/fixtures/overview";
 import {
   biggestRise,
+  cardEstimateUsdc,
   cashLedger,
   categoryBars,
   comingUp,
@@ -226,5 +227,15 @@ describe("spending charts", () => {
       "Kilimani Properties",
       "TotalEnergies Kenya",
     ]);
+  });
+});
+
+describe("cardEstimateUsdc", () => {
+  it("turns a company-held card's US cents into USDC units, or null without an estimate", () => {
+    expect([
+      cardEstimateUsdc({ amountUsdCents: "2000" }),
+      cardEstimateUsdc({ amountUsdCents: null }),
+      cardEstimateUsdc({}),
+    ]).toEqual(["20000000", null, null]);
   });
 });

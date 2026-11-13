@@ -5,6 +5,7 @@ import type {
   CardState,
   ExpendiCard,
   MembersResponse,
+  ReviewCardPurchaseRequest,
 } from "@expendi-business/shared";
 import {
   CARD_PURCHASE_STATUSES,
@@ -43,6 +44,13 @@ export const REFUND_NOTE =
 
 export const CHANGED_AFTER_EXPENSE_NOTE =
   "Its amounts changed after the Card expense was recorded. The books weren't adjusted.";
+
+/** Who holds a card, for people to read; a company-held card has no cardholder. */
+export function holderName(
+  holder: { readonly name: string | null; readonly email: string } | null,
+): string {
+  return holder === null ? "Company-held" : personName(holder);
+}
 
 /** "•••• 4242"; admins only ever see the last four digits. */
 export function maskedLastFour(lastFour: string): string {
@@ -100,7 +108,7 @@ export function sortCards(
     const byName = a.nickname.localeCompare(b.nickname);
     let primary = byName;
     if (sort.key === "holder") {
-      primary = personName(a.holder).localeCompare(personName(b.holder));
+      primary = holderName(a.holder).localeCompare(holderName(b.holder));
     } else if (sort.key === "spent") {
       primary = compareCents(
         a.spentThisMonthUsdCents,
@@ -180,18 +188,124 @@ export function purchaseAmount(purchase: CardPurchase): {
   };
 }
 
+/**
+ * The recurring payment a purchase on a company-held card belongs to, and
+ * the bill it paid once it has. The bill is the record, so no receipt is
+ * asked for.
+ */
+export function matchedPaymentOf(purchase: CardPurchase): {
+  readonly payeeName: string;
+  readonly billId: string | null;
+} | null {
+  const match = purchase.match;
+  if (match?.state !== "matched") return null;
+  return {
+    payeeName: match.payeeName ?? "its recurring payment",
+    billId: match.billId,
+  };
+}
+
+/** It's waiting for an admin to say what a new merchant's purchase is. */
+export function needsAnswer(purchase: CardPurchase): boolean {
+  return purchase.match?.state === "needs_review";
+}
+
+/** An admin answers a new merchant's purchase once, and can still change a one-off. */
+export function canAnswer(purchase: CardPurchase): boolean {
+  const state = purchase.match?.state;
+  return (
+    purchase.kind === "purchase" &&
+    (state === "needs_review" || state === "one_off")
+  );
+}
+
+export const NEEDS_ANSWER = "Needs an answer";
+
+/**
+ * The review request for what the admin picked, for the shared schema to
+ * check: the recurring payment goes only with `link`, and nothing picked
+ * is refused with the schema's own message.
+ */
+export function answerRequest(
+  decision: ReviewCardPurchaseRequest["decision"] | null,
+  recurringItemId: string,
+): unknown {
+  if (decision === null) return {};
+  return decision === "link" ? { decision, recurringItemId } : { decision };
+}
+
+/**
+ * What the sheet says once an answer is saved, from what the API made of
+ * it: a link it kept as a one-off, because the purchase's Card expense was
+ * already in the books, says so. `payeeName` is the recurring payment the
+ * admin picked.
+ */
+export function answerSavedText(
+  request: ReviewCardPurchaseRequest,
+  saved: CardPurchase,
+  payeeName: string,
+): string {
+  const state = saved.match?.state;
+  if (state === "matched") {
+    const payee = saved.match?.payeeName ?? payeeName;
+    return `Saved. It pays ${payee}’s bill, and later purchases from ${saved.merchant} match on their own.`;
+  }
+  if (state === "one_off") {
+    return request.decision === "link"
+      ? `${payeeName}’s later purchases will pay its bills. This one stays a Card expense because it’s already in your books.`
+      : "Saved as a one-off purchase. It stays a Card expense and needs a receipt.";
+  }
+  if (state === "not_recognised") {
+    return `Saved. ${saved.merchant} is declined on ${saved.card.nickname} from now on.`;
+  }
+  return "Saved.";
+}
+
+/** What an admin said about a new merchant's purchase, as its sheet shows it. */
+export const ANSWER_LABELS = {
+  one_off: "A one-off purchase",
+  not_recognised: "Not recognised: this merchant is declined on this card",
+} as const;
+
+/** "Needs a receipt" applies to a Card expense; a purchase that pays a bill has none. */
+export function asksForReceipt(purchase: CardPurchase): boolean {
+  return purchase.needsReceipt && matchedPaymentOf(purchase) === null;
+}
+
 /** An admin can waive the receipt only on a recorded Card expense still missing one. */
 export function canWaiveReceipt(purchase: CardPurchase): boolean {
   return (
     purchase.kind === "purchase" &&
     purchase.expenseId !== null &&
-    purchase.needsReceipt
+    asksForReceipt(purchase)
   );
 }
 
+/**
+ * An admin adds the receipt for a company-held card's purchase, which has
+ * no cardholder to add it from the app; the API takes one from the hold on.
+ */
+export function canAddReceipt(purchase: CardPurchase): boolean {
+  return (
+    purchase.companyHeld &&
+    purchase.kind === "purchase" &&
+    (purchase.status === "pending" || purchase.status === "settled") &&
+    asksForReceipt(purchase)
+  );
+}
+
+/** The recurring payments whose Card purchases a frozen card declines: those not paused. */
+export function paymentsDeclinedWhenFrozen(
+  card: ExpendiCard,
+): ExpendiCard["recurringPayments"] {
+  return card.recurringPayments.filter((payment) => payment.state === "active");
+}
+
+type PurchaseFilterParam = "card" | "status" | "receipt" | "review";
+
 /** The filters as the URL has them, ignoring values the API wouldn't take. */
 export function readPurchaseFilters(
-  read: (name: "card" | "status" | "receipt") => string | null,
+  read: (name: PurchaseFilterParam) => string | null,
 ): CardPurchaseFilters {
   const receipt = read("receipt");
   return {
@@ -200,6 +314,7 @@ export function readPurchaseFilters(
       CARD_PURCHASE_STATUSES.find((status) => status === read("status")) ??
       null,
     needsReceipt: receipt === "true" || receipt === "false" ? receipt : null,
+    needsReview: read("review") === "true" ? "true" : null,
   };
 }
 
@@ -207,6 +322,7 @@ export function hasPurchaseFilter(filters: CardPurchaseFilters): boolean {
   return (
     filters.cardId !== null ||
     filters.status !== null ||
-    filters.needsReceipt !== null
+    filters.needsReceipt !== null ||
+    filters.needsReview !== null
   );
 }

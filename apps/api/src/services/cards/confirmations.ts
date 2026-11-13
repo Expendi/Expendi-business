@@ -31,6 +31,7 @@ import {
   verifyApproval,
 } from "../approval/passkeys.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { checkIssueCompanyCard, issueCompanyCard } from "./company-held.js";
 import { checkIssue, issueCard } from "./issue.js";
 import { issuerFailure, requireIssuer } from "./issuer.js";
 import { checkLoad, loadCardBalance } from "./loads.js";
@@ -65,7 +66,8 @@ type ConfirmDeps =
 
 export type CardActionResultView =
   | {
-      readonly type: "issue_card" | "raise_limit" | "unfreeze_card";
+      readonly type:
+        "issue_card" | "issue_company_card" | "raise_limit" | "unfreeze_card";
       readonly card: CardView;
     }
   | { readonly type: "load_balance"; readonly load: CardLoadView }
@@ -77,6 +79,7 @@ export type CardActionResultView =
 
 const PURPOSES = {
   issue_card: "manage_cards",
+  issue_company_card: "manage_cards",
   raise_limit: "manage_cards",
   unfreeze_card: "manage_cards",
   load_balance: "load_card_balance",
@@ -91,6 +94,9 @@ const notWhatWasConfirmed = new Forbidden({
 });
 const holderOnly = new Forbidden({
   message: "Only the person holding this card can see its details.",
+});
+const companyAdminsOnly = new Forbidden({
+  message: "Only an admin can see a company-held card's details.",
 });
 
 export function cardIntentHash(tenant: Tenant, action: CardAction): string {
@@ -112,7 +118,10 @@ function refuseUnlessAllowed(
     : Effect.void;
 }
 
-/** Only the holder, and never a card that's closed or on its way there. */
+/**
+ * Only the holder, or any admin for a company-held card, which nobody
+ * holds; never a card that's closed or on its way there.
+ */
 function checkReveal(
   tenant: Tenant,
   cardId: string,
@@ -124,7 +133,10 @@ function checkReveal(
   return Effect.gen(function* () {
     yield* requireIssuer;
     const card = yield* readCardRow(tenant, cardId);
-    if (card.membershipId !== tenant.membershipId) {
+    if (card.companyHeld && tenant.role !== "admin") {
+      return yield* Effect.fail(companyAdminsOnly);
+    }
+    if (!card.companyHeld && card.membershipId !== tenant.membershipId) {
       return yield* Effect.fail(holderOnly);
     }
     yield* refuseIfClosed(card);
@@ -143,6 +155,8 @@ function check(
   switch (action.type) {
     case "issue_card":
       return Effect.asVoid(checkIssue(tenant, action));
+    case "issue_company_card":
+      return Effect.asVoid(checkIssueCompanyCard(tenant, action));
     case "raise_limit":
       return Effect.asVoid(
         Effect.zipRight(requireIssuer, checkRaise(tenant, action)),
@@ -224,6 +238,10 @@ function perform(
   switch (action.type) {
     case "issue_card":
       return issueCard(tenant, action, approvalId).pipe(
+        Effect.map((card) => ({ type: action.type, card })),
+      );
+    case "issue_company_card":
+      return issueCompanyCard(tenant, action, approvalId).pipe(
         Effect.map((card) => ({ type: action.type, card })),
       );
     case "raise_limit":

@@ -101,15 +101,19 @@ Money moved from a company's wallet to its Card balance.
 _Avoid_: Top-up, card funding
 
 **Cardholder**:
-A signed-in admin or employee who holds an Expendi card. Every Expendi card has exactly one.
+A signed-in admin or employee who holds an Expendi card. Every Expendi card has exactly one, except a company-held card, which has none.
 _Avoid_: Card user, card owner
+
+**Company-held card**:
+An Expendi card the company holds, with no cardholder. Only a company-held card can pay a recurring payment, and one card can pay several.
+_Avoid_: Company card, subscription card, shared card
 
 **Card purchase**:
 One attempt to spend on an Expendi card, from authorization until it settles, is voided or is declined.
 _Avoid_: Card transaction, charge
 
 **Card expense**:
-The expense recorded when a Card purchase settles, stating its final amount.
+The expense recorded when a Card purchase settles, stating its final amount. A Card purchase that pays a bill records none: the bill is the record.
 _Avoid_: Card claim
 
 **Bank card**:

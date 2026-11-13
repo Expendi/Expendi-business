@@ -1,11 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { Effect } from "effect";
 
 import type { CardAction } from "@expendi-business/shared";
 
 import type { DatabaseService } from "../../db/client.js";
 import type { Card } from "../../db/schema/index.js";
-import type { DbScope } from "../../db/scope.js";
+import type { DbScope, Transaction } from "../../db/scope.js";
 import type {
   DatabaseError,
   NotFound,
@@ -15,11 +15,12 @@ import type { Tenant } from "../../middleware/tenant.js";
 import type { AuditActor } from "../audit/audit-log.js";
 import type { Lithic, LithicCardPatch } from "../lithic/lithic-client.js";
 import type { CardView } from "./views.js";
-import { cards } from "../../db/schema/index.js";
+import { cards, payees, recurringItems } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { BadRequest, Conflict } from "../../errors.js";
 import { resolveAlert } from "../alerts/ops-alerts.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { hasNotEndedForCardsSql } from "../recurring/card-paid-state.js";
 import { exclusively, issuerFailure, requireIssuer } from "./issuer.js";
 import { cardNotFound, getCard, visibleCards } from "./views.js";
 
@@ -191,6 +192,122 @@ export function closeAtIssuer(
   });
 }
 
+/** "A", "A and B", "A, B and C". */
+function listed(names: readonly string[]): string {
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+}
+
+/**
+ * What frees the card of each payment still on it: one that can still be
+ * changed moves to another card or way of paying; one whose schedule ended
+ * can't be changed, so only settling its last bill lets it go.
+ */
+function stillPaysMessage(
+  payments: readonly { payeeName: string; nextDueOn: string | null }[],
+): string {
+  const running = payments.filter((payment) => payment.nextDueOn !== null);
+  const lastBillsOwed = payments.filter(
+    (payment) => payment.nextDueOn === null,
+  );
+  return [
+    ...(running.length === 0
+      ? []
+      : [
+          `This card still pays ${listed(running.map((payment) => payment.payeeName))}. Move its recurring payments to another card or another way of paying first.`,
+        ]),
+    ...lastBillsOwed.map(
+      (payment) =>
+        `${payment.payeeName}'s last bill is still owed: pay it, mark it paid or cancel it first.`,
+    ),
+  ].join(" ");
+}
+
+/**
+ * A company-held card can't close while a recurring payment that hasn't
+ * ended, paused or not, still uses it: its merchant would start being
+ * declined with nobody told why (spec §6.25).
+ */
+function refuseCloseWhilePaying(
+  tx: Transaction,
+  tenant: Tenant,
+  card: Card,
+): Effect.Effect<void, Conflict | DatabaseError> {
+  return query(() =>
+    tx
+      .select({
+        payeeName: payees.name,
+        nextDueOn: recurringItems.nextDueOn,
+      })
+      .from(recurringItems)
+      .innerJoin(payees, eq(payees.id, recurringItems.payeeId))
+      .where(
+        and(
+          eq(recurringItems.organizationId, tenant.organizationId),
+          eq(recurringItems.cardId, card.id),
+          hasNotEndedForCardsSql(),
+        ),
+      )
+      .orderBy(asc(recurringItems.createdAt), asc(recurringItems.id)),
+  ).pipe(
+    Effect.flatMap((payments) =>
+      payments.length === 0
+        ? Effect.void
+        : Effect.fail(new Conflict({ message: stillPaysMessage(payments) })),
+    ),
+  );
+}
+
+/**
+ * Asks for a company-held card's close, in one transaction holding its row
+ * for update: no recurring payment can take the card between the check and
+ * the request (`lockPayingCard` waits on the row, then sees the request).
+ * Lithic is called afterwards; if it fails, the card stays asked to close
+ * and the close-cards job finishes it, as for a leaver's.
+ */
+function requestCompanyCardClose(
+  tenant: Tenant,
+  cardId: string,
+): Effect.Effect<
+  Card,
+  Conflict | NotFound | DatabaseError,
+  DatabaseService | AuditLog
+> {
+  return withScope(tenant, (tx) =>
+    Effect.gen(function* () {
+      const audit = yield* AuditLog;
+      const [card] = yield* query(() =>
+        tx
+          .select()
+          .from(cards)
+          .where(and(visibleCards(tenant), eq(cards.id, cardId)))
+          .for("update"),
+      );
+      if (!card) return yield* Effect.fail(cardNotFound);
+      if (card.state === "closed" || card.closeRequestedAt !== null) {
+        return card;
+      }
+      yield* refuseCloseWhilePaying(tx, tenant, card);
+      const [requested] = yield* query(() =>
+        tx
+          .update(cards)
+          .set({ closeRequestedAt: new Date() })
+          .where(eq(cards.id, card.id))
+          .returning(),
+      );
+      if (!requested)
+        return yield* Effect.dieMessage("close request wrote no row");
+      yield* audit.record(tx, {
+        actor: userActor(tenant),
+        organizationId: tenant.organizationId,
+        action: "card.close_requested",
+        entity: { type: "card", id: card.id },
+      });
+      return requested;
+    }),
+  );
+}
+
 /** Admins only; closing again answers with the card as it is. */
 export function closeCard(
   tenant: Tenant,
@@ -199,7 +316,10 @@ export function closeCard(
   return exclusively(
     cardLock(cardId),
     Effect.gen(function* () {
-      const card = yield* readCardRow(tenant, cardId);
+      const read = yield* readCardRow(tenant, cardId);
+      const card = read.companyHeld
+        ? yield* requestCompanyCardClose(tenant, cardId)
+        : read;
       if (card.state !== "closed") {
         yield* closeAtIssuer(tenant, card, userActor(tenant));
       }

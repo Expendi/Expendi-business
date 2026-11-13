@@ -138,9 +138,13 @@ const serialiseObligation = (row: CashObligationView): CashObligation => ({
   dueOn: row.dueOn,
   amountKes: row.amountKes?.toString() ?? null,
   status: row.status,
-  payVia: row.payVia,
+  // Clients built before company-held cards know only these two; `card`
+  // tells the newer ones it's paid automatically.
+  payVia: row.payVia === "expendi" ? "expendi" : "outside",
   needsAmount: row.needsAmount,
   heading: row.heading,
+  card: row.card,
+  amountUsdCents: row.amountUsdCents?.toString() ?? null,
 });
 
 function serialiseCash(cash: CashCheck): SpendingOverview["cash"] {
@@ -158,6 +162,14 @@ function serialiseCash(cash: CashCheck): SpendingOverview["cash"] {
     status: cash.status,
     shortKes: cash.shortKes?.toString() ?? null,
     outsideKes: cash.outsideKes.toString(),
+    cardBills:
+      cash.cardBills === null
+        ? null
+        : {
+            dueUsdCents: cash.cardBills.dueUsdCents.toString(),
+            availableUsdCents: cash.cardBills.availableUsdCents.toString(),
+            short: cash.cardBills.short,
+          },
   };
 }
 
@@ -167,7 +179,8 @@ type OutstandingExpense = SpendingOverview["outstanding"]["claims"][number];
  * Claims waiting for approval, petty cash spent without a receipt or, with
  * one, without the eTIMS invoice its category expects, and Card expenses
  * with no receipt and no admin's reason. An overspend's extra claim shares
- * its float spending's receipt and invoice.
+ * its float spending's receipt and invoice. A Card purchase that paid a
+ * bill asks for no receipt: the bill is the record.
  */
 function readOutstandingExpenses(tx: Transaction, organizationId: string) {
   return query(() =>
@@ -199,6 +212,7 @@ function readOutstandingExpenses(tx: Transaction, organizationId: string) {
         JOIN categories c ON c.id = e.category_id
         LEFT JOIN expenses extra ON extra.id = e.overspend_claim_id
         WHERE e.organization_id = ${organizationId}
+          AND e.bill_id IS NULL
           AND (
             (e.kind = 'claim' AND e.status = 'submitted')
             OR (e.kind IN ('float', 'card') AND e.status = 'recorded')

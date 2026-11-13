@@ -154,6 +154,15 @@ describe("describeChanges", () => {
     ]);
   });
 
+  it("calls a bill a Card purchase paid Paid by card", () => {
+    // #then
+    expect(showValue("status", "paid_by_card", "bill")).toEqual({
+      kind: "status",
+      label: "Paid by card",
+      tone: "paid",
+    });
+  });
+
   it("names a field it doesn't know in plain words", () => {
     // #when
     const shown = showValue("invitedAt", null, "membership");

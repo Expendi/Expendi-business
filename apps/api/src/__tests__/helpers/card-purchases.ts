@@ -123,6 +123,48 @@ export async function createCardCompany(
   };
 }
 
+export interface CompanyHeldCard {
+  readonly cardId: string;
+  readonly cardToken: string;
+}
+
+/**
+ * A company-held card on the company's card program, written straight to the
+ * table as issuing it would leave it: no cardholder, open, issued by the
+ * company's admin. `values` overrides any column, e.g. to break a rule.
+ */
+export async function addCompanyHeldCard(
+  db: Database,
+  company: TestCompany,
+  values: Partial<typeof cards.$inferInsert> &
+    Pick<typeof cards.$inferInsert, "defaultCategoryId">,
+): Promise<CompanyHeldCard> {
+  const { organizationId } = company;
+  const cardToken = `card-${randomUUID()}`;
+  const [card] = await runInScope(
+    db,
+    { organizationId, userId: company.admin.id },
+    (tx) =>
+      tx
+        .insert(cards)
+        .values({
+          organizationId,
+          companyHeld: true,
+          cardholderId: null,
+          membershipId: null,
+          lithicCardToken: cardToken,
+          nickname: "Software subscriptions",
+          lastFour: "1881",
+          monthlyLimitUsdCents: 50_000n,
+          issuedBy: company.admin.id,
+          ...values,
+        })
+        .returning({ id: cards.id, cardToken: cards.lithicCardToken }),
+  );
+  if (!card) throw new Error("card insert returned no row");
+  return { cardId: card.id, cardToken: card.cardToken };
+}
+
 export const sendLithicEvent = (
   app: App,
   body: unknown,
@@ -144,6 +186,9 @@ export const transactionEvent = (token: string) => ({
 export interface AuthorizationOptions {
   readonly status?: string;
   readonly created?: string;
+  readonly descriptor?: string;
+  /** Lithic's merchant ID; left out, as an older request may be. */
+  readonly acceptorId?: string;
 }
 
 /** An Auth Stream Access request for `cents` US cents. */
@@ -152,7 +197,12 @@ export async function authorize(
   cardToken: string,
   transactionToken: string,
   cents: number,
-  { status = "AUTHORIZATION", created }: AuthorizationOptions = {},
+  {
+    status = "AUTHORIZATION",
+    created,
+    descriptor = "ACME SOFTWARE",
+    acceptorId,
+  }: AuthorizationOptions = {},
 ): Promise<{
   readonly status: number;
   readonly body: Record<string, unknown>;
@@ -172,7 +222,8 @@ export async function authorize(
         settlement: null,
       },
       merchant: {
-        descriptor: "ACME SOFTWARE",
+        ...(acceptorId !== undefined && { acceptor_id: acceptorId }),
+        descriptor,
         mcc: "5734",
         city: "NAIROBI",
         country: "KEN",

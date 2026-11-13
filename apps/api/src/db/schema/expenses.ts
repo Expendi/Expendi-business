@@ -73,7 +73,11 @@ export const expenses = pgTable(
      * spending recorded from a bill marked paid without saying from where.
      */
     paidFromAccountId: uuid("paid_from_account_id"),
-    /** The bill marked paid outside Expendi that recorded this company spending (spec §6.23). */
+    /**
+     * The bill whose payment this records: marked paid outside Expendi, as
+     * company spending (spec §6.23), or paid by a Card purchase on a
+     * company-held card, as kind `card`.
+     */
     billId: uuid("bill_id"),
     categoryId: uuid("category_id").notNull(),
     merchant: text("merchant").notNull(),
@@ -212,10 +216,10 @@ export const expenses = pgTable(
       "expenses_company_links",
       sql`${table.kind}::text IN ('company', 'card') OR (${table.paidFromAccountId} IS NULL AND ${table.billId} IS NULL)`,
     ),
-    // `::text`: this runs in the transaction that adds 'card' to the enum.
+    // `::text`: this ran in the transaction that added 'card' to the enum.
     check(
       "expenses_card_recorded",
-      sql`${table.kind}::text <> 'card' OR (${table.status} = 'recorded' AND ${table.paidFromAccountId} IS NOT NULL AND ${table.billId} IS NULL)`,
+      sql`${table.kind}::text <> 'card' OR (${table.status} = 'recorded' AND ${table.paidFromAccountId} IS NOT NULL)`,
     ),
     check(
       "expenses_float_recorded",

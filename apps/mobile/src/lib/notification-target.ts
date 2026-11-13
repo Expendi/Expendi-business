@@ -26,14 +26,47 @@ export type NotificationTarget =
       readonly organizationId: string;
       readonly cardId: string;
     }
-  | { readonly kind: "cards"; readonly organizationId: string };
+  | { readonly kind: "cards"; readonly organizationId: string }
+  | {
+      readonly kind: "bill";
+      readonly organizationId: string;
+      readonly billId: string;
+    }
+  | { readonly kind: "bills"; readonly organizationId: string }
+  | { readonly kind: "overview"; readonly organizationId: string };
 
 /** These go to admins, who needn't hold the card, so only the cards screen is theirs. */
 function isForAdmins(type: CardNotificationData["type"]): boolean {
   return type === "card_balance_low" || type === "card_refund_received";
 }
 
+/**
+ * About a company-held card, which has no cardholder and no screen in the
+ * app, so its admins land on the bill it pays, the bills, or the overview's
+ * cash check; never on a cardholder's cards.
+ */
+function companyHeldCardTarget(
+  data: CardNotificationData,
+): NotificationTarget | null {
+  const { type, organizationId, billId } = data;
+  switch (type) {
+    case "card_bill_declined":
+    case "card_purchase_over_estimate":
+      return billId
+        ? { kind: "bill", organizationId, billId }
+        : { kind: "bills", organizationId };
+    case "card_purchase_needs_review":
+      return { kind: "bills", organizationId };
+    case "card_balance_short":
+      return { kind: "overview", organizationId };
+    default:
+      return null;
+  }
+}
+
 function cardTarget(data: CardNotificationData): NotificationTarget {
+  const companyHeld = companyHeldCardTarget(data);
+  if (companyHeld) return companyHeld;
   const { type, organizationId, cardId, purchaseId } = data;
   if (!isForAdmins(type)) {
     if (purchaseId) {
@@ -81,6 +114,12 @@ export function notificationHref(target: NotificationTarget): Href {
       return { pathname: "/cards/[cardId]", params: { cardId: target.cardId } };
     case "cards":
       return "/cards";
+    case "bill":
+      return { pathname: "/bills/[billId]", params: { billId: target.billId } };
+    case "bills":
+      return "/bills";
+    case "overview":
+      return "/";
   }
 }
 
@@ -88,7 +127,17 @@ export function notificationHref(target: NotificationTarget): Href {
 export function notificationQueryKey(
   target: NotificationTarget,
 ): readonly unknown[] {
-  return target.kind === "claim"
-    ? queryKeys.claims(target.organizationId)
-    : queryKeys.cards(target.organizationId);
+  switch (target.kind) {
+    case "claim":
+      return queryKeys.claims(target.organizationId);
+    case "bill":
+    case "bills":
+      return queryKeys.bills(target.organizationId);
+    case "overview":
+      return queryKeys.overview(target.organizationId);
+    case "card_purchase":
+    case "card":
+    case "cards":
+      return queryKeys.cards(target.organizationId);
+  }
 }

@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   attachCardReceiptRequestSchema,
   listCardPurchasesQuerySchema,
+  reviewCardPurchaseRequestSchema,
   waiveCardReceiptRequestSchema,
 } from "@expendi-business/shared";
 
@@ -20,6 +21,7 @@ import {
   listCardPurchases,
   waiveCardReceipt,
 } from "../services/cards/purchases.js";
+import { reviewCardPurchase } from "../services/cards/review.js";
 
 const purchaseIdSchema = z.uuid();
 
@@ -93,6 +95,20 @@ export function createCardPurchaseRoutes(
             waiveCardReceiptRequestSchema,
           );
           return yield* waiveCardReceipt(c.get("tenant"), purchaseId, fields);
+        }),
+      ),
+    )
+    .post("/:purchaseId/review", requireRole("admin"), (c) =>
+      runEffect(
+        runtime,
+        c,
+        Effect.gen(function* () {
+          const purchaseId = yield* purchaseIdFrom(c.req.param("purchaseId"));
+          const review = yield* readBody(
+            c.req.raw,
+            reviewCardPurchaseRequestSchema,
+          );
+          return yield* reviewCardPurchase(c.get("tenant"), purchaseId, review);
         }),
       ),
     );

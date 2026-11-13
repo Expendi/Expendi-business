@@ -12,6 +12,7 @@ import type {
   SpendingOverview,
 } from "@expendi-business/shared";
 import {
+  cashCardBillsLine,
   cashFootnote,
   cashHeadline,
   cashOutsideLine,
@@ -24,6 +25,7 @@ import { Skel } from "~/components/data/states";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { formatKes, formatUsdc } from "~/lib/money";
+import { CardEstimate } from "./card-estimate";
 import {
   cashLedger,
   comingUp,
@@ -147,6 +149,31 @@ function CashPill({ cash }: { cash: SpendingOverview["cash"] }): JSX.Element {
   );
 }
 
+/**
+ * The card-paid bills due in the cash check's window against the Card
+ * balance (spec §6.20): they're paid from the Card balance, not the
+ * wallet, so a short Card balance gets its own warning.
+ */
+function CardBillsShort({ line }: { line: string }): JSX.Element {
+  return (
+    <p
+      role="note"
+      className="mt-2 flex items-start gap-1 rounded-control bg-error-50 px-2 py-1.5 text-xs leading-4 font-(--w-ui) text-error-700"
+    >
+      <TriangleAlertIcon
+        aria-hidden="true"
+        className="mt-px size-[13px] shrink-0"
+      />
+      <span>
+        {line}.{" "}
+        <Link href="/cards" className={textLinkClass}>
+          Load the Card balance.
+        </Link>
+      </span>
+    </p>
+  );
+}
+
 /** The wallet, what's already leaving it, what's due in 30 days and what's left. */
 export function WalletCard({
   cash,
@@ -157,6 +184,7 @@ export function WalletCard({
 }): JSX.Element {
   const { inProgressKes, leftOverKes } = cashLedger(cash);
   const outside = cashOutsideLine(cash);
+  const cardBillsLine = cashCardBillsLine(cash);
   return (
     <Card
       role="region"
@@ -205,6 +233,9 @@ export function WalletCard({
         ) : null}
       </dl>
       <CashPill cash={cash} />
+      {cash.cardBills?.short && cardBillsLine ? (
+        <CardBillsShort line={cardBillsLine} />
+      ) : null}
       {cash.unknownAmounts > 0 || outside ? (
         <p className="mt-2 text-xs leading-4 text-muted-foreground">
           {cash.unknownAmounts > 0
@@ -408,7 +439,16 @@ export function ComingUpCard({
                     </span>
                   </span>
                   <span className="text-sm font-(--w-amount)">
-                    {row.amountKes === null ? (
+                    {row.card ? (
+                      <CardEstimate
+                        row={row}
+                        none={
+                          <span className="font-normal text-muted-foreground">
+                            No estimate
+                          </span>
+                        }
+                      />
+                    ) : row.amountKes === null ? (
                       <span className="font-normal text-muted-foreground">
                         Not entered
                       </span>

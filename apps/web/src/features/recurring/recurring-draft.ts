@@ -2,6 +2,7 @@ import type {
   BillCurrency,
   BillHeading,
   CreateRecurringItemRequest,
+  PayeeMethod,
   RecurringItem,
   RecurringItemState,
   RecurringPayVia,
@@ -9,8 +10,10 @@ import type {
   UpdateRecurringItemRequest,
 } from "@expendi-business/shared";
 import {
+  CARD_LIMIT_HEADROOM_PERCENT,
   describeSchedule,
   REMINDER_DAYS_DEFAULT,
+  USDC_UNITS_PER_US_CENT,
 } from "@expendi-business/shared";
 
 import type { StatusTone } from "~/components/data/status-badge";
@@ -36,6 +39,8 @@ export interface RecurringDraft {
   /** Blank for no end date. */
   endsOn: string;
   payVia: RecurringPayVia;
+  /** The company-held card that pays it, while `payVia` is `card`. */
+  cardId: string | null;
   reminderDays: string;
   /** Null follows the payee: Subscriptions for a subscription vendor. */
   heading: BillHeading | null;
@@ -69,9 +74,28 @@ export function blankDraft(today: string): RecurringDraft {
     startsOn: today,
     endsOn: "",
     payVia: "expendi",
+    cardId: null,
     reminderDays: String(REMINDER_DAYS_DEFAULT),
     heading: null,
     categoryId: null,
+  };
+}
+
+/**
+ * A payment by company-held card has an optional USD estimate in place of
+ * an amount (spec §6.20): left blank, it's variable.
+ */
+function amountOfDraft(draft: RecurringDraft): {
+  readonly variable: boolean;
+  readonly typed: string | null;
+} {
+  if (draft.payVia === "card") {
+    const typed = blankToNull(draft.amount)?.trim() ?? null;
+    return { variable: typed === null, typed };
+  }
+  return {
+    variable: draft.variable,
+    typed: draft.variable ? null : draft.amount.trim(),
   };
 }
 
@@ -91,20 +115,33 @@ const wholeNumber = (typed: string): number =>
 export function toCreateRequest(
   draft: RecurringDraft,
 ): CreateRecurringItemRequest {
-  return {
+  const common = {
     payeeId: draft.payeeId ?? "",
-    variable: draft.variable,
-    ...(draft.currency === "usd"
-      ? { amountUsd: draft.variable ? null : blankToNull(draft.amount) }
-      : { amountKes: draft.variable ? null : blankToNull(draft.amount) }),
     schedule: draft.schedule,
     scheduleDay: wholeNumber(draft.scheduleDay),
     startsOn: draft.startsOn.trim(),
     endsOn: blankToNull(draft.endsOn)?.trim() ?? null,
-    payVia: draft.payVia,
     reminderDays: wholeNumber(draft.reminderDays),
     overviewHeading: draft.heading ?? undefined,
     categoryId: draft.categoryId ?? "",
+  };
+  if (draft.payVia === "card") {
+    const { variable, typed } = amountOfDraft(draft);
+    return {
+      ...common,
+      variable,
+      amountUsd: typed,
+      payVia: "card",
+      cardId: draft.cardId,
+    };
+  }
+  return {
+    ...common,
+    variable: draft.variable,
+    ...(draft.currency === "usd"
+      ? { amountUsd: draft.variable ? null : blankToNull(draft.amount) }
+      : { amountKes: draft.variable ? null : blankToNull(draft.amount) }),
+    payVia: draft.payVia,
   };
 }
 
@@ -113,7 +150,7 @@ export function toCreateRequest(
  * is now: blank if their method moved between KES and USDC since.
  */
 export function draftFromItem(item: RecurringItem): RecurringDraft {
-  const currency = currencyOfPayee(item.payee.method, item.currency);
+  const currency = draftCurrency(item.payVia, item.payee.method, item.currency);
   const stored = currency === item.currency ? storedAmount(item) : null;
   return {
     payeeId: item.payee.id,
@@ -125,6 +162,7 @@ export function draftFromItem(item: RecurringItem): RecurringDraft {
     startsOn: item.startsOn,
     endsOn: item.endsOn ?? "",
     payVia: item.payVia,
+    cardId: item.payVia === "card" ? (item.card?.id ?? null) : null,
     reminderDays: String(item.reminderDays),
     heading:
       item.overviewHeading === "transactions" ||
@@ -135,13 +173,75 @@ export function draftFromItem(item: RecurringItem): RecurringDraft {
   };
 }
 
+/**
+ * The currency a payment's amount is typed in: USD by company-held card,
+ * whoever the payee is (spec §6.20), else the payee's.
+ */
+export function draftCurrency(
+  payVia: RecurringPayVia,
+  method: PayeeMethod | null | undefined,
+  fallback: BillCurrency,
+): BillCurrency {
+  return payVia === "card" ? "usd" : currencyOfPayee(method, fallback);
+}
+
+/** What was typed for one way of paying: its amount (by card, the estimate) and its card. */
+type PayViaEntry = Pick<RecurringDraft, "currency" | "amount" | "cardId">;
+
+export type PayViaMemory = Partial<
+  Readonly<Record<RecurringPayVia, PayViaEntry>>
+>;
+
+/**
+ * The draft's changes once "How it's paid" moves to `payVia`, whose amount
+ * is typed in `currency`. What that way had earlier in this edit comes
+ * back, starting with what the form opened with, so a look at another way
+ * doesn't lose a card's estimate and card. Otherwise the amount carries
+ * over unless its currency changes. `memory` gains what the way being left
+ * has.
+ */
+export function switchPayVia(
+  draft: RecurringDraft,
+  memory: PayViaMemory,
+  payVia: RecurringPayVia,
+  currency: BillCurrency,
+): {
+  readonly changes: Partial<RecurringDraft>;
+  readonly memory: PayViaMemory;
+} {
+  const kept: PayViaMemory = {
+    ...memory,
+    [draft.payVia]: {
+      currency: draft.currency,
+      amount: draft.amount,
+      cardId: draft.cardId,
+    },
+  };
+  const earlier = kept[payVia];
+  const amount =
+    earlier?.currency === currency
+      ? earlier.amount
+      : currency === draft.currency
+        ? draft.amount
+        : "";
+  return {
+    changes: {
+      payVia,
+      currency,
+      amount,
+      cardId: payVia === "card" ? (earlier?.cardId ?? null) : null,
+    },
+    memory: kept,
+  };
+}
+
 /** Only the fields that changed; an empty request changes nothing. */
 export function toUpdateRequest(
   item: RecurringItem,
   draft: RecurringDraft,
 ): UpdateRecurringItemRequest {
   const request: UpdateRecurringItemRequest = {};
-  const typedAmount = draft.variable ? null : draft.amount.trim();
+  const { typed: typedAmount } = amountOfDraft(draft);
   const typedUnits =
     typedAmount === null
       ? null
@@ -149,6 +249,16 @@ export function toUpdateRequest(
   if (draft.currency !== item.currency || typedUnits !== storedAmount(item)) {
     if (draft.currency === "usd") request.amountUsd = typedAmount;
     else request.amountKes = typedAmount;
+  }
+  // Only a move to or from a company-held card changes how it's paid (spec §6.20).
+  const toOrFromCard =
+    draft.payVia !== item.payVia &&
+    (draft.payVia === "card" || item.payVia === "card");
+  const cardChanged =
+    draft.payVia === "card" && draft.cardId !== (item.card?.id ?? null);
+  if (toOrFromCard || cardChanged) {
+    request.payVia = draft.payVia;
+    if (draft.payVia === "card") request.cardId = draft.cardId ?? undefined;
   }
   if (draft.categoryId !== null && draft.categoryId !== item.category.id) {
     request.categoryId = draft.categoryId;
@@ -191,6 +301,86 @@ export function sortRecurringItems(
       dueKey(a).localeCompare(dueKey(b)) ||
       a.payee.name.localeCompare(b.payee.name),
   );
+}
+
+/**
+ * The most of a schedule's bills one calendar month can hold. Lithic's
+ * limit is per month, so a quarterly or yearly bill needs its whole amount
+ * in the month it falls in, and a month can hold five weekly ones.
+ */
+const MOST_BILLS_IN_A_MONTH: Readonly<Record<RecurringSchedule, bigint>> = {
+  weekly: 5n,
+  monthly: 1n,
+  quarterly: 1n,
+  yearly: 1n,
+};
+
+const divideUp = (amount: bigint, by: bigint): bigint =>
+  (amount + by - 1n) / by;
+
+export interface CardPaymentEstimate {
+  /** USDC base units; null when the payment has no estimate. */
+  readonly amountUsdc: string | null;
+  readonly schedule: RecurringSchedule;
+}
+
+/** In USDC base units; 0 when none has an estimate. */
+const mostInOneMonthUsdc = (payments: readonly CardPaymentEstimate[]) =>
+  payments.reduce(
+    (sum, payment) =>
+      payment.amountUsdc === null
+        ? sum
+        : sum +
+          BigInt(payment.amountUsdc) * MOST_BILLS_IN_A_MONTH[payment.schedule],
+    0n,
+  );
+
+/**
+ * The most a company-held card's recurring payments can charge in one
+ * calendar month, in US cents rounded up. Null when none has an estimate.
+ */
+export function mostInOneMonthCents(
+  payments: readonly CardPaymentEstimate[],
+): bigint | null {
+  const most = mostInOneMonthUsdc(payments);
+  return most === 0n ? null : divideUp(most, USDC_UNITS_PER_US_CENT);
+}
+
+/**
+ * The monthly limit suggested for a company-held card (spec §6.25): the
+ * most its recurring payments can charge in one month plus
+ * CARD_LIMIT_HEADROOM_PERCENT, in US cents rounded up. Null when none has
+ * an estimate.
+ */
+export function suggestedCardLimitCents(
+  payments: readonly CardPaymentEstimate[],
+): bigint | null {
+  const most = mostInOneMonthUsdc(payments);
+  if (most === 0n) return null;
+  const withHeadroom = divideUp(
+    most * BigInt(100 + CARD_LIMIT_HEADROOM_PERCENT),
+    100n,
+  );
+  return divideUp(withHeadroom, USDC_UNITS_PER_US_CENT);
+}
+
+/** What the card's other recurring payments add to a month: those that haven't ended. */
+export function otherCardPayments(
+  items: readonly RecurringItem[],
+  cardId: string,
+  exceptItemId: string | null,
+): CardPaymentEstimate[] {
+  return items
+    .filter(
+      (item) =>
+        item.card?.id === cardId &&
+        item.id !== exceptItemId &&
+        item.state !== "ended",
+    )
+    .map((item) => ({
+      amountUsdc: item.currency === "usd" ? item.amountUsdc : null,
+      schedule: item.schedule,
+    }));
 }
 
 export function reminderInWords(days: number): string {

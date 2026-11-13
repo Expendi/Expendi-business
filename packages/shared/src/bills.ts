@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { CardState } from "./cards.js";
 import type { OverviewHeading } from "./claims.js";
 import type { PayeeKind, PayeeMethod } from "./payee.js";
 import { paymentReceiptsSchema } from "./cash-out-receipt.js";
@@ -27,11 +28,12 @@ export const BILL_STATUSES = [
   "paid",
   "payout_failed",
   "paid_outside",
+  "paid_by_card",
   "cancelled",
 ] as const;
 export const billStatusSchema = z.enum(BILL_STATUSES, {
   error:
-    "A bill status is upcoming, due, overdue, paying, paid, payout_failed, paid_outside or cancelled.",
+    "A bill status is upcoming, due, overdue, paying, paid, payout_failed, paid_outside, paid_by_card or cancelled.",
 });
 export type BillStatus = z.infer<typeof billStatusSchema>;
 
@@ -97,10 +99,14 @@ export const DATED_BILL_STATUSES = [
 ] as const satisfies readonly BillStatus[];
 export type DatedBillStatus = (typeof DATED_BILL_STATUSES)[number];
 
-/** Settled for good: paid through Expendi, paid outside it, or cancelled. */
+/**
+ * Settled for good: paid through Expendi, paid outside it, paid by a Card
+ * purchase on a company-held card, or cancelled.
+ */
 export const SETTLED_BILL_STATUSES = [
   "paid",
   "paid_outside",
+  "paid_by_card",
   "cancelled",
 ] as const satisfies readonly BillStatus[];
 
@@ -393,6 +399,16 @@ const billPersonSchema = z.object({
   email: z.string(),
 });
 
+/**
+ * `CARD_STATES`, spelled out: `cards.ts` reaches this module through
+ * `company-spending.ts`, so importing its value here would be a cycle.
+ */
+const BILL_CARD_STATES = [
+  "open",
+  "frozen",
+  "closed",
+] as const satisfies readonly CardState[];
+
 export const billSchema = z.object({
   id: z.uuid(),
   status: billStatusSchema,
@@ -421,7 +437,7 @@ export const billSchema = z.object({
   payrollRunId: z.uuid().nullable(),
   /** Why a fixed amount was last changed; earlier reasons stay in the audit log. */
   adjustmentReason: z.string().nullable(),
-  /** The Kenyan calendar day it was paid, through Expendi or outside it. */
+  /** The Kenyan calendar day it was paid: through Expendi, outside it, or by card. */
   paidOn: z.iso.date().nullable(),
   /** When Expendi recorded it as paid. */
   paidAt: z.iso.datetime().nullable(),
@@ -449,6 +465,12 @@ export const billSchema = z.object({
       schedule: recurringScheduleSchema,
       scheduleDay: z.int(),
       startsOn: z.iso.date(),
+      /**
+       * False while it's paused, which `state` doesn't say once it has
+       * ended: an ended payment's card still pays its last bill unless
+       * it's paused. Always sent; optional only for clients built before it.
+       */
+      active: z.boolean().optional(),
     })
     .nullish(),
   /**
@@ -457,6 +479,36 @@ export const billSchema = z.object({
    * optional only for clients built before it.
    */
   paidFromAccount: z.object({ id: z.uuid(), name: z.string() }).nullish(),
+  /**
+   * The company-held card that pays it automatically: its recurring
+   * payment's card while it's still to be settled, or the card whose Card
+   * purchase paid a `paid_by_card` bill. Always sent; optional only for
+   * clients built before it.
+   */
+  card: z
+    .object({
+      id: z.uuid(),
+      nickname: z.string(),
+      lastFour: z.string(),
+      /**
+       * A frozen or closed card won't pay a bill still owed. Always sent;
+       * optional only for clients built before it.
+       */
+      state: z.enum(BILL_CARD_STATES).optional(),
+    })
+    .nullish(),
+  /**
+   * The card declined a Card purchase meant for it: when, and why in plain
+   * English. The bill stays owed. Always sent; optional only for clients
+   * built before it.
+   */
+  cardDeclinedAt: z.iso.datetime().nullish(),
+  cardDeclineReason: z.string().nullish(),
+  /**
+   * The Card purchase that paid a `paid_by_card` bill. Always sent;
+   * optional only for clients built before it.
+   */
+  cardPurchaseId: z.uuid().nullish(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
@@ -489,6 +541,14 @@ export const billDetailSchema = billSchema.extend({
       failureReason: z.string().nullable(),
     })
     .nullish(),
+  /**
+   * What paying it came to in KES cents, as recorded: its spending row's
+   * KES, at the day's rate for a USD bill, when paid by card or marked paid;
+   * the KES its payouts delivered (a USD bill's KES equivalent) when paid
+   * through Expendi. Null until it's paid. Always sent; optional only for
+   * clients built before it.
+   */
+  paidAmountKes: z.string().regex(/^\d+$/).nullish(),
 });
 
 export type BillDetail = z.infer<typeof billDetailSchema>;

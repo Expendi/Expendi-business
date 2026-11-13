@@ -708,6 +708,20 @@
       "when": 1794551839918,
       "tag": "0100_wallets_deposits_judged_through",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1794566126771,
+      "tag": "0101_company_held_cards",
+      "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1794566138751,
+      "tag": "0102_company_held_cards_access",
+      "breakpoints": true
     }
   ]
 }

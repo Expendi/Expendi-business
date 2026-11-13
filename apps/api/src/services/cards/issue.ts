@@ -127,6 +127,57 @@ export interface IssuePlan {
   readonly holder: Holder;
 }
 
+/**
+ * What any new card needs: cards turned on, no pause, and a default
+ * category the company still uses. Returns the card program.
+ */
+export function checkNewCard(
+  tx: Transaction,
+  organizationId: string,
+  defaultCategoryId: string,
+): Effect.Effect<CardProgramRow, BadRequest | Conflict | DatabaseError> {
+  return Effect.gen(function* () {
+    const [program] = yield* query(() =>
+      tx
+        .select()
+        .from(cardPrograms)
+        .where(eq(cardPrograms.organizationId, organizationId))
+        .limit(1),
+    );
+    if (!program) return yield* Effect.fail(cardsNotOn);
+
+    const { paused } = yield* companyControls(tx, organizationId);
+    if (paused) {
+      return yield* Effect.fail(
+        new Conflict({
+          message: "New cards are paused right now. Nothing was issued.",
+        }),
+      );
+    }
+
+    const [category] = yield* query(() =>
+      tx
+        .select({ archived: categories.archived })
+        .from(categories)
+        .where(
+          and(
+            eq(categories.organizationId, organizationId),
+            eq(categories.id, defaultCategoryId),
+          ),
+        )
+        .limit(1),
+    );
+    if (!category || category.archived) {
+      return yield* Effect.fail(
+        new BadRequest({
+          message: "Pick one of the company's categories.",
+        }),
+      );
+    }
+    return program;
+  });
+}
+
 /** Refuses a card that can't be issued; run before the passkey and again after. */
 export function checkIssue(
   tenant: Tenant,
@@ -141,49 +192,16 @@ export function checkIssue(
     yield* requireIssuer;
     return yield* withScope(tenant, (tx) =>
       Effect.gen(function* () {
-        const [program] = yield* query(() =>
-          tx
-            .select()
-            .from(cardPrograms)
-            .where(eq(cardPrograms.organizationId, organizationId))
-            .limit(1),
+        const program = yield* checkNewCard(
+          tx,
+          organizationId,
+          action.defaultCategoryId,
         );
-        if (!program) return yield* Effect.fail(cardsNotOn);
-
-        const { paused } = yield* companyControls(tx, organizationId);
-        if (paused) {
-          return yield* Effect.fail(
-            new Conflict({
-              message: "New cards are paused right now. Nothing was issued.",
-            }),
-          );
-        }
-
         const holder = yield* readEligibleHolder(
           tx,
           organizationId,
           action.membershipId,
         );
-
-        const [category] = yield* query(() =>
-          tx
-            .select({ archived: categories.archived })
-            .from(categories)
-            .where(
-              and(
-                eq(categories.organizationId, organizationId),
-                eq(categories.id, action.defaultCategoryId),
-              ),
-            )
-            .limit(1),
-        );
-        if (!category || category.archived) {
-          return yield* Effect.fail(
-            new BadRequest({
-              message: "Pick one of the company's categories.",
-            }),
-          );
-        }
         return { program, holder };
       }),
     );

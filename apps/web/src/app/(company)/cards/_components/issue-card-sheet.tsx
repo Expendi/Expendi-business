@@ -33,6 +33,8 @@ import {
 } from "~/components/ui/native-select";
 import { ROLE_LABELS } from "~/config/roles";
 import {
+  ChoiceGroup,
+  ChoiceOption,
   FormField,
   PasskeySetupCallout,
   SheetForm,
@@ -57,9 +59,13 @@ const NO_DRAFT: Draft = {
   defaultCategoryId: "",
 };
 
+/** A person's card, or a company-held one with no cardholder (spec §6.25). */
+type Holding = "person" | "company";
+
 /**
- * Issues a virtual card (spec §6.25): who holds it, what it's called, its
- * required monthly limit and default category, confirmed with the passkey.
+ * Issues an Expendi card (spec §6.25): who holds it (a person, or the
+ * company), what it's called, its required monthly limit and default
+ * category, confirmed with the passkey.
  */
 export function IssueCardSheet({
   organizationId,
@@ -82,11 +88,14 @@ export function IssueCardSheet({
     monthlyLimitUsd: useId(),
     defaultCategoryId: useId(),
   };
+  const holdingName = useId();
   const [draft, setDraft] = useState(NO_DRAFT);
+  const [holding, setHolding] = useState<Holding>("person");
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const holders = members.data ? eligibleCardholders(members.data) : [];
   const failed = members.isError ? members.error : categories.error;
+  const companyHeld = holding === "company";
 
   function change<K extends keyof Draft>(field: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -94,7 +103,10 @@ export function IssueCardSheet({
   }
 
   function submit() {
-    const request: CardActionRequest = { type: "issue_card", ...draft };
+    const { membershipId, ...card } = draft;
+    const request: CardActionRequest = companyHeld
+      ? { type: "issue_company_card", ...card }
+      : { type: "issue_card", membershipId, ...card };
     const parsed = cardActionSchema.safeParse(request);
     if (!parsed.success) {
       const found = errorsByField(parsed.error.issues);
@@ -107,7 +119,8 @@ export function IssueCardSheet({
       onSuccess: (outcome) => {
         if (
           outcome.status === "approved" &&
-          outcome.result.type === "issue_card"
+          (outcome.result.type === "issue_card" ||
+            outcome.result.type === "issue_company_card")
         ) {
           onIssued(outcome.result.card);
         }
@@ -119,7 +132,7 @@ export function IssueCardSheet({
     passkey === "ready" &&
     members.isSuccess &&
     categories.isSuccess &&
-    holders.length > 0;
+    (companyHeld || holders.length > 0);
 
   return (
     <DetailSheet
@@ -184,106 +197,146 @@ export function IssueCardSheet({
         >
           {describeApiError(failed)}
         </Callout>
-      ) : holders.length === 0 ? (
-        <EmptyState icon={UsersIcon} title="No one can hold a card yet">
-          Cards go to admins and employees who&apos;ve signed in. Invite someone
-          from Team first.
-        </EmptyState>
       ) : (
-        <SheetForm id={formId} label="Issue card" onSubmit={submit}>
-          <FormField
-            id={ids.membershipId}
-            label="Cardholder"
-            error={errors.membershipId}
-          >
-            <NativeSelect
-              id={ids.membershipId}
-              className="w-full"
-              value={draft.membershipId}
+        <div className="flex flex-col gap-[18px]">
+          <ChoiceGroup legend="Who holds it">
+            <ChoiceOption
+              name={holdingName}
+              value="person"
+              checked={!companyHeld}
               disabled={action.isPending}
-              aria-invalid={errors.membershipId ? true : undefined}
-              onChange={(event) => change("membershipId", event.target.value)}
-            >
-              <NativeSelectOption value="">Choose someone</NativeSelectOption>
-              {holders.map((member) => (
-                <NativeSelectOption key={member.id} value={member.id}>
-                  {personName(member)} ({ROLE_LABELS[member.role]})
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </FormField>
-          <FormField
-            id={ids.nickname}
-            label="Card name"
-            help="Only your company sees this, e.g. Marketing subscriptions."
-            error={errors.nickname}
-          >
-            <Input
-              id={ids.nickname}
-              maxLength={CARD_NICKNAME_MAX_LENGTH}
-              autoComplete="off"
-              value={draft.nickname}
-              disabled={action.isPending}
-              aria-invalid={errors.nickname ? true : undefined}
-              onChange={(event) => change("nickname", event.target.value)}
+              title="For a person"
+              description="Someone on the team spends with it. It closes when they leave."
+              onChoose={() => {
+                setHolding("person");
+                setErrors({});
+              }}
             />
-          </FormField>
-          <FormField
-            id={ids.monthlyLimitUsd}
-            label="Monthly limit (USD)"
-            help="Spending stops at this amount each calendar month."
-            error={errors.monthlyLimitUsd}
-          >
-            <Input
-              id={ids.monthlyLimitUsd}
-              inputMode="decimal"
-              autoComplete="off"
-              placeholder="500.00"
-              value={draft.monthlyLimitUsd}
+            <ChoiceOption
+              name={holdingName}
+              value="company"
+              checked={companyHeld}
               disabled={action.isPending}
-              aria-invalid={errors.monthlyLimitUsd ? true : undefined}
-              onChange={(event) =>
-                change("monthlyLimitUsd", event.target.value)
-              }
+              title="Company-held"
+              description="It pays recurring payments, with no cardholder, and doesn't close when anyone leaves."
+              onChoose={() => {
+                setHolding("company");
+                setErrors({});
+              }}
             />
-          </FormField>
-          <FormField
-            id={ids.defaultCategoryId}
-            label="Default category"
-            help="Purchases start in this category."
-            error={errors.defaultCategoryId}
-          >
-            <NativeSelect
-              id={ids.defaultCategoryId}
-              className="w-full"
-              value={draft.defaultCategoryId}
-              disabled={action.isPending}
-              aria-invalid={errors.defaultCategoryId ? true : undefined}
-              onChange={(event) =>
-                change("defaultCategoryId", event.target.value)
-              }
-            >
-              <NativeSelectOption value="">
-                Choose a category
-              </NativeSelectOption>
-              {(categories.data ?? []).map((category) => (
-                <NativeSelectOption key={category.id} value={category.id}>
-                  {category.name}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </FormField>
-          {action.data?.status === "cancelled" ? (
-            <SheetNote>Cancelled. No card was issued.</SheetNote>
-          ) : null}
-          {action.isError ? (
-            <div role="alert">
-              <Callout tone="error">
-                <p>{describeApprovalError(action.error)}</p>
-              </Callout>
-            </div>
-          ) : null}
-        </SheetForm>
+          </ChoiceGroup>
+          {!companyHeld && holders.length === 0 ? (
+            <EmptyState icon={UsersIcon} title="No one can hold a card yet">
+              Cards go to admins and employees who&apos;ve signed in. Invite
+              someone from Team first, or issue a company-held card.
+            </EmptyState>
+          ) : (
+            <SheetForm id={formId} label="Issue card" onSubmit={submit}>
+              {companyHeld ? null : (
+                <FormField
+                  id={ids.membershipId}
+                  label="Cardholder"
+                  error={errors.membershipId}
+                >
+                  <NativeSelect
+                    id={ids.membershipId}
+                    className="w-full"
+                    value={draft.membershipId}
+                    disabled={action.isPending}
+                    aria-invalid={errors.membershipId ? true : undefined}
+                    onChange={(event) =>
+                      change("membershipId", event.target.value)
+                    }
+                  >
+                    <NativeSelectOption value="">
+                      Choose someone
+                    </NativeSelectOption>
+                    {holders.map((member) => (
+                      <NativeSelectOption key={member.id} value={member.id}>
+                        {personName(member)} ({ROLE_LABELS[member.role]})
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </FormField>
+              )}
+              <FormField
+                id={ids.nickname}
+                label="Card name"
+                help={
+                  companyHeld
+                    ? "Only your company sees this, e.g. Software subscriptions."
+                    : "Only your company sees this, e.g. Marketing subscriptions."
+                }
+                error={errors.nickname}
+              >
+                <Input
+                  id={ids.nickname}
+                  maxLength={CARD_NICKNAME_MAX_LENGTH}
+                  autoComplete="off"
+                  value={draft.nickname}
+                  disabled={action.isPending}
+                  aria-invalid={errors.nickname ? true : undefined}
+                  onChange={(event) => change("nickname", event.target.value)}
+                />
+              </FormField>
+              <FormField
+                id={ids.monthlyLimitUsd}
+                label="Monthly limit (USD)"
+                help="Spending stops at this amount each calendar month."
+                error={errors.monthlyLimitUsd}
+              >
+                <Input
+                  id={ids.monthlyLimitUsd}
+                  inputMode="decimal"
+                  autoComplete="off"
+                  placeholder="500.00"
+                  value={draft.monthlyLimitUsd}
+                  disabled={action.isPending}
+                  aria-invalid={errors.monthlyLimitUsd ? true : undefined}
+                  onChange={(event) =>
+                    change("monthlyLimitUsd", event.target.value)
+                  }
+                />
+              </FormField>
+              <FormField
+                id={ids.defaultCategoryId}
+                label="Default category"
+                help="Purchases start in this category."
+                error={errors.defaultCategoryId}
+              >
+                <NativeSelect
+                  id={ids.defaultCategoryId}
+                  className="w-full"
+                  value={draft.defaultCategoryId}
+                  disabled={action.isPending}
+                  aria-invalid={errors.defaultCategoryId ? true : undefined}
+                  onChange={(event) =>
+                    change("defaultCategoryId", event.target.value)
+                  }
+                >
+                  <NativeSelectOption value="">
+                    Choose a category
+                  </NativeSelectOption>
+                  {(categories.data ?? []).map((category) => (
+                    <NativeSelectOption key={category.id} value={category.id}>
+                      {category.name}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </FormField>
+              {action.data?.status === "cancelled" ? (
+                <SheetNote>Cancelled. No card was issued.</SheetNote>
+              ) : null}
+              {action.isError ? (
+                <div role="alert">
+                  <Callout tone="error">
+                    <p>{describeApprovalError(action.error)}</p>
+                  </Callout>
+                </div>
+              ) : null}
+            </SheetForm>
+          )}
+        </div>
       )}
     </DetailSheet>
   );

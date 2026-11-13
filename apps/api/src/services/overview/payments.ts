@@ -20,8 +20,9 @@ import { query } from "../../db/scope.js";
  * - Recorded spending: company spending, float spending, Card expenses, and
  *   claims imported as paid before Expendi. A bill marked paid outside
  *   appears only as the company spending it recorded (`expenses.bill_id`),
- *   never as a bill as well. A Card expense reads as company spending here
- *   (this response's `kind` doesn't name cards yet).
+ *   never as a bill as well; a bill a Card purchase paid, the same way as
+ *   its card spending, paid through Expendi. A Card expense reads as company
+ *   spending here (this response's `kind` doesn't name cards yet).
  *
  * `personId` is who was paid or spent it: the claimant, the float holder,
  * the cardholder, or a bill's payee (their membership, or the personnel

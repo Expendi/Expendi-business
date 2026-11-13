@@ -32,6 +32,7 @@ import { OptionPicker } from "~/components/option-picker";
 import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { CURRENCY_LABELS, currencyOfPayee } from "~/features/bills/bill-amount";
+import { byCompanyHeldCard } from "~/features/bills/bill-card";
 import { HEADING_LABELS } from "~/features/bills/bill-status";
 import {
   amountRefusal,
@@ -105,6 +106,20 @@ const AMOUNT_OPTIONS: PickerOption<"fixed" | "variable">[] = [
   },
 ];
 
+/** A company-held card pays what the payee charges, so its amount is only ever an estimate. */
+const CARD_AMOUNT_OPTIONS: PickerOption<"fixed" | "variable">[] = [
+  {
+    value: "fixed",
+    label: "Estimate",
+    description: "About the same every time.",
+  },
+  {
+    value: "variable",
+    label: "No estimate",
+    description: "It changes with use, e.g. API credits.",
+  },
+];
+
 const SCHEDULE_OPTIONS: PickerOption<RecurringSchedule>[] = [
   { value: "weekly", label: "Weekly" },
   { value: "monthly", label: "Monthly" },
@@ -137,7 +152,8 @@ const PAY_VIA_OPTIONS: PickerOption<RecurringPayVia>[] = [
   {
     value: "outside",
     label: "Outside Expendi",
-    description: "E.g. by card. You get the reminders and mark each bill paid.",
+    description:
+      "E.g. by bank card or bank transfer. You get the reminders and mark each bill paid.",
   },
 ];
 
@@ -177,6 +193,8 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
   const [payeeMethod, setPayeeMethod] = useState<PayeeMethod | null>(
     props.item?.payee.method ?? null,
   );
+  /** Its card is set up and changed on the web dashboard only. */
+  const byCard = props.item?.payVia === "card";
   const wallet = useCompanyWallet(organizationId);
   const limits = cashOutLimitsOf(wallet.data);
   /** A variable payment sends no amount, whatever was typed before. */
@@ -259,20 +277,24 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
 
         <OptionPicker
           label="Amount"
-          options={AMOUNT_OPTIONS}
+          options={byCard ? CARD_AMOUNT_OPTIONS : AMOUNT_OPTIONS}
           value={draft.variable ? "variable" : "fixed"}
           onChange={(value) => update("variable", value === "variable")}
         />
         {draft.variable ? null : (
           <TextField
-            label={`Amount (${CURRENCY_LABELS[draft.currency]})`}
+            label={`${byCard ? "Estimate" : "Amount"} (${CURRENCY_LABELS[draft.currency]})`}
             value={draft.amount}
             onChangeText={(value) => update("amount", value)}
             placeholder={draft.currency === "usd" ? "120.00" : "45,000.00"}
             keyboardType="decimal-pad"
           />
         )}
-        {draft.currency === "usd" ? (
+        {byCard ? (
+          <Text className="text-sm text-gray-600">
+            Each bill takes its Card purchase’s actual amount.
+          </Text>
+        ) : draft.currency === "usd" ? (
           <Text className="text-sm text-gray-600">
             This payee is paid in USDC: each bill pays exactly this many USDC.
           </Text>
@@ -327,22 +349,35 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
               }}
             />
             <ErrorMessage message={fieldErrors.payVia ?? null} />
+            <Text className="text-sm text-gray-600">
+              To have a company-held card pay it, set it up on the web
+              dashboard.
+            </Text>
           </>
         )}
 
-        <TextField
-          label="Remind admins (days before it’s due)"
-          value={draft.reminderDays}
-          onChangeText={(value) => update("reminderDays", value)}
-          placeholder="3"
-          keyboardType="number-pad"
-          maxLength={2}
-        />
-        <ErrorMessage message={fieldErrors.reminderDays ?? null} />
-        <Text className="text-sm text-gray-600">
-          Up to {REMINDER_DAYS_MAX} days. Admins are also reminded on the due
-          date, and once if it’s overdue.
-        </Text>
+        {byCard ? (
+          <Text className="text-sm text-gray-600">
+            Admins are reminded only if a bill goes overdue, since the card pays
+            it.
+          </Text>
+        ) : (
+          <>
+            <TextField
+              label="Remind admins (days before it’s due)"
+              value={draft.reminderDays}
+              onChangeText={(value) => update("reminderDays", value)}
+              placeholder="3"
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+            <ErrorMessage message={fieldErrors.reminderDays ?? null} />
+            <Text className="text-sm text-gray-600">
+              Up to {REMINDER_DAYS_MAX} days. Admins are also reminded on the
+              due date, and once if it’s overdue.
+            </Text>
+          </>
+        )}
 
         <OptionPicker
           label="Overview heading"
@@ -378,17 +413,30 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
   );
 }
 
-/** What can't change once the payment is set up. */
+/** What can't change here once the payment is set up. */
 function SetOnce({ item }: { item: RecurringItem }): JSX.Element {
   return (
     <View className="gap-4">
       <ReviewRow label="Pay to" value={item.payee.name} />
       <ReviewRow label="When" value={scheduleInWords(item)} />
       <ReviewRow label="Starts" value={formatIsoDate(item.startsOn)} />
-      <Text className="text-sm text-gray-600">
-        To change who it’s paid to, when, or how, end this payment and set up a
-        new one.
-      </Text>
+      {item.payVia === "card" ? (
+        <>
+          <ReviewRow
+            label="How it’s paid"
+            value={`${byCompanyHeldCard(item.card)}. Change this on the web dashboard.`}
+          />
+          <Text className="text-sm text-gray-600">
+            To change who it’s paid to or when, end this payment and set up a
+            new one.
+          </Text>
+        </>
+      ) : (
+        <Text className="text-sm text-gray-600">
+          To change who it’s paid to, when, or how, end this payment and set up
+          a new one.
+        </Text>
+      )}
     </View>
   );
 }

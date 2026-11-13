@@ -13,6 +13,13 @@ import { Screen } from "~/components/screen";
 import { Text } from "~/components/text";
 import { formatBillAmount } from "~/features/bills/bill-amount";
 import {
+  automaticCard,
+  cardDeclined,
+  cardPaymentStop,
+  formatEstimate,
+  payingCard,
+} from "~/features/bills/bill-card";
+import {
   groupOpenBills,
   historyNewestFirst,
 } from "~/features/bills/bill-groups";
@@ -21,7 +28,7 @@ import {
   joinBillIds,
   toggleSelection,
 } from "~/features/bills/bill-payment";
-import { BillStatusBadge } from "~/features/bills/bill-status";
+import { BillBadges } from "~/features/bills/bill-status";
 import { useBillHistory, useOpenBills } from "~/features/bills/use-bills";
 import { formatIsoDate, localIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
@@ -194,19 +201,32 @@ function BillRow({
   selection: boolean | null;
   onPress: () => void;
 }): JSX.Element {
+  const card = automaticCard(bill);
   const formatted = formatBillAmount(bill);
-  const amount = formatted ?? "Amount to enter";
+  const amount = card ? formatEstimate(bill) : (formatted ?? "Amount to enter");
+  const toEnter = card === null && formatted === null;
   const when =
     bill.paidOn !== null
       ? `Paid ${formatIsoDate(bill.paidOn)}`
       : `Due ${formatIsoDate(bill.dueOn)}`;
+  const paying = payingCard(bill);
+  const stop = cardPaymentStop(bill);
+  const cardNote = [
+    ...(paying
+      ? [`paid automatically by company-held card ending ${paying.lastFour}`]
+      : []),
+    ...(stop ? [stop] : []),
+    ...(cardDeclined(bill) ? ["card declined"] : []),
+  ];
   return (
     <Pressable
       accessibilityRole={selection === null ? "button" : "checkbox"}
       accessibilityState={
         selection === null ? undefined : { checked: selection }
       }
-      accessibilityLabel={`${bill.payee.name}, ${amount}, ${when}`}
+      accessibilityLabel={[bill.payee.name, amount, when, ...cardNote].join(
+        ", ",
+      )}
       onPress={onPress}
       className={`gap-2 rounded-xl border px-4 py-3 active:bg-gray-50 ${selection ? "border-gray-900 bg-gray-50" : "border-gray-200"}`}
     >
@@ -228,12 +248,12 @@ function BillRow({
           </Text>
         </View>
         <Text
-          className={`text-base font-semibold ${formatted === null ? "text-amber-800" : "text-gray-900"}`}
+          className={`text-base font-semibold ${toEnter ? "text-amber-800" : "text-gray-900"}`}
         >
           {amount}
         </Text>
       </View>
-      <BillStatusBadge status={bill.status} />
+      <BillBadges bill={bill} />
     </Pressable>
   );
 }

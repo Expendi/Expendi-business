@@ -10,6 +10,7 @@ import type {
 } from "@expendi-business/shared";
 import {
   cashOutReceiptLabel,
+  formatUsdCents,
   nearTransactionUrl,
 } from "@expendi-business/shared";
 
@@ -19,8 +20,12 @@ import type { Tenant } from "../../middleware/tenant.js";
 import type { RenderOptions } from "../invoices/pdf-style.js";
 import {
   bills,
+  cardPurchases,
+  cards,
   categories,
+  expenses,
   organizations,
+  payees,
   payouts,
   walletTransactions,
 } from "../../db/schema/index.js";
@@ -49,7 +54,8 @@ import { describeRecipient } from "../wallet/history.js";
  * The receipt of a bill paid through Expendi, for
  * `GET …/bills/:billId/payment-receipt`: who paid whom, what for, how much
  * left the wallet and the provider's own receipt codes, kept for the books.
- * Only a bill whose payout is `paid` has one.
+ * Only a bill whose payout is `paid` has one, or a bill a Card purchase on a
+ * company-held card paid: its USD, and the KES its spending row recorded.
  */
 
 const billNotFound = new NotFound({ message: "That bill wasn't found." });
@@ -64,6 +70,11 @@ const notPaidYet = new Conflict({
     "This bill's payment hasn't gone through yet, so there's no receipt.",
 });
 
+const cardPaymentUnrecorded = new Conflict({
+  message:
+    "This bill's card payment hasn't been recorded yet, so there's no receipt.",
+});
+
 export interface BillPaymentReceiptData {
   readonly receiptNumber: string;
   readonly companyName: string;
@@ -75,10 +86,17 @@ export interface BillPaymentReceiptData {
   readonly amountKesCents: bigint;
   /** USDC base units that left the wallet; null if no ledger row records it. */
   readonly usdcSent: bigint | null;
+  /** KES per USDC for a payout, per USD for a Card purchase. */
   readonly rate: string | null;
-  readonly method: PayoutMethod;
-  /** Where it went, masked as the wallet history masks it. */
-  readonly recipientDetail: string;
+  /** How a payout sent it; null when a card paid. */
+  readonly method: PayoutMethod | null;
+  /** Where a payout sent it, masked as the wallet history masks it. */
+  readonly recipientDetail: string | null;
+  /** The company-held card whose Card purchase paid it, and how many US cents. */
+  readonly card: {
+    readonly lastFour: string;
+    readonly amountUsdCents: bigint;
+  } | null;
   readonly approvedAt: Date | null;
   readonly paidAt: Date | null;
   readonly providerReceipts: readonly CashOutReceipt[];
@@ -86,9 +104,12 @@ export interface BillPaymentReceiptData {
   readonly txChain: WalletChain | null;
 }
 
-/** Short, stable and readable aloud: the payout's first 8 hex digits. */
-export function receiptNumberOf(payoutId: string): string {
-  return `RCT-${payoutId.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
+/**
+ * Short, stable and readable aloud: the first 8 hex digits of the payout,
+ * or of the Card purchase, that paid it.
+ */
+export function receiptNumberOf(paymentId: string): string {
+  return `RCT-${paymentId.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
 }
 
 export function getBillPaymentReceiptData(
@@ -105,13 +126,18 @@ export function getBillPaymentReceiptData(
       const [row] = yield* query(() =>
         tx
           .select({
+            status: bills.status,
             payoutId: bills.payoutId,
+            cardPurchaseId: bills.cardPurchaseId,
+            paidAt: bills.paidAt,
             reference: bills.reference,
             notes: bills.notes,
+            payeeName: payees.name,
             categoryName: categories.name,
             companyName: organizations.name,
           })
           .from(bills)
+          .innerJoin(payees, eq(payees.id, bills.payeeId))
           .innerJoin(categories, eq(categories.id, bills.categoryId))
           .innerJoin(organizations, eq(organizations.id, bills.organizationId))
           .where(
@@ -120,6 +146,57 @@ export function getBillPaymentReceiptData(
           .limit(1),
       );
       if (!row) return yield* Effect.fail(billNotFound);
+      const { cardPurchaseId } = row;
+      if (row.status === "paid_by_card" && cardPurchaseId !== null) {
+        const [paid] = yield* query(() =>
+          tx
+            .select({
+              settledUsdCents: cardPurchases.settledUsdCents,
+              rate: cardPurchases.usdKesRate,
+              lastFour: cards.lastFour,
+              amountKes: expenses.amountKes,
+            })
+            .from(cardPurchases)
+            .innerJoin(cards, eq(cards.id, cardPurchases.cardId))
+            .innerJoin(
+              expenses,
+              and(
+                eq(expenses.organizationId, cardPurchases.organizationId),
+                eq(expenses.billId, billId),
+              ),
+            )
+            .where(
+              and(
+                eq(cardPurchases.organizationId, organizationId),
+                eq(cardPurchases.id, cardPurchaseId),
+              ),
+            )
+            .limit(1),
+        );
+        if (!paid) return yield* Effect.fail(cardPaymentUnrecorded);
+        return {
+          receiptNumber: receiptNumberOf(cardPurchaseId),
+          companyName: row.companyName,
+          payeeName: row.payeeName,
+          reference: row.reference,
+          description: row.notes,
+          categoryName: row.categoryName,
+          amountKesCents: paid.amountKes,
+          usdcSent: null,
+          rate: paid.rate,
+          method: null,
+          recipientDetail: null,
+          card: {
+            lastFour: paid.lastFour,
+            amountUsdCents: paid.settledUsdCents,
+          },
+          approvedAt: null,
+          paidAt: row.paidAt,
+          providerReceipts: [],
+          txHash: null,
+          txChain: null,
+        };
+      }
       if (row.payoutId === null) return yield* Effect.fail(paidOutside);
       const payoutId = row.payoutId;
 
@@ -172,6 +249,7 @@ export function getBillPaymentReceiptData(
         rate: payout.rate,
         method: payout.method,
         recipientDetail: describeRecipient(payout.recipient),
+        card: null,
         approvedAt: payout.approvedAt,
         paidAt: payout.paidAt,
         providerReceipts: cashOutReceiptsOf([payout]),
@@ -335,6 +413,11 @@ export function renderBillPaymentReceiptPdf(
       label: "Amount",
       value: `KES ${dollars(data.amountKesCents)}`,
     },
+    ...(data.card === null
+      ? []
+      : [
+          { label: "Charged", value: formatUsdCents(data.card.amountUsdCents) },
+        ]),
     ...(data.usdcSent === null
       ? []
       : [
@@ -345,9 +428,26 @@ export function renderBillPaymentReceiptPdf(
         ]),
     ...(data.rate === null
       ? []
-      : [{ label: "Rate", value: `KES ${data.rate} per USDC` }]),
-    { label: "Sent to", value: data.recipientDetail },
-    { label: "Method", value: METHOD_NAMES[data.method] },
+      : [
+          {
+            label: "Rate",
+            value: `KES ${data.rate} per ${data.card === null ? "USDC" : "USD"}`,
+          },
+        ]),
+    ...(data.recipientDetail === null
+      ? []
+      : [{ label: "Sent to", value: data.recipientDetail }]),
+    ...(data.method === null
+      ? []
+      : [{ label: "Method", value: METHOD_NAMES[data.method] }]),
+    ...(data.card === null
+      ? []
+      : [
+          {
+            label: "Paid by",
+            value: `Expendi card •••• ${data.card.lastFour}`,
+          },
+        ]),
     ...(data.approvedAt === null
       ? []
       : [{ label: "Approved", value: nairobiDateTime(data.approvedAt) }]),

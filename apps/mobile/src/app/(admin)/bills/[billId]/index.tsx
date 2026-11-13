@@ -22,8 +22,17 @@ import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { AttachInvoice } from "~/features/bills/attach-invoice";
 import { formatBillAmount, storedAmount } from "~/features/bills/bill-amount";
+import {
+  automaticCard,
+  cardDeclineLine,
+  cardPaymentInWords,
+  formatEstimate,
+  paidByCardAmount,
+  paidByCardLabel,
+  payingCard,
+} from "~/features/bills/bill-card";
 import { isPayable, joinBillIds } from "~/features/bills/bill-payment";
-import { BillStatusBadge, HEADING_LABELS } from "~/features/bills/bill-status";
+import { BillBadges, HEADING_LABELS } from "~/features/bills/bill-status";
 import { useBill, useCancelBill } from "~/features/bills/use-bills";
 import { CashOutReceiptRows } from "~/features/cash-out/cash-out-receipt";
 import { ReviewRow } from "~/features/claims/claim-editor";
@@ -86,6 +95,10 @@ function BillSummary({ bill }: { bill: BillDetail }): JSX.Element {
     bill.overviewHeading === "subscriptions"
       ? HEADING_LABELS[bill.overviewHeading]
       : "Salaries & personnel";
+  const card = automaticCard(bill);
+  const cardPayment = cardPaymentInWords(bill);
+  const declineLine = cardDeclineLine(bill);
+  const paidByCard = paidByCardLabel(bill);
   return (
     <>
       <View className="gap-2">
@@ -96,17 +109,33 @@ function BillSummary({ bill }: { bill: BillDetail }): JSX.Element {
           {bill.payee.name}
         </Text>
         <Text className="text-3xl font-bold text-gray-900">
-          {formatBillAmount(bill) ?? "Amount not entered yet"}
+          {card
+            ? formatEstimate(bill)
+            : (formatBillAmount(bill) ?? "Amount not entered yet")}
         </Text>
-        <BillStatusBadge status={bill.status} />
+        <BillBadges bill={bill} />
       </View>
       <CashOutReceiptRows receipts={bill.paymentReceipts} copyable />
 
       <View className="gap-4">
         <ReviewRow label="Due" value={formatIsoDate(bill.dueOn)} />
+        {declineLine ? (
+          <View className="gap-1">
+            <ReviewRow label="Card declined" value={declineLine} />
+            <Text className="text-sm text-gray-600">
+              Load the Card balance or check the card on the web dashboard.
+            </Text>
+          </View>
+        ) : null}
         <ReviewRow
           label="Amount"
-          value={bill.variable ? "Variable, entered each time" : "Fixed"}
+          value={
+            card
+              ? "An estimate. The bill takes the Card purchase’s actual amount."
+              : bill.variable
+                ? "Variable, entered each time"
+                : "Fixed"
+          }
         />
         <ReviewRow label="Overview heading" value={heading} />
         <ReviewRow label="Category" value={bill.category.name} />
@@ -120,10 +149,18 @@ function BillSummary({ bill }: { bill: BillDetail }): JSX.Element {
             value={bill.adjustmentReason}
           />
         ) : null}
-        {bill.payee.method === "outside" ? (
+        {cardPayment ? (
+          <ReviewRow label="How it’s paid" value={cardPayment} />
+        ) : bill.payee.method === "outside" ? (
           <ReviewRow
             label="How it’s paid"
             value="Outside Expendi. Mark it paid once you’ve paid it."
+          />
+        ) : null}
+        {paidByCard && bill.paidOn ? (
+          <ReviewRow
+            label={paidByCard}
+            value={`${paidByCardAmount(bill) ?? "Amount not recorded"}, ${formatIsoDate(bill.paidOn)}`}
           />
         ) : null}
         {bill.status === "paid_outside" && bill.paidOn ? (
@@ -207,6 +244,8 @@ function BillActions({
 
   const payable = isPayable(bill);
   const failed = bill.status === "payout_failed";
+  /** The card pays it, so marking it paid is the exception, not the next step. */
+  const automatic = payingCard(bill) !== null;
 
   return (
     <View className="gap-3">
@@ -232,12 +271,14 @@ function BillActions({
       ) : null}
       {needsAmount ? (
         <Text className="text-sm text-gray-600">
-          Enter the amount before paying or marking this bill paid.
+          {automatic
+            ? "To mark it paid outside Expendi, enter the amount first."
+            : "Enter the amount before paying or marking this bill paid."}
         </Text>
       ) : null}
       <Button
         label={needsAmount ? "Enter the amount" : "Mark paid outside Expendi"}
-        variant={payable ? "secondary" : "primary"}
+        variant={payable || automatic ? "secondary" : "primary"}
         onPress={() =>
           router.push({
             pathname: needsAmount
