@@ -6,9 +6,13 @@ import type { IntentQuote, Payout } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
 import type { BaseRpc } from "../chain/base-rpc.js";
 import type { QuoteDepositDeps } from "../intents/quote-deposit.js";
-import type { PaycrestOrder } from "../paycrest/paycrest-client.js";
-import type { KesPayoutQuote } from "../paycrest/quote.js";
+import type {
+  PaycrestError,
+  PaycrestOrder,
+} from "../paycrest/paycrest-client.js";
+import type { AmountTooSmall, KesPayoutQuote } from "../paycrest/quote.js";
 import type { OnchainDeps } from "./onchain.js";
+import type { PretiumFundDeps } from "./pretium-fund.js";
 import { payouts, wallets, walletTransactions } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { AuditLog } from "../audit/audit-log.js";
@@ -29,6 +33,7 @@ import {
 import { isPaused, lockPayout } from "./guards.js";
 import { fundOnchainPayout } from "./onchain.js";
 import { PAYOUT_MEMO } from "./prepare.js";
+import { fundPretiumPayout } from "./pretium-fund.js";
 import { applyPayoutOutcome } from "./subjects.js";
 
 const ACTOR = { type: "system", id: "payout-engine" } as const;
@@ -36,7 +41,15 @@ const ACTOR = { type: "system", id: "payout-engine" } as const;
 type CashOutDeps =
   DatabaseService | AuditLog | Paycrest | PrivyWallets | BaseRpc;
 
-export type FundDeps = CashOutDeps | OnchainDeps | QuoteDepositDeps;
+export type FundDeps =
+  CashOutDeps | PretiumFundDeps | OnchainDeps | QuoteDepositDeps;
+
+/** Says why there's no quote without naming the provider. */
+function quoteFailure(error: PaycrestError | AmountTooSmall): string {
+  return error._tag === "AmountTooSmall"
+    ? "the amount is below the smallest cash-out"
+    : "the rate service didn't answer";
+}
 
 /**
  * The wallet a cash-out's order is funded from and refunded to. Paycrest
@@ -119,11 +132,17 @@ function fundPaycrestPayout(input: {
         }),
       );
 
-    const fail = (from: Payout["status"], reason: string) =>
+    // `failureReason` is shown to the company, so a failure says nothing
+    // of the provider; what staff need goes in the audit entry.
+    const fail = (
+      from: Payout["status"],
+      reason: string,
+      details: Record<string, unknown> = {},
+    ) =>
       transition(
         { status: "failed", failureReason: reason },
         "payout.failed",
-        { reason },
+        { reason, ...details },
         from,
       );
 
@@ -186,7 +205,8 @@ function fundPaycrestPayout(input: {
     if (quoted._tag === "Left") {
       return yield* fail(
         "approved",
-        `Couldn't get a Paycrest quote: ${quoted.left.message}`,
+        `Couldn't get a rate for this cash-out: ${quoteFailure(quoted.left)}. Nothing was sent.`,
+        { problem: quoted.left.message },
       );
     }
     const quote: KesPayoutQuote = quoted.right;
@@ -246,7 +266,8 @@ function fundPaycrestPayout(input: {
           )
         : fail(
             "approved",
-            `Paycrest refused the order (${created.left.code}). Nothing was sent.`,
+            `The cash-out was refused (${created.left.code}). Nothing was sent.`,
+            { problem: created.left.message },
           );
     }
     const order: PaycrestOrder = created.right;
@@ -288,7 +309,8 @@ function fundPaycrestPayout(input: {
     if (problem || !deposit) {
       return yield* fail(
         "order_created",
-        `Paycrest's order failed our checks (${problem?.kind ?? "unsafe"}: ${problem?.reasons.join("; ") ?? "no deposit instructions"}). Nothing was sent.`,
+        `The cash-out failed our safety checks (${problem?.kind ?? "unsafe"}). Nothing was sent.`,
+        { problems: problem?.reasons ?? ["no deposit instructions"] },
       );
     }
     const amount = toMicro(deposit.amountToTransfer);
@@ -353,7 +375,7 @@ function fundPaycrestPayout(input: {
     if (barrier === "expired") {
       return yield* fail(
         "order_created",
-        "Paycrest's deposit window closed before funding. Nothing was sent.",
+        "The cash-out's payment window closed before funding. Nothing was sent.",
       );
     }
 
@@ -439,11 +461,15 @@ export function continueBaseHop(
     const advanced = yield* advanceBaseHop(quote);
     yield* settleHopPayouts({
       quote: advanced,
-      fund: (payout) =>
-        fundPaycrestPayout({
+      fund: (payout) => {
+        const target = {
           organizationId: payout.organizationId,
           payoutId: payout.id,
-        }),
+        };
+        return payout.provider === "pretium"
+          ? fundPretiumPayout(target)
+          : fundPaycrestPayout(target);
+      },
     });
     return advanced;
   });
@@ -451,7 +477,7 @@ export function continueBaseHop(
 
 /**
  * A cash-out for a company whose money is on NEAR: Base hop first, then
- * the Paycrest order and funding from the transit wallet. The payout comes
+ * its provider is paid from the transit wallet. The payout comes
  * back as far as it got; while its hop is under way it is still `approved`
  * and the job finishes it.
  */
@@ -482,9 +508,9 @@ function fundCashOutThroughHop(input: {
 }
 
 /**
- * Funds one approved payout through its provider: a Paycrest order for KES
- * (after a Base hop when the company's money is on NEAR), a transfer for
- * USDC to an allowlisted address.
+ * Funds one approved payout through its provider: for KES, a Paycrest
+ * order or a transfer to Pretium (after a Base hop when the company's
+ * money is on NEAR); for USDC, a transfer to an allowlisted address.
  */
 export function fundPayout(input: {
   readonly organizationId: string;
@@ -502,8 +528,9 @@ export function fundPayout(input: {
     Effect.flatMap(
       ([payout]): Effect.Effect<Payout, DatabaseError, FundDeps> => {
         if (payout?.provider === "onchain") return fundOnchainPayout(input);
-        return payout?.chain === "near"
-          ? fundCashOutThroughHop(input)
+        if (payout?.chain === "near") return fundCashOutThroughHop(input);
+        return payout?.provider === "pretium"
+          ? fundPretiumPayout(input)
           : fundPaycrestPayout(input);
       },
     ),

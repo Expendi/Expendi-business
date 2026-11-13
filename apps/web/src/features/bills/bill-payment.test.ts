@@ -339,7 +339,7 @@ describe("billPreviewRows", () => {
       { label: "They receive", value: "45.00 USDC, exactly" },
       { label: "Paid to", value: "0x1234…abcd" },
       { label: "In KES, at today’s rate", value: "KES 5,790.60" },
-      { label: "Paycrest fee, at most", value: "0.00 USDC" },
+      { label: "Cash-out fee, at most", value: "0.00 USDC" },
       { label: "Total, at most", value: "45.00 USDC" },
     ]);
   });

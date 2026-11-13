@@ -161,8 +161,8 @@ export function useBill(
 }
 
 /**
- * Paycrest's KES per USDC now, from the wallet, to show a USD bill's KES
- * equivalent before it's paid; null while Paycrest is unavailable.
+ * The active cash-out rate in KES per USDC, from the wallet, to show a USD
+ * bill's KES equivalent before it's paid; null while the rate is unavailable.
  */
 export function useKesRate(
   organizationId: string,

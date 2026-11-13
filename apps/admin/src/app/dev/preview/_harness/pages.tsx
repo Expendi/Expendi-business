@@ -1,3 +1,4 @@
+import type { QueryClient } from "@tanstack/react-query";
 import type { ComponentType, JSX } from "react";
 
 import { AlertsView } from "~/app/(staff)/alerts/_components/alerts-view";
@@ -13,14 +14,21 @@ import { IntentQuoteView } from "~/app/(staff)/intent-quotes/[id]/_components/in
 import { PayoutQueueView } from "~/app/(staff)/payouts/_components/payout-queue-view";
 import { PayoutView } from "~/app/(staff)/payouts/[id]/_components/payout-view";
 import ZohoBooksPage from "~/app/(staff)/zoho-books/page";
+import { queryKeys } from "~/lib/query-keys";
 import { COMPANY_ID } from "./fixtures/companies";
+import {
+  CASH_OUT_PROVIDER_PRETIUM_ACTIVE,
+  CASH_OUT_PROVIDER_PRETIUM_NOT_READY,
+} from "./fixtures/controls";
 import { INTENT_QUOTE_ID } from "./fixtures/intent-quotes";
-import { PAYOUT_ID } from "./fixtures/payouts";
+import { PAYOUT_ID, PRETIUM_PAYOUT_ID } from "./fixtures/payouts";
 
 export interface PagePreview {
   /** The real route, so the sidebar marks it current. */
   readonly path: string;
   readonly View: ComponentType;
+  /** Replaces some of `seed.ts`'s data, for another state of the same page. */
+  readonly seed?: (client: QueryClient) => void;
 }
 
 function CompanyPreview(): JSX.Element {
@@ -43,6 +51,10 @@ function PayoutPreview(): JSX.Element {
   return <PayoutView payoutId={PAYOUT_ID} />;
 }
 
+function PretiumPayoutPreview(): JSX.Element {
+  return <PayoutView payoutId={PRETIUM_PAYOUT_ID} />;
+}
+
 /**
  * The pages `/dev/preview/[page]` can show. To add one, import its view
  * here and seed what it reads in `seed.ts` (or answer it in
@@ -62,6 +74,24 @@ export const PAGE_PREVIEWS: Readonly<Record<string, PagePreview>> = {
     View: CompanyZohoPreview,
   },
   controls: { path: "/controls", View: ControlsView },
+  "controls-pretium-active": {
+    path: "/controls",
+    View: ControlsView,
+    seed: (client) =>
+      client.setQueryData(
+        queryKeys.cashOutProvider(),
+        CASH_OUT_PROVIDER_PRETIUM_ACTIVE,
+      ),
+  },
+  "controls-pretium-not-ready": {
+    path: "/controls",
+    View: ControlsView,
+    seed: (client) =>
+      client.setQueryData(
+        queryKeys.cashOutProvider(),
+        CASH_OUT_PROVIDER_PRETIUM_NOT_READY,
+      ),
+  },
   health: { path: "/health", View: HealthView },
   "intent-quote": {
     path: `/intent-quotes/${INTENT_QUOTE_ID}`,
@@ -69,6 +99,10 @@ export const PAGE_PREVIEWS: Readonly<Record<string, PagePreview>> = {
   },
   "intent-quotes": { path: "/intent-quotes", View: IntentQuoteQueueView },
   payout: { path: `/payouts/${PAYOUT_ID}`, View: PayoutPreview },
+  "payout-pretium": {
+    path: `/payouts/${PRETIUM_PAYOUT_ID}`,
+    View: PretiumPayoutPreview,
+  },
   payouts: { path: "/payouts", View: PayoutQueueView },
   "zoho-books": { path: "/zoho-books", View: ZohoBooksPage },
 };

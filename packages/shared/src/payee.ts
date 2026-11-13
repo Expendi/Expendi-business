@@ -73,7 +73,7 @@ const payeeName = z
     `Keep the name to ${PAYEE_NAME_MAX_LENGTH} characters or fewer.`,
   );
 
-/** Paycrest needs the account holder's name for every KES payment. */
+/** Every KES cash-out needs the account holder's name. */
 const enterAccountName = "Enter the name on the account.";
 const accountName = z
   .string({ error: enterAccountName })
@@ -95,8 +95,8 @@ const enterAccountReference = "Enter the Paybill account number.";
 /**
  * A payee's payment details, by method. The API normalises them further:
  * an M-Pesa number to E.164, a Base address to lowercase, and it checks
- * the bank against Paycrest's list and the address against the company's
- * allowlist.
+ * the bank against the list of banks it can pay and the address against
+ * the company's allowlist.
  */
 export const payeeDetailsSchema = z.discriminatedUnion(
   "method",
@@ -318,7 +318,7 @@ export const createPayeeResponseSchema = z.discriminatedUnion("status", [
 
 export type CreatePayeeResponse = z.infer<typeof createPayeeResponseSchema>;
 
-/** Kenyan banks Paycrest can pay, for the bank picker. */
+/** Kenyan banks a cash-out can pay, for the bank picker. */
 export const payeeBanksResponseSchema = z.array(
   z.object({ code: z.string(), name: z.string() }),
 );

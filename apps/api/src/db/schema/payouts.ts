@@ -35,9 +35,14 @@ export const payoutSubjectType = pgEnum("payout_subject_type", [
   "withdrawal",
 ]);
 
+/**
+ * Who pays a payout out: a cash-out provider (Paycrest or Pretium) turns
+ * USDC into shillings; `onchain` sends USDC itself.
+ */
 export const payoutProvider = pgEnum("payout_provider", [
   "paycrest",
   "onchain",
+  "pretium",
 ]);
 
 export const payoutMethod = pgEnum("payout_method", [
@@ -116,18 +121,28 @@ export const payouts = pgTable(
     approvedBy: uuid("approved_by").references(() => users.id),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     /**
-     * Set before Paycrest is asked for an order. Without an order ID, a set
-     * value means the request may have reached Paycrest: never ask again.
+     * Set before the provider is asked: Paycrest for an order, Pretium to pay
+     * against the sent hash. Without an order ID, a set value means the
+     * request may have reached the provider: never ask again blindly.
      */
     orderRequestedAt: timestamp("order_requested_at", { withTimezone: true }),
+    /**
+     * Paycrest's order ID, or Pretium's transaction code. Pretium only gives
+     * one once it is told the hash of the USDC sent, so a Pretium cash-out
+     * has none until then.
+     */
     providerOrderId: text("provider_order_id"),
     rate: text("rate"),
     usdcAmount: bigint("usdc_amount", { mode: "bigint" }),
     feeUsdc: bigint("fee_usdc", { mode: "bigint" }),
-    /** Exactly what is sent: the order amount plus Paycrest's fee. */
+    /**
+     * Exactly what is sent: the order amount plus Paycrest's fee, or what
+     * Pretium is sent for the shillings.
+     */
     amountToTransferUsdc: bigint("amount_to_transfer_usdc", {
       mode: "bigint",
     }),
+    /** Paycrest's per-order deposit address, or Pretium's settlement address. */
     depositAddress: text("deposit_address"),
     depositValidUntil: timestamp("deposit_valid_until", {
       withTimezone: true,
@@ -139,7 +154,7 @@ export const payouts = pgTable(
     txHash: text("tx_hash"),
     /** The M-Pesa or bank receipt, once paid. */
     providerReference: text("provider_reference"),
-    /** Paycrest's last reported order status, and when we last asked. */
+    /** The provider's last reported status, and when we last asked. */
     providerStatus: text("provider_status"),
     providerCheckedAt: timestamp("provider_checked_at", {
       withTimezone: true,
@@ -161,6 +176,19 @@ export const payouts = pgTable(
      * Null for a NEAR payee, who is paid straight from the company wallet.
      */
     deliveryQuoteId: uuid("delivery_quote_id"),
+    /**
+     * For a Pretium cash-out whose shillings were not paid after the USDC
+     * was sent: set, under the row lock, immediately before the one refund
+     * request to Pretium. Never ask twice.
+     */
+    refundRequestedAt: timestamp("refund_requested_at", {
+      withTimezone: true,
+    }),
+    /**
+     * The Base hash Pretium returned for the refund, lowercased: it links
+     * the refund arriving in the transit wallet to this payout.
+     */
+    refundTxHash: text("refund_tx_hash"),
     failureReason: text("failure_reason"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     ...timestamps,
@@ -191,7 +219,7 @@ export const payouts = pgTable(
     uniqueIndex("payouts_delivery_quote_id_unique").on(table.deliveryQuoteId),
     check(
       "payouts_base_hop_is_for_a_cash_out",
-      sql`${table.baseHopQuoteId} IS NULL OR ${table.provider} = 'paycrest'`,
+      sql`${table.baseHopQuoteId} IS NULL OR ${table.provider} <> 'onchain'`,
     ),
     check(
       "payouts_delivery_quote_is_for_usdc",
@@ -222,7 +250,25 @@ export const payouts = pgTable(
       "payouts_subject_part",
       sql`${table.subjectPart} >= 1 AND (${table.subjectPart} = 1 OR (${table.subjectType} = 'bill' AND ${table.payrollRunId} IS NOT NULL))`,
     ),
-    uniqueIndex("payouts_provider_order_id_unique").on(table.providerOrderId),
+    // Two providers' IDs live in one column and may collide.
+    uniqueIndex("payouts_provider_order_id_unique").on(
+      table.provider,
+      table.providerOrderId,
+    ),
+    // One refund refunds one payout.
+    uniqueIndex("payouts_refund_tx_hash_unique")
+      .on(table.refundTxHash)
+      .where(sql`${table.refundTxHash} IS NOT NULL`),
+    check(
+      "payouts_refund_tx_hash_is_bytes32",
+      sql`${table.refundTxHash} ~ '^0x[0-9a-f]{64}$'`,
+    ),
+    // Compared as text: Postgres won't use an enum value in the transaction
+    // that added it, and pending migrations all run in one transaction.
+    check(
+      "payouts_refund_is_pretium",
+      sql`${table.provider}::text = 'pretium' OR (${table.refundRequestedAt} IS NULL AND ${table.refundTxHash} IS NULL)`,
+    ),
     index("payouts_status_idx").on(table.status),
     index("payouts_gateway_order_id_idx").on(table.gatewayOrderId),
     check(
@@ -231,14 +277,15 @@ export const payouts = pgTable(
     ),
     check(
       "payouts_whole_shillings",
-      sql`${table.provider} <> 'paycrest' OR ${table.amountKes} % 100 = 0`,
+      sql`${table.provider} = 'onchain' OR ${table.amountKes} % 100 = 0`,
     ),
     check(
       "payouts_amounts_positive",
       sql`${table.requestedKesCents} > 0 AND ${table.amountKes} >= ${table.requestedKesCents} AND ${table.quotedUsdc} > 0 AND ${table.maxDebitUsdc} >= ${table.quotedUsdc}`,
     ),
     // Money only moves once we know exactly where and how much; through
-    // Paycrest that also means an order.
+    // Paycrest that also means an order. Pretium names its transaction only
+    // after the USDC is sent, so a Pretium cash-out funds without one.
     check(
       "payouts_funding_is_complete",
       sql`${table.status} NOT IN ('funding', 'paying', 'paid') OR (${table.amountToTransferUsdc} IS NOT NULL AND ${table.depositAddress} IS NOT NULL AND ${table.fundingStartedAt} IS NOT NULL AND (${table.provider} <> 'paycrest' OR ${table.providerOrderId} IS NOT NULL))`,

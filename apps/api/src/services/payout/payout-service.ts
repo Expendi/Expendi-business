@@ -7,6 +7,7 @@ import type { DatabaseError, Forbidden } from "../../errors.js";
 import type { ApprovalSettings } from "../approval/passkeys.js";
 import type { AuditLog } from "../audit/audit-log.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import type { PrivyWallets } from "../wallet/privy-wallets.js";
 import type { FundDeps } from "./fund.js";
 import type { OnchainDeps } from "./onchain.js";
@@ -29,6 +30,7 @@ export type PayoutEngineDeps =
   | AuditLog
   | ApprovalSettings
   | Paycrest
+  | Pretium
   | PrivyWallets
   | OnchainDeps
   | FundDeps;

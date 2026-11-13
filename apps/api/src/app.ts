@@ -19,6 +19,7 @@ import {
 } from "./routes/organizations.js";
 import { createPayRoutes } from "./routes/pay.js";
 import { createPaycrestWebhookRoutes } from "./routes/paycrest-webhook.js";
+import { createPretiumWebhookRoutes } from "./routes/pretium-webhook.js";
 import { createReportDownloadRoutes } from "./routes/reports.js";
 
 export type App = Hono<{ Variables: AuthVariables }>;
@@ -39,6 +40,7 @@ export function createApp({ runtime }: { readonly runtime: AppRuntime }): App {
   // Signed by the provider, not a user, so no login middleware.
   app.route("/webhooks", createAlchemyWebhookRoutes(runtime));
   app.route("/webhooks", createPaycrestWebhookRoutes(runtime));
+  app.route("/webhooks", createPretiumWebhookRoutes(runtime));
   app.route("/webhooks", createLithicWebhookRoutes(runtime));
   // Opened by a company's accountant, who has no Expendi login: the connect
   // link's token and Zoho's signed state authorize each step.

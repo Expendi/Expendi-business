@@ -31,7 +31,7 @@ describe("personRows", () => {
     ]);
   });
 
-  it("says a salary above Paycrest's largest payment is sent in parts", () => {
+  it("says a salary above one cash-out's limit is sent in parts", () => {
     // #when
     const rows = personRows(
       person({ amountKes: "50000050", receivesKes: "50000100", orders: 2 }),

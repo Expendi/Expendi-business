@@ -5,7 +5,12 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
+import {
+  CASH_OUT_PROVIDER_NAMES,
+  CashOutProviderFlow,
+} from "~/components/cash-out-provider-flow";
 import { PageHeader } from "~/components/data/page-header";
+import { StatusBadge } from "~/components/data/status-badge";
 import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
 import { PauseFlow } from "~/components/pause-flow";
 import { inputClass, linkClass, secondaryButton } from "~/components/styles";
@@ -19,7 +24,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * The payout pause (spec §6.15, §7.6): every company, or one. Pausing
- * never moves money; it stops new payouts at once.
+ * never moves money; it stops new payouts at once. Also the active cash-out
+ * provider, chosen for every company at once.
  */
 export function ControlsView() {
   const { api, staff } = useStaffAuth();
@@ -33,7 +39,7 @@ export function ControlsView() {
     <section className="flex max-w-3xl flex-col gap-6">
       <PageHeader
         title="Controls"
-        subtitle="Pause payouts for every company or for one. Pausing sends nothing and takes effect at once; every change needs a reason and a second confirmation, and is audited."
+        subtitle="Pause payouts for every company or for one, and choose the cash-out provider. Neither sends anything and both take effect at once; every change needs a reason and a second confirmation, and is audited."
       />
       {canAct ? null : (
         <p className="-mt-2 text-sm text-muted-foreground">
@@ -81,6 +87,8 @@ export function ControlsView() {
             </CardContent>
           </Card>
 
+          <CashOutProviderCard canAct={canAct} />
+
           <Card>
             <CardHeader>
               <CardTitle>
@@ -120,6 +128,87 @@ export function ControlsView() {
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * Its own query: readiness asks both providers, so it must not hold up the
+ * pause above.
+ */
+function CashOutProviderCard({ canAct }: { canAct: boolean }) {
+  const { api } = useStaffAuth();
+  const result = useQuery({
+    queryKey: queryKeys.cashOutProvider(),
+    queryFn: () => api.ops.cashOutProvider(),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <h2>Cash-out provider</h2>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {result.isPending ? (
+          <PageLoading label="Checking the cash-out providers…" />
+        ) : result.isError ? (
+          <PageError>{describeApiError(result.error)}</PageError>
+        ) : (
+          <>
+            <p className="mt-1 text-sm">
+              Every company&apos;s new cash-outs go through{" "}
+              <span className="font-medium">
+                {CASH_OUT_PROVIDER_NAMES[result.data.activeProvider]}
+              </span>
+              .{" "}
+              <span className="text-muted-foreground">
+                {result.data.changedAt
+                  ? `Last changed ${formatNairobiTime(result.data.changedAt)}.`
+                  : "Never changed: this is the default."}{" "}
+                A cash-out keeps the provider it had when approved.
+              </span>
+            </p>
+            <ul className="mt-4 space-y-4">
+              {result.data.providers.map((state) => (
+                <li key={state.provider}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium">
+                      {CASH_OUT_PROVIDER_NAMES[state.provider]}
+                    </span>
+                    {state.active ? (
+                      <StatusBadge tone="moving">Active</StatusBadge>
+                    ) : null}
+                    {state.ready ? (
+                      <StatusBadge tone="paid">Ready</StatusBadge>
+                    ) : (
+                      <StatusBadge tone="failed">Not ready</StatusBadge>
+                    )}
+                  </div>
+                  {state.problems.length > 0 ? (
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-destructive">
+                      {state.problems.map((problem) => (
+                        <li key={problem} className="break-words">
+                          {problem}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {canAct && !state.active ? (
+                    <div className="mt-3">
+                      <CashOutProviderFlow
+                        provider={state.provider}
+                        ready={state.ready}
+                      />
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

@@ -964,6 +964,43 @@ describe("the bill follows its payout (spec §6.20)", () => {
     ]);
   });
 
+  it("is paid when its Pretium cash-out is, recording Pretium's receipt", async () => {
+    // #given a bill whose cash-out went through Pretium
+    const billId = await bill(await tillPayee());
+    const [payout] = await pay([billId]);
+    if (!payout) throw new Error("no payout");
+    const paidByPretium = {
+      provider: "pretium",
+      providerOrderId: `TX${randomUUID().slice(0, 8).toUpperCase()}`,
+      gatewayOrderId: null,
+      feeUsdc: 0n,
+      status: "paid",
+      paidAt: new Date(),
+      providerStatus: "COMPLETE",
+      providerReference: "TKP9PRETIUM",
+    } as const;
+    await updatePayout(db, paying.company, payout.id, paidByPretium);
+
+    // #when Pretium reports it paid with a receipt
+    await runtime.runPromise(
+      withScope({ organizationId: paying.company.organizationId }, (tx) =>
+        applyPayoutOutcome(tx, { ...payout, ...paidByPretium }),
+      ),
+    );
+
+    // #then
+    expect(await statusOf(billId)).toBe("paid");
+    expect(await auditOf(billId, "bill.paid")).toMatchObject([
+      {
+        after: {
+          status: "paid",
+          payoutId: payout.id,
+          providerReference: "TKP9PRETIUM",
+        },
+      },
+    ]);
+  });
+
   it("fails when Paycrest refunds the order", async () => {
     // #given
     const billId = await bill(await tillPayee());

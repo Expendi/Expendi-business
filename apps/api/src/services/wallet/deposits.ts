@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { Cause, Data, Effect, Exit } from "effect";
 
 import type { DatabaseService } from "../../db/client.js";
@@ -33,6 +33,7 @@ import {
   isFromPaycrestGateway,
   PAYCREST_GATEWAY_BASE_ADDRESS,
 } from "../paycrest/gateway.js";
+import { PRETIUM_BASE_SETTLEMENT_ADDRESS } from "../pretium/settlement.js";
 
 /** Not mined yet, or not on Base: the caller should retry later. */
 export class ReceiptUnavailable extends Data.TaggedError("ReceiptUnavailable")<{
@@ -216,13 +217,70 @@ function refundedFromGateway(
   });
 }
 
+/**
+ * A Pretium cash-out's refund. Pretium returns the USDC to the wallet that
+ * sent it, and the refund is this payout's when:
+ *
+ * 1. its hash is the one Pretium named when the refund was asked for; or
+ * 2. it comes from the pinned settlement address and exactly one of the
+ *    company's Pretium cash-outs is waiting for a refund of exactly this
+ *    amount, with no hash named and nothing credited back yet. Two that
+ *    could match are left unlinked for a person.
+ */
+function refundedByPretium(
+  tx: Transaction,
+  organizationId: string,
+  transfer: UsdcTransfer,
+): Effect.Effect<RefundedPayout | undefined, DatabaseError> {
+  return Effect.gen(function* () {
+    const pretiumPayouts = and(
+      eq(payouts.organizationId, organizationId),
+      eq(payouts.provider, "pretium"),
+    );
+    const [named] = yield* query(() =>
+      tx
+        .select({ id: payouts.id })
+        .from(payouts)
+        .where(and(pretiumPayouts, eq(payouts.refundTxHash, transfer.txHash)))
+        .limit(1),
+    );
+    if (named) return named;
+    if (transfer.from !== PRETIUM_BASE_SETTLEMENT_ADDRESS.toLowerCase()) {
+      return undefined;
+    }
+
+    const [payout, another] = yield* query(() =>
+      tx
+        .select({ id: payouts.id })
+        .from(payouts)
+        .where(
+          and(
+            pretiumPayouts,
+            isNotNull(payouts.refundRequestedAt),
+            isNull(payouts.refundTxHash),
+            eq(payouts.amountToTransferUsdc, transfer.amount),
+            sql`NOT EXISTS (SELECT 1 FROM ${walletTransactions} WHERE ${walletTransactions.payoutId} = ${payouts.id} AND ${walletTransactions.type} = 'refund')`,
+          ),
+        )
+        .limit(2),
+    );
+    if (another) {
+      console.error(
+        `[deposits] ${transfer.amount} USDC base units from Pretium in ${transfer.txHash} (log ${transfer.logIndex}) could be the refund of more than one cash-out of company ${organizationId}; not linked`,
+      );
+      return undefined;
+    }
+    return payout;
+  });
+}
+
 type CreditOutcome = "credited" | "already_credited" | "not_a_refund";
 
 /**
  * Credits one transfer into a wallet on Base. At a company wallet made
  * before NEAR became the main chain it is a refund or a deposit. At a
- * transit wallet only a Paycrest refund is ever credited: anything else
- * gives `not_a_refund` and writes nothing.
+ * transit wallet only a cash-out's refund (Paycrest's or Pretium's) is
+ * ever credited: anything else gives `not_a_refund` and writes nothing.
  */
 function creditDeposit(
   wallet: DepositWallet,
@@ -248,11 +306,12 @@ function creditDeposit(
       Effect.gen(function* () {
         const audit = yield* AuditLog;
         const refunded = !fromGateway
-          ? yield* refundedFromDepositAddress(
+          ? ((yield* refundedFromDepositAddress(
               tx,
               wallet.organization_id,
               transfer,
-            )
+            )) ??
+            (yield* refundedByPretium(tx, wallet.organization_id, transfer)))
           : gatewayOrderId
             ? yield* refundedFromGateway(
                 tx,

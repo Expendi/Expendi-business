@@ -69,7 +69,7 @@ export const walletHistoryPayoutSchema = z.object({
   approvalId: z.uuid().nullable(),
   approvedAt: z.iso.datetime().nullable(),
   paidAt: z.iso.datetime().nullable(),
-  /** KES per USDC the payout was sent at; null until Paycrest gives one. */
+  /** KES per USDC the payout was sent at; null until the cash-out has one. */
   rate: z.string().nullable(),
   /** Why it failed, for people to read. */
   failureReason: z.string().nullable(),

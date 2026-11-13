@@ -14,6 +14,7 @@ import {
   payablePayrollRun,
   payrollPayoutRequests,
 } from "../../services/payroll/payable.js";
+import { MAX_KES_PER_ORDER_CENTS } from "../../services/payroll/split.js";
 import { addCategory } from "../helpers/claims.js";
 import { createCompany } from "../helpers/db.js";
 import { confirmPhone, randomKenyanMobile } from "../helpers/payees.js";
@@ -197,7 +198,11 @@ describe("payrollPayoutRequests", () => {
     const { payments } = Either.getOrThrow(await payable());
 
     // #when
-    const requests = payrollPayoutRequests(runId, payments);
+    const requests = payrollPayoutRequests(
+      runId,
+      payments,
+      MAX_KES_PER_ORDER_CENTS,
+    );
 
     // #then
     expect(requests).toEqual(

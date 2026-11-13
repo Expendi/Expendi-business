@@ -29,6 +29,7 @@ import { fromMicro } from "../paycrest/amounts.js";
 import { gatherNearSendsByKey } from "./near-send-evidence.js";
 import {
   baseTransfersSince,
+  heldByBaseHop,
   payoutLedger,
   planSendClosures,
   strayTransfers,
@@ -427,17 +428,21 @@ export function quotePayouts(
 
 /**
  * Whether the quote holds `payout` under review: a cash-out its Base hop
- * put there before any order was asked for, or the USDC payout it
- * delivers. What the quote did decides where the payout's money is.
+ * put there while the hop still decides where its money is
+ * (`heldByBaseHop`, the rule `quoteHolding` uses), or the USDC payout it
+ * delivers.
  */
 export function isHeldBy(
   quote: Pick<IntentQuote, "purpose">,
-  payout: Pick<Payout, "status" | "orderRequestedAt">,
+  payout: Pick<
+    Payout,
+    "status" | "provider" | "orderRequestedAt" | "fundingStartedAt"
+  >,
 ): boolean {
   if (payout.status !== "needs_review") return false;
   return (
     quote.purpose === "usdc_payout" ||
-    (quote.purpose === "base_hop" && payout.orderRequestedAt === null)
+    (quote.purpose === "base_hop" && heldByBaseHop(payout))
   );
 }
 

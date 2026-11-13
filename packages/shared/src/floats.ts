@@ -343,7 +343,7 @@ export type FloatSpendingResult = z.infer<typeof floatSpendingResultSchema>;
 export const floatPaymentPreviewSchema = z.object({
   movementId: z.uuid(),
   payoutId: z.uuid(),
-  /** The name Paycrest pays. */
+  /** The name the cash-out pays. */
   holderName: z.string(),
   /** The last four digits of the holder's confirmed M-Pesa number. */
   phoneLast4: z.string(),

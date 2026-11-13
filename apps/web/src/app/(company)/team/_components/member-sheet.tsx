@@ -613,7 +613,7 @@ interface InviteErrors {
   readonly fullName?: string;
 }
 
-/** Inviting (spec §6.2): email, full name and a role. Paycrest needs the name to pay them. */
+/** Inviting (spec §6.2): email, full name and a role. Cash-outs need the name to pay them. */
 export function InviteSheet({
   organizationId,
   open,

@@ -35,7 +35,7 @@ export function personRows(person: PayrollPersonPreview): PreviewRow[] {
       ? [
           {
             label: "Sent as",
-            value: `${person.orders} payments: one Paycrest payment tops out around KES 386,000`,
+            value: `${person.orders} payments: a salary over one cash-out’s limit is paid in parts`,
           },
         ]
       : []),
@@ -63,7 +63,7 @@ export function capRows(payment: PayrollRunPayment): PreviewRow[] {
       : []),
     { label: "Cap", value: `KES ${formatKesCents(payment.cap.capKes)}` },
     {
-      label: "Paycrest fees, at most",
+      label: "Cash-out fees, at most",
       value: `${formatUsdc(payment.totals.feeAllowanceUsdc)} USDC`,
     },
     {

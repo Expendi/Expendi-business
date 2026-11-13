@@ -135,7 +135,7 @@ export function previewRows(preview: ClaimPaymentPreview): PreviewRow[] {
     },
     { label: "USDC", value: { kind: "usdc", units: preview.usdc } },
     {
-      label: "Paycrest fee, at most",
+      label: "Cash-out fee, at most",
       value: { kind: "usdc", units: preview.feeAllowanceUsdc },
     },
     {

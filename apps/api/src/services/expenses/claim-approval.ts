@@ -126,7 +126,7 @@ function readPayableClaim(
     if (!accountName) {
       return yield* Effect.fail(
         new Conflict({
-          message: `Add ${who}'s full name before paying them: Paycrest pays M-Pesa in the recipient's name.`,
+          message: `Add ${who}'s full name before paying them: we pay M-Pesa in the recipient's name.`,
         }),
       );
     }

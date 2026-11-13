@@ -14,7 +14,6 @@ import {
   maskDetails,
   normaliseDetails,
 } from "../../services/payees/details.js";
-import { makeFakePaycrest } from "../helpers/fakes.js";
 
 type Outcome<A> = { readonly ok: A } | { readonly error: string };
 
@@ -245,7 +244,7 @@ describe("payee payment details", () => {
       },
     );
 
-    const bankCheck = async (bankCode: string, paycrest = makeFakePaycrest()) =>
+    const bankCheck = async (bankCode: string) =>
       outcomeOf(
         await Effect.runPromiseExit(
           checkBank({
@@ -253,20 +252,26 @@ describe("payee payment details", () => {
             bankCode,
             accountNumber: "0123456789",
             accountName,
-          }).pipe(Effect.provide(paycrest.layer)),
+          }),
         ),
       );
 
-    it("names a bank on Paycrest's list", async () => {
-      // #when
-      const result = await bankCheck("EQBLKENA");
+    it.each([
+      ["EQBLKENA", "Equity Bank"],
+      ["PRIEKENX", "Prime Bank Limited"],
+    ])(
+      "names the catalogue's bank %s, whichever provider can pay it",
+      async (bankCode, name) => {
+        // #when
+        const result = await bankCheck(bankCode);
 
-      // #then
-      expect(result).toEqual({ ok: "Equity Bank" });
-    });
+        // #then
+        expect(result).toEqual({ ok: name });
+      },
+    );
 
     it.each([
-      ["a code Paycrest doesn't list", "NOTABANK"],
+      ["a code the catalogue doesn't know", "NOTABANK"],
       ["M-Pesa, which isn't a bank", "SAFAKEPC"],
     ])("rejects %s", async (_case, bankCode) => {
       // #when

@@ -10,25 +10,25 @@ Companies hold USDC on NEAR in wallets managed by Expendi. The payment engine su
 
 A Kenyan company keeps its money as USDC in its own NEAR account. From there it pays staff claims, supplier bills and payroll, to M-Pesa or to a USDC payee on the chain the payee chooses. It never sees a gas token.
 
-| Track tag         | How it is used                                                                                                                                                                                                                                     |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stablecoins       | Every company's balance is native USDC on NEAR. The ledger, approvals, payroll and accountant export all run on it.                                                                                                                                |
-| NEAR Intents      | Companies fund in with USDC from Base, Ethereum, Arbitrum or Solana. USDC payees on Base or Solana are paid through 1Click. Each M-Pesa cash-out moves the exact amount to Base through 1Click, because the KES off-ramp (Paycrest) settles there. |
-| Meta transactions | Each company wallet is a Privy server wallet that signs NEP-366 delegate actions. Expendi's gas relayer pays every fee, creates each account and pays its USDC registration.                                                                       |
+| Track tag         | How it is used                                                                                                                                                                                                                                                         |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stablecoins       | Every company's balance is native USDC on NEAR. The ledger, approvals, payroll and accountant export all run on it.                                                                                                                                                    |
+| NEAR Intents      | Companies fund in with USDC from Base, Ethereum, Arbitrum or Solana. USDC payees on Base or Solana are paid through 1Click. Each M-Pesa cash-out moves the exact amount to Base through 1Click, because the cash-out providers (Paycrest and Pretium) take USDC there. |
+| Meta transactions | Each company wallet is a Privy server wallet that signs NEP-366 delegate actions. Expendi's gas relayer pays every fee, creates each account and pays its USDC registration.                                                                                           |
 
 ### How the money moves
 
 1. **Wallet.** A company gets a NEAR company wallet (a Privy wallet, owned by Expendi's management key, which the API signs for under its own key) and a Base transit wallet.
 2. **Fund-in.** A plain USDC transfer on NEAR is credited once the chain confirms it. A fund-in from another chain is a 1Click quote that delivers USDC on NEAR; if it can't be completed, it is refunded into the company's own NEAR Intents account and swapped back to the company wallet, so nobody gives a refund address. Transfers Expendi itself caused (refunds, sweeps, relayer transfers) are recognised by transaction hash and never credited.
 3. **Approval.** An admin approves a claim, bill or payroll run with a passkey. The per-transaction cap is checked by the API immediately before Privy signs.
-4. **Payout.** A NEAR payee is paid directly. A Base or Solana payee is paid through 1Click. A payroll run's M-Pesa cash-outs move to the transit wallet in one Base hop, then Paycrest pays each person in KES.
+4. **Payout.** A NEAR payee is paid directly. A Base or Solana payee is paid through 1Click. A payroll run's M-Pesa cash-outs move to the transit wallet in one Base hop, then the active cash-out provider, Paycrest or Pretium, pays each person in KES. Expendi staff choose the active provider for every company at once (`docs/decisions/pretium-cash-out-provider.md`).
 5. **Safety.** Every signed send is saved before it is broadcast, so a retry re-sends the same bytes and can never pay twice. Anything unclear goes to `needs_review`, and staff resolve it from the chain's evidence.
 
 The design and its trade-offs are in [docs/decisions/near-main-chain.md](docs/decisions/near-main-chain.md). Terms are in [CONTEXT.md](CONTEXT.md).
 
 ### Check it yourself
 
-Needs Node 22, pnpm 10 and a local Postgres with trust auth. No provider keys are needed: the tests use in-memory fakes of NEAR, 1Click, Privy, Paycrest and Alchemy, and the fake NEAR chain runs the real borsh-encoded transactions.
+Needs Node 22, pnpm 10 and a local Postgres with trust auth. No provider keys are needed: the tests use in-memory fakes of NEAR, 1Click, Privy, Paycrest, Pretium and Alchemy, and the fake NEAR chain runs the real borsh-encoded transactions.
 
 ```sh
 pnpm install
@@ -106,7 +106,7 @@ These phase numbers belong to the [51-task MVP build plan](docs/expense-mvp-buil
 
 - One managed Privy wallet per company on NEAR, with a Base transit wallet for cash-outs; NEAR USDC deposit detection, fund-in from other chains through NEAR Intents, ledger/history and KES balance estimates.
 - Shared payout engine for claims, bills, floats and payroll: batch-bound passkey approval, balance reservation, daily/payroll caps, company/global pauses and idempotent funding.
-- Paycrest KES payouts, exact USDC transfers, passkey-protected withdrawal allowlists, signed webhooks, reconciliation, onchain confirmation, refunds and explicit retries. Uncertain outcomes enter `needs_review`.
+- KES cash-outs through Paycrest or Pretium (one staff setting chooses which), exact USDC transfers, passkey-protected withdrawal allowlists, signed webhooks, reconciliation, onchain confirmation, refunds and explicit retries. Uncertain outcomes enter `needs_review`.
 
 ### Claims, receipts and expense evidence
 

@@ -36,6 +36,14 @@ _Avoid_: Refund address, reverse fund-in
 A payout the recipient receives as shillings through M-Pesa, a till, a paybill or a bank.
 _Avoid_: Off-ramp, fiat payout
 
+**Cash-out provider**:
+A company Expendi sends a cash-out through, which turns the USDC into shillings and delivers them to the recipient. Paycrest and Pretium are cash-out providers.
+_Avoid_: Off-ramp provider, payout provider, PSP, liquidity provider
+
+**Active cash-out provider**:
+The cash-out provider that new cash-outs go through, chosen by Expendi staff for every company at once.
+_Avoid_: Default provider, primary provider, current rail
+
 **USDC payout**:
 A payout the recipient receives as USDC on the payee chain they chose.
 _Avoid_: Onchain payout, crypto payout

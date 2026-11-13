@@ -6,6 +6,7 @@ import type { PayoutStatus, WalletChain } from "@expendi-business/shared";
 import type { DatabaseService } from "../../db/client.js";
 import type { Payout, Wallet } from "../../db/schema/index.js";
 import type { BadRequest, DatabaseError } from "../../errors.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import type { AuditEntryView } from "./audit-search.js";
 import type { LedgerRow } from "./payout-evidence.js";
 import type { StaffMember } from "./staff-auth.js";
@@ -14,6 +15,7 @@ import { query, withScope } from "../../db/scope.js";
 import { Conflict, NotFound, ServiceUnavailable } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { Paycrest } from "../paycrest/paycrest-client.js";
+import { syncPretiumPayout } from "../payout/pretium-sync.js";
 import { syncPayoutOrder } from "../payout/sync.js";
 import { describeRecipient } from "../wallet/history.js";
 import { searchAuditLog } from "./audit-search.js";
@@ -284,6 +286,8 @@ export interface StaffPayoutDetailView extends StaffPayoutSummaryView {
   readonly paidAt: string | null;
   readonly walletAddress: string | null;
   readonly heldByIntentQuoteId: string | null;
+  readonly refundRequestedAt: string | null;
+  readonly refundTxHash: string | null;
   readonly ledger: readonly LedgerEntryView[];
   readonly auditTrail: readonly AuditEntryView[];
 }
@@ -344,6 +348,8 @@ export function payoutDetail(
       paidAt: iso(payout.paidAt),
       walletAddress,
       heldByIntentQuoteId: quoteHolding(payout),
+      refundRequestedAt: iso(payout.refundRequestedAt),
+      refundTxHash: payout.refundTxHash,
       ledger: [...ledger.debits, ...ledger.refunds].map(ledgerView),
       auditTrail: trail.entries,
     };
@@ -353,13 +359,13 @@ export function payoutDetail(
 export interface RefetchResult {
   readonly previousStatus: PayoutStatus;
   readonly status: PayoutStatus;
-  readonly paycrestStatus: string;
+  readonly providerStatus: string;
 }
 
 /**
- * Fetches the payout's order from Paycrest and runs the ordinary sync on
- * it (spec §6.15): forward-only, and it never orders or sends. Audited as
- * the staff member.
+ * Fetches the payout's order from Paycrest, or its transaction from
+ * Pretium, and runs the ordinary sync on it (spec §6.15): forward-only, and
+ * it never orders, sends, pays or refunds. Audited as the staff member.
  */
 export function refetchPayout(
   staff: StaffMember,
@@ -367,7 +373,7 @@ export function refetchPayout(
 ): Effect.Effect<
   RefetchResult,
   NotFound | Conflict | ServiceUnavailable | DatabaseError,
-  DatabaseService | AuditLog | Paycrest
+  DatabaseService | AuditLog | Paycrest | Pretium
 > {
   return Effect.gen(function* () {
     const organizationId = yield* payoutOrganization(payoutId);
@@ -375,6 +381,9 @@ export function refetchPayout(
       organizationId,
       payoutId,
     );
+    if (before.provider === "pretium") {
+      return yield* refetchPretiumPayout(staff, organizationId, before);
+    }
     const orderId = before.providerOrderId;
     if (before.provider !== "paycrest" || !orderId) {
       return yield* Effect.fail(
@@ -422,7 +431,69 @@ export function refetchPayout(
     return {
       previousStatus: before.status,
       status,
-      paycrestStatus: order.status,
+      providerStatus: order.status,
+    };
+  });
+}
+
+/**
+ * A Pretium cash-out's re-fetch: the read-only sync reads its transaction
+ * from Pretium.
+ */
+function refetchPretiumPayout(
+  staff: StaffMember,
+  organizationId: string,
+  before: Payout,
+): Effect.Effect<
+  RefetchResult,
+  Conflict | ServiceUnavailable | DatabaseError,
+  DatabaseService | AuditLog | Pretium
+> {
+  return Effect.gen(function* () {
+    if (!before.providerOrderId) {
+      return yield* Effect.fail(
+        new Conflict({
+          message: "This payout has no Pretium transaction to re-fetch.",
+        }),
+      );
+    }
+    const synced = yield* syncPretiumPayout({
+      organizationId,
+      payoutId: before.id,
+      source: "staff",
+    });
+    if (synced.statusError && !synced.outcome.changed) {
+      return yield* Effect.fail(
+        new ServiceUnavailable({
+          message: `Pretium didn't return the transaction (${synced.statusError.code}). Nothing was changed; try again shortly.`,
+        }),
+      );
+    }
+    const status = synced.outcome.changed ? synced.outcome.to : before.status;
+    const providerStatus = synced.providerStatus ?? "";
+    yield* withScope({ organizationId }, (tx) =>
+      Effect.flatMap(AuditLog, (audit) =>
+        audit.record(tx, {
+          actor: { type: "staff", id: staff.staffUserId },
+          organizationId,
+          action: "payout.refetched",
+          entity: { type: "payout", id: before.id },
+          before: {
+            status: before.status,
+            providerStatus: before.providerStatus,
+          },
+          after: {
+            status,
+            pretiumStatus: providerStatus,
+            changed: synced.outcome.changed,
+          },
+        }),
+      ),
+    );
+    return {
+      previousStatus: before.status,
+      status,
+      providerStatus,
     };
   });
 }

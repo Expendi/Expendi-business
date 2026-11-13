@@ -7,6 +7,7 @@ import type { DatabaseService } from "../../db/client.js";
 import type { OpsAlertDetail } from "../../db/schema/index.js";
 import type { DatabaseError } from "../../errors.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import type { AlertSignal, CheckResult } from "./ops-alerts.js";
 import {
   expenses,
@@ -15,7 +16,8 @@ import {
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { nairobiDate } from "../bills/status.js";
-import { liveKesRate, readCashCheck } from "../overview/cash-check.js";
+import { activeKesRateOrNull } from "../cash-out/active-rate.js";
+import { readCashCheck } from "../overview/cash-check.js";
 
 /**
  * The six alerts' conditions (spec §6.16), read fresh on every run. No
@@ -24,7 +26,8 @@ import { liveKesRate, readCashCheck } from "../overview/cash-check.js";
  */
 
 export const RECONCILE_JOB = "reconcile-paycrest";
-/** The reconciliation job runs every minute; this long without a run is an outage. */
+export const PRETIUM_RECONCILE_JOB = "reconcile-pretium";
+/** Each reconciliation job runs every minute; this long without a run is an outage. */
 export const RECONCILIATION_STALE_MINUTES = 5;
 /** A failed payout is reported if it failed within this window. */
 export const FAILED_PAYOUT_WINDOW_HOURS = 24;
@@ -45,6 +48,11 @@ const WEBHOOK_SOURCES = {
     name: "Paycrest",
     whatToCheck:
       "Requests to /webhooks/paycrest are failing their signature check. Check PAYCREST_API_SECRET against Paycrest's dashboard; if it matches, someone else is sending them.",
+  },
+  pretium: {
+    name: "Pretium",
+    whatToCheck:
+      "Requests to /webhooks/pretium are failing their signature check. Check PRETIUM_WEBHOOK_SIGNING_KEY against the key Pretium signs with, which the consumer app's account shares; if it matches, someone else is sending them.",
   },
   lithic: {
     name: "Lithic",
@@ -131,7 +139,16 @@ export function webhookCheck(): Effect.Effect<
   );
 }
 
-/** Fires when the reconciliation job hasn't finished a run in 5 minutes. */
+/** The job that checks each cash-out provider's payouts every minute. */
+const RECONCILIATION_JOBS = [
+  { job: RECONCILE_JOB, provider: "Paycrest" },
+  { job: PRETIUM_RECONCILE_JOB, provider: "Pretium" },
+] as const;
+
+/**
+ * Fires per cash-out provider when its reconciliation job hasn't finished
+ * a run in 5 minutes, or never has.
+ */
 export function reconciliationCheck(): Effect.Effect<
   CheckResult,
   DatabaseError,
@@ -141,37 +158,43 @@ export function reconciliationCheck(): Effect.Effect<
     query(() =>
       tx
         .select({
+          job: stationHeartbeats.job,
           lastFinishedAt: stationHeartbeats.lastFinishedAt,
           stale: sql<boolean>`${stationHeartbeats.lastFinishedAt} < now() - make_interval(mins => ${RECONCILIATION_STALE_MINUTES})`,
         })
         .from(stationHeartbeats)
-        .where(eq(stationHeartbeats.job, RECONCILE_JOB)),
+        .where(
+          inArray(
+            stationHeartbeats.job,
+            RECONCILIATION_JOBS.map(({ job }) => job),
+          ),
+        ),
     ),
   ).pipe(
-    Effect.map(([heartbeat]) => ({
+    Effect.map((heartbeats) => ({
       kind: "reconciliation_stopped" as const,
-      firing:
-        heartbeat && !heartbeat.stale
-          ? []
-          : [
+      firing: RECONCILIATION_JOBS.flatMap(({ job, provider }) => {
+        const heartbeat = heartbeats.find((row) => row.job === job);
+        if (heartbeat && !heartbeat.stale) return [];
+        return [
+          {
+            kind: "reconciliation_stopped" as const,
+            subjectKey: job,
+            organizationId: null,
+            title: `${provider} reconciliation has stopped`,
+            details: [
               {
-                kind: "reconciliation_stopped" as const,
-                subjectKey: RECONCILE_JOB,
-                organizationId: null,
-                title: "Payout reconciliation has stopped",
-                details: [
-                  {
-                    label: "Last finished run",
-                    value: heartbeat?.lastFinishedAt.toISOString() ?? "never",
-                  },
-                  {
-                    label: "What it means",
-                    value:
-                      "Payouts aren't being checked against Paycrest, so stuck or failed payments go unnoticed until it runs again. Check the API's logs.",
-                  },
-                ],
+                label: "Last finished run",
+                value: heartbeat?.lastFinishedAt.toISOString() ?? "never",
+              },
+              {
+                label: "What it means",
+                value: `Cash-outs aren't being checked against ${provider}, so stuck or failed payments go unnoticed until it runs again. Check the API's logs.`,
               },
             ],
+          },
+        ];
+      }),
       keep: [],
     })),
   );
@@ -184,8 +207,29 @@ interface AlertPayoutRow extends Record<string, unknown> {
   readonly status: "needs_review" | "failed";
   readonly subject_type: string;
   readonly payroll: boolean;
+  readonly provider: "paycrest" | "pretium" | "onchain";
   readonly provider_order_id: string | null;
+  readonly tx_hash: string | null;
   readonly failure_reason: string | null;
+}
+
+/**
+ * Where to look the payout up at its provider: Paycrest's order, or
+ * Pretium's transaction, which exists only once Pretium has been told the
+ * hash of the USDC sent to it; until then, that Base transfer.
+ */
+function providerDetail(row: AlertPayoutRow): OpsAlertDetail[] {
+  if (row.provider === "pretium") {
+    if (row.provider_order_id) {
+      return [{ label: "Pretium transaction", value: row.provider_order_id }];
+    }
+    return row.tx_hash
+      ? [{ label: "Base transfer to Pretium", value: row.tx_hash }]
+      : [];
+  }
+  return row.provider_order_id
+    ? [{ label: "Paycrest order", value: row.provider_order_id }]
+    : [];
 }
 
 function payoutSignal(row: AlertPayoutRow): AlertSignal {
@@ -199,9 +243,7 @@ function payoutSignal(row: AlertPayoutRow): AlertSignal {
       company(row.organization_name),
       { label: "Payout", value: row.payout_id },
       { label: "Paying", value: row.payroll ? "payroll" : row.subject_type },
-      ...(row.provider_order_id
-        ? [{ label: "Paycrest order", value: row.provider_order_id }]
-        : []),
+      ...providerDetail(row),
       ...(row.failure_reason
         ? [{ label: "Reason", value: row.failure_reason }]
         : []),
@@ -367,12 +409,17 @@ function companyBalance(
 /**
  * Fires per company whose wallet holds less than its unpaid claims plus
  * the bills and payroll due in the next 7 days. A company that can't be
- * valued (no Paycrest rate, or its read failed) keeps whatever it had.
+ * valued (no rate from the active cash-out provider, or its read failed)
+ * keeps whatever it had.
  * Only how much is spendable is shown: the total due can reveal payroll.
  */
 export function lowBalanceCheck(
   now: Date = new Date(),
-): Effect.Effect<CheckResult, DatabaseError, DatabaseService | Paycrest> {
+): Effect.Effect<
+  CheckResult,
+  DatabaseError,
+  DatabaseService | Paycrest | Pretium
+> {
   return Effect.gen(function* () {
     const { rows } = yield* withScope(SYSTEM_SCOPE, (tx) =>
       query(() =>
@@ -386,7 +433,7 @@ export function lowBalanceCheck(
     if (rows.length === 0) {
       return { kind: "low_company_balance", firing, keep } as const;
     }
-    const rate = yield* liveKesRate;
+    const rate = yield* activeKesRateOrNull("alerts");
     const today = nairobiDate(now);
     for (const row of rows) {
       const exit = yield* Effect.exit(

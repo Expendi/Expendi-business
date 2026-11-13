@@ -72,6 +72,7 @@ import {
   allowlistAddress,
   createPayingCompany,
   readPayout,
+  updatePayout,
   USDC,
 } from "../helpers/payouts.js";
 import {
@@ -799,6 +800,39 @@ describe("bills in Zoho Books", () => {
           contentType: "application/pdf",
           fileName: `expendi-${billId}.pdf`,
         },
+      },
+    ]);
+  });
+
+  it("posts a bill paid through Pretium with Pretium's receipt and no fee line", async () => {
+    // #given a paid cash-out that Pretium paid, as Pretium leaves it
+    const setUp = await connected();
+    const billId = await tillBill(setUp);
+    const payout = await payBill(setUp, billId);
+    await settle(payout);
+    await updatePayout(db, setUp.company, payout.id, {
+      provider: "pretium",
+      providerOrderId: `TX${randomUUID().slice(0, 8).toUpperCase()}`,
+      providerStatus: "COMPLETE",
+      providerReference: "TKP9PRETIUM",
+      gatewayOrderId: null,
+      feeUsdc: 0n,
+    });
+    const { paidOn } = await readBill(db, setUp.company, billId);
+
+    // #when
+    const outcomes = await runSync(setUp.company);
+
+    // #then
+    expect(outcomes).toEqual(["synced"]);
+    expect(zoho.state.expenses.map(({ draft }) => draft)).toEqual([
+      {
+        accountId: "acc-travel",
+        paidThroughAccountId: "acc-wallet",
+        date: paidOn,
+        amount: "2500.00",
+        referenceNumber: billId,
+        description: "Kenya Power · Ref INV-0042 · Paid TKP9PRETIUM",
       },
     ]);
   });

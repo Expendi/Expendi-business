@@ -82,11 +82,11 @@ export const billPaymentPreviewSchema = z.object({
   receivesUsdc: units.nullable(),
   /** What counts towards the daily cap: the KES, or the USDC at today's rate. */
   kesEquivalent: units,
-  /** Paycrest's quoted KES per USDC. */
+  /** The cash-out's quoted KES per USDC. */
   rate: z.string(),
-  /** The USDC Paycrest converts, or the USDC sent. */
+  /** The USDC the cash-out converts, or the USDC sent. */
   usdc: units,
-  /** The most Paycrest's fee and a rate move can add; 0 for USDC. */
+  /** The most a cash-out fee and a rate move can add; 0 for USDC. */
   feeAllowanceUsdc: units,
   /** The most USDC that can leave the wallet for it. */
   maxDebitUsdc: units,

@@ -10,6 +10,7 @@ import type { DatabaseService } from "../../db/client.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import type { BillReminderKind } from "./spending-notifications.js";
 import {
   bills,
@@ -133,13 +134,13 @@ export function queueBillReminders(
 
 /**
  * Warns the admins once a Nairobi day while the wallet is short for what's
- * due in the next 7 days, by T42's cash check. Nothing when Paycrest's rate
- * is unavailable: the check can't tell. Returns whether it warned.
+ * due in the next 7 days, by T42's cash check. Nothing when the cash-out
+ * provider's rate is unavailable: the check can't tell. Returns whether it warned.
  */
 export function queueWalletShortReminder(
   organizationId: string,
   today: string,
-): Effect.Effect<boolean, DatabaseError, DatabaseService | Paycrest> {
+): Effect.Effect<boolean, DatabaseError, DatabaseService | Paycrest | Pretium> {
   return Effect.gen(function* () {
     const admin = { organizationId, role: "admin" } as const;
     const dedupeKey = `wallet_short:${today}`;
@@ -188,7 +189,7 @@ export function runSpendingReminders(
 ): Effect.Effect<
   RemindersRun | null,
   DatabaseError,
-  DatabaseService | Paycrest
+  DatabaseService | Paycrest | Pretium
 > {
   return Effect.gen(function* () {
     const at = now ?? new Date();

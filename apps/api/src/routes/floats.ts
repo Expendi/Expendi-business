@@ -49,21 +49,21 @@ const confirmSchema = z.object({
   ),
 });
 
+/** The active cash-out provider didn't answer while pricing a payment. */
+const rateUnavailable = new ServiceUnavailable({
+  message: "Couldn't get today's KES rate. Try again in a minute.",
+});
+
 /** Why the engine wouldn't prepare a payment, as the app shows it. */
 const PREPARATION_FAILURES = {
   PayoutRejected: (error: PayoutRejected) =>
     Effect.fail(payoutRejectionAsClientError(error)),
-  PaycrestError: () =>
-    Effect.fail(
-      new ServiceUnavailable({
-        message:
-          "Couldn't get today's KES rate from Paycrest. Try again in a minute.",
-      }),
-    ),
+  PaycrestError: () => Effect.fail(rateUnavailable),
+  PretiumError: () => Effect.fail(rateUnavailable),
   AmountTooSmall: () =>
     Effect.fail(
       new BadRequest({
-        message: "This is below the smallest amount Paycrest pays.",
+        message: "This is below the smallest amount that can be sent.",
       }),
     ),
 } as const;

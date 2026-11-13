@@ -29,13 +29,7 @@ import {
   users,
 } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
-import {
-  BadRequest,
-  Conflict,
-  Forbidden,
-  NotFound,
-  ServiceUnavailable,
-} from "../../errors.js";
+import { BadRequest, Conflict, Forbidden, NotFound } from "../../errors.js";
 import {
   canonicalJson,
   sha256Hex,
@@ -43,9 +37,9 @@ import {
   verifyApproval,
 } from "../approval/passkeys.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { listCashOutBanks } from "../cash-out/banks.js";
 import { EmailSender } from "../email/email-sender.js";
 import { payeeDetailsEmail } from "../email/payee-email.js";
-import { Paycrest } from "../paycrest/paycrest-client.js";
 import {
   checkAllowlisted,
   checkBank,
@@ -127,7 +121,7 @@ export interface PendingPayeeChange extends ApprovalChallenge {
 }
 
 type PayeeDeps = DatabaseService | AuditLog;
-type ConfirmDeps = PayeeDeps | ApprovalSettings | Paycrest | EmailSender;
+type ConfirmDeps = PayeeDeps | ApprovalSettings | EmailSender;
 
 const HOLD_MS = PAYEE_CHANGE_HOLD_HOURS * 60 * 60_000;
 
@@ -250,26 +244,15 @@ export function getPayee(
   return withScope(admin, (tx) => readPayee(tx, admin.organizationId, payeeId));
 }
 
-/** Kenyan banks Paycrest can pay, for the bank picker. */
+/**
+ * Every bank in Expendi's catalogue, for the bank picker. It never asks a
+ * provider, so an outage can't stop anyone choosing a bank; one the active
+ * cash-out provider can't pay is refused when a payment is prepared.
+ */
 export function listPayeeBanks(): Effect.Effect<
-  { readonly code: string; readonly name: string }[],
-  ServiceUnavailable,
-  Paycrest
+  { readonly code: string; readonly name: string }[]
 > {
-  return Effect.flatMap(Paycrest, (paycrest) => paycrest.institutions()).pipe(
-    Effect.map((institutions) =>
-      institutions
-        .filter((institution) => institution.type === "bank")
-        .map(({ code, name }) => ({ code, name })),
-    ),
-    Effect.catchTag("PaycrestError", () =>
-      Effect.fail(
-        new ServiceUnavailable({
-          message: "We can't load the list of banks right now. Try again soon.",
-        }),
-      ),
-    ),
-  );
+  return Effect.sync(() => [...listCashOutBanks()]);
 }
 
 // ── Checks ───────────────────────────────────────────────────────────────
@@ -426,12 +409,12 @@ interface ValidatedChange {
 
 /**
  * Normalises `change` and checks what can be checked outside the database:
- * formats and Paycrest's bank list. The same input always normalises to
+ * formats and the bank catalogue. The same input always normalises to
  * the same change, so its hash matches the one the passkey signed.
  */
 function validateChange(
   change: PayeeChange,
-): Effect.Effect<ValidatedChange, BadRequest | ServiceUnavailable, Paycrest> {
+): Effect.Effect<ValidatedChange, BadRequest> {
   return Effect.gen(function* () {
     const normalised: NormalisedChange =
       change.action === "create"
@@ -522,12 +505,7 @@ export function createPayee(
   input: Extract<PayeeChange, { action: "create" }>["payee"],
 ): Effect.Effect<
   CreatePayeeResult,
-  | BadRequest
-  | Forbidden
-  | NotFound
-  | Conflict
-  | ServiceUnavailable
-  | DatabaseError,
+  BadRequest | Forbidden | NotFound | Conflict | DatabaseError,
   ConfirmDeps
 > {
   return Effect.gen(function* () {
@@ -564,12 +542,7 @@ export function requestPayeeDetailsChange(
   details: PayeeDetails,
 ): Effect.Effect<
   PendingPayeeChange,
-  | BadRequest
-  | Forbidden
-  | NotFound
-  | Conflict
-  | ServiceUnavailable
-  | DatabaseError,
+  BadRequest | Forbidden | NotFound | Conflict | DatabaseError,
   ConfirmDeps
 > {
   return validateChange({ action: "change_details", payeeId, details }).pipe(
@@ -715,12 +688,7 @@ export function confirmPayeeChange(
   },
 ): Effect.Effect<
   PayeeView,
-  | BadRequest
-  | Forbidden
-  | NotFound
-  | Conflict
-  | ServiceUnavailable
-  | DatabaseError,
+  BadRequest | Forbidden | NotFound | Conflict | DatabaseError,
   ConfirmDeps
 > {
   return Effect.gen(function* () {

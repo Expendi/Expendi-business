@@ -7,7 +7,7 @@ import { AccountErrorScreen } from "~/features/company/account-error-screen";
 import { useCompanySession } from "~/features/company/company-provider";
 import { FullNameStep } from "~/features/me/full-name-step";
 
-/** Paycrest pays in the person's name, so it comes before anything else (spec §6.2). */
+/** Cash-outs are paid in the person's name, so it comes before anything else (spec §6.2). */
 function needsFullName(state: CompanyState): boolean {
   return "me" in state && state.me.user.fullName === null;
 }

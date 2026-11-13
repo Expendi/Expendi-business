@@ -8,6 +8,8 @@ import type { DatabaseService } from "../../db/client.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { Tenant } from "../../middleware/tenant.js";
+import type { Paycrest } from "../paycrest/paycrest-client.js";
+import type { Pretium } from "../pretium/pretium-client.js";
 import type { CardLoadView } from "./views.js";
 import {
   cardLoads,
@@ -18,8 +20,8 @@ import {
 import { query, withScope } from "../../db/scope.js";
 import { Conflict, ServiceUnavailable } from "../../errors.js";
 import { AuditLog } from "../audit/audit-log.js";
+import { activeKesRate } from "../cash-out/active-rate.js";
 import { fromMicro, kesCentsFor } from "../paycrest/amounts.js";
-import { Paycrest } from "../paycrest/paycrest-client.js";
 import { payoutsTodayKes } from "../payout/approve.js";
 import { cardLoadsTodayKes, lockCardProgram } from "./balance.js";
 import { cardsNotOn } from "./issue.js";
@@ -30,7 +32,8 @@ import { companyControls } from "./views.js";
  * A Card load (spec §6.25): money set aside for the company's Expendi cards.
  * In the sandbox it is only a `card_loads` row: it never touches the wallet's
  * ledger, payouts or Privy, and no USDC moves. It counts against the KES
- * daily cap at the Paycrest rate, together with today's payouts.
+ * daily cap at the active cash-out provider's rate, together with today's
+ * payouts.
  */
 
 type LoadBalance = Extract<CardAction, { type: "load_balance" }>;
@@ -42,19 +45,23 @@ interface LoadQuote {
 
 function quoteLoad(
   amountUsdCents: bigint,
-): Effect.Effect<LoadQuote, ServiceUnavailable, Paycrest> {
+): Effect.Effect<
+  LoadQuote,
+  ServiceUnavailable | DatabaseError,
+  DatabaseService | Paycrest | Pretium
+> {
   return Effect.gen(function* () {
-    const paycrest = yield* Paycrest;
     const usdc = amountUsdCents * USDC_UNITS_PER_US_CENT;
-    const { rate } = yield* paycrest.rate(fromMicro(usdc)).pipe(
-      Effect.catchTag("PaycrestError", () =>
-        Effect.fail(
-          new ServiceUnavailable({
-            message:
-              "Couldn't get today's KES rate from Paycrest. Try again in a minute.",
-          }),
-        ),
-      ),
+    const rateUnavailable = Effect.fail(
+      new ServiceUnavailable({
+        message: "Couldn't get today's KES rate. Try again in a minute.",
+      }),
+    );
+    const rate = yield* activeKesRate(fromMicro(usdc)).pipe(
+      Effect.catchTags({
+        PaycrestError: () => rateUnavailable,
+        PretiumError: () => rateUnavailable,
+      }),
     );
     return { rate, amountKes: kesCentsFor(usdc, rate) };
   });
@@ -95,7 +102,7 @@ export function checkLoad(
 ): Effect.Effect<
   void,
   Conflict | ServiceUnavailable | DatabaseError,
-  DatabaseService | Paycrest
+  DatabaseService | Paycrest | Pretium
 > {
   const { organizationId } = tenant;
   return Effect.gen(function* () {
@@ -123,7 +130,7 @@ export function loadCardBalance(
 ): Effect.Effect<
   CardLoadView,
   Conflict | ServiceUnavailable | DatabaseError,
-  DatabaseService | AuditLog | Paycrest
+  DatabaseService | AuditLog | Paycrest | Pretium
 > {
   const { organizationId } = tenant;
   return Effect.gen(function* () {

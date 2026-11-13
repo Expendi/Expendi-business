@@ -7,6 +7,31 @@ import { DataTableColumnHeader } from "~/components/data/data-table";
 import { PayoutStatusBadge } from "~/components/payout-status";
 import { formatKesCents, formatNairobiTime, formatUsdc } from "~/lib/format";
 
+const PROVIDER_NAMES = {
+  paycrest: "Paycrest",
+  pretium: "Pretium",
+  onchain: null,
+} as const satisfies Record<StaffPayoutSummary["provider"], string | null>;
+
+/** The cash-out provider's name, or null for USDC sent on chain. */
+export function providerName(
+  provider: StaffPayoutSummary["provider"],
+): "Paycrest" | "Pretium" | null {
+  return PROVIDER_NAMES[provider];
+}
+
+/**
+ * What the provider calls the payout's `providerOrderId`: Paycrest's order,
+ * or Pretium's transaction code.
+ */
+export function providerOrderLabel(
+  provider: StaffPayoutSummary["provider"],
+): string {
+  if (provider === "pretium") return "Pretium transaction";
+  if (provider === "paycrest") return "Paycrest order";
+  return "Provider order";
+}
+
 /** What a payout pays: a claim, bill, float or withdrawal, or pay in a payroll run. */
 export function subjectLabel(payout: StaffPayoutSummary): string {
   return payout.payrollRunId ? "payroll run" : payout.subjectType;
@@ -110,13 +135,16 @@ export function payoutColumns(
       header: ({ column }) => (
         <DataTableColumnHeader
           column={column}
-          title="Paycrest order / reason"
+          title="Provider order / reason"
         />
       ),
       cell: ({ row }) => (
         <>
           {row.original.providerOrderId ? (
             <span className="block font-mono text-xs break-all">
+              <span className="sr-only">
+                {providerOrderLabel(row.original.provider)}:{" "}
+              </span>
               {row.original.providerOrderId}
             </span>
           ) : null}
@@ -128,7 +156,7 @@ export function payoutColumns(
         </>
       ),
       meta: {
-        label: "Paycrest order / reason",
+        label: "Provider order / reason",
         className: "min-w-56 max-w-sm whitespace-normal",
       },
     },
