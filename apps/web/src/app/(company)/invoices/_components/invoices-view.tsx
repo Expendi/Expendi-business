@@ -93,7 +93,10 @@ function CompanyInvoices({
   canAct: boolean;
 }): JSX.Element {
   const [param, setParams] = useDeepLinkParams<Param>();
-  const invoiceId = param("invoice");
+  // The URL takes the new invoice's id a render after the create succeeds;
+  // without this the sheet closes for that render and opens again.
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const invoiceId = param("invoice") ?? createdId;
   const customerId = invoiceId ? null : param("customer");
   const tab: InvoicesTab =
     param("tab") === "customers" && !invoiceId ? "customers" : "invoices";
@@ -113,12 +116,14 @@ function CompanyInvoices({
 
   function closeSheet() {
     setLocal(NO_LOCAL_SHEET);
+    setCreatedId(null);
     setCreatingCustomer(false);
     setParams({ invoice: null, customer: null });
   }
 
   function openInvoice(id: string) {
     setLocal(NO_LOCAL_SHEET);
+    setCreatedId(null);
     setParams({ invoice: id });
   }
 
@@ -231,6 +236,7 @@ function CompanyInvoices({
         onLocal={setLocal}
         onClose={closeSheet}
         onCreated={(created) => {
+          setCreatedId(created.id);
           setLocal(NO_LOCAL_SHEET);
           setParams({ invoice: created.id, status: null });
         }}
