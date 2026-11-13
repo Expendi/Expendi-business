@@ -35,26 +35,18 @@
 
 ### The read-only check of existing rows (P2)
 
-`phase-2-design.md` asks for this before migration 0102 runs, because 0102 replaces three checks on `wallet_transactions` and re-checks every existing row. Run each query over the tunnel with a read-only role. Every count must be 0.
+Migrations 0102 and 0104 replace checks on `wallet_transactions` and `intent_quotes`, which re-checks every existing row, and 0102 adds a unique index. The checks are in `pre-migration-checks.sql`, next to this file: one count for each rule that could reject an existing row, and three that confirm the database is where the migrations expect it. Every line A to J must print 0.
 
-```sql
--- Rows the new deposit rule would reject: a quote-linked deposit, or a deposit missing a chain field
-SELECT count(*) FROM wallet_transactions
-WHERE type = 'deposit'
-  AND (intent_quote_id IS NOT NULL OR tx_hash IS NULL OR log_index IS NULL OR block_number IS NULL);
+Run it over the tunnel, in a read-only session, before the migrations:
 
--- Rows the new unique index on a quote's settlement credit would reject
-SELECT intent_quote_id, count(*) FROM wallet_transactions
-WHERE intent_quote_id IS NOT NULL AND tx_hash IS NULL AND usdc_amount > 0
-GROUP BY intent_quote_id HAVING count(*) > 1;
-
--- Rows the tightened quote checks of migration 0104 assume do not exist
-SELECT count(*) FROM intent_quotes
-WHERE deposit_type = 'CONFIDENTIAL_INTENTS' OR refund_type = 'CONFIDENTIAL_INTENTS'
-   OR signed_intent IS NOT NULL OR ledger_credited_at IS NOT NULL;
+```sh
+PGOPTIONS='-c default_transaction_read_only=on' psql "$URL" -X -v ON_ERROR_STOP=1 \
+  -f docs/work/confidential-accounts/pre-migration-checks.sql
 ```
 
-The first query is the one the design names. The second and third are derived from the SQL of migrations 0102 and 0104. Record the counts in section 5.
+**Staging, 2026-11-13:** run before pull request #27 was merged. 101 migrations applied (through `0100`), 14 quotes, 12 ledger rows, 1 wallet. Lines A to J all printed 0.
+
+**Dev:** not run. Run it there before this code is released to dev.
 
 ### The drivers
 
