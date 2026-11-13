@@ -351,6 +351,7 @@ function creditDeposit(
                   organizationId: wallet.organization_id,
                   intentQuoteId: delivering.id,
                   walletTransactionId: credit.id,
+                  txHash: transfer.txHash,
                   receivedUsdc: transfer.amount,
                   actor: ACTOR,
                 })

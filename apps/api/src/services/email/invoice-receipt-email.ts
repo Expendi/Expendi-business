@@ -14,6 +14,8 @@ export interface InvoiceReceiptEmailInput {
   readonly paymentId: string;
   /** The invoice's PDF, which shows as paid; null when there is no dashboard origin to link to. */
   readonly pdfUrl: string | null;
+  /** The delivery into the company wallet on a NEAR explorer. */
+  readonly transactionUrl: string;
 }
 
 /** 1_500_500_000n as "1,500.50": whole cents at least, more places if the amount has them. */
@@ -39,13 +41,14 @@ export function invoiceReceiptEmail(
   return {
     to: input.to,
     subject: `Payment received for invoice ${invoiceNumber}`,
-    text: `${lines.join("\n")}\n\nKeep this email as your receipt.\n${
+    text: `${lines.join("\n")}\nTransaction: ${input.transactionUrl}\n\nKeep this email as your receipt.\n${
       input.pdfUrl === null ? "" : `Download receipt (PDF): ${input.pdfUrl}\n`
     }`,
     html: [
       `<p>${escapeHtml(lines[0] ?? "")}</p>`,
       "<ul>",
       ...lines.slice(1).map((line) => `<li>${escapeHtml(line)}</li>`),
+      `<li><a href="${escapeHtml(input.transactionUrl)}">View the transaction on NEAR</a></li>`,
       "</ul>",
       "<p>Keep this email as your receipt.</p>",
       ...(input.pdfUrl === null
