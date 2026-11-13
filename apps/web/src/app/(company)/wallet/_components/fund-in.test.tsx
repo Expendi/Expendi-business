@@ -7,7 +7,7 @@ import { FUND_IN_STATUSES } from "@expendi-business/shared";
 
 import { FUND_INS } from "~/app/dev/preview/_harness/fixtures/wallet";
 import { fundInDraft } from "./fund-in-display";
-import { FundInDetails } from "./fund-in-sheet";
+import { FundInDetails, RecentFundInRow } from "./fund-in-sheet";
 import { fundInPollInterval, isFinalFundIn } from "./wallet-api";
 
 vi.mock("~/lib/use-api", () => ({ useApi: () => ({}) }));
@@ -106,7 +106,7 @@ describe("following a fund-in", () => {
       chain: /On\s+Base/.test(page),
       address: ["9d4c", "1e7a", "b0c3"].every((group) => page.includes(group)),
       arrives: /Arrives in the wallet\s+2,499\.87 USDC/.test(page),
-      deadline: /Send by\s+Today, 11:30/.test(page),
+      deadline: /Send by\s+Today, 11:30 AM/.test(page),
       copy: page.includes("Copy address"),
       warning: page.includes("Send only USDC on Base"),
     }).toEqual({
@@ -142,6 +142,52 @@ describe("following a fund-in", () => {
         copy: page.includes("Copy address"),
         warning: page.includes("Send only USDC"),
       }).toEqual({ label: true, note: true, copy: false, warning: false });
+    },
+  );
+});
+
+describe("the recent fund-ins", () => {
+  it.each([
+    ["awaiting_deposit", "warn"],
+    ["processing", "blue"],
+    ["completed", "success"],
+    ["returning", "blue"],
+    ["failed", "error"],
+    ["expired", "error"],
+  ] as const)("colours a %s fund-in's tile and status %s", (status, colour) => {
+    // #when
+    const row = renderToStaticMarkup(
+      <RecentFundInRow
+        fundIn={{ ...waiting(), status }}
+        today="2026-11-06"
+        onOpen={() => undefined}
+      />,
+    );
+
+    // #then
+    expect({
+      tile: row.includes(`bg-${colour}-50 text-${colour}-700`),
+      status: row.includes(`<span class="text-${colour}-700">`),
+    }).toEqual({ tile: true, status: true });
+  });
+
+  it.each(["returned", "refunded"] as const)(
+    "leaves a %s fund-in grey",
+    (status) => {
+      // #when
+      const row = renderToStaticMarkup(
+        <RecentFundInRow
+          fundIn={{ ...waiting(), status }}
+          today="2026-11-06"
+          onOpen={() => undefined}
+        />,
+      );
+
+      // #then
+      expect({
+        tile: row.includes("border-border bg-card text-muted-foreground"),
+        tinted: /-(50|700)\b/.test(row),
+      }).toEqual({ tile: true, tinted: false });
     },
   );
 });

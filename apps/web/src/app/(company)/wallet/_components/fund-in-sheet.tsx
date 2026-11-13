@@ -12,6 +12,7 @@ import type {
 import { FUND_IN_CHAIN_NAMES, FUND_IN_CHAINS } from "@expendi-business/shared";
 
 import type { FundInFieldErrors } from "./fund-in-display";
+import type { StatusTone } from "~/components/data/status-badge";
 import { CopyButton } from "~/components/copy-button";
 import {
   Callout,
@@ -253,25 +254,73 @@ function RecentFundIns({
       <SectionLabel>Recent fund-ins</SectionLabel>
       <ul className="m-0 mt-2 list-none p-0">
         {fundIns.data.slice(0, RECENT_FUND_INS).map((fundIn) => (
-          <RailRow
+          <RecentFundInRow
             key={fundIn.id}
-            icon={ArrowDownLeftIcon}
-            title={fundInTitle(fundIn)}
-            detail={`${FUND_IN_STATUS[fundIn.status].label} · ${happenedAt(fundIn.createdAt, today)}`}
-            action={
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={`Open ${fundInTitle(fundIn)}`}
-                onClick={() => onOpen(fundIn.id)}
-              >
-                Open
-              </Button>
-            }
+            fundIn={fundIn}
+            today={today}
+            onOpen={onOpen}
           />
         ))}
       </ul>
     </section>
+  );
+}
+
+/** A status that moved money or needs a look colours its row; one that only ended stays grey. */
+const ROW_TONES: Partial<
+  Record<StatusTone, { readonly tile: string; readonly text: string }>
+> = {
+  waiting: {
+    tile: "border-transparent bg-warn-50 text-warn-700",
+    text: "text-warn-700",
+  },
+  moving: {
+    tile: "border-transparent bg-blue-50 text-blue-700",
+    text: "text-blue-700",
+  },
+  paid: {
+    tile: "border-transparent bg-success-50 text-success-700",
+    text: "text-success-700",
+  },
+  failed: {
+    tile: "border-transparent bg-error-50 text-error-700",
+    text: "text-error-700",
+  },
+};
+
+export function RecentFundInRow({
+  fundIn,
+  today,
+  onOpen,
+}: {
+  fundIn: FundIn;
+  today: string;
+  onOpen: (fundInId: string) => void;
+}): JSX.Element {
+  const status = FUND_IN_STATUS[fundIn.status];
+  const tone = ROW_TONES[status.tone];
+  return (
+    <RailRow
+      icon={ArrowDownLeftIcon}
+      tileClassName={tone?.tile}
+      title={fundInTitle(fundIn)}
+      detail={
+        <>
+          <span className={tone?.text}>{status.label}</span>
+          {` · ${happenedAt(fundIn.createdAt, today)}`}
+        </>
+      }
+      action={
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={`Open ${fundInTitle(fundIn)}`}
+          onClick={() => onOpen(fundIn.id)}
+        >
+          Open
+        </Button>
+      }
+    />
   );
 }
 

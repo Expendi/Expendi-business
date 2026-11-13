@@ -416,12 +416,12 @@ function PaymentSteps({ item }: { item: WalletHistoryItem }): JSX.Element {
             className={cn(
               "inline-flex size-5 items-center justify-center rounded-full border-2",
               step.state === "done" &&
-                "border-foreground bg-foreground text-background",
+                "border-success-700 bg-success-700 text-background",
               step.state === "current" &&
                 "border-primary bg-card after:size-2 after:rounded-full after:bg-primary",
               step.state === "pending" && "border-input bg-card",
               step.state === "failed" &&
-                "border-warn-600 bg-warn-50 text-warn-700",
+                "border-error-700 bg-error-50 text-error-700",
             )}
           >
             {step.state === "done" ? (
@@ -434,7 +434,7 @@ function PaymentSteps({ item }: { item: WalletHistoryItem }): JSX.Element {
             className={cn(
               "text-sm leading-5",
               step.state === "pending" && "text-muted-foreground",
-              step.state === "failed" && "font-(--w-ui) text-warn-700",
+              step.state === "failed" && "font-(--w-ui) text-error-700",
             )}
           >
             {step.label}
