@@ -222,8 +222,8 @@ export const PAYOUT_STATUS: Record<PayoutStatus, PayoutBadge> = {
 };
 
 /**
- * The badge a row shows: tinted while a payment or withdrawal is moving or
- * has failed, quiet once the money has settled.
+ * The badge a row shows, in the Bills table's tints: a payment or
+ * withdrawal by where it has got to, green once the money has settled.
  */
 export function rowBadge(item: WalletHistoryItem): PayoutBadge | null {
   // The company's own money moving between its wallet and Treasury: neither
@@ -232,14 +232,14 @@ export function rowBadge(item: WalletHistoryItem): PayoutBadge | null {
     return { label: "Moved", tone: "quiet" };
   }
   if (item.type !== "payout" && item.type !== "withdrawal") {
-    return { label: "Received", tone: "quiet" };
+    return { label: "Received", tone: "paid" };
   }
   const status = item.payout?.status;
   if (!status) return null;
   if (status !== "paid") return PAYOUT_STATUS[status];
   return {
     label: item.type === "withdrawal" ? "Sent" : "Paid",
-    tone: "quiet",
+    tone: "paid",
   };
 }
 

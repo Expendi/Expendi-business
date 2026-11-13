@@ -159,23 +159,27 @@ describe("Accounts", () => {
     });
   });
 
-  it("shows money in green in the history and leaves money out plain", () => {
+  it("shows money in green and money out red in the history only", () => {
     // #when
     const html = render();
-    const green = (figure: string) =>
-      new RegExp(`text-success-700[^>]*>${figure}`).test(html);
+    const tinted = (tone: string, figure: string) =>
+      new RegExp(`text-${tone}-700[^>]*>${figure}`).test(html);
 
     // #then
     expect({
-      deposit: green("\\+6,000\\.00"),
-      refund: green("\\+31\\.78"),
-      payment: green("−1,441\\.86"),
-      monthIn: green("\\+6,031\\.78"),
+      deposit: tinted("success", "\\+6,000\\.00"),
+      refund: tinted("success", "\\+31\\.78"),
+      payment: tinted("error", "−1,441\\.86"),
+      withdrawal: tinted("error", "−2,000\\.00"),
+      monthIn: tinted("success", "\\+6,031\\.78"),
+      monthOut: tinted("error", "−4,257\\.75"),
     }).toEqual({
       deposit: true,
       refund: true,
-      payment: false,
+      payment: true,
+      withdrawal: true,
       monthIn: false,
+      monthOut: false,
     });
   });
 

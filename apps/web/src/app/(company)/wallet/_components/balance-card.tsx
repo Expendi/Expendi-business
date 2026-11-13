@@ -35,7 +35,10 @@ import {
 
 const TABLE_DAYS = [0, 7, 14, 21, 28, 30];
 
-/** "+6,000.00 USDC", the code small and muted; `tint` shows money in green. */
+/**
+ * "+6,000.00 USDC", the code small and muted; `tint` shows money in green
+ * and money out red.
+ */
 export function SignedUsdc({
   amount,
   tint = false,
@@ -43,12 +46,13 @@ export function SignedUsdc({
   amount: string;
   tint?: boolean;
 }): JSX.Element {
-  const moneyIn = tint && BigInt(amount) > 0n;
+  const units = BigInt(amount);
   return (
     <span
       className={cn(
         "whitespace-nowrap tabular-nums",
-        moneyIn && "text-success-700",
+        tint && units > 0n && "text-success-700",
+        tint && units < 0n && "text-error-700",
       )}
     >
       {signedUsdc(amount)}{" "}
