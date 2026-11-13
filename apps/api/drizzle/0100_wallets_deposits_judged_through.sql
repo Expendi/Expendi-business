@@ -1,0 +1,1 @@
+ALTER TABLE "wallets" ADD COLUMN "deposits_judged_through" text;

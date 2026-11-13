@@ -109,6 +109,15 @@ export const wallets = pgTable(
      * finished. Null until the first page is done.
      */
     depositsResumeToken: text("deposits_resume_token"),
+    /**
+     * The last transfer the deposit watcher judged in a page the transfers
+     * API gave no resume token for (a final page that isn't full), as
+     * `depositsResumeAfter` in `near-deposits.ts` writes it. The page is read
+     * again from the start every run, so this is where to pick up in it. It
+     * belongs to `depositsResumeToken` as it is now and is cleared whenever
+     * the token changes.
+     */
+    depositsJudgedThrough: text("deposits_judged_through"),
     ...timestamps,
   },
   (table) => [

@@ -481,3 +481,59 @@ describe("NearRpc.broadcast", () => {
     expect(Exit.isFailure(exit)).toBe(true);
   });
 });
+
+describe("NearRpc transport failures", () => {
+  const rpcWith = (fetchImpl: typeof fetch) =>
+    makeNearRpc(
+      Redacted.make("https://rpc.near.test/secret-key"),
+      TEST_USDC_CONTRACT,
+      TEST_INTENTS_CONTRACT,
+      fetchImpl,
+    );
+
+  const failureMessage = async (fetchImpl: typeof fetch) => {
+    const exit = await Effect.runPromiseExit(
+      rpcWith(fetchImpl).transactionOutcome(randomNearTxHash(), "a.testnet"),
+    );
+    return Exit.isFailure(exit) && exit.cause._tag === "Fail"
+      ? exit.cause.error.message
+      : null;
+  };
+
+  it("names the HTTP status the node answered with", async () => {
+    // #when
+    const message = await failureMessage(() =>
+      Promise.resolve(new Response("slow down", { status: 429 })),
+    );
+
+    // #then
+    expect(message).toBe("NEAR RPC tx failed: HTTP 429");
+  });
+
+  it("says when the node didn't answer in time", async () => {
+    // #when
+    const message = await failureMessage(() =>
+      Promise.reject(
+        new DOMException(
+          "The operation was aborted due to timeout",
+          "TimeoutError",
+        ),
+      ),
+    );
+
+    // #then
+    expect(message).toBe("NEAR RPC tx failed: timed out");
+  });
+
+  it("never puts the node's URL in the message", async () => {
+    // #when
+    const message = await failureMessage(() =>
+      Promise.reject(
+        new Error("connect ECONNREFUSED https://rpc.near.test/secret-key"),
+      ),
+    );
+
+    // #then
+    expect(message).toBe("NEAR RPC tx failed: network error");
+  });
+});

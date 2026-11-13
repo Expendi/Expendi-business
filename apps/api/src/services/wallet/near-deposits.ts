@@ -526,6 +526,14 @@ function handleRow(
   });
 }
 
+/**
+ * Names a row the indexer listed. The indexer's rows carry no unique ID, so
+ * this is the transaction, the receipt and the log the row came from.
+ */
+function rowKey(row: FastNearTransfer): string {
+  return `${row.transactionId}|${row.receiptId}|${row.logIndex ?? ""}`;
+}
+
 /** The transfer a wallet stopped at, as the indexer listed it, and why. */
 interface WalletHold {
   readonly row: FastNearTransfer;
@@ -546,6 +554,16 @@ interface WalletRun {
  * a held transfer and everything after it are read again next run; whatever
  * before it was already credited is credited once, by the ledger's unique
  * index.
+ *
+ * The indexer gives no resume token for a final page that isn't full, so that
+ * page is read from its start every run. Each RPC confirmation is a call that
+ * can fail and a failure ends the wallet's run, so confirming the same old
+ * transfers again every run would starve the new ones behind them. Instead
+ * the last transfer judged in such a page is saved with each one, and the
+ * next run starts after it. A held transfer is never judged, so it is never
+ * passed. The saved row is found again by name; if the indexer no longer
+ * lists it, the whole page is read again, which costs calls but loses
+ * nothing.
  */
 function watchWallet(
   wallet: WatchedWallet,
@@ -555,6 +573,7 @@ function watchWallet(
     const tally = { credited: 0, alreadyCredited: 0, internal: 0 };
     let unconfirmed = 0;
     let resumeToken = wallet.deposits_resume_token;
+    let judgedThrough = yield* savedJudgedThrough(wallet);
 
     for (let page = 0; page < MAX_PAGES_PER_WALLET; page += 1) {
       const { transfers, resumeToken: next } = yield* fastNear.usdcTransfersTo({
@@ -562,7 +581,12 @@ function watchWallet(
         limit: FAST_NEAR_MAX_PAGE_SIZE,
         resumeToken,
       });
-      for (const row of transfers) {
+      const pageIsRead = next === null || next === resumeToken;
+      const judgedAt =
+        judgedThrough === null
+          ? -1
+          : transfers.findIndex((row) => rowKey(row) === judgedThrough);
+      for (const row of transfers.slice(judgedAt + 1)) {
         const outcome = yield* handleRow(wallet, row);
         if (outcome.kind === "held") {
           return {
@@ -573,28 +597,63 @@ function watchWallet(
         }
         if (outcome.kind === "unconfirmed") {
           unconfirmed += 1;
-          continue;
+        } else {
+          for (const verdict of outcome.verdicts) {
+            if (verdict === "credited") tally.credited += 1;
+            if (verdict === "already_credited") tally.alreadyCredited += 1;
+            if (verdict === "internal") tally.internal += 1;
+          }
         }
-        for (const verdict of outcome.verdicts) {
-          if (verdict === "credited") tally.credited += 1;
-          if (verdict === "already_credited") tally.alreadyCredited += 1;
-          if (verdict === "internal") tally.internal += 1;
+        if (pageIsRead) {
+          // After the verdict, not in its transaction: a crash between the
+          // two only means this row is confirmed once more, and the ledger's
+          // unique index keeps that from crediting it twice.
+          judgedThrough = rowKey(row);
+          yield* saveJudgedThrough(wallet, judgedThrough);
         }
       }
-      if (next === null || next === resumeToken) break;
+      if (pageIsRead) break;
       yield* withScope({ organizationId: wallet.organization_id }, (tx) =>
         query(() =>
           tx
             .update(wallets)
-            .set({ depositsResumeToken: next })
+            .set({ depositsResumeToken: next, depositsJudgedThrough: null })
             .where(eq(wallets.id, wallet.wallet_id)),
         ),
       );
       resumeToken = next;
+      judgedThrough = null;
       if (transfers.length < FAST_NEAR_MAX_PAGE_SIZE) break;
     }
     return { ...tally, unconfirmed, hold: null };
   });
+}
+
+function savedJudgedThrough(
+  wallet: WatchedWallet,
+): Effect.Effect<string | null, DatabaseError, DatabaseService> {
+  return withScope({ organizationId: wallet.organization_id }, (tx) =>
+    query(() =>
+      tx
+        .select({ judgedThrough: wallets.depositsJudgedThrough })
+        .from(wallets)
+        .where(eq(wallets.id, wallet.wallet_id)),
+    ),
+  ).pipe(Effect.map(([row]) => row?.judgedThrough ?? null));
+}
+
+function saveJudgedThrough(
+  wallet: WatchedWallet,
+  rowName: string,
+): Effect.Effect<void, DatabaseError, DatabaseService> {
+  return withScope({ organizationId: wallet.organization_id }, (tx) =>
+    query(() =>
+      tx
+        .update(wallets)
+        .set({ depositsJudgedThrough: rowName })
+        .where(eq(wallets.id, wallet.wallet_id)),
+    ),
+  ).pipe(Effect.asVoid);
 }
 
 const QUOTE_PURPOSE_NAMES: Readonly<Record<IntentQuotePurpose, string>> = {
