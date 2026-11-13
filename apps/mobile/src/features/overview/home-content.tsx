@@ -20,6 +20,7 @@ import type {
 } from "@expendi-business/shared";
 import {
   overviewPersonSchema,
+  paymentPollInterval,
   spendingOverviewSchema,
 } from "@expendi-business/shared";
 
@@ -35,6 +36,7 @@ import { useMySalaryPayments } from "~/features/payroll/use-payroll";
 import { useFloats } from "~/features/petty-cash/use-floats";
 import { describeApiError } from "~/lib/api";
 import { formatUsdc } from "~/lib/money";
+import { overviewPersonStatuses } from "~/lib/payment-poll";
 import { useApi } from "~/providers/api-provider";
 import { colors } from "~/theme/colors";
 import {
@@ -88,6 +90,8 @@ export function AdminHomeContent({
         `/organizations/${organizationId}/overview/people/${personId}`,
         overviewPersonSchema,
       ),
+    refetchInterval: (query) =>
+      paymentPollInterval(overviewPersonStatuses(query.state.data)),
   });
   if (overview.isPending) return <OverviewSkeleton />;
   if (overview.isError)

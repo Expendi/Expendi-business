@@ -14,6 +14,7 @@ import type {
 } from "@expendi-business/shared";
 import {
   mySalaryPaymentsResponseSchema,
+  paymentPollInterval,
   payrollRunDetailSchema,
   payrollRunsResponseSchema,
   salariesResponseSchema,
@@ -23,7 +24,13 @@ import {
 
 import type { ApprovalOutcome } from "~/features/approval";
 import { usePasskeyApproval } from "~/features/approval";
+import {
+  mySalaryPaymentStatuses,
+  payrollRunListStatuses,
+  payrollRunStatuses,
+} from "~/lib/payment-poll";
 import { queryKeys } from "~/lib/query-keys";
+import { useRefreshWhenPaymentsSettle } from "~/lib/use-payments-settled";
 import { useApi } from "~/providers/api-provider";
 
 const salariesPath = (organizationId: string) =>
@@ -136,15 +143,23 @@ export function useEndSalary(
   });
 }
 
-/** Latest pay date first. Admins only. */
+/** Latest pay date first, asked about again while a run is being paid. Admins only. */
 export function usePayrollRuns(
   organizationId: string,
 ): UseQueryResult<PayrollRun[]> {
   const api = useApi();
-  return useQuery({
+  const runs = useQuery({
     queryKey: queryKeys.payrollRunList(organizationId),
     queryFn: () => api.get(runsPath(organizationId), payrollRunsResponseSchema),
+    refetchInterval: (query) =>
+      paymentPollInterval(payrollRunListStatuses(query.state.data)),
   });
+  useRefreshWhenPaymentsSettle(
+    payrollRunListStatuses(runs.data),
+    "payroll",
+    organizationId,
+  );
+  return runs;
 }
 
 export function usePayrollRun(
@@ -152,11 +167,19 @@ export function usePayrollRun(
   runId: string,
 ): UseQueryResult<PayrollRunDetail> {
   const api = useApi();
-  return useQuery({
+  const run = useQuery({
     queryKey: queryKeys.payrollRun(organizationId, runId),
     queryFn: () =>
       api.get(`${runsPath(organizationId)}/${runId}`, payrollRunDetailSchema),
+    refetchInterval: (query) =>
+      paymentPollInterval(payrollRunStatuses(query.state.data)),
   });
+  useRefreshWhenPaymentsSettle(
+    payrollRunStatuses(run.data),
+    "payroll",
+    organizationId,
+  );
+  return run;
 }
 
 function useStoreRun(organizationId: string) {
@@ -217,7 +240,11 @@ export function useChangeDraftRun(
   });
 }
 
-/** The signed-in person's own salary payments in this company, newest first. */
+/**
+ * The signed-in person's own salary payments in this company, newest
+ * first, asked about again while one is being paid. Nothing else they can
+ * see is worked out from them.
+ */
 export function useMySalaryPayments(
   organizationId: string,
 ): UseQueryResult<MySalaryPayment[]> {
@@ -229,5 +256,7 @@ export function useMySalaryPayments(
         `/organizations/${organizationId}/me/salary-payments`,
         mySalaryPaymentsResponseSchema,
       ),
+    refetchInterval: (query) =>
+      paymentPollInterval(mySalaryPaymentStatuses(query.state.data)),
   });
 }

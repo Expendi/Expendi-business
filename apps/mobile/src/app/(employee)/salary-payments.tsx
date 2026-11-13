@@ -9,6 +9,7 @@ import { Button } from "~/components/button";
 import { ErrorMessage } from "~/components/error-message";
 import { Screen } from "~/components/screen";
 import { Text } from "~/components/text";
+import { CashOutReceiptRows } from "~/features/cash-out/cash-out-receipt";
 import { formatIsoDate } from "~/features/claims/dates";
 import { RequireCompany } from "~/features/claims/require-company";
 import { MY_PAYMENT_STATUS_LABELS } from "~/features/payroll/payroll-display";
@@ -82,6 +83,7 @@ function PaymentRow({ payment }: { payment: MySalaryPayment }): JSX.Element {
         <Text className="text-base font-semibold text-gray-900">{amount}</Text>
       </View>
       <Badge label={status.label} tone={status.tone} />
+      <CashOutReceiptRows receipts={payment.paymentReceipts} />
     </View>
   );
 }

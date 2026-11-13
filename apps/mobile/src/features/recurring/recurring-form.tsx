@@ -7,6 +7,7 @@ import type {
   CreateRecurringItemRequest,
   Payee,
   PayeeKind,
+  PayeeMethod,
   RecurringItem,
   RecurringPayVia,
   RecurringSchedule,
@@ -32,11 +33,18 @@ import { Text } from "~/components/text";
 import { TextField } from "~/components/text-field";
 import { CURRENCY_LABELS, currencyOfPayee } from "~/features/bills/bill-amount";
 import { HEADING_LABELS } from "~/features/bills/bill-status";
+import {
+  amountRefusal,
+  cashOutAmountError,
+  cashOutAmountHint,
+  cashOutLimitsOf,
+} from "~/features/bills/cash-out-amount";
 import { ReviewRow } from "~/features/claims/claim-editor";
 import { formatIsoDate } from "~/features/claims/dates";
 import { useCategories } from "~/features/claims/use-claims";
 import { KIND_LABELS } from "~/features/payees/payee-display";
 import { usePayees } from "~/features/payees/use-payees";
+import { useCompanyWallet } from "~/features/wallet/use-company-wallet";
 import { describeApiError } from "~/lib/api";
 import {
   defaultScheduleDay,
@@ -166,6 +174,17 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
     props.item?.payee.kind ?? null,
   );
   const [payeeOutside, setPayeeOutside] = useState(false);
+  const [payeeMethod, setPayeeMethod] = useState<PayeeMethod | null>(
+    props.item?.payee.method ?? null,
+  );
+  const wallet = useCompanyWallet(organizationId);
+  const limits = cashOutLimitsOf(wallet.data);
+  /** A variable payment sends no amount, whatever was typed before. */
+  const typedAmount = {
+    ...draft,
+    amount: draft.variable ? "" : draft.amount,
+    method: payeeMethod,
+  };
 
   function update<K extends keyof RecurringDraft>(
     field: K,
@@ -174,27 +193,42 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
     setDraft((current) => ({ ...current, [field]: value }));
   }
 
+  /** Schema errors first; then, as the API would, the cash-out limits. */
+  function errorsOf(
+    issues: Parameters<typeof fieldErrorsOf>[0] | undefined,
+    amountSent: boolean,
+  ): FieldErrors {
+    const errors = issues ? fieldErrorsOf(issues) : {};
+    const problem = amountSent ? cashOutAmountError(typedAmount, limits) : null;
+    if (problem !== null && errors.amount === undefined) {
+      errors.amount = problem;
+    }
+    return errors;
+  }
+
   function submit(): void {
     if (props.item === undefined) {
       const request = toCreateRequest(draft);
       const parsed = createRecurringItemRequestSchema.safeParse(request);
-      if (!parsed.success) {
-        setFieldErrors(fieldErrorsOf(parsed.error.issues));
-        return;
-      }
-      setFieldErrors({});
-      props.onSubmit(request);
+      const errors = errorsOf(parsed.error?.issues, true);
+      setFieldErrors(errors);
+      if (Object.keys(errors).length === 0) props.onSubmit(request);
       return;
     }
     const request = toUpdateRequest(props.item, draft);
     const parsed = updateRecurringItemRequestSchema.safeParse(request);
-    if (!parsed.success) {
-      setFieldErrors(fieldErrorsOf(parsed.error.issues));
-      return;
-    }
-    setFieldErrors({});
-    props.onSubmit(request);
+    const errors = errorsOf(
+      parsed.error?.issues,
+      request.amountKes !== undefined,
+    );
+    setFieldErrors(errors);
+    if (Object.keys(errors).length === 0) props.onSubmit(request);
   }
+
+  const refusedAmount = amountRefusal(submitError);
+  const amountHint = draft.variable
+    ? null
+    : cashOutAmountHint(typedAmount, limits);
 
   return (
     <>
@@ -213,6 +247,7 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
                 if (currency !== draft.currency) {
                   setDraft((current) => ({ ...current, currency, amount: "" }));
                 }
+                setPayeeMethod(payee.details?.method ?? null);
                 const outside = payee.details?.method === "outside";
                 setPayeeOutside(outside);
                 if (outside) update("payVia", "outside");
@@ -242,7 +277,10 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
             This payee is paid in USDC: each bill pays exactly this many USDC.
           </Text>
         ) : null}
-        <ErrorMessage message={fieldErrors.amount ?? null} />
+        {amountHint ? (
+          <Text className="text-sm text-gray-600">{amountHint}</Text>
+        ) : null}
+        <ErrorMessage message={fieldErrors.amount ?? refusedAmount} />
         {props.item ? (
           <Text className="text-sm text-gray-600">
             A new amount applies from the next bill. To change the bill already
@@ -328,7 +366,11 @@ export function RecurringForm(props: RecurringFormProps): JSX.Element {
 
       <View className="gap-3">
         <ErrorMessage
-          message={submitError ? describeApiError(submitError) : null}
+          message={
+            submitError && refusedAmount === null
+              ? describeApiError(submitError)
+              : null
+          }
         />
         <Button label={submitLabel} loading={submitting} onPress={submit} />
       </View>

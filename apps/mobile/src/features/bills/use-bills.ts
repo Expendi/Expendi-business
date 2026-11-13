@@ -12,9 +12,12 @@ import type {
 import {
   billDetailSchema,
   billsResponseSchema,
+  paymentPollInterval,
 } from "@expendi-business/shared";
 
+import { billListStatuses, billStatuses } from "~/lib/payment-poll";
 import { queryKeys } from "~/lib/query-keys";
+import { useRefreshWhenPaymentsSettle } from "~/lib/use-payments-settled";
 import { useApi } from "~/providers/api-provider";
 import {
   HISTORY_BILL_STATUSES,
@@ -27,17 +30,28 @@ function billsPath(organizationId: string) {
   return `/organizations/${organizationId}/bills` as const;
 }
 
-/** Unpaid and in-flight bills, by due date. Admins only (spec §4). */
+/**
+ * Unpaid and in-flight bills, by due date, asked about again while one is
+ * being paid. Admins only (spec §4).
+ */
 export function useOpenBills(organizationId: string): UseQueryResult<Bill[]> {
   const api = useApi();
-  return useQuery({
+  const bills = useQuery({
     queryKey: queryKeys.billList(organizationId, "open"),
     queryFn: () =>
       api.get(
         `${billsPath(organizationId)}?status=${OPEN_BILL_STATUSES.join(",")}`,
         billsResponseSchema,
       ),
+    refetchInterval: (query) =>
+      paymentPollInterval(billListStatuses(query.state.data)),
   });
+  useRefreshWhenPaymentsSettle(
+    billListStatuses(bills.data),
+    "bills",
+    organizationId,
+  );
+  return bills;
 }
 
 /** Paid and cancelled bills due in the last six months. */
@@ -61,11 +75,19 @@ export function useBill(
   billId: string,
 ): UseQueryResult<BillDetail> {
   const api = useApi();
-  return useQuery({
+  const bill = useQuery({
     queryKey: queryKeys.bill(organizationId, billId),
     queryFn: () =>
       api.get(`${billsPath(organizationId)}/${billId}`, billDetailSchema),
+    refetchInterval: (query) =>
+      paymentPollInterval(billStatuses(query.state.data)),
   });
+  useRefreshWhenPaymentsSettle(
+    billStatuses(bill.data),
+    "bills",
+    organizationId,
+  );
+  return bill;
 }
 
 /** Settling a recurring bill creates its next one, so recurring payments refresh too. */

@@ -572,17 +572,24 @@ export function ReviewRow({
   label,
   value,
   source,
+  selectable = false,
 }: {
   label: string;
   value: string;
   source?: FieldSource | undefined;
+  selectable?: boolean;
 }): JSX.Element {
   return (
     <View
       className={`gap-0.5 ${source === "receipt_unsure" ? "rounded-lg bg-amber-50 p-2" : ""}`}
     >
       <Text className="text-sm text-gray-500">{label}</Text>
-      <Text className="text-base font-semibold text-gray-900">{value}</Text>
+      <Text
+        selectable={selectable}
+        className="text-base font-semibold text-gray-900"
+      >
+        {value}
+      </Text>
       <SourceNote source={source} />
     </View>
   );

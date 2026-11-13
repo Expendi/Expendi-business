@@ -51,6 +51,7 @@ function bill(overrides: Partial<Bill> = {}): Bill {
     cancelledAt: null,
     cancelledBy: null,
     payoutId: null,
+    paymentReceipts: [],
     fileCount: 0,
     createdAt: "2026-11-01T08:00:00.000Z",
     updatedAt: "2026-11-01T08:00:00.000Z",
