@@ -4,7 +4,7 @@ import { Effect } from "effect";
 import type { IntentQuotePurpose } from "../../db/schema/index.js";
 import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
-import { intentQuotes } from "../../db/schema/index.js";
+import { intentQuotes, wallets } from "../../db/schema/index.js";
 import { query } from "../../db/scope.js";
 
 /**
@@ -30,7 +30,8 @@ const COVERED_PURPOSES = [
  *
  * `confidential_account` is the float held in the company's confidential
  * account: the fee covers delivered into it, less what each hop and payout
- * paid out of it cost, less what each sweep into it cost. A quote still in
+ * paid out of it cost, less what each sweep into it cost, less what a
+ * finished move-out wrote off because the account was empty. A quote still in
  * flight or under review counts its whole difference, so two of them can't
  * spend the same float. `company_wallet`, the default, never reads a quote
  * paid out of a confidential account.
@@ -63,6 +64,8 @@ export function recordedExpendiSurplus(
               CASE ${intentQuotes.purpose}::text
                 WHEN 'fee_cover' THEN
                   CASE WHEN ${intentQuotes.status} = 'succeeded' THEN coalesce(${intentQuotes.swappedAmountOut}, ${intentQuotes.amountOut}) ELSE 0 END
+                WHEN 'move_out' THEN
+                  CASE WHEN ${intentQuotes.status} = 'succeeded' THEN -coalesce(${intentQuotes.movedSurplusUsdc}, 0) ELSE 0 END
                 WHEN 'sweep' THEN
                   CASE WHEN ${intentQuotes.status} = 'succeeded' THEN -greatest(${intentQuotes.amountIn} - coalesce(${intentQuotes.swappedAmountOut}, ${intentQuotes.amountOut}), 0) ELSE 0 END
                 ELSE -(${spent})
@@ -75,28 +78,36 @@ export function recordedExpendiSurplus(
               notExcluded,
               sql`(
                 ${intentQuotes.purpose}::text = 'fee_cover'
+                OR ${intentQuotes.purpose}::text = 'move_out'
                 OR (${intentQuotes.purpose}::text = 'sweep' AND ${intentQuotes.recipientType} = 'CONFIDENTIAL_INTENTS')
                 OR (${intentQuotes.purpose}::text IN ('base_hop', 'usdc_payout') AND ${intentQuotes.depositType} = 'CONFIDENTIAL_INTENTS' AND ${intentQuotes.depositStartedAt} IS NOT NULL)
               )`,
             ),
           ),
       );
-      return BigInt(sums?.surplus ?? "0");
+      const [written] = yield* query(() =>
+        tx
+          .select({ off: wallets.confidentialFloatWrittenOffUsdc })
+          .from(wallets)
+          .where(eq(wallets.id, walletId)),
+      );
+      return BigInt(sums?.surplus ?? "0") - (written?.off ?? 0n);
     }
 
     const [sums] = yield* query(() =>
       tx
         .select({
           surplus: sql<string>`coalesce(sum(
-            coalesce(${intentQuotes.feeCoverUsdc}, 0) - ${spent}), 0)::text`,
+            CASE WHEN ${intentQuotes.purpose}::text = 'move_out' THEN
+              CASE WHEN ${intentQuotes.status} = 'succeeded' THEN coalesce(${intentQuotes.movedSurplusUsdc}, 0) ELSE 0 END
+            ELSE coalesce(${intentQuotes.feeCoverUsdc}, 0) - ${spent} END), 0)::text`,
         })
         .from(intentQuotes)
         .where(
           and(
             eq(intentQuotes.walletId, walletId),
             notExcluded,
-            inArray(intentQuotes.purpose, [...COVERED_PURPOSES]),
-            sql`${intentQuotes.depositType} <> 'CONFIDENTIAL_INTENTS'`,
+            sql`(${intentQuotes.purpose}::text = 'move_out' OR (${inArray(intentQuotes.purpose, [...COVERED_PURPOSES])} AND ${intentQuotes.depositType} <> 'CONFIDENTIAL_INTENTS'))`,
             sql`${intentQuotes.depositStartedAt} IS NOT NULL`,
           ),
         ),

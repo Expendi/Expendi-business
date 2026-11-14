@@ -108,6 +108,20 @@ export function settleFromOneClick(
     const open = inArray(intentQuotes.status, ["depositing", "needs_review"]);
     const reported = refreshed?.oneClickStatus ?? null;
     if (refreshed && reported === "SUCCESS") {
+      if (
+        refreshed.purpose === "move_out" &&
+        refreshed.swappedAmountOut !== refreshed.amountIn
+      ) {
+        return yield* orCurrent(
+          refreshed,
+          yield* moveQuote(refreshed, open, {
+            status: "needs_review",
+            settledAt: null,
+            failure:
+              "The move-out did not report delivery of the whole amount. Reconcile before completing the rollback.",
+          }),
+        );
+      }
       return yield* orCurrent(
         refreshed,
         yield* moveQuote(refreshed, open, {

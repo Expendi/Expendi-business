@@ -232,7 +232,7 @@ describe("a quote's signed intent", () => {
 
 /** The columns a quote of this purpose needs to be a valid row, apart from its recipient type. */
 async function quoteOf(
-  purpose: IntentQuotePurpose,
+  purpose: Exclude<IntentQuotePurpose, "move_out">,
   company: TestCompany,
   wallet: TestWallet,
   overrides: Partial<NewIntentQuote> = {},
@@ -668,7 +668,7 @@ describe("the confidential account lookups", () => {
       recipientType: "CONFIDENTIAL_INTENTS" as const,
     };
     const save = async (
-      purpose: IntentQuotePurpose,
+      purpose: Exclude<IntentQuotePurpose, "move_out">,
       overrides: Partial<NewIntentQuote>,
     ) => {
       const [row] = await insertAs(

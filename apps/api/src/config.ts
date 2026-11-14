@@ -2,6 +2,8 @@ import type { ConfigError, Option, Redacted } from "effect";
 import { Config, Context, Effect, Layer } from "effect";
 
 export interface AppConfig {
+  /** Enables confidential defaults and the one-company-at-a-time rollout. */
+  readonly confidentialAccountsEnabled: boolean;
   readonly port: number;
   /** Non-owner app role. Row-level security must apply to it. */
   readonly databaseUrl: Redacted.Redacted;
@@ -51,7 +53,12 @@ export const ConfigLive: Layer.Layer<ConfigService, ConfigError.ConfigError> =
       );
       const adminAppOrigins = yield* originList("ADMIN_APP_ORIGINS");
       const dashboardOrigins = yield* originList("DASHBOARD_ORIGINS");
+      const confidentialAccountsEnabled = yield* Config.withDefault(
+        Config.boolean("CONFIDENTIAL_ACCOUNTS_ENABLED"),
+        false,
+      );
       return {
+        confidentialAccountsEnabled,
         port,
         databaseUrl,
         appInstallUrl,

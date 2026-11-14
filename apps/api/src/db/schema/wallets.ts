@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   check,
   pgEnum,
   pgTable,
@@ -73,6 +74,31 @@ export const wallets = pgTable(
     balanceHome: walletBalanceHome("balance_home")
       .notNull()
       .default("company_wallet"),
+    /** Draining to the public company wallet; new money operations wait. */
+    balanceHomeChanging: boolean("balance_home_changing")
+      .notNull()
+      .default(false),
+    /** Explicit rollback survives the automatic rollout until staff turn on again. */
+    confidentialOptOut: boolean("confidential_opt_out")
+      .notNull()
+      .default(false),
+    /**
+     * Recorded fee float a finished move-out found missing from the emptied
+     * confidential account. Taken off the float so a later turn-on starts at
+     * zero; positive means Expendi recorded more float than was there.
+     */
+    confidentialFloatWrittenOffUsdc: bigint(
+      "confidential_float_written_off_usdc",
+      { mode: "bigint" },
+    )
+      .notNull()
+      .default(sql`0`),
+    balanceHomeChangedAt: timestamp("balance_home_changed_at", {
+      withTimezone: true,
+    }),
+    confidentialRolloutCheckedAt: timestamp("confidential_rollout_checked_at", {
+      withTimezone: true,
+    }),
     /**
      * The most USDC one transaction may move, in base units. Privy enforces
      * it on the transit wallet through its policy; on the company wallet,

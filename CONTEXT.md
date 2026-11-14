@@ -15,7 +15,7 @@ The one account on the main chain that holds a single company's USDC. Never shar
 _Avoid_: Main wallet, NEAR wallet
 
 **Confidential account**:
-A company's own account on the private ledger NEAR Intents runs, where its USDC sits instead of in the public company wallet. Off by default, turned on per company by Expendi staff. The company wallet signs for it.
+A company's own account on the private ledger NEAR Intents runs, where its USDC sits instead of in the public company wallet. The default for new and existing companies once their environment's rollout is enabled. An explicit rollback keeps a company public until Expendi staff turn it on again. The company wallet signs for it.
 _Avoid_: Private wallet, shielded balance, private account
 
 **Transit wallet**:
@@ -39,6 +39,10 @@ _Avoid_: Deposit, on-ramp, bridge in
 **Move-in**:
 Moving USDC that sits in a company wallet into the same company's confidential account.
 _Avoid_: Shield, deposit, top-up
+
+**Move-out**:
+Moving USDC, including Expendi's fee float, from a company's confidential account back to the same company's public company wallet when turning the confidential account off. It does not change the company's ledger balance.
+_Avoid_: Withdrawal, payout, refund
 
 **Fund-in return**:
 Sending a fund-in that couldn't be completed from the company's own NEAR Intents account, where it was refunded, back to its company wallet, or its confidential account, as USDC on NEAR.

@@ -17,6 +17,7 @@ export const INTENT_QUOTE_PURPOSE_LABELS: Record<IntentQuotePurpose, string> = {
   to_treasury: "Move to Treasury",
   from_treasury: "Move to wallet",
   move_in: "Move into confidential account",
+  move_out: "Move back to company wallet",
   fee_cover: "Fee cover",
 };
 

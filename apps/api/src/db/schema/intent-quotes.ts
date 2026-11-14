@@ -55,6 +55,7 @@ export const INTENT_QUOTE_PURPOSES = [
   "from_treasury",
   "move_in",
   "fee_cover",
+  "move_out",
 ] as const;
 export type IntentQuotePurpose = (typeof INTENT_QUOTE_PURPOSES)[number];
 
@@ -262,6 +263,8 @@ export const intentQuotes = pgTable(
      * costs the company nothing, saved before it is sent.
      */
     feeCoverUsdc: bigint("fee_cover_usdc", { mode: "bigint" }),
+    /** Expendi's float carried back to the public wallet by this move-out. */
+    movedSurplusUsdc: bigint("moved_surplus_usdc", { mode: "bigint" }),
     /** The relayer's NEAR transaction that sent the fee cover. */
     feeCoverTxHash: text("fee_cover_tx_hash"),
     /**
@@ -434,7 +437,15 @@ export const intentQuotes = pgTable(
     // account, and then it refunds into it too.
     check(
       "intent_quotes_intents_side_matches_purpose",
-      sql`(${table.depositType} = 'INTENTS') = (${table.purpose}::text = 'fund_in_return') AND (${table.depositType}::text <> 'CONFIDENTIAL_INTENTS' OR ${table.purpose}::text IN ('base_hop', 'usdc_payout', 'to_treasury')) AND (${table.refundType} <> 'INTENTS' OR ${table.purpose}::text IN ('fund_in', 'fund_in_return', 'invoice_payment')) AND ((${table.refundType}::text = 'CONFIDENTIAL_INTENTS') = (${table.depositType}::text = 'CONFIDENTIAL_INTENTS'))`,
+      sql`(${table.depositType} = 'INTENTS') = (${table.purpose}::text = 'fund_in_return') AND (${table.depositType}::text <> 'CONFIDENTIAL_INTENTS' OR ${table.purpose}::text IN ('base_hop', 'usdc_payout', 'to_treasury', 'move_out')) AND (${table.refundType} <> 'INTENTS' OR ${table.purpose}::text IN ('fund_in', 'fund_in_return', 'invoice_payment')) AND ((${table.refundType}::text = 'CONFIDENTIAL_INTENTS') = (${table.depositType}::text = 'CONFIDENTIAL_INTENTS'))`,
+    ),
+    check(
+      "intent_quotes_move_out_is_free",
+      sql`${table.purpose}::text <> 'move_out' OR (${table.depositType}::text = 'CONFIDENTIAL_INTENTS' AND ${table.recipientType} = 'DESTINATION_CHAIN' AND ${table.swapType} = 'EXACT_INPUT' AND ${table.amountIn} = ${table.amountOut} AND ${table.recipient} = ${table.refundTo})`,
+    ),
+    check(
+      "intent_quotes_moved_surplus_is_move_out",
+      sql`${table.movedSurplusUsdc} IS NULL OR (${table.purpose}::text = 'move_out' AND ${table.movedSurplusUsdc} >= 0 AND ${table.movedSurplusUsdc} <= ${table.amountIn})`,
     ),
     check(
       "intent_quotes_invoice_matches_purpose",

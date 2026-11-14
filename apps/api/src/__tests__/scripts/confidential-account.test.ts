@@ -58,6 +58,7 @@ let funded: FundedCompany;
 
 beforeAll(async () => {
   ({ db } = await runtime.runPromise(DatabaseService));
+  fakes.chain.state.fundWithUsdc(fakes.relayer.accountId, 1_000_000n * USDC);
   owner = new pg.Pool({ connectionString: TEST_DATABASE_URL_MIGRATE, max: 2 });
 });
 
@@ -321,11 +322,6 @@ describe("turning a company's confidential account off", () => {
   });
 
   it.each([
-    [
-      "the environment names another company",
-      { demoOrganizationId: "00000000-0000-4000-8000-000000000000" },
-      /CONFIDENTIAL_ACCOUNT_DEMO_ORGANIZATION_ID/,
-    ],
     ["the name is wrong", { companyName: "Someone Else" }, /--company-name/],
     ["--yes is missing", { confirmed: false }, /--yes/],
   ] as const)("refuses when %s", async (_name, overrides, expected) => {
@@ -337,15 +333,15 @@ describe("turning a company's confidential account off", () => {
     expect(await balanceHome()).toBe("confidential_account");
   });
 
-  it("refuses while the confidential account still holds USDC", async () => {
+  it("requests a durable move-out while the account holds USDC", async () => {
     // #given
     await newCompany("confidential_account");
     oneClick.state.fundConfidential(paying.wallet.address, 2n * USDC);
 
     // #then
-    expect(await refusal(turnOff(options()))).toMatch(
-      /still holds 2\.000000 USDC.*back out of a confidential account isn't built yet/,
-    );
+    expect(await runtime.runPromise(turnOff(options()))).toMatchObject({
+      draining: true,
+    });
     expect(await balanceHome()).toBe("confidential_account");
   });
 

@@ -1,12 +1,12 @@
 # Confidential accounts QA plan: Phases 1 to 4
 
-**Status:** draft, 2026-11-13. Nothing in this plan has been run on staging yet.
+**Status:** original Phases 1–4 checklist, 2026-11-13. The preceding Claude session reported C1/C2 passed on staging and C3 partially complete, awaiting relayer funding. These historical results were not re-run in the confidential-default build. New rollout/rollback checks are in `default-rollout-qa.md`; the current commands and guards are in the runbook and supersede the original pilot-only instructions below.
 
-**Covers:** what is built on branch `spike/confidential-intents`, in the uncommitted working tree:
+**Covers:** Phases 1–4, merged from `spike/confidential-intents` to staging in PR #27:
 
 - **Phase 2, money in:** turning a company on with `scripts/confidential-account.ts`, the move-in job, the settlement credit for a fund-in, an invoice payment through the pay link and a fund-in return, the reconcile and the alert `confidential_balance_mismatch`, and the saved balance reading on the staff company page.
 - **Phase 3, money out:** paying out of the account with a signed message, Expendi's fee float, USDC payouts to a payee on NEAR, Base and Solana, withdrawals, the Base hop and the sweep, Move to Treasury and Move to wallet, and the staff hand-back of a payout.
-- **Phase 4, what people see:** the staff pages (company page, NEAR Intents quote page, alert label) are in the working tree. Receipts, exports, wallet history and the withdrawal screens are not: at this writing the working tree changes none of `invoice-pdf.ts`, `bills/payment-receipt.ts`, `export/data.ts`, `wallet/history.ts` or `withdrawal/withdrawals.ts`. Check `git status` before running C21 and record what the build you test does.
+- **Phase 4, what people see:** staff pages, receipts, exports, wallet history and withdrawal rendering were included in PR #27. C21 should verify the deployed API and app versions.
 
 **What was measured on mainnet, and what was not.** Measured on 2026-11-13 (the list is in `docs/decisions/confidential-accounts.md`, "What was proved"): sign-in, a move-in of 0.3 USDC, a payout to Base, a payout to NEAR, an exact-amount-out hop of 0.1 USDC to Base with its unused buffer coming back, and a set of dry quotes. Everything else in this plan was tested only against fakes. This plan is the first time the code runs against 1Click for real. Two behaviours were never measured: a refund on the confidential route, and a payout to a NEAR account that isn't registered for USDC.
 

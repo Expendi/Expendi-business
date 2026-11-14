@@ -44,6 +44,7 @@ export const INTENT_QUOTE_PURPOSES = [
   "to_treasury",
   "from_treasury",
   "move_in",
+  "move_out",
   "fee_cover",
 ] as const;
 export const intentQuotePurposeSchema = z.enum(INTENT_QUOTE_PURPOSES);

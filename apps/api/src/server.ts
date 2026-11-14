@@ -4,6 +4,7 @@ import { createApp } from "./app.js";
 import { ConfigService } from "./config.js";
 import { makeRuntime } from "./runtime.js";
 import { alertChecksJob } from "./station/alert-checks.js";
+import { balanceHomeChangesJob } from "./station/balance-home-changes.js";
 import { billStatusJob } from "./station/bill-status.js";
 import { cardReceiptRemindersJob } from "./station/card-receipt-reminders.js";
 import { cardSimulationsJob } from "./station/card-simulations.js";
@@ -69,6 +70,7 @@ const stopStation = startStation(
     fundInReturnsJob,
     moveInsJob,
     feeCoversJob,
+    balanceHomeChangesJob,
     outboundQuotesJob,
     sweepTransitWalletsJob,
     treasuryMovesJob,
