@@ -1,0 +1,21 @@
+flowchart TD
+  TX["USDC transfer to a company wallet on Base"] --> AL["Alchemy ADDRESS_ACTIVITY webhook"]
+  AL --> EP["POST /webhooks/alchemy"]
+  EP --> SIG{"HMAC x-alchemy-signature valid?"}
+  SIG -- no --> R401["401"]
+  SIG -- yes --> NET{"Base mainnet activity?"}
+  NET -- no --> IGN["200, ignored"]
+  NET -- yes --> REORG{"Removed by a reorg?"}
+  REORG -- yes --> LOG["Logged only<br/>(ledger is not reversed)"]
+  REORG -- no --> USDC["Keep USDC token transfers"]
+  USDC --> RCPT["Base RPC getTransactionReceipt"]
+  RCPT -- "missing" --> R500["500 so Alchemy retries"]
+  RCPT --> MATCH["Successful USDC Transfer logs<br/>to an active company wallet<br/>(active_wallets_by_address)"]
+  MATCH --> KIND{"Who sent it?"}
+  KIND -- "Paycrest Gateway" --> GW["Read OrderRefunded event<br/>verify on chain with getOrderInfo:<br/>refund address = this wallet, token = USDC"]
+  GW --> LINK["Link to the payout by gatewayOrderId<br/>or deposit address + amount"]
+  KIND -- "a payout's deposit address" --> LINK
+  LINK --> REF["wallet_transactions: refund"]
+  KIND -- "anyone else" --> DEP["wallet_transactions: deposit"]
+  REF & DEP --> UNIQ["Unique on (tx_hash, log_index)<br/>so webhook retries are harmless"]
+  UNIQ --> AUD["Audit wallet.refund_received / wallet.deposit_received"]

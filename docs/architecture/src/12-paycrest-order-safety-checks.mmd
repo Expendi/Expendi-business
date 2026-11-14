@@ -1,0 +1,17 @@
+flowchart TD
+  A["Approved KES payout"] --> Q["Fresh quote for the approved KES"]
+  Q -- "error or above max debit" --> F1["failed"]
+  Q --> L1["Lock: still approved, not paused<br/>set orderRequestedAt"]
+  L1 --> CO["Paycrest createOrder"]
+  CO -- "transport error, 5xx or unreadable reply" --> NR1["needs_review"]
+  CO -- "other error" --> F2["failed"]
+  CO --> OC["order_created: order id, rate, fee,<br/>amountToTransfer, deposit address, validUntil"]
+  OC --> CK{"checkOrder"}
+  CK -- "unsafe: bad or own deposit address, not Base, not USDC, memo,<br/>under 120 s left, wrong refund address, not KES/KE,<br/>recipient mismatch, wrong reference, not initiated" --> F3["failed"]
+  CK -- "quote_changed: rate over 0.5% worse" --> F3
+  CK -- "over_approved_debit: amounts or fees differ" --> F3
+  CK -- ok --> BAR["Funding barrier under lock<br/>still order_created · not paused · checkOrder again"]
+  BAR --> FUND["funding → Privy sendUsdc, key payout-&lt;id&gt;"]
+  FUND -- "refused (4xx)" --> F4["failed"]
+  FUND -- "outcome unknown" --> NR2["needs_review"]
+  FUND -- sent --> PAYING["paying + ledger debit"]

@@ -1,0 +1,21 @@
+flowchart TD
+  R1["POST /recurring-items<br/>weekly · monthly · quarterly · yearly<br/>fixed or variable · pay via Expendi or outside"] --> R2["First bill created at once"]
+  R3["recurring-bills job · 15 min"] --> R4["createNextRecurringBill<br/>one outstanding bill per item<br/>advance next_due_on"]
+  R5["pause · resume · end<br/>(salaries managed in payroll)"] --> R4
+  B1["POST /bills<br/>KES, or USD for USDC payees<br/>variable bills may start without an amount"] --> NEWB["Bill created"]
+  R2 & R4 --> NEWB
+
+  NEWB --> B2["Status from the Nairobi date<br/>upcoming · due · overdue"]
+  B3["bill-status job · 15 min<br/>advance_bill_statuses"] --> B2
+  B4["Attachments: POST /bills/upload-url<br/>images + PDF to R2 · role invoice or proof"] --> B2
+  REM["spending-reminders job<br/>due soon · due today · overdue<br/>wallet short in 7 days"] -.-> B2
+
+  B2 --> B5{"How is it settled?"}
+  B5 -- "Pay (one, or up to 20 at once)" --> B6["Checks: unpaid · payee not outside · amount entered<br/>statutory reference · currency matches · 24 h hold"]
+  B6 --> B7["One payout per bill, key bill:&lt;id&gt;:&lt;n&gt;<br/>one passkey for all"]
+  B7 --> B8["Payout engine"]
+  B8 -- paid --> B9["paid · queue Zoho"]
+  B8 -- failed --> B10["payout_failed → retry"]
+  B5 -- "Mark paid outside" --> B11["paid_outside · proof attached<br/>USD converted at today's rate<br/>records company spending · queue Zoho"]
+  B5 -- "Cancel with reason" --> B12["cancelled"]
+  B9 & B11 & B12 -. "recurring item: next bill" .-> R4

@@ -1,0 +1,25 @@
+flowchart TD
+  subgraph Signup["Sign-up · POST /organizations"]
+    S1["KRA PIN format check<br/>^[AP]\d{9}[A-Z]$ (no KRA lookup)"] --> S2["One transaction: organization<br/>creator = first active admin<br/>starter categories · audit"]
+    S2 --> S3["After commit: setUpCompanyWallet<br/>(failure keeps the company;<br/>POST /organizations/:id/wallet resumes)"]
+  end
+
+  subgraph Team["Team · /organizations/:id/members (admin)"]
+    T1["Invite by email<br/>admin · employee · accountant"] --> T2["membership: invited<br/>invite or accountant-access email via Resend<br/>install link returned if email fails"]
+    T2 --> T3["Person signs in with Privy<br/>(first login or GET /me)"]
+    T3 --> T4["membership: active"]
+    T4 --> T5["Change role admin ↔ employee<br/>(accountant fixed · last admin protected)"]
+    T4 --> T6["Remove → removed<br/>(last admin protected)"]
+    T6 -. "re-invite" .-> T2
+  end
+
+  subgraph Phone["Payout phone · /me/payout-phone (API only, no app screen yet)"]
+    P1["POST /me/payout-phone<br/>Kenyan mobile · 5 starts/day · 60 s cooldown"] --> P2["Telnyx Verify sends SMS code<br/>challenge: pending (5 min)"]
+    P2 --> P3["POST /me/payout-phone/confirm<br/>Telnyx checks the code (5 attempts)"]
+    P3 --> P4["users.phone + phone_verified_at<br/>number removed from any previous holder<br/>emails both people"]
+    P2 -. "POST /resend (max 3 sends)" .-> P2
+  end
+
+  S3 -- "admin invites the team" --> T1
+  T4 -- "employee confirms payout number" --> P1
+  P4 --> GATE["requireConfirmedPayoutPhone<br/>gates claim payouts, floats, employee payees"]

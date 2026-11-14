@@ -1,0 +1,18 @@
+flowchart LR
+  subgraph In["Read from"]
+    PO["paid claim + bill payouts (KES recorded)"]
+    RECX["recorded expenses: company spending,<br/>float spending, imported claims, bills paid outside"]
+    SUBC["submitted claims · float spending without receipt"]
+    UNP["unpaid bills · payroll runs · recurring next_due_on"]
+    LED["wallet ledger balance − reserved"]
+    RATE["Paycrest live rate (USD items)"]
+  end
+
+  PO & RECX --> PAIDV["Paid this month<br/>by heading + category vs last month<br/>20 recent payments"]
+  SUBC --> OUTV["Outstanding<br/>overdue + due today · submitted claims<br/>missing receipts"]
+  UNP & LED & RATE --> CASH["Cash check, next 30 days<br/>covered · short · unknown"]
+  CASH --> DUE["Due next"]
+  CASH --> SEVEN["7-day check → wallet_short reminder<br/>+ low_company_balance ops alert"]
+  PEOPLE["People: members + personnel payees"] --> PERSON["/overview/people/:id"]
+
+  PAIDV & OUTV & DUE --> UI["GET /overview?month<br/>mobile home (admin) · web /overview"]

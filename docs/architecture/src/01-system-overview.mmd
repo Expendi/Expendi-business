@@ -1,0 +1,33 @@
+flowchart LR
+  MOB["Mobile app · apps/mobile<br/>Expo · admins + employees<br/>Play testing track + EAS Update"]
+  WEB["Customer dashboard · apps/web<br/>Next.js on Vercel · business.expendi.app<br/>admins + accountants"]
+  OPS["Ops app · apps/admin<br/>Next.js · Expendi staff"]
+  PRIVYL["Privy login<br/>email code + login passkeys<br/>issues the Bearer token the API verifies"]
+
+  MOB & WEB & OPS -.-> PRIVYL
+
+  subgraph API["API · apps/api · Hono + Effect on Railway"]
+    ROUTES["HTTP routes<br/>/me · /organizations · /internal<br/>/webhooks · /integrations · /downloads"]
+    STATION["Station · 11 background jobs"]
+    SERVICES["Domain services + money engine"]
+    DB[("Postgres<br/>row-level security<br/>append-only ledger + audit")]
+    ROUTES --> SERVICES
+    STATION --> SERVICES
+    SERVICES --> DB
+  end
+
+  MOB & WEB & OPS -- "Bearer Privy token" --> ROUTES
+  MOB & WEB -- "signed-URL uploads" --> R2
+
+  SERVICES --> PRIVYW["Privy server wallets<br/>create wallet + policy · send USDC<br/>USDC on Base only, capped · gas sponsored"]
+  PRIVYW --> BASE["Base<br/>USDC transfers"]
+  SERVICES <--> PAYCREST["Paycrest<br/>USDC → KES: M-Pesa, Till, Paybill, bank<br/>rates · orders out · webhooks in"]
+  SERVICES <--> ALCHEMY["Alchemy Notify<br/>watch wallet addresses · deposit webhooks in"]
+  SERVICES --> RPC["Base JSON-RPC<br/>receipts · eth_call · logs"]
+  SERVICES --> R2["Cloudflare R2<br/>receipts + exports · presigned URLs"]
+  SERVICES --> RESEND["Resend email"]
+  SERVICES --> TELNYX["Telnyx Verify<br/>payout phone codes"]
+  SERVICES --> EXPO["Expo Push → FCM / APNs<br/>send + delivery receipts"]
+  SERVICES <--> ZOHO["Zoho Books<br/>OAuth callback in · expenses + receipts out"]
+  SERVICES --> CLAUDE["Anthropic Claude<br/>receipt reading · off in deployed env"]
+  API -- "secrets at boot" --> DOPPLER["Doppler"]

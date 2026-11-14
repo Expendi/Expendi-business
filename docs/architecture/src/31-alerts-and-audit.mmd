@@ -1,0 +1,15 @@
+flowchart LR
+  ACJ["alert-checks job · 60 s"] --> S1["payout in needs_review"]
+  ACJ --> S2["payout failed in last 24 h"]
+  ACJ --> S4["reconcile-paycrest heartbeat over 5 min old"]
+  ACJ --> S5["wallet below unpaid claims + 7-day obligations"]
+  ACJ --> S6["Zoho needs_reconnect or failed sync"]
+  WH["POST /webhooks/paycrest"] --> S3["bad Paycrest webhook signature"]
+  S1 & S2 & S3 & S4 & S5 & S6 --> OA[("ops_alerts<br/>one open incident per kind + subject<br/>resolves when the signal clears")]
+  OA -- "claim, +5 min, backoff to 1 h" --> MAIL["Resend → ALERT_EMAILS<br/>(only logged when unset)"]
+  OA --> OPSA["Ops app /alerts<br/>open + resolved in last 7 days"]
+
+  DOMAIN["Every customer money or admin action"] --> AL[("audit_log<br/>written in the same transaction<br/>INSERT only · trigger blocks UPDATE/DELETE/TRUNCATE")]
+  STAFFACT["Every staff action<br/>sign-in · re-fetch · resolve · pause · Zoho changes · imports"] --> AL
+  AL --> OPSL["Ops app /audit-log<br/>(staff_search_audit_log)"]
+  AL --> ACTV["Customer /activity page<br/>(company_activity_log)"]
