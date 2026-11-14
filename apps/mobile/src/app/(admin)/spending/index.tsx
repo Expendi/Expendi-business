@@ -1,41 +1,41 @@
 import type { JSX } from "react";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
+import { Building2, Plus, Receipt } from "lucide-react-native";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { RefreshControl, ScrollView, View } from "react-native";
 
-import type {
-  CompanySpending,
-  OverviewHeading,
-} from "@expendi-business/shared";
+import type { OverviewHeading } from "@expendi-business/shared";
 
 import type { Company } from "~/features/company/company-provider";
-import type { ChipOption } from "~/features/payees/filter-chips";
-import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
-import { ErrorMessage } from "~/components/error-message";
-import { Screen } from "~/components/screen";
-import { Text } from "~/components/text";
-import { WarningBadges } from "~/features/claims/claim-warnings";
+import { DetailHeader } from "~/components/detail-header";
+import { EmptyState } from "~/components/empty-state";
+import { FilterPills } from "~/components/filter-pills";
+import { LoadError } from "~/components/load-error";
+import { RoundButton } from "~/components/round-button";
+import { ItemRow, SoftGroup, SoftGroupSkeleton } from "~/components/soft-group";
+import { localIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
-import { FilterChips } from "~/features/payees/filter-chips";
 import {
   HEADING_LABELS,
   SPENDING_HEADINGS,
-  spendingSummary,
 } from "~/features/spending/spending-draft";
+import { spendingRowMeta } from "~/features/spending/spending-list";
 import { useCompanySpendingList } from "~/features/spending/use-spending";
 import { describeApiError } from "~/lib/api";
 import { formatKesCents } from "~/lib/money";
+import { colors } from "~/theme/colors";
 
 const ALL = "all";
 
-const HEADING_FILTERS: ChipOption<OverviewHeading | typeof ALL>[] = [
-  { value: ALL, label: "All" },
-  ...SPENDING_HEADINGS.map((heading) => ({
-    value: heading,
-    label: HEADING_LABELS[heading],
-  })),
-];
+const HEADING_FILTERS: { value: OverviewHeading | typeof ALL; label: string }[] =
+  [
+    { value: ALL, label: "All" },
+    ...SPENDING_HEADINGS.map((heading) => ({
+      value: heading,
+      label: HEADING_LABELS[heading],
+    })),
+  ];
 
 export default function CompanySpendingRoute(): JSX.Element {
   return (
@@ -54,109 +54,101 @@ function CompanySpendingScreen({ company }: { company: Company }): JSX.Element {
     heading === ALL ? null : heading,
   );
   const items = spending.data?.pages.flatMap((page) => page.spending) ?? [];
+  const today = localIsoDate(new Date());
 
   return (
-    <Screen
-      belowHeader
-      refreshing={spending.isRefetching}
-      onRefresh={() => void spending.refetch()}
-    >
-      <Button
-        label="Record spending"
-        onPress={() => router.push("/spending/new")}
-      />
-      <Button
-        label="Paid-from accounts"
-        variant="secondary"
-        onPress={() => router.push("/spending/accounts")}
-      />
-
-      <FilterChips
-        label="Heading"
-        options={HEADING_FILTERS}
-        value={heading}
-        onChange={setHeading}
-      />
-
-      {spending.isPending ? (
-        <ActivityIndicator accessibilityLabel="Loading company spending" />
-      ) : spending.isError ? (
-        <View className="gap-4">
-          <ErrorMessage message={describeApiError(spending.error)} />
-          <Button
-            label="Try again"
-            variant="secondary"
-            loading={spending.isFetching}
-            onPress={() => void spending.refetch()}
+    <View className="flex-1 bg-white">
+      <Stack.Screen options={{ headerShown: false }} />
+      <DetailHeader
+        title="Company spending"
+        onBack={() => router.back()}
+        right={
+          <RoundButton
+            icon={Plus}
+            label="Record spending"
+            tone="brand"
+            onPress={() => router.push("/spending/new")}
           />
-        </View>
-      ) : items.length === 0 ? (
-        <Text className="text-base text-gray-600">
-          {heading === ALL
-            ? "Nothing recorded yet. Record a supplier paid from the bank, or a card payment, with its receipt. Bills marked paid outside Expendi show here too."
-            : "Nothing recorded under this heading."}
-        </Text>
-      ) : (
-        <View className="gap-3">
-          {items.map((item) => (
-            <SpendingRow
-              key={item.id}
-              spending={item}
-              onPress={() =>
-                router.push({
-                  pathname: "/spending/[spendingId]",
-                  params: { spendingId: item.id },
-                })
-              }
-            />
-          ))}
-          {spending.hasNextPage ? (
-            <Button
-              label="Show more"
-              variant="secondary"
-              loading={spending.isFetchingNextPage}
-              onPress={() => void spending.fetchNextPage()}
-            />
-          ) : null}
-        </View>
-      )}
-    </Screen>
-  );
-}
+        }
+      />
+      <ScrollView
+        contentContainerClassName="mx-auto w-full max-w-3xl gap-5 px-5 pb-10 pt-4"
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={spending.isRefetching}
+            onRefresh={() => void spending.refetch()}
+            tintColor={colors.brandStrong}
+            colors={[colors.brandStrong]}
+          />
+        }
+      >
+        <FilterPills
+          label="Heading"
+          options={HEADING_FILTERS}
+          value={heading}
+          onChange={setHeading}
+        />
 
-function SpendingRow({
-  spending,
-  onPress,
-}: {
-  spending: CompanySpending;
-  onPress: () => void;
-}): JSX.Element {
-  const amount = `KES ${formatKesCents(spending.amountKes)}`;
-  const summary = spendingSummary(spending);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${spending.merchant}, ${amount}, ${summary}${spending.noReceipt ? ", no receipt" : ""}`}
-      onPress={onPress}
-      className="gap-2 rounded-xl border border-gray-200 px-4 py-3 active:bg-gray-50"
-    >
-      <View className="flex-row items-start justify-between gap-3">
-        <View className="flex-1 gap-0.5">
-          <Text className="text-base font-semibold text-gray-900">
-            {spending.merchant}
-          </Text>
-          <Text className="text-sm text-gray-600">{summary}</Text>
-        </View>
-        <Text className="text-base font-semibold text-gray-900">{amount}</Text>
-      </View>
-      <View className="flex-row flex-wrap gap-2">
-        <Badge label={HEADING_LABELS[spending.overviewHeading]} />
-        {spending.noReceipt ? (
-          <Badge label="No receipt" tone="warning" />
-        ) : null}
-        {spending.bill ? <Badge label="From a bill" /> : null}
-      </View>
-      <WarningBadges warnings={spending.warnings} />
-    </Pressable>
+        {spending.isPending ? (
+          <SoftGroupSkeleton rows={4} label="Loading company spending" />
+        ) : spending.isError ? (
+          <LoadError
+            message={describeApiError(spending.error)}
+            retrying={spending.isFetching}
+            onRetry={() => void spending.refetch()}
+          />
+        ) : items.length === 0 ? (
+          <EmptyState
+            icon={Receipt}
+            title={heading === ALL ? "Nothing recorded yet" : "Nothing under this heading"}
+            message={
+              heading === ALL
+                ? "Record a supplier paid from the bank, or a card payment, with its receipt. Bills marked paid outside Expendi show here too."
+                : "Try another heading, or record spending under this one."
+            }
+          />
+        ) : (
+          <>
+            <SoftGroup>
+              {items.map((item) => {
+                const meta = spendingRowMeta(item, today);
+                return (
+                  <ItemRow
+                    key={item.id}
+                    title={item.merchant}
+                    meta={meta.text}
+                    metaTone={meta.needsAttention ? "negative" : "default"}
+                    amount={formatKesCents(item.amountKes)}
+                    icon={Building2}
+                    iconTone={meta.needsAttention ? "negative" : "brand"}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/spending/[spendingId]",
+                        params: { spendingId: item.id },
+                      })
+                    }
+                  />
+                );
+              })}
+            </SoftGroup>
+            {spending.hasNextPage ? (
+              <Button
+                label="Show more"
+                variant="secondary"
+                loading={spending.isFetchingNextPage}
+                onPress={() => void spending.fetchNextPage()}
+              />
+            ) : null}
+          </>
+        )}
+
+        <Button
+          label="Paid-from accounts"
+          variant="secondary"
+          onPress={() => router.push("/spending/accounts")}
+        />
+      </ScrollView>
+    </View>
   );
 }

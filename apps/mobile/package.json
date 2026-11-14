@@ -16,6 +16,7 @@
     "release:submit:ios": "pnpm dlx eas-cli submit --profile production --platform ios",
     "release:update": "pnpm dlx eas-cli update --channel production --environment production",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
+    "preview": "xcrun simctl openurl booted 'expendi-business://preview?screen=home'",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

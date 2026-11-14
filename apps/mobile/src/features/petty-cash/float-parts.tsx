@@ -106,7 +106,7 @@ function SpendingRow({ spending }: { spending: FloatSpending }): JSX.Element {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${spending.merchant}, ${kes(spending.amountKes)}, open the claim for the extra`}
+      accessibilityLabel={`${spending.merchant}, ${kes(spending.amountKes)}, open the reimbursement for the extra`}
       onPress={() =>
         router.push({
           pathname: "/claims/[claimId]",

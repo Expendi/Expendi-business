@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 
 import type { Company } from "~/features/company/company-provider";
@@ -7,6 +7,7 @@ import { Screen } from "~/components/screen";
 import { ClaimEditor } from "~/features/claims/claim-editor";
 import { CompanyPinCard } from "~/features/claims/company-pin-card";
 import { localIsoDate } from "~/features/claims/dates";
+import { parseEvidence } from "~/features/claims/evidence";
 import { RequireCompany } from "~/features/claims/require-company";
 import { useSubmitClaim } from "~/features/claims/use-claims";
 
@@ -22,6 +23,7 @@ function NewClaimScreen({ company }: { company: Company }): JSX.Element {
   const router = useRouter();
   const submit = useSubmitClaim(company.organizationId);
   const [today] = useState(() => localIsoDate(new Date()));
+  const { evidence } = useLocalSearchParams<{ evidence?: string }>();
 
   return (
     <Screen belowHeader>
@@ -39,7 +41,8 @@ function NewClaimScreen({ company }: { company: Company }): JSX.Element {
           etimsQrPayload: null,
         }}
         intro={<CompanyPinCard organizationId={company.organizationId} />}
-        submitLabel="Submit claim"
+        startWith={parseEvidence(evidence)}
+        submitLabel="Submit reimbursement"
         submitting={submit.isPending}
         submitError={submit.error}
         onSubmit={(request) =>

@@ -72,7 +72,7 @@ describe("overspendNotice", () => {
 
     // #then
     expect(notice).toBe(
-      "KES 700.00 comes from your float and KES 300.50 will be submitted as a claim for an admin to approve.",
+      "KES 700.00 comes from your float and KES 300.50 will be submitted as a reimbursement for an admin to approve.",
     );
   });
 
@@ -82,7 +82,7 @@ describe("overspendNotice", () => {
 
     // #then
     expect(notice).toBe(
-      "Nothing is left on your float, so KES 250.00 will be submitted as a claim for an admin to approve.",
+      "Nothing is left on your float, so KES 250.00 will be submitted as a reimbursement for an admin to approve.",
     );
   });
 

@@ -33,7 +33,7 @@ function EditClaimScreen({ company }: { company: Company }): JSX.Element {
   if (claim.isPending) {
     return (
       <Screen belowHeader>
-        <ActivityIndicator accessibilityLabel="Loading the claim" />
+        <ActivityIndicator accessibilityLabel="Loading the reimbursement" />
       </Screen>
     );
   }
@@ -44,10 +44,10 @@ function EditClaimScreen({ company }: { company: Company }): JSX.Element {
           message={
             claim.isError
               ? describeApiError(claim.error)
-              : "This claim can’t be changed after it’s approved."
+              : "This reimbursement can’t be changed after it’s approved."
           }
         />
-        <Button label="Back to the claim" onPress={() => router.back()} />
+        <Button label="Back to the reimbursement" onPress={() => router.back()} />
       </Screen>
     );
   }
@@ -128,7 +128,7 @@ function ClaimEdit({
           <RejectionNotice reason={claim.rejectedReason} />
         ) : undefined
       }
-      submitLabel={resubmitting ? "Resubmit claim" : "Save changes"}
+      submitLabel={resubmitting ? "Resubmit reimbursement" : "Save changes"}
       submitting={update.isPending}
       submitError={update.error}
       onSubmit={(request) => update.mutate(request, { onSuccess: onSaved })}

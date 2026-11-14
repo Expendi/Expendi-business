@@ -113,10 +113,6 @@ function RootNavigator(): JSX.Element {
           options={withHeader("Payment details")}
         />
         <Stack.Screen
-          name="(admin)/bills/index"
-          options={withHeader("Bills")}
-        />
-        <Stack.Screen
           name="(admin)/bills/new"
           options={withHeader("New bill")}
         />
@@ -170,15 +166,11 @@ function RootNavigator(): JSX.Element {
         />
         <Stack.Screen
           name="(admin)/approvals/index"
-          options={withHeader("Approvals")}
+          options={withHeader("Reimbursements")}
         />
         <Stack.Screen
           name="(admin)/approvals/[claimId]/pay"
-          options={withHeader("Approve & pay")}
-        />
-        <Stack.Screen
-          name="(admin)/payroll/index"
-          options={withHeader("Payroll")}
+          options={withHeader("Approve and pay")}
         />
         <Stack.Screen
           name="(admin)/payroll/salaries/index"
@@ -202,19 +194,19 @@ function RootNavigator(): JSX.Element {
         />
         <Stack.Screen
           name="(employee)/claims/index"
-          options={withHeader("Claims")}
+          options={withHeader("Reimbursements")}
         />
         <Stack.Screen
           name="(employee)/claims/new"
-          options={withHeader("New claim")}
+          options={withHeader("New reimbursement")}
         />
         <Stack.Screen
           name="(employee)/claims/[claimId]/index"
-          options={withHeader("Claim")}
+          options={withHeader("Reimbursement")}
         />
         <Stack.Screen
           name="(employee)/claims/[claimId]/edit"
-          options={withHeader("Edit claim")}
+          options={withHeader("Edit reimbursement")}
         />
         <Stack.Screen
           name="(employee)/cards/index"
@@ -276,6 +268,7 @@ function RootNavigator(): JSX.Element {
       <Stack.Protected guard={!isSignedIn}>
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
+      {__DEV__ ? <Stack.Screen name="preview" /> : null}
     </Stack>
   );
 }

@@ -13,7 +13,7 @@ import type { DraftChange } from "~/features/payroll/use-payroll";
 import { Badge } from "~/components/badge";
 import { Button } from "~/components/button";
 import { ConfirmSheet } from "~/components/confirm-sheet";
-import { ErrorMessage } from "~/components/error-message";
+import { LoadError } from "~/components/load-error";
 import { OptionPicker } from "~/components/option-picker";
 import { Screen } from "~/components/screen";
 import { Text } from "~/components/text";
@@ -21,7 +21,7 @@ import { TextField } from "~/components/text-field";
 import { BillStatusBadge } from "~/features/bills/bill-status";
 import { CashOutReceiptRows } from "~/features/cash-out/cash-out-receipt";
 import { ReviewRow } from "~/features/claims/claim-editor";
-import { formatIsoDate } from "~/features/claims/dates";
+import { formatShortDate, localIsoDate } from "~/features/claims/dates";
 import { RequireAdmin } from "~/features/company/require-admin";
 import { capRoom, RUN_STATUS_LABELS } from "~/features/payroll/payroll-display";
 import { progressInWords } from "~/features/payroll/payroll-payment";
@@ -55,12 +55,10 @@ function PayrollRunScreen({ company }: { company: Company }): JSX.Element {
   if (run.isError) {
     return (
       <Screen belowHeader>
-        <ErrorMessage message={describeApiError(run.error)} />
-        <Button
-          label="Try again"
-          variant="secondary"
-          loading={run.isFetching}
-          onPress={() => void run.refetch()}
+        <LoadError
+          message={describeApiError(run.error)}
+          retrying={run.isFetching}
+          onRetry={() => void run.refetch()}
         />
       </Screen>
     );
@@ -112,7 +110,7 @@ function RunSummary({ run }: { run: PayrollRunDetail }): JSX.Element {
           accessibilityRole="header"
           className="text-2xl font-bold text-gray-900"
         >
-          Pay day {formatIsoDate(run.payDate)}
+          Pay day {formatShortDate(run.payDate, localIsoDate(new Date()))}
         </Text>
         <Text className="text-3xl font-bold text-gray-900">
           KES {formatKesCents(run.totalKes)}
@@ -136,7 +134,7 @@ function RunSummary({ run }: { run: PayrollRunDetail }): JSX.Element {
           value={`KES ${formatKesCents(run.capKes)}: salaries of KES ${formatKesCents(run.salariesKes)} plus the company’s margin`}
         />
         {room.overCap ? (
-          <Text className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+          <Text className="rounded-2xl bg-error-50 p-4 text-sm text-error-700">
             This run is KES {formatKesCents(room.cents)} over its cap, so it
             can’t be paid as it is. Lower someone’s pay or leave someone out.
           </Text>
@@ -311,7 +309,7 @@ function PaymentCard({
       )}
       <CashOutReceiptRows receipts={payment.paymentReceipts} />
       {payment.payee.payoutPhoneConfirmed === false ? (
-        <Text className="text-sm text-amber-800">
+        <Text className="text-sm text-error-700">
           Hasn’t confirmed their M-Pesa number yet.
         </Text>
       ) : null}

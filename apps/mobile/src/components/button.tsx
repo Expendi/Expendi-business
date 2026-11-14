@@ -17,7 +17,7 @@ interface ButtonProps extends Omit<PressableProps, "children" | "disabled"> {
 
 const CONTAINER_CLASSES: Record<ButtonVariant, string> = {
   primary: "bg-brand-500",
-  secondary: "border border-gray-300 bg-white",
+  secondary: "bg-gray-100",
   ghost: "bg-transparent",
   danger: "bg-error-600",
 };
@@ -52,7 +52,7 @@ export function Button({
       accessibilityLabel={label}
       accessibilityState={{ disabled: inactive, busy: loading }}
       disabled={inactive}
-      className={`min-h-[52px] flex-row items-center justify-center gap-2 rounded-xl px-4 py-3 active:opacity-80 ${CONTAINER_CLASSES[variant]} ${inactive ? "opacity-50" : ""} ${className ?? ""}`}
+      className={`min-h-14 flex-row items-center justify-center gap-2 rounded-2xl px-5 py-3 active:opacity-80 ${CONTAINER_CLASSES[variant]} ${inactive ? "opacity-50" : ""} ${className ?? ""}`}
       {...pressableProps}
     >
       {loading ? (
@@ -66,7 +66,7 @@ export function Button({
         />
       ) : null}
       <Text
-        className={`shrink text-center text-base font-semibold leading-6 ${LABEL_CLASSES[variant]}`}
+        className={`shrink text-center text-[17px] font-semibold leading-6 ${LABEL_CLASSES[variant]}`}
       >
         {label}
       </Text>

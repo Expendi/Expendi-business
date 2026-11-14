@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, Pressable, View } from "react-native";
 
 import { MAX_RECEIPTS_PER_CLAIM } from "@expendi-business/shared";
@@ -20,26 +20,40 @@ export function ReceiptPicker({
   error,
   disabled = false,
   label = "Receipt",
+  autoOpenCamera = false,
 }: {
   receipts: ReceiptSlots;
   error?: string | null;
   disabled?: boolean;
   label?: string;
+  /** Opens the camera once, as soon as the picker appears. */
+  autoOpenCamera?: boolean;
 }): JSX.Element {
   const [pickError, setPickError] = useState<string | null>(null);
   const full = receipts.slots.length >= MAX_RECEIPTS_PER_CLAIM;
+  const autoOpened = useRef(false);
 
-  async function pick(source: ReceiptSource): Promise<void> {
-    setPickError(null);
-    try {
-      const result = await pickReceiptImage(source);
-      if (result.status === "picked") receipts.add(result.image, source);
-      if (result.status === "no-camera-access") setPickError(NO_CAMERA);
-    } catch (cause) {
-      console.warn("[claims] image picker failed", cause);
-      setPickError(PICKER_FAILED);
-    }
-  }
+  const { add } = receipts;
+  const pick = useCallback(
+    async (source: ReceiptSource): Promise<void> => {
+      setPickError(null);
+      try {
+        const result = await pickReceiptImage(source);
+        if (result.status === "picked") add(result.image, source);
+        if (result.status === "no-camera-access") setPickError(NO_CAMERA);
+      } catch (cause) {
+        console.warn("[claims] image picker failed", cause);
+        setPickError(PICKER_FAILED);
+      }
+    },
+    [add],
+  );
+
+  useEffect(() => {
+    if (!autoOpenCamera || autoOpened.current) return;
+    autoOpened.current = true;
+    void pick("camera");
+  }, [autoOpenCamera, pick]);
 
   return (
     <View className="gap-3">
