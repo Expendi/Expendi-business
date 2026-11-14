@@ -1,8 +1,14 @@
 # Expendi Business
 
-B2B stablecoin finance for African startups. The current Kenya MVP brings staff claims, petty cash, supplier bills, subscriptions and salary payments into one workspace, with mobile, customer web and internal operations apps.
+**Stablecoin finance for African companies, built on NEAR.** Hold your money in USDC, pay anyone in local currency, and keep your balance and payments private.
 
-Companies hold USDC on NEAR in wallets managed by Expendi. The payment engine supports KES payouts to M-Pesa numbers, Tills, Paybills and Kenyan bank accounts, plus USDC transfers to NEAR, Base and Solana. Staff claims currently reimburse to verified M-Pesa numbers; payroll currently pays fixed net salaries in KES.
+- **Hold.** Each company's USDC sits in its own account on NEAR, inside a NEAR Intents confidential account, so the public chain doesn't show its balance or who it pays. Idle cash can earn in Treasury.
+- **Get paid.** Send invoices in US dollars. Customers pay in USDC from Base, Ethereum, Arbitrum or Solana, with no account.
+- **Pay.** Supplier bills, subscriptions, payroll, staff claims and petty cash, each approved with a passkey. Payees get local currency on local payment rails, such as mobile money and bank accounts (in Kenya: M-Pesa, Tills, Paybills and banks), or USDC on NEAR, Base or Solana.
+- **Spend.** Staff cards with monthly limits, and company-held cards for subscriptions (Lithic sandbox for now).
+- **Close the month.** Receipts, accountant exports and Zoho Books sync.
+
+Companies never touch a gas token: Expendi's relayer pays every NEAR fee. It starts with Kenya, where it runs today on a web dashboard, an Android app and an internal operations console, and is built to add more countries' currencies and payment rails. In Kenya, staff claims reimburse to verified mobile money numbers, and payroll pays fixed net salaries in KES.
 
 ## Demo video
 
