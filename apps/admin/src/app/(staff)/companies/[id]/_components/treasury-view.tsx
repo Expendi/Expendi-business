@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ChevronRightIcon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 
 import type {
@@ -33,21 +34,41 @@ const MOVE_TONES: Record<StaffTreasuryMove["status"], StatusTone> = {
   needs_review: "waiting",
 };
 
+const NONE = <span className="text-muted-foreground">-</span>;
+
+/** Long hashes keep their first and last six characters, so two rows can still be told apart. */
+export function shortHash(hash: string): string {
+  return hash.length > 16 ? `${hash.slice(0, 8)}…${hash.slice(-6)}` : hash;
+}
+
 function Hash({ hash }: { hash: string }) {
   return (
     <a
       href={transactionUrl(hash)}
       target="_blank"
       rel="noreferrer"
-      className={`${linkClass} font-mono text-xs break-all`}
+      title={hash}
+      className={`${linkClass} font-mono text-xs whitespace-nowrap`}
     >
-      {hash}
+      {shortHash(hash)}
     </a>
   );
 }
 
+function Id({ value }: { value: string | null }) {
+  if (value === null) return NONE;
+  return (
+    <span
+      title={value}
+      className="block max-w-[14ch] truncate font-mono text-xs"
+    >
+      {value}
+    </span>
+  );
+}
+
 function Hashes({ hashes }: { hashes: readonly string[] }) {
-  if (hashes.length === 0) return <>—</>;
+  if (hashes.length === 0) return NONE;
   return (
     <>
       {hashes.map((hash) => (
@@ -83,19 +104,43 @@ function Evidence({
   children: ReactNode;
 }) {
   return (
-    <div className="mt-4">
-      <h4 className="text-sm font-medium">{title}</h4>
+    <section className="mt-5">
+      <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
       {empty === null ? (
-        <div className="mt-2 overflow-x-auto">{children}</div>
+        <div className="mt-2 overflow-x-auto rounded-lg border">{children}</div>
       ) : (
         <p className="mt-1 text-sm text-muted-foreground">{empty}</p>
       )}
-    </div>
+    </section>
   );
 }
 
-const headCell = "px-3 py-2 text-xs font-medium text-muted-foreground";
+const headCell =
+  "bg-muted/50 px-3 py-2 text-xs font-medium whitespace-nowrap text-muted-foreground";
 const cell = "px-3 py-2 align-top";
+const amountCell = `${cell} text-right tabular-nums whitespace-nowrap`;
+
+function HeadRow({
+  titles,
+  amounts,
+}: {
+  titles: readonly string[];
+  amounts: readonly string[];
+}) {
+  return (
+    <tr>
+      {titles.map((title) => (
+        <th
+          key={title}
+          scope="col"
+          className={`${headCell} ${amounts.includes(title) ? "text-right" : ""}`}
+        >
+          {title}
+        </th>
+      ))}
+    </tr>
+  );
+}
 
 function Quotes({ quotes }: { quotes: readonly StaffTreasuryQuote[] }) {
   return (
@@ -105,8 +150,8 @@ function Quotes({ quotes }: { quotes: readonly StaffTreasuryQuote[] }) {
     >
       <table className="w-full text-left text-sm" aria-label="Intent quotes">
         <thead>
-          <tr>
-            {[
+          <HeadRow
+            titles={[
               "Quote",
               "Status",
               "1Click",
@@ -114,12 +159,9 @@ function Quotes({ quotes }: { quotes: readonly StaffTreasuryQuote[] }) {
               "Delivered",
               "Refunded",
               "Transactions",
-            ].map((title) => (
-              <th key={title} scope="col" className={headCell}>
-                {title}
-              </th>
-            ))}
-          </tr>
+            ]}
+            amounts={["Sent", "Delivered", "Refunded"]}
+          />
         </thead>
         <tbody>
           {quotes.map((quote) => (
@@ -128,7 +170,7 @@ function Quotes({ quotes }: { quotes: readonly StaffTreasuryQuote[] }) {
                 <Link href={`/intent-quotes/${quote.id}`} className={linkClass}>
                   {INTENT_QUOTE_PURPOSE_LABELS[quote.purpose]}
                 </Link>
-                <span className="block text-xs text-muted-foreground">
+                <span className="block text-xs whitespace-nowrap text-muted-foreground">
                   {formatNairobiTime(quote.createdAt)}
                 </span>
               </td>
@@ -138,15 +180,15 @@ function Quotes({ quotes }: { quotes: readonly StaffTreasuryQuote[] }) {
                   <span className="mt-1 block text-xs">{quote.failure}</span>
                 ) : null}
               </td>
-              <td className={cell}>{quote.oneClickStatus ?? "—"}</td>
-              <td className={cell}>{formatUsdc(quote.amountIn)}</td>
-              <td className={cell}>
+              <td className={cell}>{quote.oneClickStatus ?? NONE}</td>
+              <td className={amountCell}>{formatUsdc(quote.amountIn)}</td>
+              <td className={amountCell}>
                 {quote.swappedAmountOut
                   ? formatUsdc(quote.swappedAmountOut)
                   : `${formatUsdc(quote.amountOut)} quoted`}
               </td>
-              <td className={cell}>
-                {quote.refundedAmount ? formatUsdc(quote.refundedAmount) : "—"}
+              <td className={amountCell}>
+                {quote.refundedAmount ? formatUsdc(quote.refundedAmount) : NONE}
               </td>
               <td className={cell}>
                 <Hashes hashes={quoteTransactions(quote)} />
@@ -168,8 +210,8 @@ function EarnActions({ move }: { move: StaffTreasuryMove }) {
     >
       <table className="w-full text-left text-sm" aria-label="Earn actions">
         <thead>
-          <tr>
-            {[
+          <HeadRow
+            titles={[
               "Kind",
               "Attempt",
               "Reference",
@@ -178,20 +220,17 @@ function EarnActions({ move }: { move: StaffTreasuryMove }) {
               "Delivered",
               "Privy action",
               "Transaction",
-            ].map((title) => (
-              <th key={title} scope="col" className={headCell}>
-                {title}
-              </th>
-            ))}
-          </tr>
+            ]}
+            amounts={["Amount", "Delivered"]}
+          />
         </thead>
         <tbody>
           {earnActions.map((action) => (
             <tr key={action.id} className="border-t">
               <td className={cell}>{action.kind}</td>
               <td className={cell}>{action.attempt}</td>
-              <td className={`${cell} font-mono text-xs break-all`}>
-                {action.referenceId}
+              <td className={cell}>
+                <Id value={action.referenceId} />
               </td>
               <td className={cell}>
                 {action.status}
@@ -199,12 +238,12 @@ function EarnActions({ move }: { move: StaffTreasuryMove }) {
                   <span className="block text-xs">{action.failure}</span>
                 ) : null}
               </td>
-              <td className={cell}>{formatUsdc(action.rawAmount)}</td>
-              <td className={cell}>
-                {action.deliveredUsdc ? formatUsdc(action.deliveredUsdc) : "—"}
+              <td className={amountCell}>{formatUsdc(action.rawAmount)}</td>
+              <td className={amountCell}>
+                {action.deliveredUsdc ? formatUsdc(action.deliveredUsdc) : NONE}
               </td>
-              <td className={`${cell} font-mono text-xs break-all`}>
-                {action.privyActionId ?? "—"}
+              <td className={cell}>
+                <Id value={action.privyActionId} />
               </td>
               <td className={cell}>
                 <Hashes hashes={action.txHash ? [action.txHash] : []} />
@@ -226,20 +265,19 @@ function LedgerRows({ move }: { move: StaffTreasuryMove }) {
     >
       <table className="w-full text-left text-sm" aria-label="Ledger rows">
         <thead>
-          <tr>
-            {["Time", "Type", "Amount", "Transaction"].map((title) => (
-              <th key={title} scope="col" className={headCell}>
-                {title}
-              </th>
-            ))}
-          </tr>
+          <HeadRow
+            titles={["Time", "Type", "Amount", "Transaction"]}
+            amounts={["Amount"]}
+          />
         </thead>
         <tbody>
           {ledger.map((row) => (
             <tr key={row.id} className="border-t">
-              <td className={cell}>{formatNairobiTime(row.createdAt)}</td>
+              <td className={`${cell} whitespace-nowrap`}>
+                {formatNairobiTime(row.createdAt)}
+              </td>
               <td className={cell}>{row.type}</td>
-              <td className={cell}>{formatUsdc(row.usdcAmount)}</td>
+              <td className={amountCell}>{formatUsdc(row.usdcAmount)}</td>
               <td className={cell}>
                 <Hashes hashes={row.txHash ? [row.txHash] : []} />
               </td>
@@ -251,6 +289,31 @@ function LedgerRows({ move }: { move: StaffTreasuryMove }) {
   );
 }
 
+/** A move that still needs someone opens expanded, so its staff action is in view. */
+const MOVE_STARTS_OPEN: Record<StaffTreasuryMove["status"], boolean> = {
+  open: true,
+  needs_review: true,
+  failed: false,
+  returned: false,
+  completed: false,
+};
+
+/** The summary row hides its figures on a phone, so the details repeat them there only. */
+const phoneOnly = "sm:hidden";
+const phoneOnlyLabel = "text-muted-foreground sm:hidden";
+
+const moveGrid =
+  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 sm:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))_1.25rem]";
+
+function MoveFigure({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="hidden text-right tabular-nums sm:block">
+      <span className="sr-only">{label} </span>
+      {value}
+    </div>
+  );
+}
+
 function Move({
   move,
   actions,
@@ -258,72 +321,154 @@ function Move({
   move: StaffTreasuryMove;
   actions: ReactNode;
 }) {
+  const label = DIRECTION_LABELS[move.direction];
+  const settled = move.movedUsdc ? formatUsdc(move.movedUsdc) : "Not settled";
+  const cost = move.costUsdc ? formatUsdc(move.costUsdc) : "Not settled";
   return (
-    <article
-      aria-label={`${DIRECTION_LABELS[move.direction]} ${move.id}`}
-      className="border-t px-4 py-4 sm:px-6"
+    <details
+      aria-label={`${label} ${move.id}`}
+      open={MOVE_STARTS_OPEN[move.status]}
+      className="group/move border-t first:border-t-0"
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-semibold">
-          {DIRECTION_LABELS[move.direction]}
-        </h3>
-        <StatusBadge tone={MOVE_TONES[move.status]}>
-          {move.status.replace("_", " ")}
-        </StatusBadge>
-        <span className="text-xs text-muted-foreground">
-          {formatNairobiTime(move.createdAt)}
-        </span>
+      <summary
+        className={`${moveGrid} cursor-pointer list-none px-4 py-3 text-sm hover:bg-muted/40 sm:px-6 [&::-webkit-details-marker]:hidden`}
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-medium">{label}</h3>
+            <StatusBadge tone={MOVE_TONES[move.status]}>
+              {move.status.replace("_", " ")}
+            </StatusBadge>
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {formatNairobiTime(move.createdAt)}
+          </p>
+        </div>
+        <MoveFigure
+          label="Asked"
+          value={`${move.isAll ? "All, " : ""}${formatUsdc(move.requestedUsdc)}`}
+        />
+        <MoveFigure
+          label={move.direction === "to_treasury" ? "In the vault" : "Credited"}
+          value={settled}
+        />
+        <MoveFigure label="Cost" value={cost} />
+        <ChevronRightIcon
+          aria-hidden
+          className="size-4 justify-self-end text-muted-foreground transition-transform group-open/move:rotate-90"
+        />
+      </summary>
+      <div className="bg-muted/20 px-4 pt-1 pb-5 sm:px-6">
+        <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
+          <dt className="text-muted-foreground">Move</dt>
+          <dd className="font-mono text-xs leading-5 break-all">{move.id}</dd>
+          <dt className={phoneOnlyLabel}>Asked</dt>
+          <dd className={`${phoneOnly} tabular-nums`}>
+            {move.isAll ? "All of it, " : ""}
+            {formatUsdc(move.requestedUsdc)}
+          </dd>
+          <dt className={phoneOnlyLabel}>
+            {move.direction === "to_treasury" ? "In the vault" : "Credited"}
+          </dt>
+          <dd className={`${phoneOnly} tabular-nums`}>{settled}</dd>
+          <dt className={phoneOnlyLabel}>Cost</dt>
+          <dd className={`${phoneOnly} tabular-nums`}>{cost}</dd>
+          {move.failure ? (
+            <>
+              <dt className="text-muted-foreground">Why</dt>
+              <dd className="wrap-anywhere">{move.failure}</dd>
+            </>
+          ) : null}
+        </dl>
+        <Quotes quotes={move.quotes} />
+        <EarnActions move={move} />
+        <LedgerRows move={move} />
+        {actions ? <div className="mt-5">{actions}</div> : null}
       </div>
-      <p className="mt-1 font-mono text-xs break-all text-muted-foreground">
-        {move.id}
-      </p>
-      <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]">
-        <dt className="text-muted-foreground">Asked</dt>
-        <dd>
-          {move.isAll ? "All of it, " : ""}
-          {formatUsdc(move.requestedUsdc)}
-        </dd>
-        <dt className="text-muted-foreground">
-          {move.direction === "to_treasury" ? "In the vault" : "Credited"}
-        </dt>
-        <dd>{move.movedUsdc ? formatUsdc(move.movedUsdc) : "Not settled"}</dd>
-        <dt className="text-muted-foreground">Cost</dt>
-        <dd>{move.costUsdc ? formatUsdc(move.costUsdc) : "Not settled"}</dd>
-        {move.failure ? (
-          <>
-            <dt className="text-muted-foreground">Why</dt>
-            <dd className="wrap-anywhere">{move.failure}</dd>
-          </>
-        ) : null}
-      </dl>
-      <Quotes quotes={move.quotes} />
-      <EarnActions move={move} />
-      <LedgerRows move={move} />
-      {actions}
-    </article>
+    </details>
+  );
+}
+
+function Figure({
+  label,
+  value,
+  lead = false,
+}: {
+  label: string;
+  value: string;
+  lead?: boolean;
+}) {
+  return (
+    <div className="px-4 py-3 sm:px-5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd
+        className={`mt-1 tabular-nums ${lead ? "text-xl font-semibold" : "text-base font-medium"}`}
+      >
+        {value}
+      </dd>
+    </div>
   );
 }
 
 function Position({ position }: { position: TreasuryOn["position"] }) {
   if (position.state === "unreadable") {
     return (
-      <div role="alert" className="text-sm">
+      <div
+        role="alert"
+        className="rounded-lg border border-warn-600/30 bg-warn-50 px-4 py-3 text-sm text-warn-700"
+      >
         Couldn&apos;t read Privy: {position.message}. The moves below are from
         Expendi&apos;s own records.
       </div>
     );
   }
   return (
-    <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]">
-      <dt className="text-muted-foreground">Value in the vault</dt>
-      <dd>{formatUsdc(position.assetsInVault)}</dd>
-      <dt className="text-muted-foreground">Total deposited</dt>
-      <dd>{formatUsdc(position.totalDeposited)}</dd>
-      <dt className="text-muted-foreground">Total withdrawn</dt>
-      <dd>{formatUsdc(position.totalWithdrawn)}</dd>
-      <dt className="text-muted-foreground">Read from Privy</dt>
-      <dd>{formatNairobiTime(position.readAt)}</dd>
+    <dl className="grid grid-cols-1 divide-y rounded-lg border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <Figure
+        label="Value in the vault"
+        value={formatUsdc(position.assetsInVault)}
+        lead
+      />
+      <Figure
+        label="Total deposited"
+        value={formatUsdc(position.totalDeposited)}
+      />
+      <Figure
+        label="Total withdrawn"
+        value={formatUsdc(position.totalWithdrawn)}
+      />
     </dl>
+  );
+}
+
+function Alerts({ alerts }: { alerts: TreasuryOn["alerts"] }) {
+  if (alerts.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">No open Treasury alerts.</p>
+    );
+  }
+  return (
+    <div
+      role="alert"
+      className="flex gap-3 rounded-lg border border-warn-600/30 bg-warn-50 px-4 py-3 text-sm text-warn-700"
+    >
+      <TriangleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
+      <ul className="space-y-1">
+        {alerts.map((alert) => (
+          <li key={alert.id}>
+            <Link
+              href="/alerts"
+              className="font-medium underline-offset-4 hover:underline"
+            >
+              {alert.title}
+            </Link>{" "}
+            <span className="text-xs opacity-80">
+              open since {formatNairobiTime(alert.openedAt)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -343,57 +488,55 @@ export function TreasuryView({
   if (treasury.status === "off") {
     return <PageEmpty title="Treasury isn't turned on for this company." />;
   }
+  const { position } = treasury;
   return (
     <div>
-      <div className="space-y-4 px-4 py-4 sm:px-6">
-        <p className="text-sm">
-          <span className="text-muted-foreground">
-            Treasury wallet on Base{" "}
+      <div className="space-y-4 px-4 py-5 sm:px-6">
+        <Alerts alerts={treasury.alerts} />
+        <Position position={position} />
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span>
+            Wallet on Base{" "}
+            <a
+              href={basescanAddressUrl(treasury.address)}
+              target="_blank"
+              rel="noreferrer"
+              title={treasury.address}
+              className={`${linkClass} font-mono`}
+            >
+              {shortHash(treasury.address)}
+            </a>
           </span>
-          <a
-            href={basescanAddressUrl(treasury.address)}
-            target="_blank"
-            rel="noreferrer"
-            className={`${linkClass} font-mono text-xs break-all`}
-          >
-            {treasury.address}
-          </a>
-          <span className="block text-xs text-muted-foreground">
-            Turned on {formatNairobiTime(treasury.turnedOnAt)}
-          </span>
-        </p>
-        <Position position={treasury.position} />
-        <div>
-          <h3 className="text-sm font-medium">Open alerts</h3>
-          {treasury.alerts.length === 0 ? (
-            <p className="mt-1 text-sm text-muted-foreground">
-              No open Treasury alerts.
-            </p>
-          ) : (
-            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
-              {treasury.alerts.map((alert) => (
-                <li key={alert.id}>
-                  <Link href="/alerts" className={linkClass}>
-                    {alert.title}
-                  </Link>{" "}
-                  <span className="text-xs text-muted-foreground">
-                    open since {formatNairobiTime(alert.openedAt)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+          <span>Turned on {formatNairobiTime(treasury.turnedOnAt)}</span>
+          {position.state === "unreadable" ? null : (
+            <span>Read from Privy {formatNairobiTime(position.readAt)}</span>
           )}
-        </div>
-      </div>
-      {treasury.moves.length === 0 ? (
-        <p className="border-t px-4 py-4 text-sm text-muted-foreground sm:px-6">
-          No moves yet.
         </p>
-      ) : (
-        treasury.moves.map((move) => (
-          <Move key={move.id} move={move} actions={renderActions(move)} />
-        ))
-      )}
+      </div>
+      <div className="border-t">
+        <div
+          className={`${moveGrid} px-4 py-2 text-xs font-medium text-muted-foreground sm:px-6`}
+        >
+          <h3>
+            Moves <span className="font-normal">({treasury.moves.length})</span>
+          </h3>
+          <span className="hidden text-right sm:block">Asked</span>
+          <span className="hidden text-right sm:block">Settled</span>
+          <span className="hidden text-right sm:block">Cost</span>
+          <span aria-hidden />
+        </div>
+        {treasury.moves.length === 0 ? (
+          <p className="border-t px-4 py-4 text-sm text-muted-foreground sm:px-6">
+            No moves yet.
+          </p>
+        ) : (
+          <div className="border-t">
+            {treasury.moves.map((move) => (
+              <Move key={move.id} move={move} actions={renderActions(move)} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

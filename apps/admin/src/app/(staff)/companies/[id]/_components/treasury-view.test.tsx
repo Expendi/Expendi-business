@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { StaffTreasury } from "@expendi-business/shared";
 import { staffTreasurySchema } from "@expendi-business/shared";
 
-import { quoteTransactions, TreasuryView } from "./treasury-view";
+import { quoteTransactions, shortHash, TreasuryView } from "./treasury-view";
 
 const ID = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -254,9 +254,32 @@ describe("TreasuryView", () => {
     expect(html).not.toContain(`[actions ${ID(1)}]`);
   });
 
+  it("opens the move under review and leaves the settled one folded", () => {
+    // #when
+    const html = render(on());
+
+    // #then
+    expect(html).toMatch(
+      new RegExp(`<details aria-label="Move to wallet ${ID(2)}"[^>]* open=""`),
+    );
+    expect(html).not.toMatch(
+      new RegExp(
+        `<details aria-label="Move to Treasury ${ID(1)}"[^>]* open=""`,
+      ),
+    );
+  });
+
   it("says when there are no moves yet", () => {
     // #then
     expect(render(on({ moves: [] }))).toContain("No moves yet.");
+  });
+});
+
+describe("shortHash", () => {
+  it("keeps both ends of a long hash and leaves a short one alone", () => {
+    // #then
+    expect(shortHash(BASE_TX)).toBe("0xcdcdcd…cdcdcd");
+    expect(shortHash("tr-deposit-1")).toBe("tr-deposit-1");
   });
 });
 
