@@ -32,6 +32,8 @@ Sign in with a Privy test account. It takes a fixed code, so no inbox is needed.
 3. Code: `______` <!-- TODO: fixed code from Privy dashboard → User management → Authentication → Test accounts -->
 4. Pick **Expendi Demo Co**, the staging demo company, if asked.
 
+The test account is an **admin** of Expendi Demo Co, so every page and action an admin has is open to it.
+
 Things to try:
 
 - **Overview** and **Accounts**: the company wallet's USDC on NEAR, and the Treasury account earning on Base.
