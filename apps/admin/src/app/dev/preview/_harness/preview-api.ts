@@ -15,6 +15,7 @@ import {
   intentQuoteDetail,
 } from "./fixtures/intent-quotes";
 import { payoutDetail, PAYOUTS } from "./fixtures/payouts";
+import { TREASURY } from "./fixtures/treasury";
 import {
   ZOHO_ACCOUNTS,
   ZOHO_ORGANIZATIONS,
@@ -76,6 +77,10 @@ const ROUTES: readonly Route[] = [
   {
     pattern: /^\/internal\/companies\/([^/]+)\/zoho$/,
     respond: () => ZOHO_STATUS,
+  },
+  {
+    pattern: /^\/internal\/companies\/([^/]+)\/treasury$/,
+    respond: () => TREASURY,
   },
   {
     pattern: /^\/internal\/companies\/([^/]+)$/,
