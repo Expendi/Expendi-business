@@ -6,22 +6,22 @@ Companies hold USDC on NEAR in wallets managed by Expendi. The payment engine su
 
 ## Demo video
 
-<!-- DEMO VIDEO: replace this block with the YouTube/Loom link or an embedded thumbnail, e.g.
-[![Expendi Business on NEAR](docs/client/demo-thumbnail.png)](https://youtu.be/VIDEO_ID) -->
+[![Expendi Business on NEAR: demo video](docs/demo/demo-thumbnail.png)](docs/demo/expendi-business-near.mp4)
 
-> **Demo video:** _coming soon_ (link goes here)
+**[Watch the demo (2 min 54 s)](docs/demo/expendi-business-near.mp4)**: the web dashboard, the mobile app and the ops dashboard, running on NEAR.
 
 ## Try it on staging
 
 Staging runs the NEAR build on **NEAR mainnet** with small, real USDC amounts. NEAR Intents has no testnet.
 
-| What                                     | Link                                                                                                            | Who can open it                     |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| Customer dashboard                       | <https://staging.business.expendi.app>                                                                          | Anyone, with the test account below |
-| Invoice pay page (customer side)         | `https://staging.business.expendi.app/pay/<invoice-id>`, from an invoice's **Copy pay link**                    | Anyone with the link, no sign-in    |
-| API                                      | <https://api-staging-d6415b7f.up.railway.app> (health: `/health`)                                               | Called by the apps                  |
-| Ops dashboard (Expendi staff)            | <https://staging.business-admin.expendi.app>                                                                    | Expendi staff only, behind Vercel   |
-| Explorer: a company wallet on mainnet    | [nearblocks.io](https://nearblocks.io/address/cfe4f640d78bd13a6cbefd5301f94466d24fdca2790ef0d46f135cd1bd312d02) | Anyone                              |
+| What                                    | Link                                                                                                            | Who can open it                                |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Customer dashboard                      | <https://staging.business.expendi.app>                                                                          | Anyone, with the test account below            |
+| Android app (Google Play, open testing) | <https://play.google.com/store/apps/details?id=app.expendi.business>                                            | Anyone on Android, with the test account below |
+| Invoice pay page (customer side)        | `https://staging.business.expendi.app/pay/<invoice-id>`, from an invoice's **Copy pay link**                    | Anyone with the link, no sign-in               |
+| API                                     | <https://api-staging-d6415b7f.up.railway.app> (health: `/health`)                                               | Called by the apps                             |
+| Ops dashboard (Expendi staff)           | <https://staging.business-admin.expendi.app>                                                                    | Expendi staff only, behind Vercel              |
+| Explorer: a company wallet on mainnet   | [nearblocks.io](https://nearblocks.io/address/cfe4f640d78bd13a6cbefd5301f94466d24fdca2790ef0d46f135cd1bd312d02) | Anyone                                         |
 
 ### Test account
 
@@ -31,6 +31,8 @@ Sign in with a Privy test account. It takes a fixed code, so no inbox is needed.
 2. Email: `test-4960@privy.io`
 3. Code: `______` <!-- TODO: fixed code from Privy dashboard → User management → Authentication → Test accounts -->
 4. Pick **Expendi Demo Co**, the staging demo company, if asked.
+
+The Android app uses the same test account and the same staging data. Install it from Google Play; it's in open testing, so Play may ask you to join the test first.
 
 The test account is an **admin** of Expendi Demo Co, so every page and action an admin has is open to it.
 
