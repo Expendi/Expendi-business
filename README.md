@@ -29,7 +29,7 @@ Sign in with a Privy test account. It takes a fixed code, so no inbox is needed.
 
 1. Open <https://staging.business.expendi.app> and choose **Sign in with email**.
 2. Email: `test-4960@privy.io`
-3. Code: `______` <!-- TODO: fixed code from Privy dashboard → User management → Authentication → Test accounts -->
+3. Code: `458340`
 4. Pick **Expendi Demo Co**, the staging demo company, if asked.
 
 The Android app uses the same test account and the same staging data. Install it from Google Play; it's in open testing, so Play may ask you to join the test first.
