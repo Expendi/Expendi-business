@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import type { Withdrawal, WithdrawalAddress } from "@expendi-business/shared";
-import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
+import { PAYEE_CHAIN_NAMES, spendableUsdc } from "@expendi-business/shared";
 
 import type { PickerOption } from "~/components/option-picker";
 import type { Company } from "~/features/company/company-provider";
@@ -111,7 +111,7 @@ function WithdrawFlow({ company }: { company: Company }): JSX.Element {
   ) : (
     <WithdrawForm
       addresses={addresses.data}
-      balance={wallet.data.usdcBalance}
+      balance={spendableUsdc(wallet.data)}
       onReview={(address, amountUsdc) =>
         setDraft({ requestId: Crypto.randomUUID(), address, amountUsdc })
       }

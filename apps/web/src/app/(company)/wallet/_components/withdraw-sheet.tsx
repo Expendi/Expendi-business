@@ -18,7 +18,7 @@ import type {
   Withdrawal,
   WithdrawalAddress,
 } from "@expendi-business/shared";
-import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
+import { PAYEE_CHAIN_NAMES, spendableUsdc } from "@expendi-business/shared";
 
 import {
   Callout,
@@ -86,6 +86,7 @@ export function WithdrawSheet({
   const passkey = useApprovalPasskeyStatus();
   const withdraw = useWithdraw(organizationId);
   const rate = wallet.kesEquivalent?.rate ?? null;
+  const balance = spendableUsdc(wallet);
   const formId = useId();
   const [step, setStep] = useState<Step>({ kind: "form" });
   const [addressId, setAddressId] = useState<string | null>(null);
@@ -106,7 +107,7 @@ export function WithdrawSheet({
       setError("Choose where to send the USDC.");
       return;
     }
-    const parsed = parseUsdcAmount(amount, wallet.usdcBalance);
+    const parsed = parseUsdcAmount(amount, balance);
     if (!parsed.ok) {
       setError(parsed.error);
       return;
@@ -195,9 +196,7 @@ export function WithdrawSheet({
       </SheetActions>
     );
   } else if (step.kind === "form") {
-    const parsed = amount.trim()
-      ? parseUsdcAmount(amount, wallet.usdcBalance)
-      : null;
+    const parsed = amount.trim() ? parseUsdcAmount(amount, balance) : null;
     const estimate =
       parsed?.ok === true ? approxKes(parsed.baseUnits, rate) : null;
     body = (
@@ -211,7 +210,7 @@ export function WithdrawSheet({
           setAmount(value);
           setError(null);
         }}
-        balance={wallet.usdcBalance}
+        balance={balance}
         estimate={estimate}
         error={error}
         onSubmit={review}
@@ -230,9 +229,7 @@ export function WithdrawSheet({
   } else if (step.kind === "review") {
     const { draft } = step;
     const kes = approxKes(draft.amountUsdc, rate);
-    const left = (
-      BigInt(wallet.usdcBalance) - BigInt(draft.amountUsdc)
-    ).toString();
+    const left = (BigInt(balance) - BigInt(draft.amountUsdc)).toString();
     eyebrow = "Withdraw USDC";
     title = "Review the withdrawal";
     headerExtra = (

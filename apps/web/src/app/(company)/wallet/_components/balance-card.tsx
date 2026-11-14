@@ -6,7 +6,7 @@ import { InfoIcon, Table2Icon } from "lucide-react";
 import { useId, useState } from "react";
 
 import type { ActiveWallet } from "@expendi-business/shared";
-import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
+import { PAYEE_CHAIN_NAMES, spendableUsdc } from "@expendi-business/shared";
 
 import type { DailyBalance } from "./wallet-display";
 import { Skel } from "~/components/data/states";
@@ -94,7 +94,7 @@ export function BalanceCard({
   const since =
     addDays(today, -30) < `${month}-01` ? addDays(today, -30) : `${month}-01`;
   const history = useBalanceHistory(organizationId, since);
-  const [whole, cents] = splitUsdc(wallet.usdcBalance);
+  const [whole, cents] = splitUsdc(spendableUsdc(wallet));
   const flows = history.items ? monthFlows(history.items, month) : null;
   const series =
     history.items && history.complete

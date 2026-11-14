@@ -11,7 +11,11 @@ import { ActivityIndicator, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 
 import type { ActiveWallet, WalletChain } from "@expendi-business/shared";
-import { MAIN_CHAIN, PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
+import {
+  MAIN_CHAIN,
+  PAYEE_CHAIN_NAMES,
+  spendableUsdc,
+} from "@expendi-business/shared";
 
 import type { Company } from "~/features/company/company-provider";
 import { Button } from "~/components/button";
@@ -168,7 +172,7 @@ function WalletDetails({ wallet }: { wallet: ActiveWallet }): JSX.Element {
           className="text-3xl font-semibold leading-10 text-gray-900"
           style={{ fontVariant: ["tabular-nums"] }}
         >
-          {formatUsdc(wallet.usdcBalance)} USDC
+          {formatUsdc(spendableUsdc(wallet))} USDC
         </Text>
         <Text selectable className="text-sm leading-5 text-gray-600">
           {wallet.kesEquivalent

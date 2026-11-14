@@ -863,7 +863,100 @@ describe("withdrawing out of a confidential account", () => {
     });
     oneClick.state.costPerQuote = 4_465n;
   });
+
+  it("shows the withdrawal as pending, and the balance without it, from the moment it's approved", async () => {
+    // #given a company whose USDC is in a confidential account
+    oneClick.state.costPerQuote = 0n;
+    paying = await createNearUsdcPayingCompany(
+      runtime,
+      db,
+      fakes,
+      100n * USDC,
+      undefined,
+      "confidential_account",
+    );
+    oneClick.state.fundConfidential(paying.wallet.address, 100n * USDC);
+    treasuryId = await allowlistNearAccount(paying, "Treasury");
+    const challenge = await challengeFor(10n * USDC);
+
+    // #when the admin's passkey confirms it, before anything is debited
+    expect((await confirm(challenge)).status).toBe(200);
+
+    // #then the wallet can spend 10 USDC less and its history lists the
+    // withdrawal first, as pending
+    const pending = await walletNow();
+    expect(pending).toEqual({
+      usdcBalance: (100n * USDC).toString(),
+      availableUsdc: (90n * USDC).toString(),
+      first: {
+        id: challenge.withdrawal.id,
+        type: "withdrawal",
+        usdcAmount: (-10n * USDC).toString(),
+        pending: true,
+        status: "funding",
+      },
+      withdrawals: 1,
+    });
+
+    // #when 1Click delivers and the ledger debits it
+    const [quote] = await readQuotes(db, paying.company);
+    if (!quote) throw new Error("no quote");
+    oneClick.state.deliverIntentPayout(quote.depositAddress);
+    await runtime.runPromise(continueDelivery(quote));
+
+    // #then the ledger row takes the pending row's place, once
+    const settled = await walletNow();
+    expect({ ...settled, first: { ...settled.first, id: undefined } }).toEqual({
+      usdcBalance: (90n * USDC).toString(),
+      availableUsdc: (90n * USDC).toString(),
+      first: {
+        id: undefined,
+        type: "withdrawal",
+        usdcAmount: (-10n * USDC).toString(),
+        pending: false,
+        status: "paid",
+      },
+      withdrawals: 1,
+    });
+    oneClick.state.costPerQuote = 4_465n;
+  });
 });
+
+interface HistoryRow {
+  readonly id: string;
+  readonly type: string;
+  readonly usdcAmount: string;
+  readonly pending?: boolean;
+  readonly payout: { readonly status: string } | null;
+}
+
+/** The wallet's balances and the first row of its history, as the app reads them. */
+async function walletNow() {
+  const path = `/organizations/${paying.company.organizationId}/wallet`;
+  const headers = bearer(paying.company.admin.privyUserId);
+  const walletResponse = await app.request(path, { headers });
+  const historyResponse = await app.request(`${path}/history`, { headers });
+  const wallet = (await walletResponse.json()) as {
+    data: { usdcBalance: string; availableUsdc: string };
+  };
+  const history = (await historyResponse.json()) as {
+    data: { items: HistoryRow[] };
+  };
+  const items = history.data.items;
+  const first = items[0];
+  return {
+    usdcBalance: wallet.data.usdcBalance,
+    availableUsdc: wallet.data.availableUsdc,
+    first: first && {
+      id: first.id,
+      type: first.type,
+      usdcAmount: first.usdcAmount,
+      pending: first.pending,
+      status: first.payout?.status,
+    },
+    withdrawals: items.filter((item) => item.type === "withdrawal").length,
+  };
+}
 
 describe("withdrawal routes keep companies apart", () => {
   it("POST /organizations/:id/withdrawals", async () => {

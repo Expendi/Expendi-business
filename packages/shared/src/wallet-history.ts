@@ -111,6 +111,13 @@ export const walletHistoryItemSchema = z.object({
   counterpartyAddress: z.string().nullable(),
   createdAt: z.iso.datetime(),
   payout: walletHistoryPayoutSchema.nullable(),
+  /**
+   * An approved withdrawal whose debit isn't in the ledger yet: listed at
+   * the top of the first page from the moment it's approved, under its
+   * payout's ID, until its ledger row takes its place. Counted in the
+   * wallet's `availableUsdc`, not in its `usdcBalance`.
+   */
+  pending: z.boolean().optional(),
 });
 
 export type WalletHistoryItem = z.infer<typeof walletHistoryItemSchema>;
