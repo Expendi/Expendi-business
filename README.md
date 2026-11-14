@@ -6,9 +6,9 @@ Companies hold USDC on NEAR in wallets managed by Expendi. The payment engine su
 
 ## Demo video
 
-[![Expendi Business on NEAR: demo video](docs/demo/demo-thumbnail.png)](docs/demo/expendi-business-near.mp4)
+[![Expendi Business on NEAR: demo video](docs/demo/demo-thumbnail.png)](https://youtu.be/VOqQJ_Oepy8)
 
-**[Watch the demo (2 min 54 s)](docs/demo/expendi-business-near.mp4)**: the web dashboard, the mobile app and the ops dashboard, running on NEAR.
+**[Watch the demo on YouTube (2 min 54 s)](https://youtu.be/VOqQJ_Oepy8)**: the web dashboard and the mobile app, running on NEAR. The video file is also in the repo: [docs/demo/expendi-business-near.mp4](docs/demo/expendi-business-near.mp4).
 
 ## Try it on staging
 
@@ -61,21 +61,22 @@ A Kenyan company keeps its money as USDC in its own NEAR account. From there it 
 
 Once NEAR was the main chain, these were built on it during the hackathon. Each has a decision record in [`docs/decisions`](docs/decisions).
 
-| Feature               | What it does                                                                                                                                                                                                       | Record                                                                      |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| Crypto invoicing      | A company invoices in US dollars. The customer opens a link with no account, picks Base, Ethereum, Arbitrum or Solana, and pays to a 1Click deposit address. USDC lands on NEAR and the invoice marks itself paid. | [crypto-invoicing.md](docs/decisions/crypto-invoicing.md)                   |
-| Confidential accounts | A company can keep its USDC in its own account on NEAR Intents' private ledger (`intents.far`), so the public chain doesn't show its balance or who it pays. Off by default; staff turn it on per company.         | [confidential-accounts.md](docs/decisions/confidential-accounts.md)         |
-| Treasury              | Idle USDC moves from NEAR through NEAR Intents to a company-owned Treasury wallet on Base and earns in a Privy Earn vault.                                                                                         | [treasury-on-base.md](docs/decisions/treasury-on-base.md)                   |
-| Second cash-out rail  | Pretium joins Paycrest for KES cash-outs; one staff setting picks the active provider.                                                                                                                             | [pretium-cash-out-provider.md](docs/decisions/pretium-cash-out-provider.md) |
-| Cards (sandbox)       | Staff cards and company-held cards that pay recurring subscriptions, on Lithic's sandbox. No real card money moves.                                                                                                | [company-held-cards.md](docs/decisions/company-held-cards.md)               |
+| Feature               | What it does                                                                                                                                                                                                                         | Record                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| Crypto invoicing      | A company invoices in US dollars. The customer opens a link with no account, picks Base, Ethereum, Arbitrum or Solana, and pays to a 1Click deposit address. USDC lands on NEAR and the invoice marks itself paid.                   | [crypto-invoicing.md](docs/decisions/crypto-invoicing.md)                   |
+| Confidential accounts | A company can keep its USDC in its own account on NEAR Intents' private ledger (`intents.far`), so the public chain doesn't show its balance or who it pays. Every company uses one by default; staff can turn it off for a company. | [confidential-accounts.md](docs/decisions/confidential-accounts.md)         |
+| Treasury              | Idle USDC moves from NEAR through NEAR Intents to a company-owned Treasury wallet on Base and earns in a Privy Earn vault.                                                                                                           | [treasury-on-base.md](docs/decisions/treasury-on-base.md)                   |
+| Second cash-out rail  | Pretium joins Paycrest for KES cash-outs; one staff setting picks the active provider.                                                                                                                                               | [pretium-cash-out-provider.md](docs/decisions/pretium-cash-out-provider.md) |
+| Cards (sandbox)       | Staff cards and company-held cards that pay recurring subscriptions, on Lithic's sandbox. No real card money moves.                                                                                                                  | [company-held-cards.md](docs/decisions/company-held-cards.md)               |
 
 ### How the money moves
 
 1. **Wallet.** A company gets a NEAR company wallet (a Privy wallet, owned by Expendi's management key, which the API signs for under its own key) and a Base transit wallet.
-2. **Fund-in.** A plain USDC transfer on NEAR is credited once the chain confirms it. A fund-in from another chain is a 1Click quote that delivers USDC on NEAR; if it can't be completed, it is refunded into the company's own NEAR Intents account and swapped back to the company wallet, so nobody gives a refund address. Transfers Expendi itself caused (refunds, sweeps, relayer transfers) are recognised by transaction hash and never credited.
-3. **Approval.** An admin approves a claim, bill or payroll run with a passkey. The per-transaction cap is checked by the API immediately before Privy signs.
-4. **Payout.** A NEAR payee is paid directly. A Base or Solana payee is paid through 1Click. A payroll run's M-Pesa cash-outs move to the transit wallet in one Base hop, then the active cash-out provider, Paycrest or Pretium, pays each person in KES. Expendi staff choose the active provider for every company at once (`docs/decisions/pretium-cash-out-provider.md`).
-5. **Safety.** Every signed send is saved before it is broadcast, so a retry re-sends the same bytes and can never pay twice. Anything unclear goes to `needs_review`, and staff resolve it from the chain's evidence.
+2. **Confidential account.** The company's USDC rests in its own confidential account on NEAR Intents' private ledger, not on the public company wallet. USDC that lands on the company wallet is moved in by a job, free. Expendi keeps a small fee float (1 USDC) in each confidential account, paid by the gas relayer, to cover payout fees. If the relayer can't fund a float yet, the company starts on its company wallet and switches over automatically once it can.
+3. **Fund-in.** A plain USDC transfer on NEAR is credited once the chain confirms it. A fund-in from another chain is a 1Click quote that delivers USDC on NEAR; if it can't be completed, it is refunded into the company's own NEAR Intents account and swapped back to the company wallet, so nobody gives a refund address. Transfers Expendi itself caused (refunds, sweeps, relayer transfers) are recognised by transaction hash and never credited.
+4. **Approval.** An admin approves a claim, bill or payroll run with a passkey. The per-transaction cap is checked by the API immediately before Privy signs.
+5. **Payout.** From a confidential account, each payment is a 1Click quote that the company wallet signs as a NEAR Intents message; the API checks the amount against the cap before Privy signs. A NEAR payee is paid directly. A Base or Solana payee is paid through 1Click. A payroll run's M-Pesa cash-outs move to the transit wallet in one Base hop, then the active cash-out provider, Paycrest or Pretium, pays each person in KES. Expendi staff choose the active provider for every company at once (`docs/decisions/pretium-cash-out-provider.md`).
+6. **Safety.** Every signed send is saved before it is broadcast, so a retry re-sends the same bytes and can never pay twice. Anything unclear goes to `needs_review`, and staff resolve it from the chain's evidence.
 
 The design and its trade-offs are in [docs/decisions/near-main-chain.md](docs/decisions/near-main-chain.md). Terms are in [CONTEXT.md](CONTEXT.md).
 
@@ -198,37 +199,40 @@ Source: [`services/export`](apps/api/src/services/export), [`services/zoho`](app
 
 - USD invoices with customers, line items, one tax rate, terms and numbering; email delivery, a public pay page with no account, PDF download, and payment by USDC from Base, Ethereum, Arbitrum or Solana through 1Click. A payment credits the company wallet and marks the invoice paid in one transaction.
 - Treasury: move USDC from the company wallet on NEAR to a company-owned Treasury wallet on Base and into a Privy Earn vault, with move progress and history.
-- Confidential accounts: per-company, staff-enabled; balances and payouts run through the company's own account on NEAR Intents' private ledger.
+- Confidential accounts: on for every company by default (`CONFIDENTIAL_ACCOUNTS_ENABLED`); balances and payouts run through the company's own account on NEAR Intents' private ledger, with an automatic rollout, a relayer-paid fee float and a staff turn-off that moves the balance back to the company wallet.
 - Cards on Lithic's sandbox: staff cards and company-held cards that pay recurring payments.
 
 Source: [`apps/api/src/services`](apps/api/src/services), decisions in [`docs/decisions`](docs/decisions).
 
 ## How it fits together
 
-_**Before the NEAR port.** These diagrams were drawn from the Base version on 2026-11-06. The platform, spending, records and apps diagrams still hold; the money-path diagrams show Alchemy deposits and a Base company wallet. For the NEAR money path, read [How the money moves](#how-the-money-moves) and [docs/decisions/near-main-chain.md](docs/decisions/near-main-chain.md)._
-
-_Drawn from the source code on 2026-11-06, with API migrations through `0066`. Only implemented code is shown, and anything switched off or not wired yet is marked. Each diagram is a PNG in [`docs/architecture`](docs/architecture); click one to open it full size. The Mermaid source for each is in [`docs/architecture/src`](docs/architecture/src). To redraw one after editing it, run `npx -y @mermaid-js/mermaid-cli -i docs/architecture/src/<name>.mmd -o docs/architecture/<name>.png -w 1600 -s 2 -b white`._
+_Drawn from the source code; the platform, money-path and confidential-account diagrams were redrawn on 2026-11-15, with API migrations through `0108`. Only implemented code is shown, and anything switched off or not wired yet is marked. Each diagram is a PNG in [`docs/architecture`](docs/architecture); click one to open it full size. The Mermaid source for each is in [`docs/architecture/src`](docs/architecture/src). To redraw one after editing it, run `npx -y @mermaid-js/mermaid-cli@11.4.2 -i docs/architecture/src/<name>.mmd -o docs/architecture/<name>.png -w 1600 -s 2 -b white`._
 
 1. [Platform](#platform): the apps, the API, providers, jobs and data
 2. [Money path](#money-path): wallets, deposits, Approve & pay, payouts, withdrawals
-3. [Spending](#spending): sign-up, claims, payees, bills, payroll, floats, overview
-4. [Records and operations](#records-and-operations): notifications, exports, Zoho, imports, alerts, Ops app
-5. [Apps](#apps): sign-in, mobile screens, web pages
-6. [Not wired yet](#not-wired-yet)
+3. [Confidential accounts](#confidential-accounts): where the balance lives, money in and out, what the chain sees
+4. [Spending](#spending): sign-up, claims, payees, bills, payroll, floats, overview
+5. [Records and operations](#records-and-operations): notifications, exports, Zoho, imports, alerts, Ops app
+6. [Apps](#apps): sign-in, mobile screens, web pages
+7. [Not wired yet](#not-wired-yet)
 
 ### Platform
 
 #### System overview
 
-All four apps import `packages/shared` (zod schemas, types, parsers and money helpers), so the clients and the API validate the same shapes.
+All four apps import `packages/shared` (zod schemas, types, parsers and money helpers), so the clients and the API validate the same shapes. Each company's USDC belongs to its company wallet on NEAR, and rests in its confidential account on NEAR Intents' private ledger when `CONFIDENTIAL_ACCOUNTS_ENABLED` is on. Expendi's gas relayer pays every NEAR fee. 1Click (NEAR Intents) handles fund-ins, cross-chain payouts and the hop to Base for cash-outs. Base holds the transit wallet that Paycrest and Pretium cash out from, the Treasury wallet, and USDC payees on Base.
 
 ![System overview](docs/architecture/01-system-overview.png)
 
 #### Request pipeline
 
+Each route group has its own entry check: a Privy login and company check for `/me` and `/organizations`, a staff login for `/internal`, and a signature or token for webhooks, Zoho and downloads. The public `/pay` invoice page needs no login. Every route reaches the database as the restricted app role, under row-level security.
+
 ![Request pipeline](docs/architecture/02-request-pipeline.png)
 
 #### API boot
+
+On deploy, Railway runs the migrations. The API then loads its secrets (Doppler or env), builds every provider layer, including NEAR, 1Click and confidential accounts, and starts the server and the 26 station jobs. `CONFIDENTIAL_ACCOUNTS_ENABLED` is read once at start-up and is false when unset.
 
 ![API boot](docs/architecture/03-api-boot.png)
 
@@ -238,84 +242,122 @@ All services live in `apps/api/src/services/` and are wired as Effect layers in 
 
 ![Service layers](docs/architecture/04-service-layers.png)
 
-| Service              | Depends on                                                                                                                                        |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `expenses`           | payments, payout, phone-verification (payout-phone gate), notification, zoho, FileStorage, ReceiptExtractor, audit                                |
-| `bills`              | payees, recurring, payments, payout, expenses (bills paid outside), payroll (run status), notification, zoho, FileStorage, Paycrest (rate), audit |
-| `recurring`          | bills and payees tables (next bill), audit                                                                                                        |
-| `payroll`            | bills, recurring, payments, payout, approval (salary and margin changes), notification, zoho, EmailSender, audit                                  |
-| `floats`             | payout, wallet, phone-verification, expense rules, notification, zoho, audit                                                                      |
-| `payees`             | approval, allowlist, phone-verification, Paycrest (bank list), EmailSender, audit                                                                 |
-| `withdrawal`         | payout, wallet, Paycrest                                                                                                                          |
-| `organization`       | wallet, audit                                                                                                                                     |
-| `membership`         | EmailSender, config (install URL)                                                                                                                 |
-| `phone-verification` | OtpProvider (Telnyx), EmailSender, audit                                                                                                          |
-| `overview`           | wallet ledger, Paycrest (rate)                                                                                                                    |
-| `payments`           | payout, wallet, Paycrest                                                                                                                          |
-| `payout`             | approval, allowlist, wallet, chain, Paycrest, PrivyWallets, BaseRpc, subject hooks (expenses, bills, floats), audit                               |
-| `approval`           | approval settings, auth (recent sign-in), EmailSender, audit                                                                                      |
-| `allowlist`          | approval, audit                                                                                                                                   |
-| `wallet`             | PrivyWallets, AlchemyWebhook, BaseRpc, Paycrest Gateway (refund detection), audit                                                                 |
-| `notification`       | PushSender, EmailSender, overview (cash check for reminders)                                                                                      |
-| `zoho`               | Zoho client, Zoho access-token cache, AccountingTokenKey, FileStorage, audit                                                                      |
-| `export`             | FileStorage, EmailSender, audit                                                                                                                   |
-| `import`             | shared spreadsheet parser, payees/floats/expenses/bills/recurring tables, audit                                                                   |
-| `alerts`             | EmailSender, overview (cash check), Paycrest (rate)                                                                                               |
-| `staff`              | PrivyAuth, payout, alerts, wallet, chain, Paycrest, BaseRpc, audit                                                                                |
-| `auth`               | PrivyAuth, membership (invite activation), audit                                                                                                  |
-| `audit`              | Postgres only                                                                                                                                     |
+| Service              | Depends on                                                                                                                                         |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `expenses`           | payments, payout, phone-verification (payout-phone gate), notification, zoho, FileStorage, ReceiptExtractor, audit                                 |
+| `bills`              | payees, recurring, payments, payout, expenses (bills paid outside), payroll (run status), notification, zoho, FileStorage, Paycrest (rate), audit  |
+| `recurring`          | bills and payees tables (next bill), audit                                                                                                         |
+| `payroll`            | bills, recurring, payments, payout, approval (salary and margin changes), notification, zoho, EmailSender, audit                                   |
+| `floats`             | payout, wallet, phone-verification, expense rules, notification, zoho, audit                                                                       |
+| `payees`             | approval, allowlist, phone-verification, Paycrest (bank list), EmailSender, audit                                                                  |
+| `withdrawal`         | payout, wallet, Paycrest                                                                                                                           |
+| `organization`       | wallet, audit                                                                                                                                      |
+| `membership`         | EmailSender, config (install URL)                                                                                                                  |
+| `phone-verification` | OtpProvider (Telnyx), EmailSender, audit                                                                                                           |
+| `overview`           | wallet ledger, Paycrest (rate)                                                                                                                     |
+| `payments`           | payout, wallet, Paycrest                                                                                                                           |
+| `payout`             | approval, allowlist, wallet, chain, Paycrest, Pretium, PrivyWallets, NearRelayer, NearRpc, BaseRpc, subject hooks (expenses, bills, floats), audit |
+| `approval`           | approval settings, auth (recent sign-in), EmailSender, audit                                                                                       |
+| `allowlist`          | approval, audit                                                                                                                                    |
+| `wallet`             | PrivyWallets, NearRelayer, NearRpc, FastNear, ConfidentialAccounts, AlchemyWebhook (transit wallets on Base), BaseRpc, audit                       |
+| `notification`       | PushSender, EmailSender, overview (cash check for reminders)                                                                                       |
+| `zoho`               | Zoho client, Zoho access-token cache, AccountingTokenKey, FileStorage, audit                                                                       |
+| `export`             | FileStorage, EmailSender, audit                                                                                                                    |
+| `import`             | shared spreadsheet parser, payees/floats/expenses/bills/recurring tables, audit                                                                    |
+| `alerts`             | EmailSender, overview (cash check), Paycrest (rate)                                                                                                |
+| `staff`              | PrivyAuth, payout, alerts, wallet, chain, Paycrest, Pretium, OneClick, FastNear, NearRpc, BaseRpc, TreasuryPositionReader, audit                   |
+| `intents`            | OneClick, ConfidentialAccounts, NearRelayer, NearRpc, PrivyWallets, audit                                                                          |
+| `treasury`           | PrivyWallets, BaseRpc, intents, audit                                                                                                              |
+| `invoices`           | OneClick, EmailSender, audit                                                                                                                       |
+| `cards`              | Lithic (sandbox), audit                                                                                                                            |
+| `auth`               | PrivyAuth, membership (invite activation), audit                                                                                                   |
+| `audit`              | Postgres only                                                                                                                                      |
 
 #### Service dependencies: provider clients
+
+Each service reaches outside systems only through a provider client. The NEAR clients (NearRelayer, NearRpc, FastNear, OneClick, ConfidentialAccounts) sit alongside Privy, Paycrest, Pretium, Lithic and BaseRpc.
 
 ![Service dependencies: provider clients](docs/architecture/05-service-dependencies-provider-clients.png)
 
 #### Background jobs (station)
 
-Every API instance runs each job on an in-process interval; a Postgres advisory lock lets only one instance do the work per tick. Postgres tables are the queues.
+Every API instance runs each job on an in-process interval; a Postgres advisory lock lets only one instance do the work per tick. Postgres tables are the queues. The 26 jobs fall into four groups: NEAR deposits and confidential accounts (including move-ins, fee covers and balance-home changes, which also runs the confidential rollout), moving money out, cards, and bills, reports and alerts.
 
 ![Background jobs (station)](docs/architecture/06-background-jobs.png)
 
 #### Data model and isolation
 
-Migrations run as the owner role before each Railway deploy (`apps/api/drizzle`, latest `0066`). The API connects as `expendi_business_app`, which can't bypass RLS.
+Migrations run as the owner role before each Railway deploy (`apps/api/drizzle`, latest `0108`). The API connects as `expendi_business_app`, which can't bypass RLS.
 
 ![Data model and isolation](docs/architecture/07-data-model-and-isolation.png)
 
 ### Money path
 
-#### Company wallet creation
+#### Company wallet and transit wallet creation
 
-![Company wallet creation](docs/architecture/08-company-wallet-creation.png)
+Sign-up creates a Privy NEAR wallet (the company wallet) and a Base transit wallet with a capped USDC policy. The gas relayer creates the NEAR account and registers it for USDC. Activation then puts the balance in a confidential account when that is on and the relayer can fund the fee float; otherwise it starts on the company wallet.
+
+![Company wallet and transit wallet creation](docs/architecture/08-company-wallet-creation.png)
 
 #### Deposits and refunds coming in
+
+Money arrives by a fund-in or pay-link payment from another chain, or by a plain USDC transfer on NEAR to the company wallet. A delivery into the confidential account is credited when 1Click reports SUCCESS; a company-wallet transfer is credited by the NEAR deposit watcher and then moved into the confidential account. Cash-out refunds from Paycrest or Pretium arrive at the transit wallet on Base and are swept back.
 
 ![Deposits and refunds coming in](docs/architecture/09-deposits-and-refunds-coming-in.png)
 
 #### Wallet ledger
 
+One append-only ledger covers the company's money wherever it sits: company wallet, confidential account or transit wallet. The available balance is the ledger sum minus reserved payouts and any open move to Treasury. Hops, sweeps, move-ins, move-outs and fee-float top-ups move money between Expendi-controlled places, so they are not ledger rows.
+
 ![Wallet ledger](docs/architecture/10-wallet-ledger.png)
 
 #### Approve & pay (claims, bills, floats, payroll, withdrawals)
 
-Every money action uses the same engine. Claims, bills, floats and payroll runs plug in through subject hooks; payroll payments are bills linked to a run.
+Every money action uses the same engine. Claims, bills, floats and payroll runs plug in through subject hooks; payroll payments are bills linked to a run. A KES cash-out hops to the transit wallet on Base, then Paycrest or Pretium pays it. A USDC payout goes straight to the payee. From a confidential account, both are paid by a 1Click quote the company wallet signs as a NEAR Intents message, and the ledger is written at the quote's outcome.
 
 ![Approve & pay (claims, bills, floats, payroll, withdrawals)](docs/architecture/11-approve-and-pay.png)
 
 #### Paycrest order safety checks
 
+Once the hop has delivered, the Paycrest order is created with the transit wallet as its refund address, checked against the quote and the approved maximum debit, and funded only after Base shows the transit wallet holds the amount.
+
 ![Paycrest order safety checks](docs/architecture/12-paycrest-order-safety-checks.png)
 
 #### Payout states
 
+A payout moves from awaiting_approval to approved to paid or failed, with needs_review for anything unclear. Staff can close needs_review as paid or failed; a retry creates a new payout.
+
 ![Payout states](docs/architecture/13-payout-states.png)
 
 #### Withdrawals and the address allowlist
+
+Allowlist changes and withdrawals both need an admin passkey, and the allowlist holds NEAR, Base and Solana addresses. A withdrawal leaves a confidential account by signed message, or the company wallet directly (NEAR) or through a 1Click quote (Base, Solana).
 
 ![Withdrawals and the address allowlist](docs/architecture/14-withdrawals-and-the-address-allowlist.png)
 
 #### Passkey enrolment
 
 ![Passkey enrolment](docs/architecture/15-passkey-enrolment.png)
+
+### Confidential accounts
+
+#### Where a company's balance lives
+
+A new company wallet starts on a confidential account if `CONFIDENTIAL_ACCOUNTS_ENABLED` is on and the gas relayer can fund its fee float. Otherwise it starts on the company wallet, and a job switches one waiting company every 30 seconds once nothing is in flight and the relayer can cover the float. Turning a company off drains it first: new quotes, sends, payouts and Treasury moves are refused until the move-out finishes.
+
+![Where a company's balance lives](docs/architecture/38-confidential-account-balance-home.png)
+
+#### Money in and out of a confidential account
+
+USDC sent to the public company wallet is credited, then a job moves it into the confidential account for free. Fund-ins and invoice pay links deliver straight in and are credited when 1Click reports SUCCESS. A payout is a 1Click quote: the generated message is checked against the spend cap, signed and submitted, and the ledger is written only at the quote's outcome. The gas relayer keeps each fee float topped up.
+
+![Money in and out of a confidential account](docs/architecture/39-money-in-and-out-of-a-confidential-account.png)
+
+#### What the public chain sees
+
+The move-in transfer into NEAR Intents and the payee's receipt from a shared NEAR Intents account are public, with amounts and the payee's address. The company's balance and who it pays are held only in the private ledger, `intents.far`.
+
+![What the public chain sees](docs/architecture/40-what-the-public-chain-sees.png)
 
 ### Spending
 
@@ -384,6 +426,8 @@ Staff sign in with Privy; the API accepts them only if their email is an active 
 ![Ops app (apps/admin)](docs/architecture/32-ops-app.png)
 
 #### Staff payout resolution
+
+Ops resolves a needs_review payout in two steps, prepare then confirm, from fresh evidence from the cash-out provider and the chains. A payout waiting on a NEAR Intents quote is refused; staff resolve the quote instead.
 
 ![Staff payout resolution](docs/architecture/33-staff-payout-resolution.png)
 
@@ -566,7 +610,7 @@ The mobile app needs a native development build for its native integrations. Dep
 ## Docs
 
 - [NEAR main chain](docs/decisions/near-main-chain.md): the port's design and trade-offs; other decisions sit beside it in [`docs/decisions`](docs/decisions).
-- [Architecture diagrams](docs/architecture): PNGs and Mermaid sources, drawn before the NEAR port.
+- [Architecture diagrams](docs/architecture): PNGs and Mermaid sources.
 - [MVP spec](docs/expense-mvp-spec.md): agreed Kenya spending scope, flows, data model and go-live checklist.
 - [Build plan](docs/expense-mvp-build-plan.md): 51 ordered tasks and acceptance checkpoints.
 - [Build handoffs](docs/handoffs/README.md): implementation notes and QA by phase.

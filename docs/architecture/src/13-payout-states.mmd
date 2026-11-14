@@ -2,23 +2,28 @@ stateDiagram-v2
   [*] --> awaiting_approval: preparePayouts
   awaiting_approval --> approved: passkey approval, caps, balance
   awaiting_approval --> failed: discarded (stale or replaced)
-  approved --> order_created: Paycrest order created
-  approved --> funding: USDC payout passes barrier
-  approved --> failed: paused, quote error, wallet inactive, refused, no order in 15 min
-  approved --> needs_review: ambiguous createOrder, no order id after 2 min
+  approved --> order_created: Paycrest order created, after the Base hop delivered
+  approved --> funding: Pretium cash-out or USDC payout passes barrier
+  approved --> failed: paused, quote error, wallet inactive, refused, Base hop or delivery quote refunded or failed, no order in 15 min
+  approved --> needs_review: ambiguous createOrder, no order id after 2 min, Base hop in review
   order_created --> funding: funding barrier passed
   order_created --> failed: checkOrder fails, paused, expired, cancelled
   order_created --> needs_review: unexpected Paycrest status
-  funding --> paying: USDC sent, or Paycrest saw the deposit
-  funding --> failed: send refused
+  funding --> paying: USDC sent or deposit ran
+  funding --> paid: 1Click delivered
+  funding --> failed: send refused, quote refunded
   funding --> needs_review: send outcome unknown, over 10 min, expired
-  paying --> paid: Paycrest validated or settled, onchain receipt matches
-  paying --> failed: Paycrest refunded (USDC back as a refund row)
-  paying --> needs_review: expired, cancelled, over 2 h, receipt mismatch
+  paying --> paid: Paycrest validated or settled, Pretium complete, or payee chain delivery confirmed
+  paying --> failed: provider refunded (USDC back as a refund row), or 1Click refunded the deposit
+  paying --> needs_review: over 2 h, mismatch
   needs_review --> paid: staff resolve with second confirmation
   needs_review --> failed: staff resolve with second confirmation
   paid --> [*]
   failed --> [*]
+  note right of approved
+    A KES cash-out stays approved
+    while its Base hop is under way
+  end note
   note right of failed
     Retry creates a new payout for the same subject
     with a new key and needs a fresh approval

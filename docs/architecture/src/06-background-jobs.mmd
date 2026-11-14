@@ -1,32 +1,62 @@
-flowchart LR
+flowchart TB
   SCHED["station/scheduler.ts<br/>setInterval per job<br/>pg_try_advisory_lock"]
 
-  SCHED --> J1["reconcile-paycrest<br/>60 s · lock 72001"]
-  SCHED --> J2["confirm-onchain<br/>60 s · lock 72002"]
-  SCHED --> J3["bill-status<br/>15 min · lock 72035"]
-  SCHED --> J4["recurring-bills<br/>15 min · lock 72036"]
-  SCHED --> J5["payroll-drafts<br/>15 min · lock 72038"]
-  SCHED --> J6["monthly-export<br/>15 min · lock 72022<br/>from the 1st, Nairobi"]
-  SCHED --> J7["spending-reminders<br/>15 min · lock 72043<br/>from 08:00 Nairobi"]
-  SCHED --> J8["push-notifications<br/>5 s · lock 72020"]
-  SCHED --> J9["push-receipts<br/>5 min · lock 72021"]
-  SCHED --> J10["zoho-sync<br/>60 s · lock 72031"]
-  SCHED --> J11["alert-checks<br/>60 s · lock 72026"]
+  subgraph NEARJOBS["NEAR deposits and confidential accounts"]
+    N1["near-deposits<br/>30 s · lock 72050<br/>credits USDC arriving at company wallets<br/>alerts staff to a wallet stuck at a transfer"]
+    N2["fund-ins<br/>30 s · lock 72051<br/>settles finished fund-ins<br/>credits confidential accounts on 1Click SUCCESS"]
+    N3["fund-in-returns<br/>30 s · lock 72052<br/>sends a refunded fund-in back to the<br/>company wallet or confidential account"]
+    N4["move-ins<br/>30 s · lock 72055<br/>company wallet → confidential account"]
+    N5["fee-covers<br/>30 s · lock 72056<br/>tops up Expendi's fee float<br/>when a confidential account's float runs low"]
+    N6["balance-home-changes<br/>30 s · lock 72062<br/>move-outs for companies turning it off<br/>+ admits one existing company a tick<br/>when CONFIDENTIAL_ACCOUNTS_ENABLED"]
+  end
 
-  J1 -- "getOrder" --> PC["Paycrest"]
-  J1 --> O1["payout status + ledger debits<br/>+ station heartbeat"]
-  J2 -- "getTransactionReceipt" --> RPC["Base RPC"]
-  J2 --> O2["onchain USDC payouts → paid / needs_review"]
-  J3 --> O3["bills: upcoming → due → overdue"]
-  J4 --> O4["next bill for each active recurring item"]
-  J5 --> O5["draft payroll runs 5 days before pay day<br/>+ admin notifications"]
-  J6 --> O6["last month's export → R2<br/>+ email to accountants"]
-  J7 -- "rate for cash check" --> PC
-  J7 --> O7["due-date reminders + wallet-short warnings<br/>→ notification_outbox"]
-  J8 -- "push" --> EXPO["Expo Push"]
-  J8 -- "email" --> RES["Resend"]
-  J9 -- "getReceipts" --> EXPO
-  J9 --> O9["disable tokens of uninstalled apps"]
-  J10 -- "createExpense + attachReceipt" --> ZB["Zoho Books"]
-  J10 --> O10["accounting_syncs → synced / failed"]
-  J11 --> O11["ops_alerts rows + email to ALERT_EMAILS"]
+  subgraph MONEYJOBS["Moving money out"]
+    M1["outbound-quotes<br/>15 s · lock 72047<br/>Base hops · USDC payouts · sweeps<br/>applies outcomes to payouts"]
+    M2["sweep-transit-wallets<br/>5 min · lock 72048<br/>transit wallet leftovers → company balance"]
+    M3["treasury-moves<br/>15 s · lock 72049<br/>moves to and from Treasury"]
+    M4["treasury-snapshots<br/>15 min · lock 72054<br/>one Treasury snapshot a day per company"]
+    M5["confirm-onchain<br/>60 s · lock 72002<br/>direct USDC payouts → paid / needs_review"]
+    M6["reconcile-paycrest<br/>60 s · lock 72001<br/>payout status + ledger debits + heartbeat"]
+    M7["reconcile-pretium<br/>60 s · lock 72053<br/>Pretium cash-outs · sends, refunds, heartbeat"]
+  end
+
+  subgraph CARDJOBS["Expendi cards"]
+    C1["close-cards<br/>30 s · lock 72044<br/>closes cards of people who left"]
+    C2["reconcile-lithic<br/>60 s · lock 72045<br/>unfinished Card purchases vs Lithic"]
+    C3["card-receipt-reminders<br/>15 min · lock 72046<br/>missing-receipt reminders from 08:00 Nairobi"]
+    C4["card-simulations<br/>15 min · lock 72058<br/>sandbox pretend merchant charges due bills"]
+  end
+
+  subgraph BOOKJOBS["Bills, payroll, reports, alerts"]
+    B1["bill-status<br/>15 min · lock 72035<br/>upcoming → due → overdue"]
+    B2["recurring-bills<br/>15 min · lock 72036<br/>next bill for each active recurring item"]
+    B3["payroll-drafts<br/>15 min · lock 72038<br/>draft runs 5 days before pay day"]
+    B4["monthly-export<br/>15 min · lock 72022<br/>last month's export → R2 + email"]
+    B5["spending-reminders<br/>15 min · lock 72043<br/>due-date reminders + wallet-short warnings"]
+    B6["push-notifications<br/>5 s · lock 72020<br/>push + email from the outbox"]
+    B7["push-receipts<br/>5 min · lock 72021<br/>disable tokens of uninstalled apps"]
+    B8["zoho-sync<br/>60 s · lock 72031<br/>accounting_syncs → synced / failed"]
+    B9["alert-checks<br/>60 s · lock 72026<br/>ops_alerts rows + email to ALERT_EMAILS"]
+  end
+
+  N1 ~~~ N2 ~~~ N3 ~~~ N4 ~~~ N5 ~~~ N6
+  M1 ~~~ M2 ~~~ M3 ~~~ M4 ~~~ M5 ~~~ M6 ~~~ M7
+  C1 ~~~ C2 ~~~ C3 ~~~ C4
+  B1 ~~~ B2 ~~~ B3 ~~~ B4 ~~~ B5 ~~~ B6 ~~~ B7 ~~~ B8 ~~~ B9
+
+  SCHED --> NEARJOBS & MONEYJOBS & CARDJOBS & BOOKJOBS
+
+  N1 -- "transfers + confirmation" --> NEARX["FastNEAR + NEAR RPC"]
+  N3 & N4 & N5 --> NEARX
+  N1 & N2 & N3 & N4 & N5 & N6 & M1 & M3 -- "quotes + status" --> OC["1Click · NEAR Intents"]
+  M2 --> OC
+  M5 -- "receipts" --> NEARX
+  M5 --> BRPC["Base RPC"]
+  M6 -- "getOrder" --> PC["Paycrest"]
+  M7 -- "status · send · refund" --> PR["Pretium"]
+  M3 -- "vault deposit" --> PRIVY["Privy Earn"]
+  C1 & C2 --> LI["Lithic"]
+  B5 -- "rate for cash check" --> PC & PR
+  B6 --> EXPO["Expo Push + Resend"]
+  B7 --> EXPO
+  B8 --> ZB["Zoho Books"]

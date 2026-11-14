@@ -1,6 +1,6 @@
 flowchart TD
   subgraph Allowlist["Allowlist change · /organizations/:id/withdrawal-addresses"]
-    A1["POST /changes<br/>add or remove · EVM address · label"] --> A2["Admin check"]
+    A1["POST /changes<br/>add or remove · payee chain (NEAR, Base or Solana) · address · label"] --> A2["Admin check"]
     A2 --> A3["startApproval(change_allowlist)"]
     A3 --> A4["Passkey"]
     A4 --> A5["POST /changes/:challengeId/confirm<br/>verifyApproval + intent hash"]
@@ -9,12 +9,17 @@ flowchart TD
   end
 
   subgraph Withdraw["Withdrawal · /organizations/:id/withdrawals"]
-    W1["POST / {requestId, addressId, amountUsdc}"] --> W2["Not paused · address active · wallet active<br/>amount ≤ balance − reserved"]
+    W1["POST / {requestId, addressId, amountUsdc}"] --> W2["Not paused · address active · wallet active<br/>amount ≤ ledger balance − reserved"]
     W2 --> W3["preparePayouts: subject withdrawal<br/>key withdrawal:&lt;requestId&gt;"]
     W3 --> W4["requestPayoutApproval → passkey challenge"]
     W4 --> W5["POST /:challengeId/confirm → approveAndPay<br/>alone in its batch · exempt from daily cap"]
-    W5 --> W6["fundOnchainPayout → Privy sendUsdc"]
-    W6 --> W7["confirm-onchain job → paid / needs_review"]
+    W5 --> W6{"Where does the balance sit?"}
+    W6 -- "confidential account" --> W7["Quote to the address, paid by a signed message<br/>(1Click generate-intent, Privy signs, submit-intent)<br/>1Click delivers on the payee chain"]
+    W6 -- "company wallet, NEAR address" --> W8["Company wallet sends the USDC directly"]
+    W6 -- "company wallet, Base or Solana address" --> W9["Company wallet pays a 1Click quote's deposit address<br/>1Click delivers on the payee chain"]
+    W7 --> W10["outbound-quotes job → ledger debit and paid<br/>when 1Click reports delivery"]
+    W8 --> W11["confirm-onchain job → paid / needs_review"]
+    W9 --> W10
   end
 
   A7 -. "only allowlisted addresses" .-> W2

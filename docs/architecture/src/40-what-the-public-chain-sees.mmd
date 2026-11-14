@@ -1,0 +1,18 @@
+flowchart LR
+  subgraph PUBLIC["Public on NEAR"]
+    direction TB
+    CW["Company wallet<br/>public address"]
+    ND["NEAR Intents deposit address"]
+    SH["Shared NEAR Intents account"]
+    PAYEE["Payee's own address<br/>receives amount and address"]
+  end
+
+  subgraph PRIVATE["Private: ledger intents.far"]
+    direction TB
+    BAL["Company's balance<br/>and who it pays"]
+  end
+
+  CW -- "move-in: public transfer<br/>with its amount" --> ND
+  ND -.->|"credited privately"| BAL
+  BAL -- "payout: signed message<br/>never named on chain" --> SH
+  SH -- "public transfer from the shared account" --> PAYEE

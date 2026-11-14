@@ -1,0 +1,34 @@
+flowchart TD
+  subgraph IN["Money in"]
+    direction TB
+    DEP["Deposit to the public<br/>company wallet"] --> CRED["Deposit watcher credits<br/>the ledger"]
+    CRED --> MI["move-in job: 1Click quote<br/>NEAR USDC to confidential account<br/>free, in parts up to the spend cap<br/>dust under 0.05 USDC stays"]
+    MI --> ACC
+    FI["Fund-in from another chain<br/>or an invoice pay link"] --> Q1["1Click quote delivers<br/>straight to the confidential account"]
+    Q1 --> OK{"Quote reaches SUCCESS?"}
+    OK -- yes --> CRED2["Ledger credited once,<br/>for the amount 1Click reports delivered"]
+    CRED2 --> ACC
+    OK -- "refunded" --> RET["Refund lands in the company's public<br/>NEAR Intents account, fund-in return<br/>sends it on to the account"]
+    RET --> ACC
+  end
+
+  ACC[("Confidential account<br/>+ Expendi fee float")]
+
+  subgraph OUTS["Money out"]
+    direction TB
+    P["Payout approved"] --> Q2["1Click quote, paid<br/>from the confidential account"]
+    Q2 --> GEN["generate-intent<br/>1Click writes the message"]
+    GEN --> CAP{"Message checked: intents.far, company signs,<br/>USDC only, to the quote's deposit address,<br/>exact amount, at or under spend cap?"}
+    CAP -- no --> FAIL["Not signed, payout fails,<br/>nothing moved"]
+    CAP -- yes --> SIGN["Privy signs, signed message saved"]
+    SIGN --> SUB["submit-intent"]
+    SUB --> OUT{"Quote outcome"}
+    OUT -- SUCCESS --> LED["Ledger debited, payout marked paid"]
+    OUT -- REFUNDED --> NOP["Payout fails, ledger untouched"]
+    OUT -- "stuck" --> REV["needs_review, nothing debited"]
+  end
+
+  ACC --> P
+  GAS["Gas relayer"] --> FC["fee-cover job: tops the float up to 1 USDC<br/>when under 0.25 USDC, or when a payment needs it"]
+  FC --> ACC
+  ACC --> MO["Turn-off: move-out job<br/>free, exact input, parts up to the spend cap<br/>back to the public company wallet"]

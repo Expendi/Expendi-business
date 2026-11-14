@@ -3,14 +3,24 @@ flowchart TD
   RETRY["POST /organizations/:id/wallet<br/>retry from the app"] --> SET
   SET --> ENS["ensureCompanyWallet<br/>idempotent, resumes after a crash"]
   ENS --> ROW["Insert wallets row: status creating<br/>per-transaction cap 3,100 USDC"]
-  ROW --> POL{"Policy saved?"}
-  POL -- no --> CP["Privy createPolicy<br/>ALLOW only eth_sendTransaction to USDC on Base (8453)<br/>with transfer amount ≤ cap · deny everything else"]
-  CP --> FIND
-  POL -- yes --> FIND{"Privy wallet for this company?"}
-  FIND -- no --> CW["Privy createWallet<br/>owner: Expendi management quorum (API never holds it)<br/>policy attached · runtime signer added"]
+  ROW --> FIND{"Privy NEAR wallet<br/>for this company?"}
+  FIND -- no --> CW["Privy createNearWallet<br/>owner: Expendi management quorum (API never holds it)<br/>runtime signer added · no policy (Privy has none for NEAR)"]
   FIND -- yes --> CHK
-  CW --> CHK{"checkPrivyWallet<br/>owner · exactly one policy · runtime signer"}
+  CW --> CHK{"checkPrivyWallet<br/>owner · runtime signer · implicit NEAR account"}
   CHK -- mismatch --> BAD["WalletMisconfigured<br/>setup returns status creating"]
-  CHK -- ok --> ACT["Activate wallet row + audit wallet.created"]
-  ACT --> WATCH["Alchemy Notify: add address to webhook<br/>set depositsWatchedAt"]
-  WATCH --> READY(["Wallet ready = active + watched"])
+  CHK -- ok --> SAVE["Save the company wallet<br/>chain near · address = the NEAR account"]
+  SAVE --> POL{"Transit policy saved?"}
+  POL -- no --> CP["Privy createPolicy<br/>ALLOW only eth_sendTransaction to USDC on Base (8453)<br/>with transfer amount ≤ cap · deny everything else"]
+  CP --> TFIND
+  POL -- yes --> TFIND{"Privy Base wallet<br/>for the transit wallet?"}
+  TFIND -- no --> TW["Privy createWallet (transit wallet)<br/>owner: management quorum · policy attached<br/>runtime signer added"]
+  TFIND -- yes --> TCHK
+  TW --> TCHK{"checkPrivyWallet<br/>owner · exactly one policy · runtime signer"}
+  TCHK -- mismatch --> BAD
+  TCHK -- ok --> REL["Gas relayer creates the NEAR account<br/>and registers it with the USDC contract<br/>(only what the chain still lacks)"]
+  REL --> HOME{"CONFIDENTIAL_ACCOUNTS_ENABLED and the<br/>gas relayer can fund the fee float?"}
+  HOME -- yes --> ACT1["Activate wallet row · balance home: confidential account<br/>+ audit wallet.created"]
+  HOME -- no --> ACT2["Activate wallet row · balance home: company wallet<br/>the rollout job turns it confidential later<br/>+ audit wallet.created"]
+  ACT1 --> WATCH
+  ACT2 --> WATCH["Alchemy Notify: add the transit address to the webhook<br/>(cash-out refunds land there) · set depositsWatchedAt"]
+  WATCH --> READY(["Wallet ready = active + transit address watched"])

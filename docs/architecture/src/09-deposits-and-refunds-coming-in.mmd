@@ -1,21 +1,41 @@
 flowchart TD
-  TX["USDC transfer to a company wallet on Base"] --> AL["Alchemy ADDRESS_ACTIVITY webhook"]
-  AL --> EP["POST /webhooks/alchemy"]
-  EP --> SIG{"HMAC x-alchemy-signature valid?"}
-  SIG -- no --> R401["401"]
-  SIG -- yes --> NET{"Base mainnet activity?"}
-  NET -- no --> IGN["200, ignored"]
-  NET -- yes --> REORG{"Removed by a reorg?"}
-  REORG -- yes --> LOG["Logged only<br/>(ledger is not reversed)"]
-  REORG -- no --> USDC["Keep USDC token transfers"]
-  USDC --> RCPT["Base RPC getTransactionReceipt"]
-  RCPT -- "missing" --> R500["500 so Alchemy retries"]
-  RCPT --> MATCH["Successful USDC Transfer logs<br/>to an active company wallet<br/>(active_wallets_by_address)"]
-  MATCH --> KIND{"Who sent it?"}
-  KIND -- "Paycrest Gateway" --> GW["Read OrderRefunded event<br/>verify on chain with getOrderInfo:<br/>refund address = this wallet, token = USDC"]
-  GW --> LINK["Link to the payout by gatewayOrderId<br/>or deposit address + amount"]
-  KIND -- "a payout's deposit address" --> LINK
-  LINK --> REF["wallet_transactions: refund"]
-  KIND -- "anyone else" --> DEP["wallet_transactions: deposit"]
-  REF & DEP --> UNIQ["Unique on (tx_hash, log_index)<br/>so webhook retries are harmless"]
-  UNIQ --> AUD["Audit wallet.refund_received / wallet.deposit_received"]
+  subgraph FUNDIN["Fund-in or pay-link payment, from any supported chain"]
+    F1["Sender pays the 1Click deposit address<br/>of the company's fund-in or invoice quote"] --> F2["1Click delivers USDC to where<br/>the company's balance sits"]
+    F1 -. "can't complete" .-> RF["Refunded into the company's<br/>NEAR Intents account"]
+    RF --> RT["fund-in-returns job swaps it back to USDC on NEAR<br/>and delivers it to where the balance sits"]
+    RT --> F2
+  end
+
+  F2 -- "confidential account" --> C1["Nothing public to read<br/>fund-ins job sees 1Click report SUCCESS"]
+  C1 --> C2["quote-credit: ledger deposit for the amount<br/>1Click says it delivered<br/>one credit per quote, no chain hash"]
+  F2 -- "company wallet" --> W1
+
+  subgraph NEAR["USDC arriving at the company wallet on NEAR"]
+    X["Direct transfer from a person"] --> W1["near-deposits job: FastNear lists USDC transfers,<br/>NEAR RPC confirms: final, USDC contract,<br/>this wallet, same amount"]
+    W1 --> V{"What is it?"}
+    V -- "own money" --> INT["Internal, no ledger row:<br/>gas relayer fee cover, move-in refund, hop, sweep,<br/>payout refund, confidential delivery"]
+    V -- "unexplained" --> HOLD["From NEAR Intents while a quote could still explain it:<br/>held, read again next run,<br/>staff alerted after about 15 minutes"]
+    V -- "Treasury" --> FT["Move to wallet delivery:<br/>wallet_transactions from_treasury"]
+    V -- "new money" --> DEP["Fund-in, invoice payment or fund-in return delivery,<br/>or anything else:<br/>wallet_transactions deposit"]
+  end
+  DEP --> MI["move-ins job: when the balance sits in a confidential account,<br/>moves the company wallet's USDC into it (not a ledger row)"]
+
+  subgraph BASE["Cash-out refund on Base"]
+    R0["Paycrest Gateway or Pretium returns USDC<br/>to the company's transit wallet"] --> AL["Alchemy ADDRESS_ACTIVITY webhook<br/>POST /webhooks/alchemy"]
+    AL --> SIG{"Signature valid?"}
+    SIG -- no --> R401["401"]
+    SIG -- yes --> NET{"Base mainnet USDC,<br/>not reorged?"}
+    NET -- no --> IGN["200, ignored<br/>(reorg logged, ledger not reversed)"]
+    NET -- yes --> RCPT["Base RPC getTransactionReceipt<br/>(missing: 500 so Alchemy retries)"]
+    RCPT --> KIND{"Whose is it?"}
+    KIND -- "a refund" --> RFD["Paycrest: Gateway OrderRefunded checked with getOrderInfo,<br/>or the order's deposit address.<br/>Pretium: the hash it named, or its settlement address<br/>with exactly one waiting cash-out of that amount.<br/>wallet_transactions refund, linked to the payout"]
+    KIND -- "own money" --> OWN["The company's own hop or sweep:<br/>left alone, no ledger row"]
+    KIND -- "unknown" --> REV["Anything else:<br/>raised for review, never credited"]
+    RFD --> SW["sweep-transit-wallets job: once nothing is in flight,<br/>sweeps more than 1 USDC back to where the balance sits<br/>(not a ledger row)"]
+  end
+
+  C2 --> UNIQ
+  DEP --> UNIQ
+  FT --> UNIQ
+  RFD --> UNIQ["One credit per transfer: unique per quote, per NEAR receipt and log,<br/>or per Base tx_hash and log_index, so retries are harmless"]
+  UNIQ --> AUD["Audit wallet.deposit_received, wallet.refund_received<br/>or wallet.treasury_returned"]

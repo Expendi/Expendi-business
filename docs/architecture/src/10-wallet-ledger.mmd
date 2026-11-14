@@ -1,14 +1,19 @@
 flowchart LR
   subgraph Ledger["wallet_transactions · append-only (SELECT + INSERT only, trigger blocks changes)"]
-    C1["deposit (+)"]
-    C2["refund (+)"]
-    C3["topup (+)<br/>defined, not written yet"]
-    D1["payout (−)"]
+    C1["deposit (+)<br/>fund-in, invoice payment, direct transfer"]
+    C2["refund (+)<br/>cash-out refund at the transit wallet"]
+    C3["from_treasury (+)<br/>Move to wallet"]
+    C4["topup (+)<br/>defined, not written yet"]
+    D1["payout (−)<br/>written when the cash-out is funded<br/>or the USDC payout is paid"]
     D2["withdrawal (−)"]
+    D3["to_treasury (−)<br/>Move to Treasury"]
   end
-  BAL["Balance = sum of wallet_transactions"]
-  RES["Reserved = sum of maxDebitUsdc for payouts in<br/>approved · order_created · funding · needs_review"]
+  NOT["Not ledger rows: Base hops, sweeps, move-ins,<br/>move-outs, fee float top-ups"]
+  BAL["Balance = sum of wallet_transactions<br/>one ledger across the company wallet,<br/>the confidential account and the transit wallet"]
+  RES["Reserved = maxDebitUsdc of payouts in<br/>approved · order_created · funding · needs_review<br/>+ the unsent part of an open move to Treasury"]
   AV["Available to approve = balance − reserved"]
   Ledger --> BAL --> AV
   RES --> AV
-  KES["KES equivalent shown at the live Paycrest rate"] -.- BAL
+  CHK["Reconciliation compares the balance with what the company wallet,<br/>the transit wallet and the confidential account hold"] -.- BAL
+  KES["KES equivalent shown at the active cash-out provider's rate"] -.- BAL
+  NOT -.- Ledger

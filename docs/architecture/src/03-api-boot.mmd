@@ -4,10 +4,11 @@ flowchart TD
   BOOT -- "env (default)" --> ENV["process.env"]
   DOP --> ENV
   ENV --> SRV["server.ts (dynamic import)"]
-  SRV --> RT["ManagedRuntime(MainLayer)<br/>builds every layer up front"]
+  SRV --> RT["ManagedRuntime(MainLayer)<br/>builds every layer up front<br/>config · database · Privy · NEAR · 1Click<br/>confidential accounts · Base · providers"]
+  RT --> CFG["Config<br/>CONFIDENTIAL_ACCOUNTS_ENABLED<br/>unset means false"]
   RT --> DBC["Database pool<br/>assertRestrictedRole"]
   RT --> SERVE["@hono/node-server on PORT"]
-  RT --> ST["startStation()<br/>11 jobs"]
+  RT --> ST["startStation()<br/>26 jobs"]
   SERVE -. "SIGTERM/SIGINT" .-> STOP["close server → stop jobs → dispose runtime"]
   RAIL["Railway deploy"] --> MIG["preDeploy: migrate<br/>(owner role, advisory lock)"]
   MIG --> IDX
