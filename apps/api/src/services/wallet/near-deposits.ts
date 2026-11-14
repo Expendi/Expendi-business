@@ -193,6 +193,7 @@ const couldSendToCompanyWallet = (
     "purpose" | "recipientType" | "depositType" | "refundType" | "originAsset"
   >,
 ): boolean =>
+  quote.purpose === "move_out" ||
   (quote.recipientType === "DESTINATION_CHAIN" &&
     quote.depositType !== "CONFIDENTIAL_INTENTS") ||
   (quote.refundType === "ORIGIN_CHAIN" &&
@@ -200,6 +201,7 @@ const couldSendToCompanyWallet = (
     quote.purpose !== "fee_cover");
 
 const couldSendToCompanyWalletSql = or(
+  eq(intentQuotes.purpose, "move_out"),
   and(
     eq(intentQuotes.recipientType, "DESTINATION_CHAIN"),
     ne(intentQuotes.depositType, "CONFIDENTIAL_INTENTS"),
@@ -389,6 +391,7 @@ function readQuote(quote: ListedQuote): QuoteReading {
     case "sweep":
     case "usdc_payout":
     case "move_in":
+    case "move_out":
     case "fee_cover":
       return { kind: "internal" };
   }
@@ -775,6 +778,7 @@ const QUOTE_PURPOSE_NAMES: Readonly<Record<IntentQuotePurpose, string>> = {
   to_treasury: "move to Treasury",
   from_treasury: "move to wallet",
   move_in: "move-in",
+  move_out: "move-out",
   fee_cover: "fee cover",
 };
 

@@ -15,6 +15,7 @@ import { query, withScope } from "../../db/scope.js";
 import { NearRelayer } from "../chain/near-relayer.js";
 import { NearRpc } from "../chain/near-rpc.js";
 import { isImplicitNearAccount } from "../chain/near.js";
+import { FEE_FLOAT_TARGET_USDC } from "./balance-home.js";
 import { sessionForQuote } from "./company-session.js";
 import {
   ConfidentialAccounts,
@@ -29,6 +30,8 @@ import {
   quoteById,
   settleFromOneClick,
 } from "./quote-settle.js";
+
+export { FEE_FLOAT_TARGET_USDC } from "./balance-home.js";
 
 /**
  * Fee cover for a company that keeps its USDC in a confidential account
@@ -48,7 +51,6 @@ import {
  */
 
 /** What a top-up brings the float to. */
-export const FEE_FLOAT_TARGET_USDC = 1_000_000n;
 
 /** The float below which the job tops it up, whether or not a hop waits for it. */
 export const FEE_FLOAT_LOW_USDC = 250_000n;
@@ -76,6 +78,7 @@ function confidentialWallet(wallet: Wallet | undefined) {
     wallet?.status !== "active" ||
     wallet.chain !== "near" ||
     wallet.balanceHome !== "confidential_account" ||
+    wallet.balanceHomeChanging ||
     wallet.address === null ||
     wallet.privyWalletId === null ||
     !isImplicitNearAccount(wallet.address)
@@ -281,12 +284,19 @@ export function startFeeCover(input: {
       Effect.gen(function* () {
         yield* query(() =>
           tx
-            .select({ id: wallets.id })
+            .select()
             .from(wallets)
             .where(eq(wallets.id, wallet.id))
             .for("update"),
         );
-        if (!(yield* mayStart(tx, organizationId))) return null;
+        const [currentWallet] = yield* query(() =>
+          tx.select().from(wallets).where(eq(wallets.id, wallet.id)),
+        );
+        if (
+          !confidentialWallet(currentWallet) ||
+          !(yield* mayStart(tx, organizationId))
+        )
+          return null;
         const [row] = yield* query(() =>
           tx
             .insert(intentQuotes)
@@ -328,12 +338,18 @@ const stillConfidential = (
   withScope({ organizationId: quote.organizationId }, (tx) =>
     query(() =>
       tx
-        .select({ balanceHome: wallets.balanceHome })
+        .select({
+          balanceHome: wallets.balanceHome,
+          changing: wallets.balanceHomeChanging,
+        })
         .from(wallets)
         .where(eq(wallets.id, quote.walletId)),
     ),
   ).pipe(
-    Effect.map(([wallet]) => wallet?.balanceHome === "confidential_account"),
+    Effect.map(
+      ([wallet]) =>
+        wallet?.balanceHome === "confidential_account" && !wallet.changing,
+    ),
   );
 
 /**

@@ -1,6 +1,6 @@
 # Confidential accounts: keeping a company's balance off the public chain
 
-**Status:** decisions accepted 2026-11-13 (Dennis). Phase 1 is built, tested and committed on branch `spike/confidential-intents`. Phases 2 and 3 are built and tested against fakes on the same branch, and committed. Phase 4's receipts, exports, wallet history, withdrawals, app rendering, staff pages and docs are built on the same branch, and committed. The live QA (task 14) is not done: nothing has run on staging, and it waits on a release to staging. Designs and the decisions taken while building: `phase-2-design.md` and `phase-3-4-design.md`. The runbook is `docs/runbooks/confidential-accounts.md`; the live QA plan is `qa-plan.md`; the decision record is `docs/decisions/confidential-accounts.md`.
+**Status:** Phases 1–4 merged into staging in PR #27. The preceding session reported C1/C2 passed and C3 partially complete, awaiting relayer funding. Phase 5, confidential defaults and rollback, is built locally on `feat/confidential-default`; its live QA has not run. Designs: `phase-2-design.md`, `phase-3-4-design.md`; current operations: `docs/runbooks/confidential-accounts.md`; QA: `qa-plan.md` and `default-rollout-qa.md`; decision: `docs/decisions/confidential-accounts.md`.
 
 **Applies to:** the code on `staging`. Every file path below is on that branch.
 
@@ -43,7 +43,7 @@ Not measured at the time of the spike: a payout to Solana, a refund on the confi
 
 All six were accepted as recommended.
 
-1. **Per company, off by default, turned on by Expendi staff.** Nothing changes for a company that doesn't have it.
+1. **Confidential by default for new and existing companies.** Dennis superseded the earlier off-by-default decision later on 2026-11-13. See Phase 5 below for the gated rollout and rollback.
 2. **The ledger is credited from 1Click, not from the chain.** A fund-in or invoice payment to a confidential account is credited when 1Click reports the quote `SUCCESS`, and checked against the balance 1Click returns. There is no chain to confirm it against. This replaces "confirmed at `FINAL`" for these companies, and reverses the reason `near-main-chain.md` gave for a public company wallet.
 3. **The company wallet stays as the public address.** USDC sent straight to it is credited as today, then moved in by a job. Turning the feature on is the same job run over the whole balance.
 4. **Sessions aren't stored.** The API signs in when it needs to and keeps the access token in memory. Nothing new to encrypt or leak.
@@ -88,7 +88,7 @@ Phase 1 left two things for later phases. The check `intent_quotes_intents_side_
 
 12. **Receipts and exports.** Built 2026-11-13: the bill payment receipt, wallet history, withdrawals and the CSV export show the payee chain's transaction for a payment out of a confidential account, named by its chain, and no NEAR link; the invoice PDF shows the payer's own-chain transaction, unlinked; web, mobile and admin render a row with no transaction. Not built: the Base delivery hash in the Treasury export, and a transaction line in the mobile history list.
 13. **Docs.** Written 2026-11-13: `docs/decisions/confidential-accounts.md`, the term **Fee float** in `CONTEXT.md`, and the runbook `docs/runbooks/confidential-accounts.md` (turning on and off, the alert, a quote in review, the fee float, 1Click down).
-14. **Live QA on staging** with Expendi Demo Co. Not done; the plan is `qa-plan.md`: turn on, fund-in, invoice payment, each payout kind, a cash-out through each cash-out provider, a Treasury move each way, a forced refund.
+14. **Live QA on staging** with Expendi Demo Co. Partially done according to the preceding session (C1/C2; C3 partial). Remaining checks in `qa-plan.md`: fund-in, invoice payment, each payout kind, cash-outs, Treasury moves and refunds.
 
 About 8 to 10 working days for one person; 4 to 5 with parallel build sessions, since phases 2 and 3 only share phase 1.
 
@@ -99,3 +99,22 @@ About 8 to 10 working days for one person; 4 to 5 with parallel build sessions, 
 3. What can the operators of the private ledger read, and is there an audit or technical description of it?
 4. Can one confidential account pay another directly? It decides how Expendi covers hop fees (task 8).
 5. Where does a refund land when a payout out of a confidential account fails?
+
+## 7. Phase 5: confidential by default
+
+Continues Claude session `204f9535-f754-4650-a1ff-cea04ee69490`.
+Implemented on `feat/confidential-default`:
+
+- Environment-gated defaults for new wallets, with readiness before activation.
+- One existing company admitted per tick, funding reservations, in-flight
+  checks and fair rotation of blocked candidates.
+- Resumable, capped, free move-outs; ledger-neutral float accounting.
+- Admission fencing during rollback, persisted opt-out, and a status command.
+- Corrected balance-alert advice to consider the transit wallet too.
+- Migration `0108_confidential_default.sql`; no existing balance-home updates
+  are performed by the migration.
+
+PR #27 already deployed Phases 1–4 to staging. The previous session reported
+C1/C2 passed and C3 awaiting relayer funding. The new rollout and move-out
+need live checks; see `default-rollout-qa.md`. No deployment or live-money
+operation is part of this local build.

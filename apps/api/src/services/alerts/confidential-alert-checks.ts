@@ -190,7 +190,7 @@ export function confidentialBalanceCheck(
                   value:
                     verdict === "short"
                       ? "The company holds less than the ledger says it has. Look at its recent payouts, sends and fund-ins first: a delivery 1Click reported but never made would show up here."
-                      : "The company holds more than the ledger and Expendi's surplus explain, and the excess isn't waiting in the company wallet. USDC may have reached the confidential account without a quote of ours, and nothing will credit it.",
+                      : "The company holds more than the ledger and Expendi's surplus explain. Compare the company wallet, transit wallet and confidential account figures with recent transfers and quotes. An unrecorded transfer into any of these can explain the excess; do not assume it reached the confidential account.",
                 },
               ]),
         ],

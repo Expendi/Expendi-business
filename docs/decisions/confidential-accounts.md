@@ -2,7 +2,7 @@
 
 _2026-11-13. Dennis, after the confidential-intents spike on mainnet (branch `spike/confidential-intents`)._
 
-A company that asks for it keeps its USDC in a confidential account: its own account on the private ledger NEAR Intents runs (`intents.far`), reached through the 1Click API we already use. The company wallet stays as the company's public address and the key that signs for the confidential account. We chose this over leaving every balance in the public company wallet, which anyone who knows the account can read along with every USDC payout and payee, and over 1Click's `confidentiality` flag on its own, which by NEAR Intents' description hides only where a transfer between chains came from and leaves the balance public. Phases 1 to 3 are built (the signing guard, money in, money out) and tested against fakes on that branch, and the staff pages that show a confidential company are in its working tree. None of it has run on staging. What has run on mainnet is the spike's own calls and the measurements under "What was proved". The runbook is `docs/runbooks/confidential-accounts.md`.
+A company keeps its USDC in a confidential account: its own account on the private ledger NEAR Intents runs (`intents.far`), reached through the 1Click API we already use. The company wallet stays as the company's public address and signing key. This replaces public balances and payment histories, which 1Click's `confidentiality` flag alone does not hide. Phases 1–4 were merged into staging in PR #27. The preceding Claude session reported live checks C1 and C2 passed; that evidence is historical, not re-run for this build. The default rollout and rollback are implemented on `feat/confidential-default`, with local tests against fakes. The runbook is `docs/runbooks/confidential-accounts.md`.
 
 What stays public: the transit wallet and the Treasury wallet on Base, the payee's own receipt of a payment (amount and address), the sender's side of a fund-in, and everything the company wallet did before it was turned on. A move-in is public too: it is a transfer out of the company wallet, with its amount, to a NEAR Intents deposit address. A confidential account hides who paid, not that a payment happened.
 
@@ -12,7 +12,7 @@ This extends `near-main-chain.md`. Terms are defined in `CONTEXT.md`.
 
 Dennis accepted these on 2026-11-13.
 
-1. **Per company, off by default, turned on by Expendi staff.** Nothing changes for a company that doesn't have it.
+1. **Every company, new and existing, uses a confidential account by default.** Dennis superseded the initial opt-in decision later on 2026-11-13. Deployment is gated by `CONFIDENTIAL_ACCOUNTS_ENABLED` (unset means false). With it enabled, new wallets are created confidential and existing eligible NEAR wallets are admitted one per job tick. An explicit rollback opts a company out until staff turn it on again.
 2. **The ledger is credited from 1Click, not from the chain.** A fund-in or invoice payment to a confidential account is credited when 1Click reports the quote `SUCCESS`, and checked against the balance 1Click returns. There is no chain to confirm it against. This replaces "confirmed at `FINAL`" for these companies.
 3. **The company wallet stays as the public address.** USDC sent straight to it is credited as today, then moved in by a job. Turning the feature on is that job run over the whole balance.
 4. **Sessions aren't stored.** The API signs in to 1Click when it needs to and keeps the access token in memory.
@@ -80,6 +80,18 @@ Not proved: a refund on the confidential route (where it lands, whether the whol
 - A refill is a free USDC-to-USDC delivery into the account, paid by the gas relayer, with the refund going back to the relayer. The relayer has to hold the USDC (staging held 0.47 USDC on 2026-11-13). When it doesn't, no refill starts and a quote that needs the float expires with nothing sent.
 - Expendi absorbs sweep costs into the float. If costs spend it below zero, company money is paying Expendi's costs, and the alert shows the company as short.
 
+### Activation and rollback
+
+- A new wallet activates confidential when sign-in works and the relayer can fund its float. Otherwise it activates on its company wallet, so sign-up never waits on the relayer, and the rollout turns it confidential later.
+- Existing companies switch only when quotes, reserving payouts, sends, Treasury moves and confidential credits are settled. The rollout rotates past blocked companies.
+- Recently successful confidential exact-output quotes also block switching for five minutes, allowing their asynchronously returned buffers to arrive before draining.
+- Activation and manual turn-on share a database lock and a relayer budget check. Other active confidential companies' outstanding float targets reserve budget, including refills still in flight.
+- Turn-off requests a durable drain (`balance_home_changing`), keeping the balance home confidential until it is empty. New quotes, company-wallet sends, reserving payouts and Treasury moves are fenced by the wallet row lock and database admission triggers. Move-ins and float refills stop.
+- Each `move_out` is an exact-input, free NEAR-USDC delivery to the company's own public address, under its spend cap. The usual checked, saved-before-submitted signing path is reused. Uncertain quotes block replacement; refunds or failed attempts wait 30 minutes before retry.
+- Move-outs never change the ledger. The public deposit watcher recognises their transfers as internal. `moved_surplus_usdc` moves Expendi's float from the confidential surplus calculation to the public one only on success.
+- A short or missing delivered amount stays under review. Completion requires no unsettled quotes and a fresh zero confidential balance. Recorded float still left then was never in the account; it is written off on the wallet (`confidential_float_written_off_usdc`), logged and audited, so a drain can't pause a company's payments for good. A negative float must be refilled before requesting rollback.
+- Disabling the environment switch stops forward rollout, not already-requested rollbacks or existing confidential payments.
+
 ### Staff
 
 - Staff can't ask 1Click about a confidential quote, read the balance live or read the account's history. They see the balance the alert check last saved, with its time, and the last status the job heard for each quote.
@@ -93,7 +105,7 @@ Not proved: a refund on the confidential route (where it lands, whether the whol
 - Amounts and payee addresses stay public. When few others use the shared account, someone can match a payment by amount and time.
 - Every payment, including one to a payee on NEAR, now goes through a 1Click quote and depends on 1Click being up.
 - A payout to Base costs about 0.0048 USDC fixed plus 2 bps.
-- Turning a company off isn't built. `turn-off` refuses while the account holds any USDC, and Expendi's own fee float sits in the account, so a company that has been turned on stays on. Moving a balance back out (a move-out quote, the mirror of a move-in, which was measured free in the spike) is a later task.
+- Turn-off pauses new money operations while a resumable move-out drains the account. Provider outages, a quote in review, or dust the provider refuses can prolong that pause. Move-out lifecycle behaviour is tested locally, not yet measured live.
 - A payroll run of many USDC payouts can run slower. Each payout is its own quote, where a NEAR payee was one direct transfer, and a quote is paid only when the account holds its amount in plus that of every other quote of the wallet still in flight. A quote that waits past its deadline expires and its payout fails with nothing sent. The company's admin can retry it. Rate limits on 1Click's calls for a large payroll are unknown.
 - Each move-in and each fee float refill costs Expendi a storage registration (0.00125 NEAR) for its deposit address, plus relay gas, and the float itself is Expendi's USDC inside the account, where NEAR Intents can see it.
 - A staff member can't settle a confidential quote that is stuck in review, or look into it live. It waits for the job, for 1Click, or for the message's own deadline, up to three days.

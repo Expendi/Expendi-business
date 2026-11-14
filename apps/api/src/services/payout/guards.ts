@@ -8,6 +8,7 @@ import {
   organizations,
   payouts,
   platformSettings,
+  wallets,
 } from "../../db/schema/index.js";
 import { query } from "../../db/scope.js";
 
@@ -39,7 +40,18 @@ export function isPaused(
         .from(platformSettings)
         .limit(1),
     );
-    return !company || company.paused || (platform?.paused ?? true);
+    const [wallet] = yield* query(() =>
+      tx
+        .select({ changing: wallets.balanceHomeChanging })
+        .from(wallets)
+        .where(eq(wallets.organizationId, organizationId)),
+    );
+    return (
+      !company ||
+      company.paused ||
+      (platform?.paused ?? true) ||
+      (wallet?.changing ?? false)
+    );
   });
 }
 

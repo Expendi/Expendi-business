@@ -12,14 +12,20 @@ import type { DatabaseError } from "../../errors.js";
 import type { AlchemyNotifyError } from "../alchemy/alchemy-webhook.js";
 import type { AuditActor } from "../audit/audit-log.js";
 import type { NearRelayerError } from "../chain/near-relayer.js";
-import type { NearRpcError } from "../chain/near-rpc.js";
+import type { NearRpc, NearRpcError } from "../chain/near-rpc.js";
+import type { ConfidentialAccounts } from "../intents/confidential-account.js";
 import type { PrivyWalletError, PrivyWalletRecord } from "./privy-wallets.js";
+import { ConfigService } from "../../config.js";
 import { wallets } from "../../db/schema/index.js";
 import { query, withScope } from "../../db/scope.js";
 import { AlchemyWebhook } from "../alchemy/alchemy-webhook.js";
 import { AuditLog } from "../audit/audit-log.js";
 import { NearRelayer } from "../chain/near-relayer.js";
 import { isImplicitNearAccount } from "../chain/near.js";
+import {
+  checkConfidentialReadiness,
+  lockConfidentialRollout,
+} from "../intents/balance-home.js";
 import { PrivyWallets } from "./privy-wallets.js";
 
 const USDC_PER_WHOLE_DOLLAR = 1_000_000n;
@@ -89,6 +95,9 @@ export type EnsureCompanyWalletError =
   | DatabaseError;
 
 export type EnsureCompanyWalletDeps =
+  | ConfigService
+  | ConfidentialAccounts
+  | NearRpc
   | DatabaseService
   | AuditLog
   | PrivyWallets
@@ -209,6 +218,7 @@ export function ensureCompanyWallet(input: {
     const relayer = yield* NearRelayer;
     const alchemy = yield* AlchemyWebhook;
     const audit = yield* AuditLog;
+    const config = yield* ConfigService;
 
     let wallet = yield* withScope(scope, (tx) =>
       query(() =>
@@ -301,10 +311,38 @@ export function ensureCompanyWallet(input: {
       const walletId = wallet.id;
       wallet = yield* withScope(scope, (tx) =>
         Effect.gen(function* () {
+          yield* lockConfidentialRollout(tx);
+          const [current] = yield* query(() =>
+            tx
+              .select()
+              .from(wallets)
+              .where(eq(wallets.id, walletId))
+              .for("update"),
+          );
+          if (current?.status !== "creating")
+            return yield* selectWallet(tx, organizationId);
+          // A company that can't be made confidential yet still gets a working
+          // public wallet; the rollout job turns it confidential later.
+          const confidential =
+            config.confidentialAccountsEnabled &&
+            (yield* checkConfidentialReadiness(tx, current).pipe(
+              Effect.as(true),
+              Effect.catchTag("BalanceHomeNotReady", (error) => {
+                console.warn(
+                  `[wallet] ${organizationId} starts on its company wallet; the rollout turns it confidential later: ${error.message}`,
+                );
+                return Effect.succeed(false);
+              }),
+            ));
           const [activated] = yield* query(() =>
             tx
               .update(wallets)
-              .set({ status: "active" })
+              .set({
+                status: "active",
+                balanceHome: confidential
+                  ? "confidential_account"
+                  : "company_wallet",
+              })
               .where(
                 and(eq(wallets.id, walletId), eq(wallets.status, "creating")),
               )

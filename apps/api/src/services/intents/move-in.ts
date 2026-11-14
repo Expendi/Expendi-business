@@ -86,6 +86,7 @@ function moveInWallet(wallet: Wallet | undefined): MoveInWallet | null {
     wallet?.status !== "active" ||
     wallet.chain !== "near" ||
     wallet.balanceHome !== "confidential_account" ||
+    wallet.balanceHomeChanging ||
     wallet.address === null ||
     wallet.privyWalletId === null ||
     !isImplicitNearAccount(wallet.address)
@@ -317,6 +318,10 @@ export function startMoveIn(input: {
             .where(eq(wallets.id, wallet.id))
             .for("update"),
         );
+        const [currentWallet] = yield* query(() =>
+          tx.select().from(wallets).where(eq(wallets.id, wallet.id)),
+        );
+        if (moveInWallet(currentWallet) === null) return null;
         if (!(yield* mayStart(tx, organizationId, wallet.id))) return null;
         const [row] = yield* query(() =>
           tx
@@ -380,11 +385,14 @@ function stillWanted(
       }
       const [wallet] = yield* query(() =>
         tx
-          .select({ balanceHome: wallets.balanceHome })
+          .select({
+            balanceHome: wallets.balanceHome,
+            changing: wallets.balanceHomeChanging,
+          })
           .from(wallets)
           .where(eq(wallets.id, quote.walletId)),
       );
-      if (wallet?.balanceHome !== "confidential_account") {
+      if (wallet?.balanceHome !== "confidential_account" || wallet.changing) {
         return {
           kind: "abandon",
           reason:
