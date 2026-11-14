@@ -47,7 +47,7 @@ Approving a payment asks for a passkey on the device you're using. Please don't 
 
 ## NEAR HACKATHON submission
 
-**Track 08 · Real-World Money.** Expendi Business already ran on Base before the hackathon. What was built for NEAR HACKATHON is the port that makes NEAR the main chain, and the features built on it since: everything on the `staging` branch after the `pre-hackathon-near` tag. [See the diff](https://github.com/Expendi/Expendi-business/compare/pre-hackathon-near...staging).
+**Track 08 · Real-World Money.** What was built for NEAR HACKATHON is NEAR as the main chain and the features built on it: everything on the `staging` branch after the `pre-hackathon-near` tag. [See the diff](https://github.com/Expendi/Expendi-business/compare/pre-hackathon-near...staging).
 
 A Kenyan company keeps its money as USDC in its own NEAR account. From there it pays staff claims, supplier bills and payroll, to M-Pesa or to a USDC payee on the chain the payee chooses. It never sees a gas token.
 
@@ -113,7 +113,6 @@ You should see every test pass. The NEAR behaviour lives in these files under `a
 
 ### Disclosure
 
-- Expendi Business existed on Base before NEAR HACKATHON. The NEAR port is the hackathon work.
 - Code was written with Claude Code (Anthropic), using parallel subagents, and reviewed and verified in the main session.
 - Libraries: `near-api-js`, `@privy-io/node`, `@defuse-protocol/one-click-sdk-typescript`, plus the existing stack listed under Development.
 
