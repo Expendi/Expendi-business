@@ -3,13 +3,19 @@ import { describe, expect, it } from "vitest";
 import {
   canFreeze,
   canShowDetails,
+  cardFaceNumber,
   cardStateNotice,
   declineNotice,
+  limitLeft,
+  limitUsed,
   maskedCardNumber,
+  merchantKind,
   purchaseAmount,
   purchaseBadges,
   purchaseDate,
   purchaseKes,
+  purchaseMeta,
+  purchaseShortDate,
   receiptSummary,
   spentOfLimit,
 } from "./card-display";
@@ -202,5 +208,129 @@ describe("purchaseDate", () => {
 
     // #then
     expect(date).toBe("9 Nov 2026");
+  });
+});
+
+describe("the monthly limit", () => {
+  it("fills the meter by how much is spent", () => {
+    // #when
+    const used = limitUsed({
+      spentThisMonthUsdCents: "41250",
+      monthlyLimitUsdCents: "150000",
+    });
+
+    // #then
+    expect(used).toBe(0.275);
+  });
+
+  it.each([
+    ["over the limit", "160000", "150000"],
+    ["a zero limit", "0", "0"],
+  ])("shows a full meter on %s", (_case, spent, limit) => {
+    // #when
+    const used = limitUsed({
+      spentThisMonthUsdCents: spent,
+      monthlyLimitUsdCents: limit,
+    });
+
+    // #then
+    expect(used).toBe(1);
+  });
+
+  it("says what's left this month", () => {
+    // #when
+    const left = limitLeft({
+      spentThisMonthUsdCents: "41250",
+      monthlyLimitUsdCents: "150000",
+    });
+
+    // #then
+    expect(left).toBe("USD 1,087.50 left");
+  });
+
+  it("never says less than nothing is left", () => {
+    // #when
+    const left = limitLeft({
+      spentThisMonthUsdCents: "160000",
+      monthlyLimitUsdCents: "150000",
+    });
+
+    // #then
+    expect(left).toBe("USD 0.00 left");
+  });
+});
+
+describe("cardFaceNumber", () => {
+  it("masks every group but the last four", () => {
+    expect(cardFaceNumber("4821")).toBe("••••  ••••  ••••  4821");
+  });
+});
+
+describe("purchaseMeta", () => {
+  const now = new Date("2026-11-14T08:00:00.000Z");
+  const purchase = {
+    authorizedAt: "2026-11-12T16:20:00.000Z",
+    kind: "purchase",
+    status: "settled",
+    needsReceipt: false,
+  } as const;
+
+  it("is just the day for a settled purchase with its receipt", () => {
+    expect(purchaseMeta(purchase, now)).toBe("12 Nov");
+  });
+
+  it("asks for the receipt", () => {
+    expect(purchaseMeta({ ...purchase, needsReceipt: true }, now)).toBe(
+      "12 Nov · Receipt needed",
+    );
+  });
+
+  it("says when it's still pending", () => {
+    expect(
+      purchaseMeta({ ...purchase, status: "pending", needsReceipt: true }, now),
+    ).toBe("12 Nov · Pending · Receipt needed");
+  });
+
+  it("says a decline", () => {
+    expect(purchaseMeta({ ...purchase, status: "declined" }, now)).toBe(
+      "12 Nov · Declined",
+    );
+  });
+
+  it("calls a refund a refund", () => {
+    expect(purchaseMeta({ ...purchase, kind: "refund" }, now)).toBe(
+      "12 Nov · Refund",
+    );
+  });
+});
+
+describe("purchaseShortDate", () => {
+  const now = new Date("2026-01-02T08:00:00.000Z");
+
+  it("leaves out this year", () => {
+    expect(purchaseShortDate("2026-01-01T09:00:00.000Z", now)).toBe("1 Jan");
+  });
+
+  it("keeps the year of an older purchase, by the day in Nairobi", () => {
+    // #given 22:30 UTC on 31 Dec is already 1 Jan in Nairobi
+    expect(purchaseShortDate("2025-12-31T20:30:00.000Z", now)).toBe(
+      "31 Dec 2025",
+    );
+    expect(purchaseShortDate("2025-12-31T22:30:00.000Z", now)).toBe("1 Jan");
+  });
+});
+
+describe("merchantKind", () => {
+  it.each([
+    ["4511", "flight"],
+    ["3058", "flight"],
+    ["7011", "stay"],
+    ["3502", "stay"],
+    ["4121", "ride"],
+    ["5541", "fuel"],
+    ["5812", "food"],
+    ["5734", "other"],
+  ] as const)("reads MCC %s as %s", (mcc, kind) => {
+    expect(merchantKind(mcc)).toBe(kind);
   });
 });

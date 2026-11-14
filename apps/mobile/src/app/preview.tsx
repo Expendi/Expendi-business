@@ -21,7 +21,7 @@ import { previewSession } from "~/features/preview/session";
 import { ApiClientProvider } from "~/providers/api-provider";
 
 export default function PreviewRoute(): JSX.Element {
-  const { screen } = useLocalSearchParams<{ screen?: string }>();
+  const { screen, bare } = useLocalSearchParams<{ screen?: string; bare?: string }>();
   const router = useRouter();
   if (!__DEV__) return <Redirect href="/" />;
   const current =
@@ -48,7 +48,7 @@ export default function PreviewRoute(): JSX.Element {
           }
         />
       ) : null}
-      <Switcher
+      {bare ? null : <Switcher
         current={current}
         bottomOffset={current.tab ? TAB_BAR_HEIGHT + 12 : 140}
         onStep={(step) => {
@@ -56,7 +56,7 @@ export default function PreviewRoute(): JSX.Element {
           const count = PREVIEW_SCREENS.length;
           show(PREVIEW_SCREENS[(index + step + count) % count]);
         }}
-      />
+      />}
     </View>
   );
 }

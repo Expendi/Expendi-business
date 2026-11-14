@@ -2,6 +2,7 @@
 import type { PreviewArea, PreviewRoute, PreviewScreen } from "./types";
 import { AUTH_AREA } from "./areas/auth";
 import { BILLS_AREA } from "./areas/bills";
+import { CARDS_AREA } from "./areas/cards";
 import { COMPANY_AREA } from "./areas/company";
 import { EXPENSES_AREA } from "./areas/expenses";
 import { HOME_AREA } from "./areas/home";
@@ -15,6 +16,7 @@ const AREAS: readonly PreviewArea[] = [
   EXPENSES_AREA,
   PAYROLL_AREA,
   COMPANY_AREA,
+  CARDS_AREA,
   AUTH_AREA,
 ];
 

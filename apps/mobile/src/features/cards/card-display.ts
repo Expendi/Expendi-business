@@ -45,6 +45,30 @@ export function spentOfLimit(
   return `${spent} of ${limit} this month`;
 }
 
+type LimitFacts = Pick<
+  ExpendiCard,
+  "spentThisMonthUsdCents" | "monthlyLimitUsdCents"
+>;
+
+/** How full this month's limit is, 0 to 1, for the meter. */
+export function limitUsed(card: LimitFacts): number {
+  const limit = BigInt(card.monthlyLimitUsdCents);
+  const spent = BigInt(card.spentThisMonthUsdCents);
+  if (spent >= limit) return 1;
+  return Number((spent * 1000n) / limit) / 1000;
+}
+
+export function limitLeft(card: LimitFacts): string {
+  const left =
+    BigInt(card.monthlyLimitUsdCents) - BigInt(card.spentThisMonthUsdCents);
+  return `${formatUsdCents(left > 0n ? left : 0n)} left`;
+}
+
+/** The number as the card face shows it, before the details are revealed. */
+export function cardFaceNumber(lastFour: string): string {
+  return `••••  ••••  ••••  ${lastFour}`;
+}
+
 /** Only an admin unfreezes, so a holder can freeze a card once. */
 export function canFreeze(card: Pick<ExpendiCard, "yours" | "state">): boolean {
   return card.yours && card.state === "open";
@@ -102,6 +126,33 @@ export function purchaseBadges(
   return purchase.needsReceipt ? [status, RECEIPT_NEEDED_BADGE] : [status];
 }
 
+/** Under the merchant in a list: the day, then anything that isn't plain settled. */
+export function purchaseMeta(
+  purchase: Pick<
+    CardPurchase,
+    "authorizedAt" | "kind" | "status" | "needsReceipt"
+  >,
+  now: Date,
+): string {
+  const notes = purchaseBadges(purchase)
+    .filter((badge) => badge !== PURCHASE_STATUS_BADGES.settled)
+    .map((badge) => badge.label);
+  return [purchaseShortDate(purchase.authorizedAt, now), ...notes].join(" · ");
+}
+
+export type MerchantKind = "flight" | "stay" | "ride" | "fuel" | "food" | "other";
+
+/** What sort of place took the payment, from its merchant category code. */
+export function merchantKind(mcc: string): MerchantKind {
+  const code = Number(mcc);
+  if ((code >= 3000 && code <= 3350) || code === 4511) return "flight";
+  if ((code >= 3501 && code <= 3999) || code === 7011) return "stay";
+  if (code === 4121) return "ride";
+  if (code === 5541 || code === 5542 || code === 5983) return "fuel";
+  if (code >= 5811 && code <= 5814) return "food";
+  return "other";
+}
+
 export function declineNotice(
   purchase: Pick<CardPurchase, "status" | "declineReason">,
 ): string | null {
@@ -137,4 +188,23 @@ const NAIROBI_DAY = new Intl.DateTimeFormat("en-GB", {
 /** e.g. "8 Nov 2026": the day it was in Kenya when the card was used. */
 export function purchaseDate(authorizedAt: string): string {
   return NAIROBI_DAY.format(new Date(authorizedAt));
+}
+
+const NAIROBI_DAY_MONTH = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  timeZone: "Africa/Nairobi",
+});
+
+const NAIROBI_YEAR = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric",
+  timeZone: "Africa/Nairobi",
+});
+
+/** e.g. "12 Nov", with the year only when it wasn't this year in Kenya. */
+export function purchaseShortDate(authorizedAt: string, now: Date): string {
+  const at = new Date(authorizedAt);
+  return NAIROBI_YEAR.format(at) === NAIROBI_YEAR.format(now)
+    ? NAIROBI_DAY_MONTH.format(at)
+    : NAIROBI_DAY.format(at);
 }
