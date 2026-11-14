@@ -4,7 +4,7 @@ import type {
   ControlsResponse,
 } from "@expendi-business/shared";
 
-import { sampleId } from "./ids";
+import { minutesAgo, sampleId } from "./ids";
 
 export const COMPANY_ID = sampleId(1);
 export const PAUSED_COMPANY_ID = sampleId(4);
@@ -106,13 +106,14 @@ export function companyDetail(
       },
     ],
     wallet: {
-      chain: "base",
+      chain: "near",
       status: "active",
-      address: "0x4f2a9c81d3b7e60a15c8f2d94b73e0a6c1d58e37",
+      address:
+        "31b95d2eb4c4aaa56d63b85728c30cbd243b7850f04510624692af892d8026f8",
       usdcBalance: "1842500000",
-      balanceHome: "company_wallet",
-      confidentialUsdc: null,
-      confidentialUsdcReadAt: null,
+      balanceHome: "confidential_account",
+      confidentialUsdc: "1842500000",
+      confidentialUsdcReadAt: minutesAgo(3),
       kesEquivalent: { kesCents: "23768250000", rate: "129" },
     },
     unpaidClaims: { count: 6, totalKesCents: "8745000" },

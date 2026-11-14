@@ -1,28 +1,25 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { GaugeIcon, ReceiptIcon, WalletIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import type { CompanyDetail } from "@expendi-business/shared";
-import { PAYEE_CHAIN_NAMES } from "@expendi-business/shared";
 
 import { DataTable, useDataTable } from "~/components/data/data-table";
 import { PageHeader } from "~/components/data/page-header";
-import { StatCard, StatCards } from "~/components/data/stat-cards";
 import { PageEmpty, PageError, PageLoading } from "~/components/page-state";
-import { PauseFlow } from "~/components/pause-flow";
 import { PayoutsTable } from "~/components/payouts-table";
 import { secondaryButton } from "~/components/styles";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardHeader, CardTitle } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useStaffAuth } from "~/contexts/staff-auth-context";
 import { describeApiError } from "~/lib/api";
-import { formatKesCents, formatNairobiTime, formatUsdc } from "~/lib/format";
+import { formatNairobiTime } from "~/lib/format";
 import { queryKeys } from "~/lib/query-keys";
 import { CardSimulationsSection } from "./card-simulations-section";
 import { memberColumns } from "./columns";
+import { CompanyRail } from "./company-rail";
 import { TreasurySection } from "./treasury-section";
 
 /** One company, as the Expendi team sees it (spec §6.15). Read-only except the pause. */
@@ -43,7 +40,7 @@ export function CompanyView({ companyId }: { companyId: string }) {
   const company = result.data;
 
   return (
-    <section className="max-w-5xl">
+    <section className="max-w-7xl">
       <p className="text-sm">
         <Link
           href="/companies"
@@ -93,59 +90,14 @@ export function CompanyView({ companyId }: { companyId: string }) {
         </Link>
       </p>
 
-      <PauseSection company={company} canAct={canAct} />
-
-      <StatCards label="Company figures" columns={3}>
-        <StatCard
-          icon={WalletIcon}
-          tone="total"
-          label="Wallet balance (ledger)"
-          value={
-            company.wallet
-              ? formatUsdc(company.wallet.usdcBalance)
-              : "No wallet yet"
-          }
-          sub={
-            company.wallet
-              ? company.wallet.kesEquivalent
-                ? `≈ ${formatKesCents(company.wallet.kesEquivalent.kesCents)} at ${company.wallet.kesEquivalent.rate}`
-                : "KES equivalent unavailable"
-              : undefined
-          }
-        />
-        <StatCard
-          icon={GaugeIcon}
-          tone="total"
-          label="Daily payout cap"
-          value={formatKesCents(company.dailyPayoutCapKesCents)}
-        />
-        <StatCard
-          icon={ReceiptIcon}
-          tone="total"
-          label="Unpaid claims"
-          value={company.unpaidClaims.count}
-          sub={formatKesCents(company.unpaidClaims.totalKesCents)}
-        />
-      </StatCards>
-      {company.wallet?.address ? (
-        <p className="mt-2 text-sm text-muted-foreground">
-          Company wallet on {PAYEE_CHAIN_NAMES[company.wallet.chain]}{" "}
-          <span className="font-mono text-xs break-all">
-            {company.wallet.address}
-          </span>{" "}
-          ({company.wallet.status})
-        </p>
-      ) : null}
-      {company.wallet?.balanceHome === "confidential_account" ? (
-        <p className="mt-2 text-sm text-muted-foreground">
-          {company.wallet.confidentialUsdc !== null &&
-          company.wallet.confidentialUsdcReadAt !== null
-            ? `Confidential account, as of ${formatNairobiTime(company.wallet.confidentialUsdcReadAt)}: ${formatUsdc(company.wallet.confidentialUsdc)}`
-            : "Confidential account: not read yet"}
-        </p>
-      ) : null}
-
-      <CompanyTabs company={company} canAct={canAct} />
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)_336px] items-start gap-6 max-[1280px]:grid-cols-1">
+        <div className="min-w-0 max-[1280px]:order-2">
+          <CompanyTabs company={company} canAct={canAct} />
+        </div>
+        <div className="max-[1280px]:order-1">
+          <CompanyRail company={company} canAct={canAct} />
+        </div>
+      </div>
     </section>
   );
 }
@@ -191,7 +143,7 @@ function CompanyTabs({
   }
 
   return (
-    <Tabs value={active} onValueChange={selectTab} className="mt-6 gap-4">
+    <Tabs value={active} onValueChange={selectTab} className="gap-4">
       <div className="max-w-full overflow-x-auto">
         <TabsList>
           {COMPANY_TABS.map((tab) => (
@@ -235,63 +187,11 @@ function CompanyTabs({
           {company.recentPayouts.length === 0 ? (
             <PageEmpty title="No payouts yet." />
           ) : (
-            <PayoutsTable
-              payouts={company.recentPayouts}
-              showCompany={false}
-            />
+            <PayoutsTable payouts={company.recentPayouts} showCompany={false} />
           )}
         </Card>
       </TabsContent>
     </Tabs>
-  );
-}
-
-function PauseSection({
-  company,
-  canAct,
-}: {
-  company: CompanyDetail;
-  canAct: boolean;
-}) {
-  return (
-    <Card className="mt-6">
-      <CardHeader>
-        <CardTitle>
-          <h2>Payouts</h2>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="mt-1 text-sm">
-          {company.payoutsPaused
-            ? "Paused for this company."
-            : "Running for this company."}
-          {company.platformPayoutsPaused
-            ? " All companies' payouts are paused too (Controls)."
-            : null}
-        </p>
-        <div className="mt-3">
-          {canAct ? (
-            company.payoutsPaused ? (
-              <PauseFlow
-                action="unpause"
-                organizationId={company.id}
-                label={`Unpause ${company.name}'s payouts`}
-              />
-            ) : (
-              <PauseFlow
-                action="pause"
-                organizationId={company.id}
-                label={`Pause ${company.name}'s payouts`}
-              />
-            )
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Pausing needs an ops admin.
-            </p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
