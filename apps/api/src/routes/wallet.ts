@@ -30,6 +30,7 @@ import {
 } from "../services/intents/fund-in.js";
 import { kesCentsFor } from "../services/paycrest/amounts.js";
 import { walletHistory } from "../services/wallet/history.js";
+import { availableUsdc } from "../services/wallet/ledger.js";
 import {
   readyAddress,
   setUpCompanyWallet,
@@ -64,6 +65,7 @@ type CompanyWallet =
       readonly address: string;
       readonly chain: WalletChain;
       readonly usdcBalance: bigint;
+      readonly availableUsdc: bigint;
       readonly kesEquivalent: {
         readonly kesCents: bigint;
         readonly rate: string;
@@ -75,7 +77,7 @@ type CompanyWallet =
     };
 
 /**
- * The ledger balance: what Expendi will let the company spend. Read only: a
+ * The ledger balance and what the company can spend now. Read only: a
  * wallet still `creating` is reported as such, and `POST` resumes it.
  */
 function getCompanyWallet(
@@ -112,10 +114,12 @@ function getCompanyWallet(
           .from(walletTransactions)
           .where(eq(walletTransactions.walletId, wallet.id)),
       );
+      const available = yield* availableUsdc(tx, wallet.id);
       return {
         address,
         chain: wallet.chain,
         usdcBalance: BigInt(ledger?.balance ?? "0"),
+        availableUsdc: available > 0n ? available : 0n,
       };
     }),
   ).pipe(
@@ -131,7 +135,7 @@ function getCompanyWallet(
           ? Effect.succeed({ status: "creating" })
           : Effect.map(
               Effect.all(
-                [kesEquivalent(wallet.usdcBalance), activeCashOutLimits],
+                [kesEquivalent(wallet.availableUsdc), activeCashOutLimits],
                 { concurrency: "unbounded" },
               ),
               ([kes, cashOutLimits]) => ({

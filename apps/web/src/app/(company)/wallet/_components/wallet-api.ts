@@ -178,7 +178,7 @@ const BALANCE_MAX_PAGES = 10;
 
 /**
  * The ledger back to `since` (a Nairobi day), for the balance chart and the
- * month's money in and out. Loads further pages by itself until it gets
+ * month's money in and out; withdrawals not yet debited are left out. Loads further pages by itself until it gets
  * there; `complete` is false while it's still on its way.
  */
 export function useBalanceHistory(
@@ -200,7 +200,9 @@ export function useBalanceHistory(
     getNextPageParam: (page) => page.nextCursor,
   });
   const pages = history.data?.pages;
-  const items = pages?.flatMap((page) => page.items) ?? null;
+  const items =
+    pages?.flatMap((page) => page.items.filter((item) => !item.pending)) ??
+    null;
   const oldest = items?.at(-1)?.createdAt;
   const reached = oldest === undefined || nairobiDay(oldest) < since;
   const needsMore =

@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Effect } from "effect";
 
 import type {
@@ -10,6 +10,7 @@ import type {
 
 import type { DatabaseService } from "../../db/client.js";
 import type { Payout } from "../../db/schema/index.js";
+import type { Transaction } from "../../db/scope.js";
 import type { DatabaseError } from "../../errors.js";
 import type { Tenant } from "../../middleware/tenant.js";
 import type { PayoutRecipient } from "../paycrest/recipient.js";
@@ -17,6 +18,7 @@ import {
   bills,
   categories,
   payouts,
+  RESERVING_STATUSES,
   wallets,
   walletTransactions,
 } from "../../db/schema/index.js";
@@ -62,6 +64,8 @@ export interface WalletHistoryItem {
   readonly counterpartyAddress: string | null;
   readonly createdAt: Date;
   readonly payout: WalletHistoryPayout | null;
+  /** An approved withdrawal whose debit isn't in the ledger yet. */
+  readonly pending: boolean;
 }
 
 export interface WalletHistoryPage {
@@ -174,12 +178,14 @@ export function walletHistory(input: {
           .limit(limit + 1),
       );
 
+      const pending =
+        before === null ? yield* pendingWithdrawals(tx, wallet.id) : [];
       const page = rows.slice(0, limit);
       const last = page.at(-1);
       return {
-        items: page.map(({ entry, payout, categoryName }) => {
-          const delivery = payout && deliveryTransactionOf(payout);
-          return {
+        items: [
+          ...pending,
+          ...page.map(({ entry, payout, categoryName }) => ({
             id: entry.id,
             type: entry.type,
             usdcAmount: entry.usdcAmount,
@@ -187,36 +193,85 @@ export function walletHistory(input: {
             txHash: entry.txHash,
             counterpartyAddress: entry.counterpartyAddress,
             createdAt: entry.createdAt,
-            payout: payout && {
-              id: payout.id,
-              subjectType: payout.subjectType,
-              method: payout.method,
-              recipientName: payout.recipient.accountName,
-              recipientDetail: describeRecipient(payout.recipient),
-              recipientChain:
-                payout.recipient.method === "usdc"
-                  ? payout.recipient.chain
-                  : null,
-              amountKesCents: payout.amountKes,
-              status: payout.status,
-              subjectId: payout.subjectId,
-              payrollRunId: payout.payrollRunId,
-              approvalId: payout.approvalId,
-              approvedAt: payout.approvedAt,
-              paidAt: payout.paidAt,
-              categoryName,
-              paymentReceipts: cashOutReceiptsOf([payout]),
-              rate: payout.rate,
-              failureReason: payout.failureReason,
-              ...(delivery && {
-                deliveryTxHash: delivery.txHash,
-                deliveryTxChain: delivery.chain,
-              }),
-            },
-          };
-        }),
+            payout: payout && payoutView(payout, categoryName),
+            pending: false,
+          })),
+        ],
         nextCursor: rows.length > limit && last ? last.entry.id : null,
       };
     }),
+  );
+}
+
+function payoutView(
+  payout: Payout,
+  categoryName: string | null,
+): WalletHistoryPayout {
+  const delivery = deliveryTransactionOf(payout);
+  return {
+    id: payout.id,
+    subjectType: payout.subjectType,
+    method: payout.method,
+    recipientName: payout.recipient.accountName,
+    recipientDetail: describeRecipient(payout.recipient),
+    recipientChain:
+      payout.recipient.method === "usdc" ? payout.recipient.chain : null,
+    amountKesCents: payout.amountKes,
+    status: payout.status,
+    subjectId: payout.subjectId,
+    payrollRunId: payout.payrollRunId,
+    approvalId: payout.approvalId,
+    approvedAt: payout.approvedAt,
+    paidAt: payout.paidAt,
+    categoryName,
+    paymentReceipts: cashOutReceiptsOf([payout]),
+    rate: payout.rate,
+    failureReason: payout.failureReason,
+    ...(delivery && {
+      deliveryTxHash: delivery.txHash,
+      deliveryTxChain: delivery.chain,
+    }),
+  };
+}
+
+/**
+ * Approved withdrawals whose debit isn't in the ledger yet, newest first,
+ * so the history shows one the moment it's approved rather than when the
+ * send lands. Each is shown at the amount its debit will be, under the
+ * payout's ID, until the ledger row replaces it.
+ */
+function pendingWithdrawals(
+  tx: Transaction,
+  walletId: string,
+): Effect.Effect<WalletHistoryItem[], DatabaseError> {
+  return query(() =>
+    tx
+      .select({ payout: payouts, wallet: { chain: wallets.chain } })
+      .from(payouts)
+      .innerJoin(wallets, eq(wallets.id, payouts.walletId))
+      .leftJoin(walletTransactions, eq(walletTransactions.payoutId, payouts.id))
+      .where(
+        and(
+          eq(payouts.walletId, walletId),
+          eq(payouts.subjectType, "withdrawal"),
+          inArray(payouts.status, [...RESERVING_STATUSES, "needs_review"]),
+          isNull(walletTransactions.id),
+        ),
+      )
+      .orderBy(desc(payouts.approvedAt), desc(payouts.id)),
+  ).pipe(
+    Effect.map((rows) =>
+      rows.map(({ payout, wallet }) => ({
+        id: payout.id,
+        type: "withdrawal" as const,
+        usdcAmount: -(payout.amountToTransferUsdc ?? payout.quotedUsdc),
+        chain: wallet.chain,
+        txHash: null,
+        counterpartyAddress: payout.depositAddress,
+        createdAt: payout.approvedAt ?? new Date(),
+        payout: payoutView(payout, null),
+        pending: true,
+      })),
+    ),
   );
 }

@@ -1,4 +1,5 @@
 import type { FloatSummary, WalletResponse } from "@expendi-business/shared";
+import { spendableUsdc } from "@expendi-business/shared";
 
 import { formatKesCents, formatUsdc } from "../../lib/money";
 import { openFloatLeft } from "../overview/overview-display";
@@ -48,7 +49,7 @@ export function floatsMeta(
 /** "3,412.58 USDC · KES 440,222.82", or why there is no KES figure. */
 export function walletMeta(wallet: WalletResponse): string {
   if (wallet.status === "creating") return "Setting up";
-  const usdc = `${formatUsdc(wallet.usdcBalance)} USDC`;
+  const usdc = `${formatUsdc(spendableUsdc(wallet))} USDC`;
   return wallet.kesEquivalent
     ? `${usdc} · KES ${formatKesCents(wallet.kesEquivalent.kesCents)}`
     : `${usdc} · KES rate unavailable`;

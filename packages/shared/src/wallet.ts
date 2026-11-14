@@ -59,9 +59,17 @@ export const activeWalletSchema = z.object({
   status: z.literal("active"),
   address: z.string(),
   chain: walletChainSchema,
+  /** The ledger balance: what has settled on chain. */
   usdcBalance: usdcBaseUnits,
   /**
-   * The balance in KES cents at the active cash-out provider's rate now,
+   * What the company can spend now: `usdcBalance` less what approved
+   * payouts, withdrawals and an open move to Treasury have reserved but not
+   * yet debited, never below zero. Drops as soon as a withdrawal is
+   * approved. Always sent; optional only for clients built before it.
+   */
+  availableUsdc: usdcBaseUnits.optional(),
+  /**
+   * `availableUsdc` in KES cents at the active cash-out provider's rate now,
    * rounded down; null while that rate is unavailable.
    */
   kesEquivalent: z
@@ -76,6 +84,11 @@ export const activeWalletSchema = z.object({
 });
 
 export type ActiveWallet = z.infer<typeof activeWalletSchema>;
+
+/** What the company can spend now; the ledger balance from an API built before `availableUsdc`. */
+export function spendableUsdc(wallet: ActiveWallet): string {
+  return wallet.availableUsdc ?? wallet.usdcBalance;
+}
 
 /**
  * `GET /organizations/:id/wallet`. While it's `creating` there's no address

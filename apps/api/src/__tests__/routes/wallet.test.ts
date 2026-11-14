@@ -78,7 +78,7 @@ const getWallet = (organizationId: string, privyUserId: string) =>
   });
 
 describe("GET /organizations/:organizationId/wallet", () => {
-  it("shows an admin the address and the ledger balance", async () => {
+  it("shows an admin the address, the ledger balance and what it can spend", async () => {
     // #given
     const { companyA } = fixture;
 
@@ -98,6 +98,7 @@ describe("GET /organizations/:organizationId/wallet", () => {
           address: walletA.address,
           chain: "base",
           usdcBalance: "12500000",
+          availableUsdc: "12500000",
           kesEquivalent: { kesCents: "160850", rate: "128.68" },
           cashOutLimits: { minKesCents: "6500", maxKesCents: "30000000" },
         },
