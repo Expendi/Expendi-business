@@ -3,11 +3,15 @@ flowchart LR
     AUTHS["auth · staff-auth"]
     WALLET["wallet"]
     PAYOUT["payout"]
-    PAYMENTS["payments · withdrawal · bills · payees"]
-    OVER["overview · alerts"]
+    INTS["intents<br/>fund-in · move-in · move-out · fee-cover<br/>confidential rollout · balance home"]
+    TREAS["treasury"]
+    PAYMENTS["payments · withdrawal · payees"]
+    BILLS["bills · overview · alerts"]
+    CARDS["cards · card-simulations"]
+    INV["invoices"]
     EXP["expenses"]
     PV["phone-verification"]
-    MAILERS["membership · approval · payees · payroll<br/>phone-verification · notification · export · alerts"]
+    MAILERS["membership · approval · payroll<br/>notification · export · alerts"]
     NOTIF["notification"]
     FILES["expenses · bills · export · zoho"]
     ZOHOS["zoho"]
@@ -17,9 +21,17 @@ flowchart LR
   subgraph Clients["Provider clients (Effect layers)"]
     PRIVYA["PrivyAuth"]
     PRIVYW["PrivyWallets"]
+    NCHAIN["NearChain + NearRpc"]
+    NREL["NearRelayer"]
+    FNEAR["FastNear"]
+    ONEC["OneClick"]
+    CONFA["ConfidentialAccounts"]
     PAYC["Paycrest"]
+    PRET["Pretium"]
+    LITH["Lithic + LithicSimulator"]
     ALC["AlchemyWebhook"]
     RPC["BaseRpc"]
+    TPR["TreasuryPositionReader"]
     FS["FileStorage"]
     MAIL["EmailSender"]
     OTP["OtpProvider"]
@@ -29,11 +41,17 @@ flowchart LR
   end
 
   AUTHS --> PRIVYA
-  WALLET --> PRIVYW & ALC & RPC
-  WALLET -- "refund detection" --> PAYC
-  PAYOUT --> PRIVYW & PAYC & RPC
-  PAYMENTS & OVER --> PAYC
-  STAFF --> PAYC & RPC
+  WALLET --> PRIVYW & NREL & NCHAIN & FNEAR & CONFA & ALC & RPC
+  PAYOUT --> PRIVYW & NREL & NCHAIN & RPC & PAYC & PRET
+  INTS --> ONEC & CONFA & NREL & NCHAIN & PRIVYW
+  TREAS --> PRIVYW & RPC
+  TREAS -- "moves through" --> INTS
+  PAYMENTS --> PRIVYW
+  BILLS --> PAYC & PRET
+  BILLS -- "treasury alerts" --> PRIVYW & RPC
+  CARDS --> LITH
+  INV --> ONEC & MAIL
+  STAFF --> PRIVYA & PAYC & PRET & RPC & NCHAIN & FNEAR & ONEC & TPR
   EXP --> RX
   FILES --> FS
   MAILERS --> MAIL
@@ -41,13 +59,40 @@ flowchart LR
   NOTIF --> PUSH
   ZOHOS --> ZC
 
-  PRIVYA & PRIVYW --> PRIVY["Privy API"]
-  PAYC --> PCAPI["Paycrest v2 API"]
-  ALC --> ALAPI["Alchemy Notify API"]
-  RPC --> BASEAPI["Base JSON-RPC"]
-  FS --> R2["Cloudflare R2 (SigV4)<br/>off without R2_* vars"]
-  MAIL --> RES["Resend<br/>fails cleanly without key"]
-  OTP --> TEL["Telnyx Verify<br/>off without TELNYX_* vars"]
-  PUSH --> EXPO["Expo Push"]
-  ZC --> ZAPI["Zoho accounts + Books API"]
-  RX --> CL["Anthropic API<br/>off without ANTHROPIC_API_KEY"]
+  NREL --> PRIVYW & NCHAIN
+  CONFA --> PRIVYW & NCHAIN & ONEC
+  TPR --> PRIVYW
+
+  subgraph APIs["Provider APIs"]
+    PRIVY["Privy API"]
+    NEARAPI["NEAR JSON-RPC"]
+    FNAPI["FastNEAR Transfers API"]
+    OCAPI["NEAR Intents 1Click API<br/>confidential routes use the company's own session"]
+    PCAPI["Paycrest v2 API"]
+    PRAPI["Pretium KES API<br/>no sandbox"]
+    LIAPI["Lithic sandbox API<br/>the only address the client knows"]
+    ALAPI["Alchemy Notify API<br/>transit wallets on Base"]
+    BASEAPI["Base JSON-RPC"]
+    R2["Cloudflare R2 (SigV4)<br/>off without R2_* vars"]
+    RES["Resend<br/>fails cleanly without key"]
+    TEL["Telnyx Verify<br/>off without TELNYX_* vars"]
+    EXPO["Expo Push"]
+    ZAPI["Zoho accounts + Books API"]
+    CL["Anthropic API<br/>off without ANTHROPIC_API_KEY"]
+  end
+
+  PRIVYA & PRIVYW --> PRIVY
+  NCHAIN --> NEARAPI
+  FNEAR --> FNAPI
+  ONEC --> OCAPI
+  PAYC --> PCAPI
+  PRET --> PRAPI
+  LITH --> LIAPI
+  ALC --> ALAPI
+  RPC --> BASEAPI
+  FS --> R2
+  MAIL --> RES
+  OTP --> TEL
+  PUSH --> EXPO
+  ZC --> ZAPI
+  RX --> CL

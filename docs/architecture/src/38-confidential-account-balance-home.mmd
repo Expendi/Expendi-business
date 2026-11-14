@@ -1,0 +1,22 @@
+flowchart LR
+  NEW["New company wallet<br/>last step of setup"] --> ENV{"Switch on and relayer<br/>can fund the fee float?"}
+  ENV -- yes --> CONF(["Balance home:<br/>confidential account"])
+  ENV -- "no, sign-up never waits" --> PUB(["Balance home:<br/>company wallet"])
+
+  PUB --> ROLL["Rollout job, every 30 s<br/>one company per tick<br/>skips opted-out companies<br/>advisory lock + wallet row lock"]
+  ON["Staff script: turn-on<br/>refuses instead of waiting"] --> BUSY
+  ROLL --> BUSY{"Anything in flight?<br/>quotes, payouts, sends,<br/>Treasury moves, credits owed"}
+  BUSY -- yes --> WAIT["Wait, next company"]
+  BUSY -- no --> READY{"Account readable and<br/>relayer USDC covers this float<br/>plus floats already reserved?"}
+  READY -- no --> WAIT
+  READY -- yes --> CONF
+
+  CONF --> OFF["Staff script: turn-off<br/>company marked opted out"]
+  OFF --> EMPTY{"Account and recorded<br/>float both empty?"}
+  EMPTY -- yes --> PUB
+  EMPTY -- no --> DRAIN(["Draining: home stays confidential<br/>new quotes, sends, payouts and<br/>Treasury moves refused by triggers"])
+  DRAIN --> OUT["Move-out job: free quotes, parts<br/>up to the spend cap, to the<br/>company wallet"]
+  OUT --> ZERO{"No quote open and<br/>fresh balance zero?"}
+  ZERO -- no --> OUT
+  ZERO -- yes --> WO["Missing float written off,<br/>logged, audited"]
+  WO --> PUB

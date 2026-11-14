@@ -7,8 +7,8 @@ flowchart LR
   MOB & WEB & OPS -.-> PRIVYL
 
   subgraph API["API · apps/api · Hono + Effect on Railway"]
-    ROUTES["HTTP routes<br/>/me · /organizations · /internal<br/>/webhooks · /integrations · /downloads"]
-    STATION["Station · 11 background jobs"]
+    ROUTES["HTTP routes<br/>/me · /organizations · /pay · /internal<br/>/webhooks · /integrations · /downloads"]
+    STATION["Station · 26 background jobs"]
     SERVICES["Domain services + money engine"]
     DB[("Postgres<br/>row-level security<br/>append-only ledger + audit")]
     ROUTES --> SERVICES
@@ -17,17 +17,53 @@ flowchart LR
   end
 
   MOB & WEB & OPS -- "Bearer Privy token" --> ROUTES
-  MOB & WEB -- "signed-URL uploads" --> R2
 
-  SERVICES --> PRIVYW["Privy server wallets<br/>create wallet + policy · send USDC<br/>USDC on Base only, capped · gas sponsored"]
-  PRIVYW --> BASE["Base<br/>USDC transfers"]
-  SERVICES <--> PAYCREST["Paycrest<br/>USDC → KES: M-Pesa, Till, Paybill, bank<br/>rates · orders out · webhooks in"]
-  SERVICES <--> ALCHEMY["Alchemy Notify<br/>watch wallet addresses · deposit webhooks in"]
-  SERVICES --> RPC["Base JSON-RPC<br/>receipts · eth_call · logs"]
-  SERVICES --> R2["Cloudflare R2<br/>receipts + exports · presigned URLs"]
-  SERVICES --> RESEND["Resend email"]
-  SERVICES --> TELNYX["Telnyx Verify<br/>payout phone codes"]
-  SERVICES --> EXPO["Expo Push → FCM / APNs<br/>send + delivery receipts"]
-  SERVICES <--> ZOHO["Zoho Books<br/>OAuth callback in · expenses + receipts out"]
-  SERVICES --> CLAUDE["Anthropic Claude<br/>receipt reading · off in deployed env"]
+  SERVICES --> PRIVYW["Privy server wallets<br/>creates and signs for every wallet below<br/>Base wallets: Privy policy caps USDC<br/>NEAR wallets: the API checks the cap"]
+
+  subgraph NEAR["NEAR · the main chain"]
+    CW["Company wallet<br/>one per company · holds its USDC"]
+    RELAYER["Gas relayer<br/>Expendi account · pays NEAR gas<br/>refills each fee float"]
+    NRPC["NEAR RPC + FastNEAR<br/>deposit watcher reads transfers<br/>RPC confirms them"]
+  end
+
+  subgraph INTENTS["NEAR Intents"]
+    ONECLICK["1Click API<br/>quotes · deposit addresses · status<br/>fund-ins · Base hops · payouts · sweeps"]
+    CONF["Confidential account<br/>private ledger intents.far<br/>on when CONFIDENTIAL_ACCOUNTS_ENABLED"]
+  end
+
+  subgraph BASEC["Base · still used"]
+    TRANSIT["Transit wallet<br/>holds nothing at rest<br/>cash-outs pass through · refunds return"]
+    TREAS["Treasury wallet<br/>Privy Earn vault position"]
+    BPAYEE["USDC payees on Base"]
+  end
+
+  PRIVYW --> CW & RELAYER & TRANSIT & TREAS
+  SERVICES --> NRPC
+  CW -- "move-in" --> CONF
+  CONF -- "move-out" --> CW
+  SERVICES <--> ONECLICK
+  ONECLICK <--> CONF
+  ONECLICK -- "fund-ins in · Base hops<br/>Treasury moves · payouts out" --> BASEC
+  ONECLICK -- "USDC payouts" --> SOLP["USDC payees on Solana"]
+  subgraph CASH["Cash-out providers"]
+    PAYCREST["Paycrest<br/>USDC → KES: M-Pesa, Till, Paybill, bank<br/>orders out · webhooks in"]
+    PRETIUM["Pretium<br/>USDC → KES cash-outs<br/>callbacks in · staff pick the active one"]
+  end
+  SERVICES <--> CASH
+  TRANSIT -- "USDC on Base" --> CASH
+
+  subgraph OTHER["Other providers"]
+    direction TB
+    BRPC["Base JSON-RPC<br/>receipts · eth_call · logs"]
+    ALCHEMY["Alchemy Notify<br/>watches transit wallets<br/>Base transfer webhooks in"]
+    LITHIC["Lithic<br/>Expendi cards · sandbox only<br/>authorisation + event webhooks in"]
+    R2["Cloudflare R2<br/>receipts + exports<br/>clients upload by presigned URL"]
+    RESEND["Resend email"]
+    TELNYX["Telnyx Verify<br/>payout phone codes"]
+    EXPO["Expo Push → FCM / APNs"]
+    ZOHO["Zoho Books<br/>OAuth callback in · expenses out"]
+    CLAUDE["Anthropic Claude<br/>receipt reading · off in deployed env"]
+  end
+  BRPC ~~~ ALCHEMY ~~~ LITHIC ~~~ R2 ~~~ RESEND ~~~ TELNYX ~~~ EXPO ~~~ ZOHO ~~~ CLAUDE
+  SERVICES <--> OTHER
   API -- "secrets at boot" --> DOPPLER["Doppler"]

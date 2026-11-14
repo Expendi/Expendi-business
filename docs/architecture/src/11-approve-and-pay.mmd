@@ -5,14 +5,15 @@ sequenceDiagram
   participant PM as payments helpers
   participant PO as payout engine
   participant AP as approval (WebAuthn)
-  participant PC as Paycrest
-  participant PW as Privy wallet
-  participant B as Base
+  participant CP as cash-out provider (Paycrest or Pretium)
+  participant OC as NEAR Intents (1Click)
+  participant PW as Privy
+  participant CH as NEAR and Base
 
   Admin->>API: POST …/approval or …/payment (selected items)
   API->>PM: awaitingPayoutFor(subject)
   PM->>PO: preparePayouts
-  PO->>PC: rates + institutions (validate recipient, quote)
+  PO->>CP: rates + institutions (validate recipient, quote)
   PO->>PO: max debit = quote + 0.25 USDC + 0.5%, per-transaction cap, idempotency key
   PO-->>API: payouts in awaiting_approval
   API->>AP: startApproval(approve_payouts, intent hash of the batch)
@@ -22,21 +23,50 @@ sequenceDiagram
   API->>AP: verifyApproval (challenge burned first, signature + counter checked)
   API->>PO: approvePayouts
   PO->>PO: lock wallet row, intent hash must match, allowlist re-check
-  PO->>PO: company + platform pause, balance minus reserved, daily or payroll cap
+  PO->>PO: company + platform pause, ledger balance minus reserved, daily or payroll cap
   PO->>PO: status approved, subject hook (claim/bill/float → paying), audit
   loop each payout, failures isolated
-    alt KES payout
-      PO->>PC: createOrder (reference = payout id, refund address = company wallet)
-      PO->>PO: checkOrder: address, chain, token, recipient, rate, amounts, deposit window
-      PO->>PW: sendUsdc(amountToTransfer → order deposit address)
-    else USDC payee or withdrawal
-      PO->>PW: sendUsdc(exact amount → allowlisted address)
+    alt KES cash-out
+      PO->>OC: Base hop quote: exact USDC from where the balance sits to the transit wallet (payouts approved together share one)
+      alt balance sits in the confidential account
+        PO->>OC: generate-intent for the quote
+        OC-->>PO: message to sign
+        PO->>PW: Privy signs it with the company wallet key
+        PO->>OC: submit-intent (the signed message, saved before it is sent)
+        Note over PO,OC: Expendi's fee float inside the account covers what the hop costs beyond what it delivers
+      else balance sits in the company wallet
+        PO->>PW: company wallet sends USDC to the quote's deposit address (gas relayer pays gas)
+        PW->>CH: ft_transfer on NEAR
+      end
+      OC->>CH: delivers USDC to the transit wallet on Base
+      Note over PO,OC: outbound-quotes job follows the hop. The payout stays approved until 1Click reports SUCCESS
+      alt Paycrest
+        PO->>CP: createOrder (reference = payout id, refund address = transit wallet)
+        PO->>PO: checkOrder: address, chain, token, recipient, rate, amounts, deposit window
+        PO->>CH: Base RPC: transit wallet holds amountToTransfer
+        PO->>PW: sendUsdc(amountToTransfer → order deposit address) from the transit wallet
+      else Pretium
+        PO->>PW: sendUsdc(amount → pinned settlement address) from the transit wallet
+        PO->>CP: tell Pretium to pay, by the transfer's hash
+      end
+      PW->>CH: USDC transfer on Base, gas sponsored
+      PO->>PO: status paying + ledger debit
+    else USDC payee (NEAR, Base or Solana) or withdrawal
+      alt balance sits in the confidential account
+        PO->>OC: quote whose recipient is the payee, then generate-intent
+        PO->>PW: Privy signs the message
+        PO->>OC: submit-intent
+        OC->>CH: delivers the exact USDC on the payee chain
+        PO->>PO: 1Click reports delivery: ledger debit and paid together
+      else balance sits in the company wallet
+        PO->>PW: NEAR payee: company wallet sends exact USDC to the allowlisted address. Base or Solana payee: it pays the quote's deposit address
+        PW->>CH: transfer on NEAR, 1Click delivers on the payee chain
+        PO->>PO: status paying + ledger debit
+      end
     end
-    PW->>B: USDC transfer, gas sponsored
-    PO->>PO: status paying + ledger debit
   end
-  API-->>Admin: paying / failed / needs_review per item
-  PC-)API: POST /webhooks/paycrest (HMAC)
-  API->>PC: getOrder (body never trusted)
-  API->>PO: syncPayoutOrder → paid, subject hook (claim/bill/float → paid)
-  Note over PO,PC: reconcile-paycrest (60 s) and confirm-onchain (60 s) do the same if a webhook is missed
+  API-->>Admin: paying / failed / needs_review per item (a cash-out behind its hop is still approved)
+  CP-)API: POST /webhooks/paycrest or /webhooks/pretium (signed)
+  API->>CP: fetch the order or transaction (body never trusted)
+  API->>PO: sync the payout → paid, subject hook (claim/bill/float → paid)
+  Note over PO,CP: reconcile-paycrest, reconcile-pretium, confirm-onchain and outbound-quotes (all 60 s or less) do the same if a webhook is missed

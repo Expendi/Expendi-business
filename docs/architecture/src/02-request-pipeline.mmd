@@ -4,8 +4,11 @@ flowchart TD
 
   G -- "/health" --> H["Health check"]
   G -- "/downloads/reports" --> DL["Export-link token (30 days)<br/>→ 302 to short-lived R2 URL"]
-  G -- "/webhooks/alchemy" --> WA["HMAC x-alchemy-signature"]
+  G -- "/webhooks/alchemy" --> WA["HMAC x-alchemy-signature<br/>Base transit-wallet transfers"]
   G -- "/webhooks/paycrest" --> WP["HMAC x-paycrest-signature<br/>64 KB limit · bad signature raises ops alert"]
+  G -- "/webhooks/pretium" --> WR["x-signature-key<br/>64 KB limit · bad signature raises ops alert"]
+  G -- "/webhooks/lithic" --> WL["webhook-signature<br/>events + /authorization decision<br/>64 KB limit · bad signature raises ops alert"]
+  G -- "/pay" --> PAYP["dashboardCors · no login<br/>invoice public ID is the credential<br/>1Click payment quotes"]
   G -- "/integrations/zoho" --> ZI["Connect-link token<br/>+ signed OAuth state"]
 
   G -- "/me · /organizations" --> DC["dashboardCors<br/>DASHBOARD_ORIGINS"]
@@ -23,7 +26,7 @@ flowchart TD
 
   ME & SIGNUP & ORG --> SCOPE["withScope → transaction with<br/>set_config app.org_id · app.user_id · app.role"]
   INT --> SSCOPE["withStaffReadScope<br/>READ ONLY transaction"]
-  WA & WP & ZI & DL --> SVC["Services"]
+  WA & WP & WR & WL & ZI & DL & PAYP --> SVC["Services"]
   SCOPE --> SVC
   SSCOPE --> SVC
   SVC --> PG[("Postgres as expendi_business_app<br/>no superuser · no BYPASSRLS<br/>RLS policies read app.* settings")]
