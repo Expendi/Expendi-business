@@ -12,7 +12,7 @@ Companies never touch a gas token: Expendi's relayer pays every NEAR fee. It sta
 
 ## Demo video
 
-[![Expendi Business on NEAR: demo video](docs/demo/demo-thumbnail.png)](https://youtu.be/VOqQJ_Oepy8)
+[![Play the Expendi Business on NEAR demo video (2 min 54 s)](docs/demo/demo-thumbnail-play.png)](https://youtu.be/VOqQJ_Oepy8)
 
 **[Watch the demo on YouTube (2 min 54 s)](https://youtu.be/VOqQJ_Oepy8)**: the web dashboard and the mobile app, running on NEAR. The video file is also in the repo: [docs/demo/expendi-business-near.mp4](docs/demo/expendi-business-near.mp4).
 
