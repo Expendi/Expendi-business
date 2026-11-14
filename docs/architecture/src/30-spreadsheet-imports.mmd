@@ -1,0 +1,16 @@
+flowchart TD
+  OPSI["Ops admin<br/>POST /internal/companies/:id/imports/{preview,commit}<br/>payees · salaries · recurring · bills · claims · floats · history"] --> PARSE
+  CUSTI["Company admin (web /imports)<br/>POST /organizations/:id/imports/{preview,commit}<br/>paid history · unpaid bills"] --> BROWSER["Browser parses CSV/TSV<br/>with shared parseImportSpreadsheet"]
+  BROWSER --> PARSE["Parse · max 512 KB, 500 rows<br/>apply column mapping"]
+  PARSE --> PREV["Preview · READ ONLY transaction"]
+  PREV --> PLAN["Plan each row<br/>row hash = sha256(kind, source, data)"]
+  PLAN --> DUP{"Checks"}
+  DUP -- "hash already imported or repeated" --> SKIP["skipped"]
+  DUP -- "duplicate M-Pesa code, payee, open float,<br/>ongoing salary" --> ERR["error: no preview token"]
+  DUP -- ok --> TOKEN["Counts · total KES · new suppliers/categories<br/>HMAC preview token, 30 min, per process"]
+  TOKEN --> COMMIT["Commit · advisory lock per company<br/>re-plan, token must match (409 if data changed)"]
+  COMMIT --> CREATE["Create missing suppliers + categories<br/>(customer, when asked)"]
+  CREATE --> INS["Insert import_runs + entities + import_rows<br/>unique (org, row_hash)"]
+  INS --> AUD["Audit &lt;table&gt;.imported + import.completed"]
+  INS --> ENT["payees · floats · claims · paid_outside / recorded history<br/>bills (KES) · recurring_items"]
+  ENT -. "imported history never sends money<br/>or queues Zoho syncs" .- AUD

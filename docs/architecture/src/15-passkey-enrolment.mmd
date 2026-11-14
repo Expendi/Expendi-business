@@ -1,0 +1,16 @@
+sequenceDiagram
+  actor U as Admin
+  participant API as /me/approval-passkey
+  participant AP as approval service
+  participant DB as Postgres
+  participant M as Resend
+
+  U->>API: POST /options
+  API->>AP: active admin? signed in recently? no passkey yet?
+  AP->>DB: store challenge (register_passkey, 5 min)
+  AP-->>U: WebAuthn registration options (user verification required)
+  U->>U: create platform passkey
+  U->>API: POST /verify
+  API->>AP: lock user, consume challenge, verifyRegistrationResponse
+  AP->>DB: insert approval_passkeys + audit approval_passkey.enrolled
+  AP->>M: email every admin (after commit)

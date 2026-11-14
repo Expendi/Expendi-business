@@ -1,0 +1,14 @@
+flowchart LR
+  subgraph Ledger["wallet_transactions · append-only (SELECT + INSERT only, trigger blocks changes)"]
+    C1["deposit (+)"]
+    C2["refund (+)"]
+    C3["topup (+)<br/>defined, not written yet"]
+    D1["payout (−)"]
+    D2["withdrawal (−)"]
+  end
+  BAL["Balance = sum of wallet_transactions"]
+  RES["Reserved = sum of maxDebitUsdc for payouts in<br/>approved · order_created · funding · needs_review"]
+  AV["Available to approve = balance − reserved"]
+  Ledger --> BAL --> AV
+  RES --> AV
+  KES["KES equivalent shown at the live Paycrest rate"] -.- BAL

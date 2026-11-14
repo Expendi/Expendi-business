@@ -1,0 +1,21 @@
+flowchart TB
+  ID[("Identity + tenancy<br/>users · organizations · memberships<br/>staff_users · staff_confirmations<br/>approval_passkeys · webauthn_challenges<br/>phone_verification_challenges")]
+  MONEY[("Money<br/>wallets · wallet_transactions · payouts<br/>withdrawal_addresses · platform_settings")]
+  SPEND[("Spending<br/>expenses · receipt_files · categories<br/>paid_from_accounts · floats · float_movements")]
+  PAYABLES[("Payables<br/>payees · bills · recurring_items · payroll_runs")]
+  BOOKS[("Accounting + reporting<br/>accounting_connections · accounting_syncs<br/>report_exports · report_export_links<br/>import_runs · import_rows")]
+  OPSDB[("Ops<br/>push_tokens · notification_outbox<br/>ops_alerts · station_heartbeats · audit_log")]
+
+  ID --> MONEY & SPEND & PAYABLES
+  PAYABLES -- "bills pay through" --> MONEY
+  SPEND -- "claims + floats pay through" --> MONEY
+  SPEND & PAYABLES -- "synced / exported / imported" --> BOOKS
+  MONEY & SPEND & PAYABLES -- "events, alerts, audit" --> OPSDB
+
+  RLS["Row-level security on company tables<br/>policies read app_current_org_id() · app_current_user_id() · app_current_role()<br/>role rules hide salaries from employees"]
+  APPEND["Append-only<br/>audit_log: INSERT only, trigger blocks UPDATE/DELETE/TRUNCATE for every role<br/>wallet_transactions: SELECT + INSERT only, trigger blocks changes"]
+  DEFINER["SECURITY DEFINER functions<br/>job queues and staff reads across companies<br/>(staff_users, platform_settings, station_heartbeats use grants only)"]
+
+  RLS -.- ID & MONEY & SPEND & PAYABLES & BOOKS
+  APPEND -.- OPSDB & MONEY
+  DEFINER -.- OPSDB

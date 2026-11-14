@@ -1,0 +1,29 @@
+flowchart TD
+  REQ["Incoming request"] --> RID["requestId() · onError → 500"]
+  RID --> G{"Route group"}
+
+  G -- "/health" --> H["Health check"]
+  G -- "/downloads/reports" --> DL["Export-link token (30 days)<br/>→ 302 to short-lived R2 URL"]
+  G -- "/webhooks/alchemy" --> WA["HMAC x-alchemy-signature"]
+  G -- "/webhooks/paycrest" --> WP["HMAC x-paycrest-signature<br/>64 KB limit · bad signature raises ops alert"]
+  G -- "/integrations/zoho" --> ZI["Connect-link token<br/>+ signed OAuth state"]
+
+  G -- "/me · /organizations" --> DC["dashboardCors<br/>DASHBOARD_ORIGINS"]
+  DC --> AUTH["authMiddleware<br/>verify Privy token (JWKS or local key)<br/>first login: create user, activate invites"]
+  AUTH --> ME["/me routes<br/>profile · payout phone · push tokens<br/>approval passkey"]
+  AUTH --> SIGNUP["POST /organizations<br/>company sign-up"]
+  AUTH --> TEN["tenantMiddleware<br/>active membership in :organizationId<br/>accountants: GET/HEAD only"]
+  TEN --> ROLE["requireRole · requireAdminOrReader<br/>admin · employee · accountant"]
+  ROLE --> ORG["/organizations/:id/* routes"]
+
+  G -- "/internal" --> AC["adminAppCors<br/>ADMIN_APP_ORIGINS"]
+  AC --> SA["staffAuthMiddleware<br/>Privy token + active staff_users email"]
+  SA --> SR["requireStaffRole('ops_admin') on actions<br/>ops_viewer reads only"]
+  SR --> INT["/internal routes"]
+
+  ME & SIGNUP & ORG --> SCOPE["withScope → transaction with<br/>set_config app.org_id · app.user_id · app.role"]
+  INT --> SSCOPE["withStaffReadScope<br/>READ ONLY transaction"]
+  WA & WP & ZI & DL --> SVC["Services"]
+  SCOPE --> SVC
+  SSCOPE --> SVC
+  SVC --> PG[("Postgres as expendi_business_app<br/>no superuser · no BYPASSRLS<br/>RLS policies read app.* settings")]

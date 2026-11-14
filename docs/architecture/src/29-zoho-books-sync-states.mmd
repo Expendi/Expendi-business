@@ -1,0 +1,20 @@
+stateDiagram-v2
+  direction LR
+  state "Connection" as conn {
+    [*] --> pending: connect link created
+    pending --> active: organization chosen
+    pending --> active: callback with organization already chosen
+    needs_reconnect --> active: callback after a new link
+    pending --> needs_reconnect: Zoho rejects token
+    active --> needs_reconnect: Zoho rejects token
+    pending --> disconnected: staff disconnect
+    active --> disconnected: staff disconnect
+    needs_reconnect --> disconnected: staff disconnect
+  }
+  state "Sync row" as sync {
+    [*] --> queued: enqueue
+    queued --> queued: backoff, paused, rate limited
+    queued --> synced: expense created
+    queued --> failed_sync: 6 attempts or cannot post
+    failed_sync --> queued: staff requeue
+  }

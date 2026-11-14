@@ -4,9 +4,46 @@ B2B stablecoin finance for African startups. The current Kenya MVP brings staff 
 
 Companies hold USDC on NEAR in wallets managed by Expendi. The payment engine supports KES payouts to M-Pesa numbers, Tills, Paybills and Kenyan bank accounts, plus USDC transfers to NEAR, Base and Solana. Staff claims currently reimburse to verified M-Pesa numbers; payroll currently pays fixed net salaries in KES.
 
+## Demo video
+
+<!-- DEMO VIDEO: replace this block with the YouTube/Loom link or an embedded thumbnail, e.g.
+[![Expendi Business on NEAR](docs/client/demo-thumbnail.png)](https://youtu.be/VIDEO_ID) -->
+
+> **Demo video:** _coming soon_ (link goes here)
+
+## Try it on staging
+
+Staging runs the NEAR build on **NEAR mainnet** with small, real USDC amounts. NEAR Intents has no testnet.
+
+| What                                     | Link                                                                                                            | Who can open it                     |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Customer dashboard                       | <https://staging.business.expendi.app>                                                                          | Anyone, with the test account below |
+| Invoice pay page (customer side)         | `https://staging.business.expendi.app/pay/<invoice-id>`, from an invoice's **Copy pay link**                    | Anyone with the link, no sign-in    |
+| API                                      | <https://api-staging-d6415b7f.up.railway.app> (health: `/health`)                                               | Called by the apps                  |
+| Ops dashboard (Expendi staff)            | <https://staging.business-admin.expendi.app>                                                                    | Expendi staff only, behind Vercel   |
+| Explorer: a company wallet on mainnet    | [nearblocks.io](https://nearblocks.io/address/cfe4f640d78bd13a6cbefd5301f94466d24fdca2790ef0d46f135cd1bd312d02) | Anyone                              |
+
+### Test account
+
+Sign in with a Privy test account. It takes a fixed code, so no inbox is needed.
+
+1. Open <https://staging.business.expendi.app> and choose **Sign in with email**.
+2. Email: `test-4960@privy.io`
+3. Code: `______` <!-- TODO: fixed code from Privy dashboard → User management → Authentication → Test accounts -->
+4. Pick **Expendi Demo Co**, the staging demo company, if asked.
+
+Things to try:
+
+- **Overview** and **Accounts**: the company wallet's USDC on NEAR, and the Treasury account earning on Base.
+- **Invoices**: create one, use **Copy pay link**, open it in a private window and see the chains a customer can pay from.
+- **Bills**, **Payroll** and **Expenses**: what a company pays, and how each payment is approved.
+- **Cards**: virtual staff cards and company-held cards for subscriptions (Lithic sandbox; no real card money).
+
+Approving a payment asks for a passkey on the device you're using. Please don't send money out of the demo company; ask us if you want to see a payout end to end.
+
 ## NEAR HACKATHON submission
 
-**Track 08 · Real-World Money.** Expendi Business already ran on Base before the hackathon. What was built for NEAR HACKATHON is the port that makes NEAR the main chain: everything on the `chain/near` branch after the `pre-hackathon-near` tag. [See the diff](https://github.com/Expendi/Expendi-business/compare/pre-hackathon-near...chain/near).
+**Track 08 · Real-World Money.** Expendi Business already ran on Base before the hackathon. What was built for NEAR HACKATHON is the port that makes NEAR the main chain, and the features built on it since: everything on the `staging` branch after the `pre-hackathon-near` tag. [See the diff](https://github.com/Expendi/Expendi-business/compare/pre-hackathon-near...staging).
 
 A Kenyan company keeps its money as USDC in its own NEAR account. From there it pays staff claims, supplier bills and payroll, to M-Pesa or to a USDC payee on the chain the payee chooses. It never sees a gas token.
 
@@ -15,6 +52,18 @@ A Kenyan company keeps its money as USDC in its own NEAR account. From there it 
 | Stablecoins       | Every company's balance is native USDC on NEAR. The ledger, approvals, payroll and accountant export all run on it.                                                                                                                                                    |
 | NEAR Intents      | Companies fund in with USDC from Base, Ethereum, Arbitrum or Solana. USDC payees on Base or Solana are paid through 1Click. Each M-Pesa cash-out moves the exact amount to Base through 1Click, because the cash-out providers (Paycrest and Pretium) take USDC there. |
 | Meta transactions | Each company wallet is a Privy server wallet that signs NEP-366 delegate actions. Expendi's gas relayer pays every fee, creates each account and pays its USDC registration.                                                                                           |
+
+### Built on the NEAR port
+
+Once NEAR was the main chain, these were built on it during the hackathon. Each has a decision record in [`docs/decisions`](docs/decisions).
+
+| Feature               | What it does                                                                                                                                                                                                       | Record                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| Crypto invoicing      | A company invoices in US dollars. The customer opens a link with no account, picks Base, Ethereum, Arbitrum or Solana, and pays to a 1Click deposit address. USDC lands on NEAR and the invoice marks itself paid. | [crypto-invoicing.md](docs/decisions/crypto-invoicing.md)                   |
+| Confidential accounts | A company can keep its USDC in its own account on NEAR Intents' private ledger (`intents.far`), so the public chain doesn't show its balance or who it pays. Off by default; staff turn it on per company.         | [confidential-accounts.md](docs/decisions/confidential-accounts.md)         |
+| Treasury              | Idle USDC moves from NEAR through NEAR Intents to a company-owned Treasury wallet on Base and earns in a Privy Earn vault.                                                                                         | [treasury-on-base.md](docs/decisions/treasury-on-base.md)                   |
+| Second cash-out rail  | Pretium joins Paycrest for KES cash-outs; one staff setting picks the active provider.                                                                                                                             | [pretium-cash-out-provider.md](docs/decisions/pretium-cash-out-provider.md) |
+| Cards (sandbox)       | Staff cards and company-held cards that pay recurring subscriptions, on Lithic's sandbox. No real card money moves.                                                                                                | [company-held-cards.md](docs/decisions/company-held-cards.md)               |
 
 ### How the money moves
 
@@ -140,6 +189,242 @@ Source: [`services/bills`](apps/api/src/services/bills), [`services/recurring`](
 - Customer Next.js dashboard: expenses, approvals, bills, recurring items, payees, payroll, wallet, team, categories, activity, reports and imports; read-only accountant access.
 
 Source: [`services/export`](apps/api/src/services/export), [`services/zoho`](apps/api/src/services/zoho), [`services/import`](apps/api/src/services/import), [`apps/admin`](apps/admin), [`apps/web`](apps/web).
+
+### Invoicing, Treasury and confidential accounts (built on NEAR)
+
+- USD invoices with customers, line items, one tax rate, terms and numbering; email delivery, a public pay page with no account, PDF download, and payment by USDC from Base, Ethereum, Arbitrum or Solana through 1Click. A payment credits the company wallet and marks the invoice paid in one transaction.
+- Treasury: move USDC from the company wallet on NEAR to a company-owned Treasury wallet on Base and into a Privy Earn vault, with move progress and history.
+- Confidential accounts: per-company, staff-enabled; balances and payouts run through the company's own account on NEAR Intents' private ledger.
+- Cards on Lithic's sandbox: staff cards and company-held cards that pay recurring payments.
+
+Source: [`apps/api/src/services`](apps/api/src/services), decisions in [`docs/decisions`](docs/decisions).
+
+## How it fits together
+
+_**Before the NEAR port.** These diagrams were drawn from the Base version on 2026-11-06. The platform, spending, records and apps diagrams still hold; the money-path diagrams show Alchemy deposits and a Base company wallet. For the NEAR money path, read [How the money moves](#how-the-money-moves) and [docs/decisions/near-main-chain.md](docs/decisions/near-main-chain.md)._
+
+_Drawn from the source code on 2026-11-06, with API migrations through `0066`. Only implemented code is shown, and anything switched off or not wired yet is marked. Each diagram is a PNG in [`docs/architecture`](docs/architecture); click one to open it full size. The Mermaid source for each is in [`docs/architecture/src`](docs/architecture/src). To redraw one after editing it, run `npx -y @mermaid-js/mermaid-cli -i docs/architecture/src/<name>.mmd -o docs/architecture/<name>.png -w 1600 -s 2 -b white`._
+
+1. [Platform](#platform): the apps, the API, providers, jobs and data
+2. [Money path](#money-path): wallets, deposits, Approve & pay, payouts, withdrawals
+3. [Spending](#spending): sign-up, claims, payees, bills, payroll, floats, overview
+4. [Records and operations](#records-and-operations): notifications, exports, Zoho, imports, alerts, Ops app
+5. [Apps](#apps): sign-in, mobile screens, web pages
+6. [Not wired yet](#not-wired-yet)
+
+### Platform
+
+#### System overview
+
+All four apps import `packages/shared` (zod schemas, types, parsers and money helpers), so the clients and the API validate the same shapes.
+
+![System overview](docs/architecture/01-system-overview.png)
+
+#### Request pipeline
+
+![Request pipeline](docs/architecture/02-request-pipeline.png)
+
+#### API boot
+
+![API boot](docs/architecture/03-api-boot.png)
+
+#### Service layers
+
+All services live in `apps/api/src/services/` and are wired as Effect layers in `layers/main.ts`. Routes and jobs call domain services; anything that moves money goes through the one payout engine.
+
+![Service layers](docs/architecture/04-service-layers.png)
+
+| Service              | Depends on                                                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `expenses`           | payments, payout, phone-verification (payout-phone gate), notification, zoho, FileStorage, ReceiptExtractor, audit                                |
+| `bills`              | payees, recurring, payments, payout, expenses (bills paid outside), payroll (run status), notification, zoho, FileStorage, Paycrest (rate), audit |
+| `recurring`          | bills and payees tables (next bill), audit                                                                                                        |
+| `payroll`            | bills, recurring, payments, payout, approval (salary and margin changes), notification, zoho, EmailSender, audit                                  |
+| `floats`             | payout, wallet, phone-verification, expense rules, notification, zoho, audit                                                                      |
+| `payees`             | approval, allowlist, phone-verification, Paycrest (bank list), EmailSender, audit                                                                 |
+| `withdrawal`         | payout, wallet, Paycrest                                                                                                                          |
+| `organization`       | wallet, audit                                                                                                                                     |
+| `membership`         | EmailSender, config (install URL)                                                                                                                 |
+| `phone-verification` | OtpProvider (Telnyx), EmailSender, audit                                                                                                          |
+| `overview`           | wallet ledger, Paycrest (rate)                                                                                                                    |
+| `payments`           | payout, wallet, Paycrest                                                                                                                          |
+| `payout`             | approval, allowlist, wallet, chain, Paycrest, PrivyWallets, BaseRpc, subject hooks (expenses, bills, floats), audit                               |
+| `approval`           | approval settings, auth (recent sign-in), EmailSender, audit                                                                                      |
+| `allowlist`          | approval, audit                                                                                                                                   |
+| `wallet`             | PrivyWallets, AlchemyWebhook, BaseRpc, Paycrest Gateway (refund detection), audit                                                                 |
+| `notification`       | PushSender, EmailSender, overview (cash check for reminders)                                                                                      |
+| `zoho`               | Zoho client, Zoho access-token cache, AccountingTokenKey, FileStorage, audit                                                                      |
+| `export`             | FileStorage, EmailSender, audit                                                                                                                   |
+| `import`             | shared spreadsheet parser, payees/floats/expenses/bills/recurring tables, audit                                                                   |
+| `alerts`             | EmailSender, overview (cash check), Paycrest (rate)                                                                                               |
+| `staff`              | PrivyAuth, payout, alerts, wallet, chain, Paycrest, BaseRpc, audit                                                                                |
+| `auth`               | PrivyAuth, membership (invite activation), audit                                                                                                  |
+| `audit`              | Postgres only                                                                                                                                     |
+
+#### Service dependencies: provider clients
+
+![Service dependencies: provider clients](docs/architecture/05-service-dependencies-provider-clients.png)
+
+#### Background jobs (station)
+
+Every API instance runs each job on an in-process interval; a Postgres advisory lock lets only one instance do the work per tick. Postgres tables are the queues.
+
+![Background jobs (station)](docs/architecture/06-background-jobs.png)
+
+#### Data model and isolation
+
+Migrations run as the owner role before each Railway deploy (`apps/api/drizzle`, latest `0066`). The API connects as `expendi_business_app`, which can't bypass RLS.
+
+![Data model and isolation](docs/architecture/07-data-model-and-isolation.png)
+
+### Money path
+
+#### Company wallet creation
+
+![Company wallet creation](docs/architecture/08-company-wallet-creation.png)
+
+#### Deposits and refunds coming in
+
+![Deposits and refunds coming in](docs/architecture/09-deposits-and-refunds-coming-in.png)
+
+#### Wallet ledger
+
+![Wallet ledger](docs/architecture/10-wallet-ledger.png)
+
+#### Approve & pay (claims, bills, floats, payroll, withdrawals)
+
+Every money action uses the same engine. Claims, bills, floats and payroll runs plug in through subject hooks; payroll payments are bills linked to a run.
+
+![Approve & pay (claims, bills, floats, payroll, withdrawals)](docs/architecture/11-approve-and-pay.png)
+
+#### Paycrest order safety checks
+
+![Paycrest order safety checks](docs/architecture/12-paycrest-order-safety-checks.png)
+
+#### Payout states
+
+![Payout states](docs/architecture/13-payout-states.png)
+
+#### Withdrawals and the address allowlist
+
+![Withdrawals and the address allowlist](docs/architecture/14-withdrawals-and-the-address-allowlist.png)
+
+#### Passkey enrolment
+
+![Passkey enrolment](docs/architecture/15-passkey-enrolment.png)
+
+### Spending
+
+#### Company sign-up, team and payout phones
+
+![Company sign-up, team and payout phones](docs/architecture/16-company-sign-up-team-and-payout-phones.png)
+
+#### Staff claims
+
+![Staff claims](docs/architecture/17-staff-claims.png)
+
+![Staff claims — states](docs/architecture/18-staff-claims-states.png)
+
+#### Payees and change protection
+
+![Payees and change protection](docs/architecture/19-payees-and-change-protection.png)
+
+#### Bills and recurring payments
+
+![Bills and recurring payments](docs/architecture/20-bills-and-recurring-payments.png)
+
+![Bills and recurring payments — states](docs/architecture/21-bills-and-recurring-payments-states.png)
+
+#### Salaries and payroll runs
+
+![Salaries and payroll runs](docs/architecture/22-salaries-and-payroll-runs.png)
+
+![Salaries and payroll runs — states](docs/architecture/23-salaries-and-payroll-runs-states.png)
+
+#### Petty cash floats
+
+![Petty cash floats](docs/architecture/24-petty-cash-floats.png)
+
+#### Spending overview
+
+![Spending overview](docs/architecture/25-spending-overview.png)
+
+### Records and operations
+
+#### Notifications
+
+![Notifications](docs/architecture/26-notifications.png)
+
+#### Accountant exports
+
+![Accountant exports](docs/architecture/27-accountant-exports.png)
+
+#### Zoho Books sync
+
+![Zoho Books sync](docs/architecture/28-zoho-books-sync.png)
+
+![Zoho Books sync — states](docs/architecture/29-zoho-books-sync-states.png)
+
+#### Spreadsheet imports
+
+![Spreadsheet imports](docs/architecture/30-spreadsheet-imports.png)
+
+#### Alerts and audit
+
+![Alerts and audit](docs/architecture/31-alerts-and-audit.png)
+
+#### Ops app (apps/admin)
+
+Staff sign in with Privy; the API accepts them only if their email is an active `staff_users` row. `ops_viewer` can read everything, and only `ops_admin` can act. Risky actions need a second confirmation: same staff member, same intent, five minutes, single use.
+
+![Ops app (apps/admin)](docs/architecture/32-ops-app.png)
+
+#### Staff payout resolution
+
+![Staff payout resolution](docs/architecture/33-staff-payout-resolution.png)
+
+### Apps
+
+#### Sign-in and company selection
+
+![Sign-in and company selection](docs/architecture/34-sign-in-and-company-selection.png)
+
+#### Mobile app (apps/mobile)
+
+![Mobile app (apps/mobile)](docs/architecture/35-mobile-app.png)
+
+#### Claim capture on the phone
+
+![Claim capture on the phone](docs/architecture/36-claim-capture-on-the-phone.png)
+
+#### Web dashboard (apps/web · business.expendi.app)
+
+![Web dashboard (apps/web · business.expendi.app)](docs/architecture/37-web-dashboard.png)
+
+### Not wired yet
+
+These came up while mapping the code for the diagrams above.
+
+- **Payout phone confirmation has no screen.** The API has `/me/payout-phone`, `/resend` and `/confirm`, but neither the mobile app nor the web dashboard calls them. Claim payouts, floats and employee payees all require a confirmed number.
+- **Receipt reading is off.** It's implemented, but every receipt comes back unread until `ANTHROPIC_API_KEY` is set, and it isn't set in the deployed environment.
+- **Bill invoices aren't read.** Invoice uploads work; reading an invoice and its eTIMS QR code isn't wired to bills yet (`services/bills/files.ts`).
+- **Some areas are mobile-only or web-only.** The web dashboard has no claim submission, petty cash floats or company spending pages. Category management and imports are web-only.
+- **Optional providers fail quietly.** Without the R2 settings, uploads return 503. Without Telnyx, payout phones can't be confirmed. Without Resend, every email fails cleanly. Without `ALERT_EMAILS`, alerts are only logged.
+- **System health shows one job.** Only `reconcile-paycrest` records a heartbeat, so the Ops health page lists just that job.
+
+## Planned after the MVP: USD accounts and company cards
+
+Added to the [MVP spec's roadmap](docs/expense-mvp-spec.md#later) on 2026-11-06; neither is in the implementation guide. Both need answers from the provider before going to production. The questions are listed in the spec's [To settle](docs/expense-mvp-spec.md#to-settle) section.
+
+- [ ] **USD bank accounts (Polygon Open Money Stack):** each company gets its own US account details, and ACH and wire deposits arrive in its wallet as USDC.
+  - **Where:** Polygon blocks Kenya for bank-rail flows, checking the company's address and its owners' addresses. This launches for companies outside Kenya and reaches Kenya if Polygon lifts the block. Nigeria, Ghana, Uganda, Tanzania, Rwanda, South Africa, Zambia, Egypt and Morocco aren't on Polygon's blocked lists.
+  - **In the product:** the company's country decides whether an admin sees the USD account option.
+  - **To confirm:** deposits settling as USDC on Base, fees, and early access.
+- [ ] **Company cards (Lithic):** built on Lithic's sandbox, including company-held cards for subscriptions ([decision](docs/decisions/company-held-cards.md)); no production path yet. Virtual and physical staff cards with per-card limits, funded from the company's USDC.
+  - **Funding:** through Lithic's stablecoin pilot (USDC on Base), or by approving each card payment against the company wallet in real time.
+  - **What it unlocks:** paying card-only subscriptions, and the card-transaction linking listed under Part 1 below.
+  - **Money safety:** staff pay without an admin passkey for each payment, so cards need their own named purpose and limits in the spec's [money-safety rules](docs/expense-mvp-spec.md#7-money-safety).
+  - **To confirm:** issuing to Kenyan companies and staff, and pricing.
 
 ## Pending to complete the current MVP
 
@@ -276,6 +561,8 @@ The mobile app needs a native development build for its native integrations. Dep
 
 ## Docs
 
+- [NEAR main chain](docs/decisions/near-main-chain.md): the port's design and trade-offs; other decisions sit beside it in [`docs/decisions`](docs/decisions).
+- [Architecture diagrams](docs/architecture): PNGs and Mermaid sources, drawn before the NEAR port.
 - [MVP spec](docs/expense-mvp-spec.md): agreed Kenya spending scope, flows, data model and go-live checklist.
 - [Build plan](docs/expense-mvp-build-plan.md): 51 ordered tasks and acceptance checkpoints.
 - [Build handoffs](docs/handoffs/README.md): implementation notes and QA by phase.

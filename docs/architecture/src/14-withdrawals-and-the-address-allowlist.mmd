@@ -1,0 +1,21 @@
+flowchart TD
+  subgraph Allowlist["Allowlist change · /organizations/:id/withdrawal-addresses"]
+    A1["POST /changes<br/>add or remove · EVM address · label"] --> A2["Admin check"]
+    A2 --> A3["startApproval(change_allowlist)"]
+    A3 --> A4["Passkey"]
+    A4 --> A5["POST /changes/:challengeId/confirm<br/>verifyApproval + intent hash"]
+    A5 --> A6["Add: insert confirmed address<br/>Remove: set removedAt"]
+    A6 --> A7["Audit withdrawal_address.added / .removed"]
+  end
+
+  subgraph Withdraw["Withdrawal · /organizations/:id/withdrawals"]
+    W1["POST / {requestId, addressId, amountUsdc}"] --> W2["Not paused · address active · wallet active<br/>amount ≤ balance − reserved"]
+    W2 --> W3["preparePayouts: subject withdrawal<br/>key withdrawal:&lt;requestId&gt;"]
+    W3 --> W4["requestPayoutApproval → passkey challenge"]
+    W4 --> W5["POST /:challengeId/confirm → approveAndPay<br/>alone in its batch · exempt from daily cap"]
+    W5 --> W6["fundOnchainPayout → Privy sendUsdc"]
+    W6 --> W7["confirm-onchain job → paid / needs_review"]
+  end
+
+  A7 -. "only allowlisted addresses" .-> W2
+  USDCP["USDC payees on bills"] -. "must be allowlisted too" .-> A6

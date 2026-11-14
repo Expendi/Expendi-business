@@ -1,0 +1,27 @@
+flowchart LR
+  LOGIN["/ · Privy email login<br/>POST /internal/session · GET /internal/me"] --> NAV["Staff layout"]
+
+  NAV --> P1["/companies<br/>search · paused filter"]
+  NAV --> P2["/companies/[id]<br/>details · pause one company"]
+  NAV --> P3["/companies/[id]/imports"]
+  NAV --> P4["/companies/[id]/zoho<br/>link · organization · mapping<br/>syncs · requeue · disconnect"]
+  NAV --> P5["/payouts<br/>needs_review + failed queue"]
+  NAV --> P6["/payouts/[id]<br/>ledger · audit trail · re-fetch · resolve"]
+  NAV --> P7["/alerts"]
+  NAV --> P8["/health<br/>job heartbeats"]
+  NAV --> P9["/controls<br/>pause all or one company"]
+  NAV --> P10["/audit-log<br/>search"]
+  NAV --> P11["/zoho-books<br/>company ID → /companies/[id]/zoho"]
+
+  P1 --> I1["GET /internal/companies"]
+  P2 --> I2["GET /internal/companies/:id<br/>pause prepare + confirm"]
+  P3 --> I3["POST …/imports/preview · commit"]
+  P4 --> I4["…/zoho: GET · syncs · organizations · accounts<br/>POST connect-link · organization · requeue · disconnect<br/>PUT mapping"]
+  P5 --> I5["GET /internal/payouts"]
+  P6 --> I6["GET /internal/payouts/:id<br/>POST refetch · resolve/prepare · resolve/confirm"]
+  P7 --> I7["GET /internal/alerts"]
+  P8 --> I8["GET /internal/health"]
+  P9 --> I9["GET /internal/controls<br/>pause / unpause prepare + confirm"]
+  P10 --> I10["GET /internal/audit"]
+
+  I2 & I6 & I9 --> CONF["staff_confirmations<br/>resolve_payout · pause_payouts · unpause_payouts"]

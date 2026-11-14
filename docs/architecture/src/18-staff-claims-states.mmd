@@ -1,0 +1,12 @@
+stateDiagram-v2
+  direction LR
+  [*] --> submitted: submitClaim or float overspend
+  submitted --> rejected: admin rejects
+  rejected --> submitted: owner edits
+  submitted --> paying: approved
+  paying --> paid: payout paid
+  paying --> payout_failed: payout failed
+  payout_failed --> paying: retry approved
+  paid --> [*]
+  [*] --> paid_outside: spreadsheet import only
+  [*] --> recorded: company or float spending
