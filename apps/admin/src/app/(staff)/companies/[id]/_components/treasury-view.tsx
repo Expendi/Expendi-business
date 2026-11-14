@@ -305,11 +305,22 @@ const phoneOnlyLabel = "text-muted-foreground sm:hidden";
 const moveGrid =
   "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 sm:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))_1.25rem]";
 
-function MoveFigure({ label, value }: { label: string; value: string }) {
+function MoveFigure({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+}) {
   return (
-    <div className="hidden text-right tabular-nums sm:block">
+    <div className="hidden text-right whitespace-nowrap tabular-nums sm:block">
       <span className="sr-only">{label} </span>
       {value}
+      {note ? (
+        <span className="block text-xs text-muted-foreground">{note}</span>
+      ) : null}
     </div>
   );
 }
@@ -346,7 +357,8 @@ function Move({
         </div>
         <MoveFigure
           label="Asked"
-          value={`${move.isAll ? "All, " : ""}${formatUsdc(move.requestedUsdc)}`}
+          value={formatUsdc(move.requestedUsdc)}
+          note={move.isAll ? "all of it" : undefined}
         />
         <MoveFigure
           label={move.direction === "to_treasury" ? "In the vault" : "Credited"}
